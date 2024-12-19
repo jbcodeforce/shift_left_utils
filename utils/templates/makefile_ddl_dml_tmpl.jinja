@@ -1,0 +1,49 @@
+include ../../../common.mk
+
+# --- {{ table_name }}
+
+# --- Entry point
+create_{{ table_name }}: create_flink_ddl  create_flink_dml
+
+
+# --- Topic used as source
+create_topics: create_topic_{{ table_name }}
+
+create_topic_{{ table_name }}:
+	@confluent kafka topic create {{ table_name }} --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
+
+delete_topic_{{ table_name }}:
+	@confluent kafka topic delete {{ table_name }} --force; 
+
+list_record_data_from_topic:
+	$(call list_topic_content, {{ table_name }})
+
+
+
+create_{{ table_name }}: create_flink_ddl  create_flink_dml
+
+create_flink_ddl: 
+	$(call create_flink_statement, ddl-{{ statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
+
+delete_flink_ddl:
+	$(call delete_flink_statement, ddl-{{ statement_name }})
+
+create_flink_dml:
+	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
+
+delete_flink_dml:
+	$(call delete_flink_statement, dml-{{ statement_name }})
+
+pause_flink_dml:
+	$(call pause_flink_statement dml-{{ statement_name }})
+
+resume_flink_dml:
+	$(call resume_flink_statement dml-{{ statement_name }})
+
+delete_schemas:
+	$(call delete_schema, {{ table_name }}-value)
+	$(call delete_schema, {{ table_name }}-key)
+
+delete_flink_statements: delete_flink_ddl delete_flink_dml
+
+delete_data: delete_schemas delete_topic_{{ table_name }}

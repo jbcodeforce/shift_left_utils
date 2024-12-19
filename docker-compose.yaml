@@ -1,0 +1,16 @@
+services:
+  ollama:
+    image: ollama/ollama
+    hostname: ollama
+    volumes:
+      - ./start-ollama.sh:/start-ollama.sh
+    container_name: ollama
+    entrypoint: ["/usr/bin/bash", "/start-ollama.sh"]
+    ports:
+      - 11434:11434
+  pythonenv:
+    image: jbcodeforce/shift-left-utils
+    hostname: pythonenv
+    container_name: pythonenv
+    volumes:
+      - .:/app

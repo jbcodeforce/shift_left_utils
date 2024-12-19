@@ -1,0 +1,20 @@
+
+CREATE TABLE {{ table_name }}_dedup (
+  PRIMARY KEY(__db) NOT ENFORCED
+) DISTRIBUTED BY (__db) INTO 1 BUCKETS
+WITH (
+    'changelog.mode' = 'upsert',
+    'value.fields-include' = 'all'
+) AS SELECT
+    *,
+    -- change key and add columns
+FROM (
+    select
+      *,
+      ROW_NUMBER() OVER (
+        PARTITION BY `__db`
+        ORDER
+          BY $rowtime ASC
+      ) AS row_num
+    FROM {{ table_name }}_raw
+) WHERE row_num = 1;

@@ -1,0 +1,64 @@
+include ../../common.mk
+
+# --- {{ table_name }}
+
+# --- Entry point
+create_{{ table_name }}: create_flink_ddl  create_flink_dml
+
+#
+# --- utility targets:
+#
+create_topics: create_topic_{{ table_name }}
+
+create_topic_{{ table_name }}:
+	@confluent kafka topic create {{ table_name }}_raw --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
+	@confluent kafka topic create {{ table_name }}_dedup --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
+
+delete_topic_{{ table_name }}_raw:
+	@confluent kafka topic delete {{ table_name }}_raw --force; 
+
+delete_topic_{{ table_name }}_deduped:
+	@confluent kafka topic delete {{ table_name }}_deduped --force; 
+
+list_record_data_from_topic:
+	$(call list_topic_content, {{ table_name }}_raw)
+
+
+create_flink_ddl: 
+	$(call create_flink_statement, ddl-{{ statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
+
+delete_flink_ddl:
+	$(call delete_flink_statement, ddl-{{ statement_name }})
+
+create_flink_dml:
+	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
+
+delete_flink_dml:
+	$(call delete_flink_statement, dml-{{ statement_name }})
+
+pause_flink_dml:
+	$(call pause_flink_statement dml-{{ statement_name }})
+
+resume_flink_dml:
+	$(call resume_flink_statement dml-{{ statement_name }})
+	
+delete_dedup:
+	$(call delete_schema, {{ table_name }}_deduped-value)
+	$(call delete_schema, {{ table_name }}_deduped-key)
+
+delete_raw:
+	$(call delete_schema, {{ table_name }}_raw-value)
+	$(call delete_schema, {{ table_name }}_raw-key)
+
+#
+# --- Different cleaning aggregate targets:
+#
+delete_flink_statements: delete_flink_ddl delete_flink_dml
+
+delete_data: delete_dedup delete_raw delete_topic_{{ table_name }}
+
+delete_data_from_raw: delete_raw delete_topic_{{ table_name }}
+
+delete_data_from_dedup: delete_dedup delete_topic_{{ table_name }}_dedup
+
+delete_data: delete_data_from_raw delete_data_from_dedup  

@@ -1,0 +1,10 @@
+
+CREATE TABLE {{ table_name }}_dedup (
+  PRIMARY KEY(id) NOT ENFORCED
+) DISTRIBUTED BY (id) INTO 1 BUCKETS
+WITH (
+    'changelog.mode' = 'upsert',
+    'value.fields-include' = 'all'
+) AS SELECT
+    *
+FROM {{ table_name }}_raw;
