@@ -120,7 +120,8 @@ def define_flink_sql_agent():
         print(f"\n--- Start translator Agent ---")
         prompt = ChatPromptTemplate.from_template(translator_template) 
         chain = prompt | model 
-        flink_sql = chain.invoke(state)
+        llm_out = chain.invoke(state)
+        flink_sql = remove_noise_in_sql(llm_out)
         print(f"\n--- Done translator Agent: \n{flink_sql}")
         return {"flink_sql": flink_sql}
 

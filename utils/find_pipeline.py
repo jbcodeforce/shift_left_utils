@@ -34,13 +34,29 @@ def process_files_from_queue():
     else:
         return dependency_list
 
+def generate_tracking_output(file_name: str, dep_list) -> str:
+    the_path= Path(file_name)
+
+    table_name = the_path.stem
+    output=f"""## Tracking the pipeline implementation for table: {table_name}
+    
+    -- Processed file: {file_name}
+    --- DDL of the table -> NOT_TESTED | OK
+    --- DML of the table -> NOT_TESTED | OK
+    --- Final result is a list of tables in the pipeline: 
+    
+    """
+    output+="\n NOT_TESTED | OK ".join(str(d) for d in dep_list)
+    output+="\n\n## Data\n"
+    output+="Created with tool and updated to make the final join working on the merge conditions:"
+    return output
+
 if __name__ == "__main__":
     args = parser.parse_args()
     all_files= build_all_file_inventory()
     files_to_process.append(args.file_name)
     dl=process_files_from_queue()
-    print("\n--- Final result is a list of tables in the pipeline: ")
-    for d in dl:
-        print(d)
+    
+    print(generate_tracking_output(args.file_name,dl))
 
         

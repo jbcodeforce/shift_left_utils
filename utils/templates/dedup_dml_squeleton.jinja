@@ -1,5 +1,5 @@
 
-CREATE TABLE {{ table_name }}_dedup (
+CREATE TABLE IF NOT EXIST {{ table_name }}_dedup (
   PRIMARY KEY(__db) NOT ENFORCED
 ) DISTRIBUTED BY (__db) INTO 1 BUCKETS
 WITH (

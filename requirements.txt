@@ -2,3 +2,6 @@ langgraph
 langchain-core
 confluent-kafka[avro]
 coloredlogs
+pydantic
+pyyaml
+pydantic-avro

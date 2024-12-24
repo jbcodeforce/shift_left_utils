@@ -1,0 +1,1 @@
+confluent kafka topic consume $1 --cluster $CLUSTER_ID --environment $ENV_ID --from-beginning
