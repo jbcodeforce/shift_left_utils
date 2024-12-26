@@ -4,7 +4,7 @@ from pydantic_avro.base import AvroBase
 from datetime import datetime
 import json
 from confluent_kafka.schema_registry import SchemaRegistryClient, Schema
-from confluent_kafka.schema_registry.avro import AvroSerializer
+
 from app_config import read_config
 
 SQLS_PATH="../flink_sqls/tmp"

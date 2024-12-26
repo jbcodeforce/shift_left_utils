@@ -22,16 +22,16 @@ def list_sql_files(folder_path: str) -> set[str]:
     return sql_files
 
 def build_all_file_inventory() -> set[str]:
-    file_paths=list_sql_files("../../de-datawarehouse-main/models/intermediates")
-    file_paths.update(list_sql_files("../../de-datawarehouse-main/models/dimensions"))
-    file_paths.update(list_sql_files("../../de-datawarehouse-main/models/stage"))
-    file_paths.update(list_sql_files("../../de-datawarehouse-main/models/facts"))
-    file_paths.update(list_sql_files("../../de-datawarehouse-main/models/sources"))
-    file_paths.update(list_sql_files("../../de-datawarehouse-main/models/dedups"))
+    file_paths=list_sql_files("../dbt-src/models/intermediates")
+    file_paths.update(list_sql_files("../dbt-src/models/dimensions"))
+    file_paths.update(list_sql_files("../dbt-src/models/stage"))
+    file_paths.update(list_sql_files("../dbt-src/models/facts"))
+    file_paths.update(list_sql_files("../dbt-src/models/sources"))
+    file_paths.update(list_sql_files("../dbt-src/models/dedups"))
    
     return file_paths
 
-def search_table_in_inventory(table_name: str, inventory: set[str]) -> str:
+def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:
     """
     :return: the path to access the sql file for the matching table: the filename has to match the table
     """
@@ -46,8 +46,8 @@ def update_with_uri(file: str):
     """
     new_lines=set()
     file_paths=build_all_file_inventory()
-    with open(file, 'r') as file:
-        old_entries=set(line.strip() for line in file)
+    with open(file, 'r') as f:
+        old_entries=set(line.strip() for line in f)
         for base_name in old_entries:
             found=False
             for apath in file_paths:

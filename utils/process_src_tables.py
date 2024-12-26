@@ -15,6 +15,7 @@ import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
 from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files
 from clean_sql import process_ddl_file
+from kafka.app_config import get_config
 
 TMPL_FOLDER="./templates"
 TABLES_TO_PROCESS="./process_out/tables_to_process.txt"
@@ -300,6 +301,7 @@ def proces_from_table_name(args):
     
 if __name__ == "__main__":
     args = parser.parse_args()
+    if 
     if args.ld:
         list_dependencies(args.folder_path, True)
         sys.exit()

@@ -1,7 +1,10 @@
 langgraph
 langchain-core
+langchain
+langchain-ollama
 confluent-kafka[avro]
 coloredlogs
 pydantic
 pyyaml
 pydantic-avro
+jinja2

@@ -2,6 +2,7 @@ from process_src_tables import list_dependencies
 from find_path_for_table import build_all_file_inventory, search_table_in_inventory
 import os, argparse
 from collections import deque
+from pathlib import Path
 
 files_to_process= deque()
 dependency_list = set()
@@ -13,7 +14,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-f', '--file_name', required=True, help="name of the file of the sink table")
 
-def process_files_from_queue():
+def process_files_from_queue(files_to_process, all_files):
     """
     For each file in the queue get the parents (dependencies) of the table
     declare in the file. Get the matching file name in the dbt project of each of those parent table,
@@ -30,7 +31,7 @@ def process_files_from_queue():
                 files_to_process.append(matching_sql_file)
             else:
                 dependency_list.add((dep,None))
-        return process_files_from_queue()
+        return process_files_from_queue(files_to_process,all_files)
     else:
         return dependency_list
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_files= build_all_file_inventory()
     files_to_process.append(args.file_name)
-    dl=process_files_from_queue()
+    dl=process_files_from_queue(files_to_process,all_files)
     
     print(generate_tracking_output(args.file_name,dl))
 

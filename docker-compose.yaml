@@ -12,5 +12,11 @@ services:
     image: jbcodeforce/shift-left-utils
     hostname: pythonenv
     container_name: pythonenv
+    entrypoint: ["/usr/bin/bash"]
+    environment:
+      - CONFIG_FILE=config.yaml
     volumes:
-      - .:/app
+      - ./pipelines/:/app/pipelines
+      - ./staging/:/app/staging
+      - ./config.yaml:/app/config.yaml
+      - ./dbt-src/:/app/dbt-src  # change this one

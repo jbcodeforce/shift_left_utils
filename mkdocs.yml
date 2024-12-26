@@ -1,0 +1,67 @@
+site_name: Shift Left Utilities
+repo_url: https://github.com/jbcodeforce/shift_left_utils
+site_url: https://jeromeboyer.net/shift_left_utils
+copyright: Copyright &copy; 2024 Jerome Boyer
+nav:
+  - Introduction: index.md
+  - Setup: setup.md
+theme: 
+  name: material
+  logo: assets/logo.drawio.png
+  favicon: assets/logo.drawio.png
+  palette:
+    scheme: default
+  language: en
+  features:
+      - content.code.annotate
+      - content.code.copy
+      - content.tooltips
+      - content.code.copy
+      - search.highlight
+      - navigation.instant
+      - navigation.instant.progress
+      # - navigation.tabs
+      # - navigation.tabs.sticky
+      - navigation.instant
+      - navigation.tracking
+      # - navigation.sections
+      #- navigation.expand
+      - navigation.top
+      - navigation.footer
+extra_css: ["extra.css"]
+plugins:
+  - search:
+      lang: en
+  - minify:
+      minify_html: true
+markdown_extensions:
+  - abbr
+  - attr_list
+  - md_in_html
+  - admonition
+  - codehilite
+  - footnotes
+  - tables
+  - pymdownx.smartsymbols
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.tabbed
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: 'https://github.com/jbcodeforce'
+    - icon: fontawesome/brands/linkedin
+      link: 'https://linkedin.com/in/jeromeboyer'
+    - icon: fontawesome/solid/paper-plane
+      mailto: jerome@intelligent-automations.com

@@ -11,7 +11,7 @@ coloredlogs.install()
 
 TESTS_FOLDER="tests"
 DATA_FN="data.json"
-CONFIG_FILE="config.yaml"
+CONFIG_FILE="../config.yaml"
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
@@ -26,7 +26,7 @@ The goal of this tool is to read test data for a given source, send them to the
 corresponding Kafka Topic in Confluent Cloud, taking into account the schema registry
 """
 
-def specific_shema(sr_client, subject_name: str) -> str:
+def specific_shema(sr_client, subject_name: str) -> str | None:
     try:
         schema_version = sr_client.get_latest_version(subject_name)
         schema_def = schema_version.schema   # instance of confluent_kafka.schema_registry.schema_registry_client.Schema
@@ -94,7 +94,7 @@ def process_test_data(kafka_producer, src_table_name: str, topic_name: str):
             logging.info(f"Produced message to topic {topic_name}: key = {record["key"]} value = {record["value"]}")
             kafka_producer.flush()
 
-def prepare_producer(config,topic_name):   
+def prepare_producer(config: dict, topic_name: str):   
 
     registry_client=SchemaRegistryClient({"url": config["registry"]["url"], 
                                    "basic.auth.user.info":  config["registry"]["registry_key_name"]+":"+config["registry"]["registry_key_secret"]})
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     """
     args = parser.parse_args()
     config=read_config(CONFIG_FILE)
-    kafka_producer = prepare_producer(config,args.topic_name)
+    kafka_producer = prepare_producer(config, args.topic_name)
     process_test_data(kafka_producer, args.src_table_name, args.topic_name)
     print("Done !")
     
