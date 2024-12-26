@@ -1,8 +1,8 @@
 # Shift left Tools and AI utilities
 
-Shift Left means taking bach-processing jobs and try to refactor them to real-time processing using a product such as Apache Flink. In batch processing a lot of projects use SQL and dbt (Data build tool) to define the logic of the data pipeline. In real-time processing, Apache Kafka is a de-facto middleware to persist immutable records, and for SQL, Python and Java based real-time processing, Apache Flink is also the preferred platform.
+This repository includes a set of tools to help refactoring SQL batch processing to real-time prodessing using Apache Flink. 
 
-[Read in book format]()
+[Read the utility documentation in book format](https://jbcodeforce.github.io/shift_left_utils/).
 
 Working on this kind of refactoring projects is taking some time and are challenging. AI Agentic solution should help data engineers to shift their data pipelines to the real-time processing by offering SQL translation tools.
 
@@ -18,15 +18,3 @@ To avoid calling remote LLM, the current repository use Ollama, running locally,
 * [x] A docker image for the python environment to run the existing python tools
 * [x] A docker compose file to run Ollama and the python environment to be able to do dbt refactoring 
 * [x] A set of python tools to do code generation
-
-## Set up
-
-
-
-## Kafka tools
-
-### Running the Kafka consumer
-
-```sh
-python kafka_avro_consumer.py -t topic_name
-```
