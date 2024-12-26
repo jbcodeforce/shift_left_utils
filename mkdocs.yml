@@ -5,6 +5,8 @@ copyright: Copyright &copy; 2024 Jerome Boyer
 nav:
   - Introduction: index.md
   - Setup: setup.md
+  - Commands: commands.md
+  - Migration Process: migration.md 
 theme: 
   name: material
   logo: assets/logo.drawio.png
