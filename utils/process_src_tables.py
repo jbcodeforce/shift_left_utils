@@ -301,7 +301,8 @@ def proces_from_table_name(args):
     
 if __name__ == "__main__":
     args = parser.parse_args()
-    if 
+    config=get_config()
+    create_folder_if_not_exist(config["app"]["report_output_dir"])
     if args.ld:
         list_dependencies(args.folder_path, True)
         sys.exit()

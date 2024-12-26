@@ -14,7 +14,7 @@ services:
     container_name: pythonenv
     entrypoint: ["/usr/bin/bash"]
     environment:
-      - CONFIG_FILE=config.yaml
+      - CONFIG_FILE=/app/config.yaml
     volumes:
       - ./pipelines/:/app/pipelines
       - ./staging/:/app/staging

@@ -2,10 +2,10 @@ import yaml
 import os
 from functools import lru_cache
 
-_config = None
+_config = {}
 
 @lru_cache
-def get_config(fn: str = "config.yaml"):
+def get_config(fn: str = "config.yaml") -> dict[str, str]:
   """_summary_
   reads the client configuration from config.yaml
   Args:
@@ -18,4 +18,4 @@ def get_config(fn: str = "config.yaml"):
       if CONFIG_FILE:
         with open(fn) as f:
           _config=yaml.load(f,Loader=yaml.FullLoader)
-      return _config
+  return _config

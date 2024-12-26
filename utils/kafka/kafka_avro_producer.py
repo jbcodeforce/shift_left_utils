@@ -2,7 +2,7 @@ from confluent_kafka import  SerializingProducer
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 
-from app_config import read_config
+from app_config import get_config
 import os, argparse
 import json
 import coloredlogs, logging
@@ -11,7 +11,7 @@ coloredlogs.install()
 
 TESTS_FOLDER="tests"
 DATA_FN="data.json"
-CONFIG_FILE="../config.yaml"
+CONFIG_FILE="./config.yaml"
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
