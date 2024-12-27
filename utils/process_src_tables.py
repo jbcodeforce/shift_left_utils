@@ -133,7 +133,7 @@ def get_dependencies(table_name, dbt_script_content) -> list[str]:
     For a given table and dbt script content, get the dependent tables using the dbt { ref: } template
     """
     dependencies = []
-    dependency_names = parse_sql(table_name,dbt_script_content)
+    dependency_names = parse_sql(table_name, dbt_script_content)
 
     if (len(dependency_names) > 0):
         print("Dependencies found:")
@@ -181,7 +181,7 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     create_ddl_squeleton(table_name,f"{table_folder}/tests")
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
     create_makefile(table_name, "tests", "dedups", table_folder)
-    merge_items_in_processing_file([table_name], TABLES_TO_PROCESS)
+    merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
 def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent: bool = False):
@@ -202,13 +202,13 @@ def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent:
     with open(src_file_name) as f:
         sql_content= f.read()
         parents=get_dependencies(table_name, sql_content)
-        merge_items_in_processing_file(parents,TABLES_TO_PROCESS)
+        merge_items_in_reporting_file(parents,TABLES_TO_PROCESS)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
         save_dml_ddl(table_folder, table_name, dml, ddl)
         # not sure we want that: merge_items_in_processing_file([table_name], TABLES_DONE)
     if walk_parent:
         for parent in parents:
-            proces_from_table_name(parent, target_path, walk_parent)
+            process_from_table_name(parent, target_path, walk_parent)
 
 
 
@@ -252,7 +252,7 @@ def process_one_file(src_file: str, target_folder: str, process_dependency: bool
     select_src_sql_file_processing(src_file, sources_path, process_dependency)
 
 
-def merge_items_in_processing_file(dependencies: list[str], persistent_file):
+def merge_items_in_reporting_file(dependencies: list[str], persistent_file):
     """
     using the existing persistenc_file, save the dependency in the list of dependencies if not present in the file
     The file contains as a first column the name of the dependencies
@@ -283,14 +283,14 @@ def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
             sql_content= f.read()
             l=get_dependencies(table_name, sql_content)
             if persist_dependencies:
-                merge_items_in_processing_file(l,TABLES_TO_PROCESS)
+                merge_items_in_reporting_file(l,TABLES_TO_PROCESS)
             return l
     else:
         # loop over the files in the folder
         for file in list_sql_files(file_or_folder):
             list_dependencies(file)
 
-def proces_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool):
+def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool):
     """
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
@@ -298,7 +298,8 @@ def proces_from_table_name(table_name: str, pipeline_folder_path: str, walk_pare
     :param: the program argument with the table name
     """
     all_files= build_all_file_inventory()
-    matching_sql_file=search_table_in_inventory(table_name,all_files)
+
+    matching_sql_file=search_table_in_inventory(table_name, all_files)
     if matching_sql_file:
         print(f"Start processing the table: {table_name} from the dbt file: {matching_sql_file}")
         process_one_file(matching_sql_file, pipeline_folder_path, walk_parent)
@@ -323,7 +324,7 @@ if __name__ == "__main__":
         else:    
             process_files_in_folder(args)
     elif args.table_name:
-        proces_from_table_name(args.table_name, args.pipeline_folder_path, args.pd)
+        process_from_table_name(args.table_name, args.pipeline_folder_path, args.pd)
 
     print("\n\nDone !")
     

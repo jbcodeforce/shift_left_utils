@@ -106,7 +106,7 @@ def remove_noise_in_sql(sql: str) -> str:
     """
     remove final AS ( and SELECT * FROM final
     """
-    newone=sql.replace("final AS (","").replace("CURRENT_DATE()", "event_ts")
+    newone=sql.replace(" final AS (","").replace("CURRENT_DATE()", "event_ts")
     return newone.replace("SELECT * FROM final","")
 
 

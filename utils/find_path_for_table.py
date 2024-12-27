@@ -1,4 +1,6 @@
 import os
+from functools import lru_cache
+
 TABLES_TO_PROCESS="./process_out/tables_to_process.txt"
 
 """
@@ -21,20 +23,22 @@ def list_sql_files(folder_path: str) -> set[str]:
                 sql_files.add(os.path.join(root, file))   
     return sql_files
 
+@lru_cache
 def build_all_file_inventory() -> set[str]:
-    src_path=os.getenv("SRC_FOLDER","../dbt-src")
-    file_paths=list_sql_files(f"{src_path}/models/intermediates")
-    file_paths.update(list_sql_files(f"{src_path}/models/dimensions"))
-    file_paths.update(list_sql_files(f"{src_path}/models/stage"))
-    file_paths.update(list_sql_files(f"{src_path}/models/facts"))
-    file_paths.update(list_sql_files(f"{src_path}/models/sources"))
-    file_paths.update(list_sql_files(f"{src_path}/models/dedups"))
+    src_path=os.getenv("SRC_FOLDER","../dbt-src/models")
+    file_paths=list_sql_files(f"{src_path}/intermediates")
+    file_paths.update(list_sql_files(f"{src_path}/dimensions"))
+    file_paths.update(list_sql_files(f"{src_path}/stage"))
+    file_paths.update(list_sql_files(f"{src_path}/facts"))
+    file_paths.update(list_sql_files(f"{src_path}/sources"))
+    file_paths.update(list_sql_files(f"{src_path}/dedups"))
     return file_paths
 
 def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:
     """
     :return: the path to access the sql file for the matching table: the filename has to match the table
     """
+    #print(f"Search {table_name} in {inventory}")
     for apath in inventory:
         if table_name+'.' in apath:
             return apath
