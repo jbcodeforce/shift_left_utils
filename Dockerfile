@@ -4,6 +4,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 ENV PYTHONPATH=/app
 RUN apt-get update && apt-get install -y cargo vim
+RUN echo "alias ll='ls -al'" >> ~/.bashrc
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 COPY ./utils/requirements.txt /app/requirements.txt

@@ -18,8 +18,8 @@ from clean_sql import process_ddl_file
 from kafka.app_config import get_config
 
 TMPL_FOLDER="./templates"
-TABLES_TO_PROCESS="./process_out/tables_to_process.txt"
-TABLES_DONE="./process_out/tables_done.txt"
+TABLES_TO_PROCESS="./reports/tables_to_process.txt"
+TABLES_DONE="./reports/tables_done.txt"
 CREATE_TABLE_TMPL="create_table_squeleton.jinja"
 #DML_DEDUP_TMPL="dedup_dml_squeleton.jinja"
 DML_DEDUP_TMPL="dml_to_upsert.jinja"
@@ -302,7 +302,12 @@ def proces_from_table_name(args):
 if __name__ == "__main__":
     args = parser.parse_args()
     config=get_config()
-    create_folder_if_not_exist(config["app"]["report_output_dir"])
+    REPORT_DIR: str=config["app"]["report_output_dir"]
+    create_folder_if_not_exist(REPORT_DIR)
+    TABLES_TO_PROCESS=f"{REPORT_DIR}/tables_to_process.txt"
+    create_folder_if_not_exist(TABLES_TO_PROCESS)
+    TABLES_DONE=f"{REPORT_DIR}/tables_done.txt"
+    create_folder_if_not_exist(TABLES_DONE)
     if args.ld:
         list_dependencies(args.folder_path, True)
         sys.exit()
