@@ -62,6 +62,9 @@ Keep all the select statement defined with WITH keyword.
 
 Do not add suggestions or explanations in the response, just return the structured sql output.
 
+Do not use VARCHAR prefer STRING. 
+Do not wrap CONCAT statement with SHA.
+
 Start the generated code with:
 
 INSERT INTO {table_name}
@@ -83,8 +86,10 @@ statement from the current flink sql insert into statement like:
 
 {flink_sql}
 
-The resulting ddl for the table {table_name} should include STRING for any _id column
-and VARCHAR as STRING. 
+The resulting ddl for the table {table_name} should include STRING for any _id column.
+
+Do not use VARCHAR prefer STRING. 
+Do not wrap CONCAT statement with SHA.
 
 Finish the statement with the following declaration:
 
@@ -142,7 +147,8 @@ def define_flink_sql_agent():
         print(f"\n--- Start ddl_generation Agent ---")
         prompt = ChatPromptTemplate.from_template(flink_ddl_generation_template) 
         chain = prompt | model 
-        derived_ddl = chain.invoke(state)
+        llm_out = chain.invoke(state)
+        derived_ddl = remove_noise_in_sql(llm_out)
         print(f" --- Done DDL generator Agent:\n{derived_ddl}")
         return {"derived_ddl": derived_ddl}
 

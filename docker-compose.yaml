@@ -4,6 +4,7 @@ services:
     hostname: ollama
     volumes:
       - ./start-ollama.sh:/start-ollama.sh
+      - ./ollama:/root/.ollama
     container_name: ollama
     entrypoint: ["/usr/bin/bash", "/start-ollama.sh"]
     ports:
@@ -17,6 +18,7 @@ services:
       - CONFIG_FILE=/app/config.yaml
       - LLM_MODEL=qwen2.5-coder:32b
       - LLM_BASE_URL=http://ollama:11434
+      - SRC_FOLDER=/app/dbt-src
     volumes:
       - ./pipelines/:/app/pipelines
       - ./staging/:/app/staging

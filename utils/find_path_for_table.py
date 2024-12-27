@@ -22,13 +22,13 @@ def list_sql_files(folder_path: str) -> set[str]:
     return sql_files
 
 def build_all_file_inventory() -> set[str]:
-    file_paths=list_sql_files("../dbt-src/models/intermediates")
-    file_paths.update(list_sql_files("../dbt-src/models/dimensions"))
-    file_paths.update(list_sql_files("../dbt-src/models/stage"))
-    file_paths.update(list_sql_files("../dbt-src/models/facts"))
-    file_paths.update(list_sql_files("../dbt-src/models/sources"))
-    file_paths.update(list_sql_files("../dbt-src/models/dedups"))
-   
+    src_path=os.getenv("SRC_FOLDER","../dbt-src")
+    file_paths=list_sql_files(f"{src_path}/models/intermediates")
+    file_paths.update(list_sql_files(f"{src_path}/models/dimensions"))
+    file_paths.update(list_sql_files(f"{src_path}/models/stage"))
+    file_paths.update(list_sql_files(f"{src_path}/models/facts"))
+    file_paths.update(list_sql_files(f"{src_path}/models/sources"))
+    file_paths.update(list_sql_files(f"{src_path}/models/dedups"))
     return file_paths
 
 def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:

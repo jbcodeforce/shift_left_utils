@@ -26,11 +26,11 @@ Two important concepts of this practice:
 
 The target environment will be Apache Flink running within the Confluent Cloud as a managed service. The source of the batch processing is defined within a dbt (Data build tool) project and the refactored SQL are produced under the `pipelines` folder.
 
-The following diagram illustrates the development environment:
+The following diagram illustrates the development environment whicj, mainly, uses 2 containers:
 
 ![](./images/environment.drawio.png)
 
-The shift left utils docker images groups a set of Python tools, Python 3.13.1 and the needed libraries, like using LLM client API with Langgraph. The [ollama image](https://hub.docker.com/r/ollama/ollama) is used to run **qwen2.5-coder:32b** LLM model locally on the developer's computer.
+The shift left utils docker image groups a set of Python tools, Python 3.13.1 and the needed libraries to integrate with Ollama, like using LLM client API with Langgraph. The [ollama image](https://hub.docker.com/r/ollama/ollama) is used to run **qwen2.5-coder:32b** LLM model locally on the developer's computer.
 
 Follow the [setup instructions to get started with the migration project](./setup.md).
 
@@ -42,4 +42,50 @@ Any batch pipelines creating tables or files into a Lakehouse platform, may be r
 
 ![](./images/generic_src_to_sink_flow.drawio.png)
 
-This is the target architecture for each pipeline after migration.
+This is the target architecture for each pipeline after migration. This architecture uses a potential sink to  be a Postgresql Database to be used to support business intelligence dashboards. The Flink tables are mapped to Kafka topics. Kafka connectors are used to move data from topic to Postgresql DB. 
+
+From a Confluent Cloud Flink pipeline point of view, the last topic is the sink.
+
+To perform the refactoring, the approach is to start from the sink table and process backward to the sources. Once the sources are identified, the process mya implement a set of deduplication statements, and intermediate steps to apply some business logic or data transformation.
+
+The dbt project contains all the SQL statements for migration, located in the models folder. The objective of the tools is to process these files and replicate the same organizational structure for Flink SQL statements, which includes sources, intermediates, staging, dimensions, and facts. Additionally, the tools aim to automate parts of the migration process.
+
+The target structure will look like in the following example:
+
+```sh
+pipelines
+├── dimensions
+│   └── {application_name}
+│       └── {dimension_name}
+│           ├── Makefile
+│           ├── sql-scripts
+│           │   ├── ddl.{dim_name}.sql
+│           │   └── dml.{dim_trainee}.sql
+│           └── tests
+├── facts
+│   └── {application_name}
+│       └─── {fact_name}
+│           ├── Makefile
+│           ├── sql-scripts
+│           │   ├── ddl.{fact_name}.sql
+│           │   └── dml.{fact_name}.sql
+│           └── tests
+├── intermediates
+│   └── {application_name}
+│       └─── {fact_name}
+│          ├── Makefile
+│          ├── sql-scripts
+│          │   ├── ddl.{intermediate_name}.sql
+│          │   └── dml.{intermediate_name}.sql
+│          └── tests
+├── sources
+│   └── {application_name}
+│       ├── {src_name}
+│           ├── Makefile
+│           ├── dedups
+│           │   └── dml.{src_name}.sql
+│           └── tests
+│               └── ddl.{src_name}.sql
+
+```
+

@@ -32,7 +32,7 @@ parser.add_argument('-f', '--folder_path', required=False, help="name of the fol
 parser.add_argument('-o', '--pipeline_folder_path', required=True, help="name of the folder output of the pipelines")
 parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
 parser.add_argument('-ld', action=argparse.BooleanOptionalAction, default= False, help="For the given file or folder list for each table their table dependancies")
-parser.add_argument('-pd', action=argparse.BooleanOptionalAction, default= False, help="For the given file, process also its dependencies so a full graph is created NOT SUPPORTED")
+parser.add_argument('-pd', action=argparse.BooleanOptionalAction, default= False, help="For the given file, process also its dependencies so a full graph is created. NOT SUPPORTED")
 # Attention pd is for taking a sink and process up to all sources.
 
 # --- utilities functions
@@ -184,7 +184,7 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     merge_items_in_processing_file([table_name], TABLES_TO_PROCESS)
 
 
-def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_parent: bool = False):
+def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent: bool = False):
     """
     Transform stage, fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -194,19 +194,22 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     :param walk_parent: Assess if it needs to process the dependencies
     """
     table_name = extract_table_name(src_file_name)
-    table_folder=f"{source_target_path}/{table_name}"
+    table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/sql-scripts")
     create_folder_if_not_exist(f"{table_folder}/tests")
     create_makefile(table_name, "sql-scripts", "sql-scripts", table_folder)
+    parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()
-        l=get_dependencies(table_name, sql_content)
-        merge_items_in_processing_file(l,TABLES_TO_PROCESS)
+        parents=get_dependencies(table_name, sql_content)
+        merge_items_in_processing_file(parents,TABLES_TO_PROCESS)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
         save_dml_ddl(table_folder, table_name, dml, ddl)
         # not sure we want that: merge_items_in_processing_file([table_name], TABLES_DONE)
     if walk_parent:
-        print("NOT IMPLEMENTED")
+        for parent in parents:
+            proces_from_table_name(parent, target_path, walk_parent)
+
 
 
 
@@ -225,7 +228,7 @@ def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, 
     the source tables have a different processing, so this is the routing function
     """
     print("\n\n-----------------------------")
-    print("\t PROCESS file: {sql_file_path}")
+    print(f"\t PROCESS file: {sql_file_path}")
     if sql_file_path.find("source") > 0:
         process_src_sql_file(sql_file_path, source_target_path)
     else:
@@ -287,25 +290,25 @@ def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
         for file in list_sql_files(file_or_folder):
             list_dependencies(file)
 
-def proces_from_table_name(args):
+def proces_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool):
     """
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
 
-    :param: the program argument with the table name is populated
+    :param: the program argument with the table name
     """
     all_files= build_all_file_inventory()
-    matching_sql_file=search_table_in_inventory(args.table_name,all_files)
+    matching_sql_file=search_table_in_inventory(table_name,all_files)
     if matching_sql_file:
-        print(f"Start processing the table: {args.table_name} from the dbt file: {matching_sql_file}")
-        process_one_file(matching_sql_file, args.pipeline_folder_path, args.pd)
+        print(f"Start processing the table: {table_name} from the dbt file: {matching_sql_file}")
+        process_one_file(matching_sql_file, pipeline_folder_path, walk_parent)
     else:
         print("Matching sql file not found !")
     
 if __name__ == "__main__":
     args = parser.parse_args()
     config=get_config()
-    REPORT_DIR: str=config["app"]["report_output_dir"]
+    REPORT_DIR: str=os.getenv("REPORT_FOLDER", config["app"]["report_output_dir"])
     create_folder_if_not_exist(REPORT_DIR)
     TABLES_TO_PROCESS=f"{REPORT_DIR}/tables_to_process.txt"
     create_file_if_not_exist(TABLES_TO_PROCESS)
@@ -320,7 +323,7 @@ if __name__ == "__main__":
         else:    
             process_files_in_folder(args)
     elif args.table_name:
-        proces_from_table_name(args)
+        proces_from_table_name(args.table_name, args.pipeline_folder_path, args.pd)
 
     print("\n\nDone !")
     
