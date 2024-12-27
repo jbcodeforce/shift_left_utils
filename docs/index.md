@@ -9,6 +9,14 @@ Shift Left means taking bach-processing jobs and try to refactor them to real-ti
 
 To organize batch processing and data pipelines to Datawarehouse, some compagnies are using the [Kimball guidelines](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/) and best practices.
 
+Working on this kind of refactoring projects is taking some time and is challenging. AI Agentic solution should help data engineers to shift their data pipelines to the real-time processing by offering flexible SQL translation tools.
+
+This repository is a tentative to develop and share some of those tools and practices for running such projects.
+
+As of now the utilities are oriented to use Confluent Cloud for Kafka and for Flink, but running local Flink and Kafka should be easy to support.
+
+To avoid calling remote LLM, the current repository uses Ollama, running locally, or potentially in a remote server on-premises or inside a private network.
+
 Two important concepts of this practice:
 
 * **Dimensions** provide the “who, what, where, when, why, and how” context surrounding a business process event. Dimension tables contain the descriptive attributes used by BI applications for ﬁltering and grouping the facts. 

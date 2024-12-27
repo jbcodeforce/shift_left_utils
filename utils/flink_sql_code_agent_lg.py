@@ -49,7 +49,9 @@ def extract_sql_blocks(text) -> str:
     else:
         return text
 
-model = OllamaLLM(model="qwen2.5-coder:32b")
+model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
+llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
+model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
 translator_template = """
 you are qwen-coder an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 

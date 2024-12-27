@@ -15,6 +15,8 @@ services:
     entrypoint: ["/usr/bin/bash"]
     environment:
       - CONFIG_FILE=/app/config.yaml
+      - LLM_MODEL=qwen2.5-coder:32b
+      - LLM_BASE_URL=http://ollama:11434
     volumes:
       - ./pipelines/:/app/pipelines
       - ./staging/:/app/staging
