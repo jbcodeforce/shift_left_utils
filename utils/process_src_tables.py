@@ -40,7 +40,10 @@ def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
         os.makedirs(new_path)
 
-
+def create_file_if_not_exist(new_file):
+    if not os.path.exists(new_file):
+        with open(new_file,"w") as f:
+           f.write("")
 
 
 def create_ddl_squeleton(table_name:str, target_folder: str):
@@ -305,9 +308,9 @@ if __name__ == "__main__":
     REPORT_DIR: str=config["app"]["report_output_dir"]
     create_folder_if_not_exist(REPORT_DIR)
     TABLES_TO_PROCESS=f"{REPORT_DIR}/tables_to_process.txt"
-    create_folder_if_not_exist(TABLES_TO_PROCESS)
+    create_file_if_not_exist(TABLES_TO_PROCESS)
     TABLES_DONE=f"{REPORT_DIR}/tables_done.txt"
-    create_folder_if_not_exist(TABLES_DONE)
+    create_file_if_not_exist(TABLES_DONE)
     if args.ld:
         list_dependencies(args.folder_path, True)
         sys.exit()
