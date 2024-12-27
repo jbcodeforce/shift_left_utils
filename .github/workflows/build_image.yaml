@@ -59,7 +59,7 @@ jobs:
       - name: build docker image
         run: |
           FULL_IMAGE_NAME="${DOCKER_REG}/${DOCKER_R}/${IMAGE_NAME}"
-          docker build  -t ${FULL_IMAGE_NAME}:${IMAGE_TAG}
+          docker build  -t ${FULL_IMAGE_NAME}:${IMAGE_TAG} .
           docker push ${FULL_IMAGE_NAME}:${IMAGE_TAG}
         env:
           DOCKER_U: ${{ secrets.DOCKER_USER }}

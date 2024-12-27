@@ -6,7 +6,7 @@ ENV PYTHONPATH=/app
 RUN apt-get update && apt-get install -y cargo vim
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-COPY ./requirements.txt /app/requirements.txt
+COPY ./utils/requirements.txt /app/requirements.txt
 COPY utils /app/utils
 # RUN apt-get install -u build-essential curl
 
