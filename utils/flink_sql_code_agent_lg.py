@@ -89,7 +89,8 @@ statement from the current flink sql insert into statement like:
 The resulting ddl for the table {table_name} should include STRING for any _id column.
 
 Do not use VARCHAR prefer STRING. 
-Do not wrap CONCAT statement with SHA.
+
+Use CREATE TABLE IF NOT EXIST instead of CREATE TABLE
 
 Finish the statement with the following declaration:
 

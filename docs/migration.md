@@ -1,8 +1,8 @@
 # Migration process
 
-This chapter is going over a simple fact to sources pipeline migration. Be sure to have done the project setup using one of the option as explained [in this note](./setup.md).
+This chapter is going over a simple fact to sources pipeline migration. Be sure to have done the project setup using one of the two option as explained [in this note](./setup.md).
 
-All the dbt source tables are defined in the examples folder. 
+All the dbt source tables are defined in the #SRC_FOLDER folder. 
 
 The method start from a fact table.
 
@@ -27,11 +27,6 @@ Dependencies found:
   - depends on : int_docs_wo_trainingdata
 
 
--- Process file: ../dbt-src/models/intermediates/training_document/int_courses_wo_trainingdata.sql
-Process the table: int_courses_wo_trainingdata
-Dependencies found:
-  - depends on : int_training_data_deduped
-
   ....
 
  NOT_TESTED | OK ('int_training_completed_release', '../dbt-src/models/intermediates/training_document/int_training_completed_release.sql')
@@ -44,7 +39,7 @@ Dependencies found:
 
 ```
 
-From there we can work manually on all those table using some of the LLM tool.
+From there we can work manually on all those tables using some of the LLM tool.
 
 ## 2 - Process a hierarchy from one single sink sql file
 
@@ -58,10 +53,10 @@ The program arguments are:
 | **-o  or --pipeline_folder_path** | name of the folder, output of the sql statement creation. Mandatory |
 | **-t or --table_name** | [optional] name of the table to process - the tool searches for the file in the source project and then processes the sql file. This approach is used when developer use table name instead fo file name. |
 | **-ld** |  default= False, For the given file or folder, list for each table their table dependancies |
-| **-pd** | default= False, For the given file, process also its dependencies so a full graph is created. NOT currently SUPPORTED" |
+| **-pd** | default= False, For the given file, process also its dependencies so a full graph is created. |
 
 
-**Attention** `-pd` is for taking a table and process all its parents, up to all sources: it can be long and creates a lot of files to process. It is not yet fully implemented.
+**Attention** `-pd` is for taking a table and process all its parents, up to all sources: it can be long and creates a lot of files to process. 
 
 The following example will create a DML based on the same logic as the one in the dbt sql script, and will add corresponding DDL to create the sink table:
 
@@ -124,7 +119,20 @@ table_name, Type of dbt, DDL, DML, URI_SRC, URI_TGT
 fct_user_role,fact,T,T,facts/qx/fct_user_role.sql,pipelines/facts/qx/fct_user_role
 ```
 
-## 3 - Process one table at a time
+## 3 - Process one table using the -pd flag
+
+The `process_src_tables.py` has a flag to process the parents from the current fact or dimension table. This will create intermediate tables up to source tables.
+
+It is very helpful but developers need to take care of the semantic of the intermediate table as some can be done in the deduplication DML at the source table. So it is import to work with domain expert to select the best path for implementation.
+
+???+ warning
+    This is when it becomes a little bit tricky, as analysis should lead to refactoring.  Intermediate tables, name starting with `int_`, include some transformation and filtering logic or but also some deduplication.  It was decided to do the deduplication as early as possible. close to the raw data. So when migrating source table, the tool prepare a dml to do the dedup, which means partitioning on the `__db` field and the primary key of the table. It is also leveraging the Flink table changelog format as `upsert` to keet the last record for a given key.
+
+The refactored tables are keeping the same table name and are saved under the -o specificied $STAGING folder. So it may be relevant to move the ddl and dml for the intermediates and source tables to the pipeline path.
+
+Be sure to do update tracking document.
+
+## 4 - Process one table at a time
 
 When taking a fact or dimention table, which is considered as a sink of the pipeline, the `process_src_tables.py` gives the list of dependent tables. The following output is for an example:
 
@@ -138,7 +146,7 @@ Dependencies found:
   - depends on : int_docs_wo_trainingdata
 ```
 
-From there is it possible to use the same tool (with option **-t**) to contimnue walking to the parent hierarchy: We can launch the same tool to process the tables one by one given their name, the tool will search in the source dbt file for the table reference:
+From there is it possible to use the same tool (with option **-t**) to continue walking to the parent hierarchy one step at a time: We can launch the same tool to process the tables, one by one, given their name, the tool will search in the source dbt file for the table reference:
 
 ```sh
 python process_src_tables.py  -t int_training_completed_release  -o $STAGING
@@ -159,7 +167,7 @@ intermediates
         └── tests
 ```
 
-! This is when it becomes a little bit tricky, as analysis should lead to refectoring.  Intermediate tables, name starting with `int_`, include some transformation and filtering logic or but also some deduplication.  It was decided to do the deduplication as early as possible. close to the raw data. So when migrating source table, the tool prepare a dml to do the dedup, which means partitioning on the `__db` field and the primary key of the table. It is also leveraging the Flink table changelog format as `upsert` to keet the last record for a given key.
+
 
 The source table is coming from a topic and the `src_tdc_sys_user.sql` as the following source structure:
 
@@ -187,7 +195,7 @@ The conditions in previous example, use the `limit_tenants` and `limit_ts_ms` wh
 Doing the following command creates the source ddl and dml statements to do the dedups for this source table. The logic of the tool is to look at the table name pattern so `src_` is a source table. We could find a better heuristic in the future.
 
 ```sh
-python process_src_tables.py -t src_tdc_sys_user -o staging/qx
+python process_src_tables.py -t src_tdc_sys_user -o staging
 ```
 
 To complete the dedup logic it is import to understand the dbt dedup macro and the intermediate sql to see if there is something important to add and definitively to get the goof column names used for partitioning.
