@@ -64,10 +64,10 @@ The following example will create a DML based on the same logic as the one in th
 python process_src_tables.py -f $SRC_FOLDER/facts/fct_training_doc.sql -o $STAGING
 ```
 
-The tool also lists the dependencies in term of parent tables, up to the source files as it reuses the same functions of the `find_pipeline.py` script.
+The tool also lists the dependencies in term of parent tables, up to the source files, as the tool reuses the same functions of the `find_pipeline.py` script.
 
 
-For a given table, the tool creates one folder with the table name, a Makefile to help managing the Flink Statements with confluent cli, a `sql-scripts` folder for the Flink ddl and dml statements. A `tests` folder to add `data.json` (using another tool) to do some basic testing.
+For a given table, the tool creates one folder with the table name, a Makefile to help managing the Flink Statements with Confluent cli, a `sql-scripts` folder for the Flink ddl and dml statements. A `tests` folder to add `data.json` (using another tool) to do some basic testing.
 
 Example of created folders:
 
@@ -119,16 +119,19 @@ table_name, Type of dbt, DDL, DML, URI_SRC, URI_TGT
 fct_user_role,fact,T,T,facts/qx/fct_user_role.sql,pipelines/facts/qx/fct_user_role
 ```
 
+The template for the Makefile in the case of Sink table is `utils/templates/makefile_ddl_dml_tmpl.jinja`.
+
 ## 3 - Process one table using the -pd flag
 
 The `process_src_tables.py` has a flag to process the parents from the current fact or dimension table. This will create intermediate tables up to source tables.
 
-It is very helpful but developers need to take care of the semantic of the intermediate table as some can be done in the deduplication DML at the source table. So it is import to work with domain expert to select the best path for implementation.
+It is very helpful but developers need to take care of the semantic of the intermediate tables. It is important to work with domain experts to select the best path for implementation. 
+
 
 ???+ warning
     This is when it becomes a little bit tricky, as analysis should lead to refactoring.  Intermediate tables, name starting with `int_`, include some transformation and filtering logic or but also some deduplication.  It was decided to do the deduplication as early as possible. close to the raw data. So when migrating source table, the tool prepare a dml to do the dedup, which means partitioning on the `__db` field and the primary key of the table. It is also leveraging the Flink table changelog format as `upsert` to keet the last record for a given key.
 
-The refactored tables are keeping the same table name and are saved under the -o specificied $STAGING folder. So it may be relevant to move the ddl and dml for the intermediates and source tables to the pipeline path.
+The refactored tables are keeping the same table name and are saved under the -o specified $STAGING folder. So it may be relevant to move the ddl and dml for the intermediates and source tables to the pipeline path manually after completing the analysis with domain experts.
 
 Be sure to do update tracking document.
 
@@ -146,7 +149,7 @@ Dependencies found:
   - depends on : int_docs_wo_trainingdata
 ```
 
-From there is it possible to use the same tool (with option **-t**) to continue walking to the parent hierarchy one step at a time: We can launch the same tool to process the tables, one by one, given their name, the tool will search in the source dbt file for the table reference:
+From there is it possible to use the same tool (with option **-t**) to continue walking to the parent hierarchy one step at a time: developers can launch the same tool to process the tables, one by one, given their name, the tool will search in the source dbt file for the table reference:
 
 ```sh
 python process_src_tables.py  -t int_training_completed_release  -o $STAGING
@@ -167,8 +170,6 @@ intermediates
         └── tests
 ```
 
-
-
 The source table is coming from a topic and the `src_tdc_sys_user.sql` as the following source structure:
 
 ```sql
@@ -188,9 +189,11 @@ tdc_sys_user as (select * from {{ source('mc_qx','tdc_sys_user') }})
 select * from final
 ```
 
-The tool has identified the source of `int_tdc_sys_user_deduped` is `src_tdc_sys_user` and this sql file uses `tdc_sys_user` as the source table. This source table structure is defined in Databrick, so using Databricks console, we can update the generated DDL to complete the column definitions. 
+The tool has identified the source of `int_tdc_sys_user_deduped` is `src_tdc_sys_user` and this sql file uses `tdc_sys_user` as the source table. This source table structure is defined in Databrick, so using Databricks console, developers can update the generated DDL to complete the column definitions. 
 
-The conditions in previous example, use the `limit_tenants` and `limit_ts_ms` which may not be relevant when running in Flink as this logic is used to filter out records in the batch processing as the order of records is not guarantee. In Kafka topic the records are in append mode so ordered over time and each records with the same key will be in the same topic/partition. 
+The DDL is used for testing, but if you are already connected to a Kafka Cluster where the source topics are already available, then it is prefered to do not use the sources.
+
+The conditions in previous example, use the `limit_tenants` and `limit_ts_ms` which may not be relevant when running in Flink as this logic is used to filter out records in the batch processing as the order of records is not guarantee. In Kafka topic the records are in append mode so ordered over time and each records with the same key will be in the same Kafka partition. 
 
 Doing the following command creates the source ddl and dml statements to do the dedups for this source table. The logic of the tool is to look at the table name pattern so `src_` is a source table. We could find a better heuristic in the future.
 
@@ -198,4 +201,4 @@ Doing the following command creates the source ddl and dml statements to do the 
 python process_src_tables.py -t src_tdc_sys_user -o staging
 ```
 
-To complete the dedup logic it is import to understand the dbt dedup macro and the intermediate sql to see if there is something important to add and definitively to get the goof column names used for partitioning.
+To complete the dedup logic it is import to understand the dbt dedup macro and the intermediate sql to see if there is something important to add and definitively to get the good column names used for partitioning.

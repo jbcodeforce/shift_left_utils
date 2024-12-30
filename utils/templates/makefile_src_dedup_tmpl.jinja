@@ -11,17 +11,17 @@ create_{{ table_name }}: create_flink_ddl  create_flink_dml
 create_topics: create_topic_{{ table_name }}
 
 create_topic_{{ table_name }}:
-	@confluent kafka topic create {{ table_name }}_raw --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
-	@confluent kafka topic create {{ table_name }}_dedup --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
+	@confluent kafka topic create {{ table_name }} --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
+	@confluent kafka topic create {{ table_name }}_deduped --partitions 1 --if-not-exists --cluster $(CLUSTER_ID) --environment $(ENV_ID)
 
-delete_topic_{{ table_name }}_raw:
-	@confluent kafka topic delete {{ table_name }}_raw --force; 
+delete_topic_{{ table_name }}:
+	@confluent kafka topic delete {{ table_name }} --force; 
 
 delete_topic_{{ table_name }}_deduped:
 	@confluent kafka topic delete {{ table_name }}_deduped --force; 
 
 list_record_data_from_topic:
-	$(call list_topic_content, {{ table_name }}_raw)
+	$(call list_topic_content, {{ table_name }})
 
 
 create_flink_ddl: 
@@ -47,8 +47,8 @@ delete_dedup:
 	$(call delete_schema, {{ table_name }}_deduped-key)
 
 delete_raw:
-	$(call delete_schema, {{ table_name }}_raw-value)
-	$(call delete_schema, {{ table_name }}_raw-key)
+	$(call delete_schema, {{ table_name }}-value)
+	$(call delete_schema, {{ table_name }}-key)
 
 #
 # --- Different cleaning aggregate targets:
@@ -57,8 +57,8 @@ delete_flink_statements: delete_flink_ddl delete_flink_dml
 
 delete_data: delete_dedup delete_raw delete_topic_{{ table_name }}
 
-delete_data_from_raw: delete_raw delete_topic_{{ table_name }}
+delete_data_from_src: delete_raw delete_topic_{{ table_name }}
 
-delete_data_from_dedup: delete_dedup delete_topic_{{ table_name }}_dedup
+delete_data_from_dedup: delete_dedup delete_topic_{{ table_name }}_deduped
 
-delete_data: delete_data_from_raw delete_data_from_dedup  
+delete_data: delete_data_from_src delete_data_from_dedup  
