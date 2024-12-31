@@ -78,6 +78,9 @@ export STAGING=../../flink-project/staging
 export REPORT_FOLDER=../../flink-project/reports
 ```
 
+* Install Ollama: [using one of the downloads](https://ollama.com/download).
+* Start Ollama using `ollama serve` then download the one of the Qwen model used by the AI Agent: `qwen2.5-coder:32b` or `qwen2.5. coder:14b` depending of your memory and GPU.
+
 Yor are ready to use the different tool, as a next step read an example of migrstion approach in [this note](./migration.md#migration-process)
 
 ## Using Docker Pythonenv image
