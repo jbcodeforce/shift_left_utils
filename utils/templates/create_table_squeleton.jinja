@@ -1,5 +1,5 @@
 -- recall that this is a temporary DDL as the CDC Debezium should create those topic and Flink CC create implicit table.
-CREATE TABLE IF NOT EXIST {{ table_name }}_raw (
+CREATE TABLE IF NOT EXISTS {{ table_name }}_raw (
   -- put columns here- BE SURE to put NOT NULL to the potential primary fields to avoid Flink SQL statement execution error on dedup DMLs
 ) WITH (
     'changelog.mode' = 'append',

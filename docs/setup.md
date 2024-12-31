@@ -10,33 +10,33 @@ This chapter addresses the basic tools needed and the project setup. There are t
 * Go to the folder parent to the dbt source project. For example if your dbt project is in /home/user/code then be in this code folder.
 * Clone this repository: 
 
-  ```sh
-  git clone  https://github.com/jbcodeforce/shift_left_utils.git
-  ```
+```sh
+git clone  https://github.com/jbcodeforce/shift_left_utils.git
+```
 
 * Use setup.sh script to create the project structure for the new flink project: 
 
-  ```sh
-  cd shift_left_utils
-  ./setup.sh <a_flink_project_name | default is flink_project>
-  ```
+```sh
+cd shift_left_utils
+./setup.sh <a_flink_project_name | default is flink_project>
+```
 
-  At this stage you should have three folders for the project, and for the flink_project a pipelines placeholder
+At this stage you should have three folders for the project, and for the flink_project a pipelines placeholder
 
-  ```sh
-  ├── flink-project
-  │   ├── docker-compose.yaml
-  │   ├── pipelines
-  │   │   ├── common.mk
-  │   │   ├── dimensions
-  │   │   ├── facts
-  │   │   ├── intermediates
-  │   │   ├── sources
-  │   │   └── stage
-  │   └── start-ollama.sh
-  ├── shift_left_utils
-  └── src_dbt_project
-  ```
+```sh
+├── flink-project
+│   ├── docker-compose.yaml
+│   ├── pipelines
+│   │   ├── common.mk
+│   │   ├── dimensions
+│   │   ├── facts
+│   │   ├── intermediates
+│   │   ├── sources
+│   │   └── stage
+│   └── start-ollama.sh
+├── shift_left_utils
+└── src_dbt_project
+```
 
 * Connect to Confluent Cloud with CLI, then get environment and compute pool
 
