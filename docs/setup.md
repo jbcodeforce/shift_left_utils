@@ -7,10 +7,37 @@ This chapter addresses the basic tools needed and the project setup. There are t
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 * All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html)
+* Go to the folder parent to the dbt source project. For example if your dbt project is in /home/user/code then be in this code folder.
 * Clone this repository: 
-```sh
-git clone  https://github.com/jbcodeforce/shift_left_utils.git
-```
+
+  ```sh
+  git clone  https://github.com/jbcodeforce/shift_left_utils.git
+  ```
+
+* Use setup.sh script to create the project structure for the new flink project: 
+
+  ```sh
+  cd shift_left_utils
+  ./setup.sh <a_flink_project_name | default is flink_project>
+  ```
+
+  At this stage you should have three folders for the project, and for the flink_project a pipelines placeholder
+
+  ```sh
+  ├── flink-project
+  │   ├── docker-compose.yaml
+  │   ├── pipelines
+  │   │   ├── common.mk
+  │   │   ├── dimensions
+  │   │   ├── facts
+  │   │   ├── intermediates
+  │   │   ├── sources
+  │   │   └── stage
+  │   └── start-ollama.sh
+  ├── shift_left_utils
+  └── src_dbt_project
+  ```
+
 * Connect to Confluent Cloud with CLI, then get environment and compute pool
 
 ```sh
@@ -23,26 +50,9 @@ confluent login --save
 confluent flink quickstart --name dbt-migration --max-cfu 50 --region us-west-2 --cloud aws
 ```
 
-* Get to the parent folder of the dbt project. In this note it is referenced as `src-dbt-project`.
-* Create a folder for your new project that will keep the Flink SQL statements for the different pipeline: As an example we use `flink-project` at the same level as the cloned repository.
 
-```sh
-mkdir flink-project
-tree
-├── src-dbt-project
-├── flink-project
-├── shift_left_utils
-│   ├── Dockerfile
-│   ├── README.md
-│   ├── docker-compose.yaml
-```
-
-* Get the config_template and set the corresponding values
-
-```sh
-# under flink_project
-cp ../shift_left_utils/utils/config_tmpl.yaml config.yaml
-```
+* Modify the config.yaml with the corresponding values
+* Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`
 
 ## Using Python Virtual Environment
 
