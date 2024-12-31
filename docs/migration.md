@@ -4,38 +4,47 @@ This chapter is going over a simple fact to sources pipeline migration. Be sure 
 
 All the dbt source tables are defined in the #SRC_FOLDER folder. 
 
-The method start from a fact table.
+The method starts from a fact table. At the high level, the development flow looks as in the following diagram:
+
+![](./images/working_flow_chart.drawio.png)
+
+1. Starting from one Fact or Dimension table, process the fact table with the full hierarchy up to the sources, save the outcomes to an intermediate staging folder as manual work needs to be done.
+1. From the generated code, update the Fink statements for source tables, add complete the dedup logic, in the generated DML (CTAS structure)  to reflect the dbt logic applied for deduplication. The new table is upsert appendlog, with specific primary key. The source topic may not have the same primary key so it is important to use do the primary key refactoring in this CTAS statement. If you do not have access to the origin source topic, then a DDL is also created under the tests folder to do some isolated test. The DDL content, mostly column definitions can be completed by looking at the source table in tool like DataBricks or Snowflake. Move the resulting folder to `pipeline/sources`.
+1. Remove non-necessary intermediate steps, the ones with the deduplication logic, as it was done in the source dml statement. Update any other intermediate statements with specific business logic. Move resulting statements to the `pipeline/intermediates` folder.
+1. Execute any DDLs for the Sink tables and intermediate tables.
+1. If the source topics do not have records, then use the tool to create test data only at the source table level. Be coherent on the data for the different join conditions.
+1. Execute remaining DMLs.
+1. Validate data in the output topics used as sink tables.
 
 ## 1 - Discover the current pipeline
 
 Taking one target fact table, the following command will find the dependency hierarchy with some element to track the migration project:
 
 ```sh
-python find_pipeline.py -f $SRC_FOLDER/facts/fct_training_document.sql 
+python find_pipeline.py -f $SRC_FOLDER/facts/fact_education_document.sql 
 ```
 
-* The output may look like inthe folloering report:
+* The output may look like in the followring report:
 
 ```
--- Process file: ../dbt-src/models/facts/fct_training_document.sql
-Process the table: fct_training_document
+-- Process file: $SRC_FOLDER/facts/fact_education_document.sql
+Process the table: fact_education_document
 Dependencies found:
-  - depends on : int_training_completed_release
+  - depends on : int_education_completed
   - depends on : int_non_abandond_training
   - depends on : int_unassigned_curriculum
-  - depends on : int_courses_wo_trainingdata
-  - depends on : int_docs_wo_trainingdata
+  - depends on : int_courses
+  - depends on : int_docs_wo_training_data
 
 
   ....
 
- NOT_TESTED | OK ('int_training_completed_release', '../dbt-src/models/intermediates/training_document/int_training_completed_release.sql')
- NOT_TESTED | OK ('src_tdc_doc_accesscattype', '../dbt-src/models/sources/src_tdc_doc_accesscattype.sql')
- NOT_TESTED | OK ('src_web_business_unit_entity_type', '../dbt-src/models/sources/src_web_business_unit_entity_type.sql')
+ NOT_TESTED | OK ('int_training_completed_release', '$SRC_FOLDER/intermediates/training_document/int_training_completed.sql')
+ NOT_TESTED | OK ('src_web_business_unit_entity_type', '$SRC_FOLDER/sources/src_web_business_unit_data.sql')
  ...
- NOT_TESTED | OK ('int_training_course_deduped', '../dbt-src/models/intermediates/dedups/int_training_course_deduped.sql')
- NOT_TESTED | OK ('int_courses_wo_trainingdata', '../dbt-src/models/intermediates/training_document/int_courses_wo_trainingdata.sql')
- NOT_TESTED | OK ('src_training_curriculum', '../dbt-src/models/sources/src_training_curriculum.sql')
+ NOT_TESTED | OK ('int_training_course_deduped', '$SRC_FOLDER/intermediates/dedups/int_training_course_deduped.sql')
+ NOT_TESTED | OK ('int_courses_wo_trainingdata', '$SRC_FOLDER/intermediates/training_document/int_courses_wo_training_data.sql')
+ NOT_TESTED | OK ('src_training_curriculum', '$SRC_FOLDER/sources/src_training_curriculum.sql')
 
 ```
 
