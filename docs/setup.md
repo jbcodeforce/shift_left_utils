@@ -2,6 +2,10 @@
 
 This chapter addresses the basic tools needed and the project setup. There are two options to run the tools, one using a python virtual environment, and the other one is to use docker and a pythonenv predefined image with all the necessary module and code.
 
+Also as running Ollama Qwen model with 32b parameters, needs 64Gb of memory and GPU at 32G VRAM, it may be better suited to create an EC2 instance with necessary resources to run the migration for each fact and dimension tables, to generate staged migrated SQL and then stop the machine. The tuning to pipeline, final version of each SQL is done manually as of now.
+
+To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.]()
+
 ## Common Pre-requisites
 
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
