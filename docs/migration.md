@@ -111,7 +111,7 @@ This action will create the Kafka topic and will create the schema definition fo
 make create_flink_dml
 ```
 
-* Sometime we may need to delete the created topics and schemas, for that the makefile target is:
+* Sometime, we may need to delete the created topics and schemas, for that the makefile target is:
 
 ```sh
 make delete_data
@@ -135,7 +135,9 @@ table_name, Type of dbt, DDL, DML, URI_SRC, URI_TGT
 fct_user_role,fact,T,T,facts/qx/fct_user_role.sql,pipelines/facts/qx/fct_user_role
 ```
 
-The template for the Makefile in the case of Sink table is `utils/templates/makefile_ddl_dml_tmpl.jinja`.
+???- info "Code explanation"
+  The template for the Makefile in the case of Sink table is `utils/templates/makefile_ddl_dml_tmpl.jinja` and for source with deduplication logic the Makefile template is `utils/templates/makefile_src_dedup_tmpl.jinja`.
+
 
 ## 3 - Process one table using the -pd flag
 

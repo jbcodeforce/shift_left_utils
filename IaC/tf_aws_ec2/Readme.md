@@ -39,10 +39,11 @@ The Terraform creates:
 ## Pre-requisites
 
 * Install Terraform CLI [from here](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+* Update the environment variables
 
 ## Execution
 
-* Run the `terraform init` command in the same directory. The terraform init command initializes the plugins and providers which are required to work with resources.
+* Run the `terraform init` command in the `IaC/tf_aws_ec2` directory. The terraform init command initializes the plugins and providers which are required to work with resources.
 * Run the `terraform plan` command. This is an optional, yet recommended action to ensure your configuration’s syntax is correct and gives you an overview of which resources will be provisioned in your infrastructure.
 * Provision the AWS VPC and resources using `terraform apply`.
 

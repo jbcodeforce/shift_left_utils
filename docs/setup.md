@@ -4,7 +4,7 @@ This chapter discusses the essential tools required and the project setup. There
 
 Additionally, running the Ollama Qwen model with 32 billion parameters requires 64 GB of memory and a GPU with 32 GB of VRAM. Therefore, it may be more practical to create an EC2 instance with the appropriate resources to handle the migration of each fact and dimension table, generate the staged migrated SQL, and then terminate the instance. Currently, tuning the pipeline and finalizing each SQL version is done manually.
 
-To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2)
+To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) With Terraform and setup.sh script the next sections are automated. The EC2 does not need to run docker.
 
 ## Common Pre-requisites
 
@@ -60,43 +60,41 @@ confluent flink quickstart --name dbt-migration --max-cfu 50 --region us-west-2 
 ```
 
 
-* Modify the `config.yaml` with the corresponding values. 
+* Modify the `config.yaml` with the corresponding values. The Kafka section is to access the topics
 
-    The Kafka section is to access the topics
+```yaml
+kafka:
+  bootstrap.servers: pkc-<uid>.us-west-2.aws.confluent.cloud:9092
+  security.protocol: SASL_SSL
+  sasl.mechanisms: PLAIN
+  sasl.username: <key name>
+  sasl.password: <key seceret> 
+  session.timeout.ms: 5000
+```
 
-    ```yaml
-    kafka:
-      bootstrap.servers: pkc-<uid>.us-west-2.aws.confluent.cloud:9092
-      security.protocol: SASL_SSL
-      sasl.mechanisms: PLAIN
-      sasl.username: <key name>
-      sasl.password: <key seceret> 
-      session.timeout.ms: 5000
-    ```
+The registry section is for the schema registy.
 
-    The registry section is for the schema registy.
+```yaml
+registry:
+  url: https://psrc-<uid>.us-west-2.aws.confluent.cloud
+  registry_key_name: <registry-key-name>
+  registry_key_secret: <registry-key-secrets>
+``` 
 
-    ```yaml
-    registry:
-      url: https://psrc-<uid>.us-west-2.aws.confluent.cloud
-      registry_key_name: <registry-key-name>
-      registry_key_secret: <registry-key-secrets>
-    ``` 
-
-    Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
+  Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
 
 * Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`. The first lines of this common makefile file have some variables set up:
 
-  ```
-  ENV_NAME=aws-west    # name of the Confluent Cloud environment
-  CLOUD=aws            # cloud provider
-  REGION=us-west-2     # cloud provider region where compute pool and kakfa cluster run
-  MY_CONTEXT= login-jboyer@confluent.io-https://confluent.cloud 
-  DB_NAME=cluster_0.   # Name of the Kafka Cluster, mapped to Database name in Flink
-  ```
+```
+ENV_NAME=aws-west    # name of the Confluent Cloud environment
+CLOUD=aws            # cloud provider
+REGION=us-west-2     # cloud provider region where compute pool and kakfa cluster run
+MY_CONTEXT= login-jboyer@confluent.io-https://confluent.cloud 
+DB_NAME=cluster_0.   # Name of the Kafka Cluster, mapped to Database name in Flink
+```
 
 ???- warning "Security access"
-  THe key are in the config.yaml file that is ignore in Git. But it can be possible in the future to access secrets using Key manager API. This could be a future enhancement.
+  The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 
 ## Using Python Virtual Environment
 
@@ -180,7 +178,7 @@ colima start --cpu 4 -m 48 -d 100 -r docker
     # do not touch the other mounted volumes
 ```
 
-You are ready to use the different tool, as a next step read an example of migrstion approach in [this note](./migration.md#migration-process)
+You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process)
 
 
 
