@@ -1,15 +1,20 @@
 # Environment Setup
 
-This chapter addresses the basic tools needed and the project setup. There are two options to run the tools, one using a python virtual environment, and the other one is to use docker and a pythonenv predefined image with all the necessary module and code.
+This chapter discusses the essential tools required and the project setup. There are two options for running the tools: one involves using a Python virtual environment, while the other utilizes Docker along with a predefined Python environment image that includes all the necessary modules and code.
 
-Also as running Ollama Qwen model with 32b parameters, needs 64Gb of memory and GPU at 32G VRAM, it may be better suited to create an EC2 instance with necessary resources to run the migration for each fact and dimension tables, to generate staged migrated SQL and then stop the machine. The tuning to pipeline, final version of each SQL is done manually as of now.
+Additionally, running the Ollama Qwen model with 32 billion parameters requires 64 GB of memory and a GPU with 32 GB of VRAM. Therefore, it may be more practical to create an EC2 instance with the appropriate resources to handle the migration of each fact and dimension table, generate the staged migrated SQL, and then terminate the instance. Currently, tuning the pipeline and finalizing each SQL version is done manually.
 
-To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.]()
+To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2)
 
 ## Common Pre-requisites
 
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+* All Platforms - [install make for windows](https://gnuwin32.sourceforge.net/packages/make.htm), 
+
+    * Mac OS: ```brew install make``` 
+    * Linux: ```sudo apt-get install build-essential```
+
 * All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html)
 * Go to the folder parent to the dbt source project. For example if your dbt project is in /home/user/code then be in this code folder.
 * Clone this repository: 
@@ -18,14 +23,14 @@ To create this EC2 machine, Terraform configurations are defined in [the IaC fol
 git clone  https://github.com/jbcodeforce/shift_left_utils.git
 ```
 
-* Use setup.sh script to create the project structure for the new flink project: 
+* Use the `setup.sh` script to create the project structure, and copy some important files, for the new flink project: 
 
 ```sh
 cd shift_left_utils
 ./setup.sh <a_flink_project_name | default is flink_project>
 ```
 
-At this stage you should have three folders for the project, and for the flink_project a pipelines placeholder
+At this stage, you should have three folders for the project: flink_project, the dbt_source, the shift_left_utils. For the flink_project a pipelines folder with the same structure as defined by the Kimball guidelines:
 
 ```sh
 ├── flink-project
@@ -42,27 +47,62 @@ At this stage you should have three folders for the project, and for the flink_p
 └── src_dbt_project
 ```
 
-* Connect to Confluent Cloud with CLI, then get environment and compute pool
+* Connect to Confluent Cloud with CLI, then get environment and compute pool identifiers:
 
 ```sh
 confluent login --save
 ```
 
-* Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool. If you do not have such environment confluent cli has a quickstart plugin:
+* Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool. If you do not have such environment Confluent cli has a quickstart plugin:
 
 ```sh
 confluent flink quickstart --name dbt-migration --max-cfu 50 --region us-west-2 --cloud aws
 ```
 
 
-* Modify the config.yaml with the corresponding values
-* Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`
+* Modify the `config.yaml` with the corresponding values. 
+
+    The Kafka section is to access the topics
+
+    ```yaml
+    kafka:
+      bootstrap.servers: pkc-<uid>.us-west-2.aws.confluent.cloud:9092
+      security.protocol: SASL_SSL
+      sasl.mechanisms: PLAIN
+      sasl.username: <key name>
+      sasl.password: <key seceret> 
+      session.timeout.ms: 5000
+    ```
+
+    The registry section is for the schema registy.
+
+    ```yaml
+    registry:
+      url: https://psrc-<uid>.us-west-2.aws.confluent.cloud
+      registry_key_name: <registry-key-name>
+      registry_key_secret: <registry-key-secrets>
+    ``` 
+
+    Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
+
+* Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`. The first lines of this common makefile file have some variables set up:
+
+  ```
+  ENV_NAME=aws-west    # name of the Confluent Cloud environment
+  CLOUD=aws            # cloud provider
+  REGION=us-west-2     # cloud provider region where compute pool and kakfa cluster run
+  MY_CONTEXT= login-jboyer@confluent.io-https://confluent.cloud 
+  DB_NAME=cluster_0.   # Name of the Kafka Cluster, mapped to Database name in Flink
+  ```
+
+???- warning "Security access"
+  THe key are in the config.yaml file that is ignore in Git. But it can be possible in the future to access secrets using Key manager API. This could be a future enhancement.
 
 ## Using Python Virtual Environment
 
 ### Pre-requisites
 
-* All Platforms - [Install Python 3.12 or 3.13]()
+* All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
 * Create a virtual environment:
 
 ```sh
@@ -83,7 +123,7 @@ source .venv/bin/activate
 pip install -r utils/requirements.txt
 ```
 
-* Define environment variables
+* Define environment variables, change the flink_project folder to reflect your own settings:
 
 ```sh
 export CONFIG_FILE=../../flink-project/config.yaml
@@ -93,9 +133,9 @@ export REPORT_FOLDER=../../flink-project/reports
 ```
 
 * Install Ollama: [using one of the downloads](https://ollama.com/download).
-* Start Ollama using `ollama serve` then download the one of the Qwen model used by the AI Agent: `qwen2.5-coder:32b` or `qwen2.5. coder:14b` depending of your memory and GPU.
+* Start Ollama using `ollama serve` then download the one of the Qwen model used by the AI Agent: `qwen2.5-coder:32b` or `qwen2.5-coder:14b` depending of your memory and GPU resources.
 
-Yor are ready to use the different tool, as a next step read an example of migrstion approach in [this note](./migration.md#migration-process)
+You are ready to use the different tools, as a next step, read the migration approach in [this note](./migration.md#migration-process)
 
 ## Using Docker Pythonenv image
 
@@ -127,13 +167,6 @@ colima start --cpu 4 -m 48 -d 100 -r docker
 ```
 
 ### Project setup
-
-* Copy the `docker-compose.yaml` file from the shift-left-project as you need to reference the source project, and the config.yaml template:
-
-  ```sh
-  cp shift_left_utils/docker-compose.yaml flink-project
-  cp shift_left_utils/utils/config_tmpl.yaml flink-project/config.yaml
-  ```
 
 * Modify the `docker-compose.yaml` file to reference the source code folder path mapped to dbt-src folder. For example, using a source project, named `src-dbt-project`, defined at the same level as the root folder of this repository, the statement looks like:
 
