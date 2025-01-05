@@ -89,3 +89,15 @@ pipelines
 
 ```
 
+## Source Topic management
+
+In some ETL or ELT pipelines the Kafka topic may be the source of the pipeline. A classical example is when a change data capture mechanism is deployed and get records from existing SQL database. The architecture looks like in the following diagram:
+
+![](./images/elt_pipe.drawio.png)
+
+When migrating to real-time processing, using Confluent Cloud and Flink compute pool, the source topics may be reused and the Flink Statement will do mostly the same processing as the ELT. But Confluent Cloud for Flink creates table from topic and get the schema from the schema registry.
+
+The name of the table matches the name of the topic and the table schema maps to the topic-value schema. 
+
+If the first DML is to dedup records fron source topic, the from statement, in the DML statement, will be the name of the source table. If the topic has naming convention based on the environment, the DML will need to be changed. 
+The DML runs continuously. So one DML per environment. The target table can have a generic name (e.g. int_order_deduped) so DML statements can be deployed the same way on different environment.  
