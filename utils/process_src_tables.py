@@ -158,6 +158,15 @@ def save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
     save_one_file(ddl_fn,ddl)
     process_ddl_file(f"{content_path}/sql-scripts/",ddl_fn)
 
+def find_table_already_processed(table_name: str, persistent_file: str) -> bool:
+    """
+    The table list to process is persisted in persistent_file file. Search if the table is part of the list.
+    """
+    with open(persistent_file, "r") as f:
+        for line in f:
+            if table_name == line.rstrip():
+                return True
+    return False
 
 
 # ----- more specific functions
@@ -194,6 +203,7 @@ def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent:
     :param walk_parent: Assess if it needs to process the dependencies
     """
     table_name = extract_table_name(src_file_name)
+    merge_items_in_reporting_file([table_name],TABLES_TO_PROCESS)   # add the current table to the processed tables
     table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/sql-scripts")
     create_folder_if_not_exist(f"{table_folder}/tests")
@@ -225,14 +235,21 @@ def create_target_folder(target_root_folder: str) -> str:
 
 def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, walk_parent: bool = False):
     """
-    the source tables have a different processing, so this is the routing function
+    Routing fct to select the relevant processing for the given SQL source file.
+    :param: the sql file to process
+    :param: the source folder  
+    :param: the flag to process the parent hierarchy
     """
     print("\n\n-----------------------------")
-    print(f"\t PROCESS file: {sql_file_path}")
-    if sql_file_path.find("source") > 0:
-        process_src_sql_file(sql_file_path, source_target_path)
+    table_name = extract_table_name(sql_file_path)
+    if not find_table_already_processed(table_name, TABLES_TO_PROCESS):
+        print(f"\t PROCESS file: {sql_file_path}")
+        if sql_file_path.find("source") > 0:
+            process_src_sql_file(sql_file_path, source_target_path)
+        else:
+            process_fact_dim_sql_file(sql_file_path, source_target_path, walk_parent)
     else:
-        process_fact_dim_sql_file(sql_file_path, source_target_path, walk_parent)
+        print(f"\t Table: {table_name} already processed.")
 
 def process_files_in_folder(args):
     """
@@ -254,8 +271,8 @@ def process_one_file(src_file: str, target_folder: str, process_dependency: bool
 
 def merge_items_in_reporting_file(dependencies: list[str], persistent_file):
     """
-    using the existing persistenc_file, save the dependency in the list of dependencies if not present in the file
-    The file contains as a first column the name of the dependencies
+    using the existing persistent_file, save the dependency in the list of dependencies if not present in the file
+    The file contains as a first column the name of the dependency
     """
     existing_lines = set()
     with open(persistent_file, 'r') as file:
@@ -295,7 +312,7 @@ def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_par
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
 
-    :param: the program argument with the table name
+    :param: the table name
     """
     all_files= build_all_file_inventory()
 

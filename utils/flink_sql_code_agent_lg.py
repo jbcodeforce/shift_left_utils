@@ -60,10 +60,12 @@ Flink SQL statement with same semantic.
 
 Keep all the select statement defined with WITH keyword.
 
-Do not add suggestions or explanations in the response, just return the structured sql output.
+Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 
 Do not use VARCHAR prefer STRING. 
 Do not wrap CONCAT statement with SHA.
+Transform sentence like: "to_date(concat_ws('-', year, right(concat('0', cast(month AS STRING)), 2), right(concat('0', cast(day AS STRING)), 2)))"
+to concat_ws('-', year, right(concat('0', cast(month AS STRING)), 2), right(concat('0', cast(day AS STRING)), 2)).toDate()
 
 Start the generated code with:
 

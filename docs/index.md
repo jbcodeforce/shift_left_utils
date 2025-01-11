@@ -99,5 +99,4 @@ When migrating to real-time processing, using Confluent Cloud and Flink compute 
 
 The name of the table matches the name of the topic and the table schema maps to the topic-value schema. 
 
-If the first DML is to dedup records fron source topic, the from statement, in the DML statement, will be the name of the source table. If the topic has naming convention based on the environment, the DML will need to be changed. 
-The DML runs continuously. So one DML per environment. The target table can have a generic name (e.g. int_order_deduped) so DML statements can be deployed the same way on different environment.  
+Leverage the naming convention from the change data capture, like Debezium for the topic. Any naming convention based on the environment like dev, staging, or production, will impact any DML statements. In Confluent Cloud the environment feature groups 1 to many Kafka cluster and Flink compute pool. The topic name can be the same between Kafka cluster so the same DML statement can be used in different conpute pool.
