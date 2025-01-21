@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
     description='Test Flink sql generation from a dbt sql file'
 )
-parser.add_argument('-n', '--file_path', required=True, help="name of the fpath withthe sql file to process")
+parser.add_argument('-n', '--file_path', required=True, help="name of the file path with the sql file to process")
 
 """
 Create Flink SQL with a set of agents working within the following workflow
@@ -94,11 +94,13 @@ Do not use VARCHAR prefer STRING.
 
 Use CREATE TABLE IF NOT EXIST instead of CREATE TABLE
 
+Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
+
 Finish the statement with the following declaration:
 
    PRIMARY KEY(ID) NOT ENFORCED -- VERIFY KEY
 ) WITH ( 'changelog.mode' = 'upsert',
-  'value.format' = 'avro-registry',
+   'value.format' = 'avro-registry',
    'value.fields-include' = 'all'
 )
 
@@ -107,7 +109,8 @@ Do not generate explanations for the fixes you did.
 
 def remove_noise_in_sql(sql: str) -> str:
     """
-    remove final AS ( and SELECT * FROM final
+    remove final AS ( 
+    and SELECT * FROM final
     """
     newone=sql.replace(" final AS (","").replace("CURRENT_DATE()", "event_ts")
     return newone.replace("SELECT * FROM final","")

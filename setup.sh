@@ -2,7 +2,7 @@ project_name="flink-project"
 
 if [ "$#" -eq 1 ]
 then
-    project_name= $1
+    project_name=$1
 fi
 
 
