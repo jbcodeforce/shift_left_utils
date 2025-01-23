@@ -79,6 +79,10 @@ flink_sql_syntaxic_template="""
 you are qwen-coder an agent expert in Apache Flink SQL syntax expert and your goal is to generate a cleaner Apache Flink SQL
 statement from the following {flink_sql}.
 
+Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
+
+Transform the column name `dl_landed_at` within a SELECT to `$rowtime` as dl_landed_at.
+
 Do not generate explanations for the fixes you did.
 """
 
@@ -95,6 +99,8 @@ Do not use VARCHAR prefer STRING.
 Use CREATE TABLE IF NOT EXIST instead of CREATE TABLE
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
+
+Remove column name dl_landed_at within create table or select.
 
 Finish the statement with the following declaration:
 

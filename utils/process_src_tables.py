@@ -108,6 +108,16 @@ def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: 
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
 
+def create_tracking_doc(table_name: str,  out_dir: str):
+    env = Environment(loader=FileSystemLoader('.'))
+    tracking_tmpl = env.get_template(f"{TMPL_FOLDER}/tracking_tmpl.jinja")
+    context = {
+        'table_name': table_name,
+    }
+    rendered_tracking_md = tracking_tmpl.render(context)
+    with open(out_dir + '/tracking.md', 'w') as f:
+        f.write(rendered_tracking_md)
+
 
 def extract_table_name(src_file_name: str, prefix_to_remove: str = None) -> str:
     the_path= Path(src_file_name)
@@ -162,9 +172,11 @@ def find_table_already_processed(table_name: str, persistent_file: str) -> bool:
     """
     The table list to process is persisted in persistent_file file. Search if the table is part of the list.
     """
+    print(persistent_file)
     with open(persistent_file, "r") as f:
         for line in f:
             if table_name == line.rstrip():
+                print(f"{table_name} in {line} found")
                 return True
     return False
 
@@ -190,7 +202,7 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     create_ddl_squeleton(table_name,f"{table_folder}/tests")
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
     create_makefile(table_name, "tests", "dedups", table_folder)
-    merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
+    # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
 def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent: bool = False):
@@ -203,7 +215,6 @@ def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent:
     :param walk_parent: Assess if it needs to process the dependencies
     """
     table_name = extract_table_name(src_file_name)
-    merge_items_in_reporting_file([table_name],TABLES_TO_PROCESS)   # add the current table to the processed tables
     table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/sql-scripts")
     create_folder_if_not_exist(f"{table_folder}/tests")
@@ -215,6 +226,8 @@ def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent:
         merge_items_in_reporting_file(parents,TABLES_TO_PROCESS)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
         save_dml_ddl(table_folder, table_name, dml, ddl)
+        merge_items_in_reporting_file([table_name],TABLES_DONE)   # add the current table to the processed tables
+    
         # not sure we want that: merge_items_in_processing_file([table_name], TABLES_DONE)
     if walk_parent:
         for parent in parents:
@@ -242,7 +255,7 @@ def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, 
     """
     print("\n\n-----------------------------")
     table_name = extract_table_name(sql_file_path)
-    if not find_table_already_processed(table_name, TABLES_TO_PROCESS):
+    if not find_table_already_processed(table_name, TABLES_DONE):
         print(f"\t PROCESS file: {sql_file_path}")
         if sql_file_path.find("source") > 0:
             process_src_sql_file(sql_file_path, source_target_path)

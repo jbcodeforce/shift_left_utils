@@ -38,17 +38,18 @@ If the developer laptop does not have enough capacity, there is an option to run
 
 ## A migration path
 
-Any batch pipelines creating tables or files into a Lakehouse platform, may be refactored with Flink pipeline using an approach illustrated by the following figure:
+Any batch pipelines that create tables or files in a Lakehouse platform can be refactored using a Flink pipeline, as illustrated in the following figure:
 
 ![](./images/generic_src_to_sink_flow.drawio.png)
 
-This is the target architecture for each pipeline after migration. This architecture uses a potential sink to  be a Postgresql Database to be used to support business intelligence dashboards. The Flink tables are mapped to Kafka topics. Kafka connectors are used to move data from topic to Postgresql DB. 
+The diagram above illustrates the target architecture for each pipeline after migration. This architecture employs a sink configured as a PostgreSQL database, which will support business intelligence dashboards. The Flink tables are mapped to Kafka topics, and Kafka connectors are utilized to transfer data from these topics to the PostgreSQL database.
 
-From a Confluent Cloud Flink pipeline point of view, the last topic is the sink.
+From the perspective of a Confluent Cloud Flink pipeline, the last topic serves as the sink.
 
-To perform the refactoring, the approach is to start from the sink table and process backward to the sources. Once the sources are identified, the process mya implement a set of deduplication statements, and intermediate steps to apply some business logic or data transformation.
+To facilitate the refactoring, the approach begins with the sink table and works backward to identify the sources. Once the sources are determined, the process may involve implementing a set of deduplication statements and intermediate steps to apply business logic or data transformations.
 
-The dbt project contains all the SQL statements for migration, located in the models folder. The objective of the tools is to process these files and replicate the same organizational structure for Flink SQL statements, which includes sources, intermediates, staging, dimensions, and facts. Additionally, the tools aim to automate parts of the migration process.
+The dbt project contains all the SQL statements necessary for migration, located in the models folder. The goal of the tools is to process these files and replicate the same organizational structure for Flink SQL statements, which includes sources, intermediates, staging, dimensions, and facts. Additionally, the tools aim to automate parts of the migration process.
+
 
 The target structure will look like in the following example:
 
