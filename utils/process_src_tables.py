@@ -197,11 +197,11 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     """
     table_name = extract_table_name(src_file_name,"src_")
     table_folder=f"{source_target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/dedups")
+    create_folder_if_not_exist(f"{table_folder}/sql-scripts")
     create_folder_if_not_exist(f"{table_folder}/tests")
     create_ddl_squeleton(table_name,f"{table_folder}/tests")
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
-    create_makefile(table_name, "tests", "dedups", table_folder)
+    create_makefile(table_name, "tests", "sql-scripts", table_folder)
     # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
