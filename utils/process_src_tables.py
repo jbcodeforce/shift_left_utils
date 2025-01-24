@@ -13,7 +13,7 @@ from flink_sql_code_agent_lg import translate_to_flink_sqls
 from jinja2 import Environment, FileSystemLoader
 import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
-from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files
+from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
 from clean_sql import process_ddl_file
 from kafka.app_config import get_config
 
@@ -148,7 +148,7 @@ def get_dependencies(table_name, dbt_script_content) -> list[str]:
     if (len(dependency_names) > 0):
         print("Dependencies found:")
         for dependency in dependency_names:
-            print(f"  - depends on : {dependency}")
+            print(f"- depends on : {dependency}")
             dependencies.append(dependency)
     else:
         print("  - No dependency")
@@ -168,18 +168,26 @@ def save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
     save_one_file(ddl_fn,ddl)
     process_ddl_file(f"{content_path}/sql-scripts/",ddl_fn)
 
-def find_table_already_processed(table_name: str, persistent_file: str) -> bool:
-    """
-    The table list to process is persisted in persistent_file file. Search if the table is part of the list.
-    """
-    print(persistent_file)
-    with open(persistent_file, "r") as f:
-        for line in f:
-            if table_name == line.rstrip():
-                print(f"{table_name} in {line} found")
-                return True
-    return False
 
+def remove_already_processed_table(parents: list[str]) -> list[str]:
+    """
+    If a table in the provided list of parents table is already processed, remove it from the list.
+    A processed table is one already define in the pipelines folder hierarchy.
+    """
+    newParents=[]
+    for parent in parents:
+        table_name=parent.replace("int_","").replace("_deduped","").strip()
+        if not search_table_in_processed_tables(table_name):
+            newParents.append(table_name)
+    return newParents
+
+def create_folder_structure(table_name: str, ddl_folder_name:str, dml_folder_name:str, target_path: str):
+    table_folder=f"{target_path}/{table_name}"
+    create_folder_if_not_exist(f"{table_folder}/{dml_folder_name}")
+    create_folder_if_not_exist(f"{table_folder}/{ddl_folder_name}")
+    create_makefile(table_name, ddl_folder_name, dml_folder_name, table_folder)
+    create_tracking_doc(table_name,table_folder)
+    return table_folder
 
 # ----- more specific functions
 def process_src_sql_file(src_file_name: str, source_target_path: str):
@@ -196,16 +204,14 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
 
     """
     table_name = extract_table_name(src_file_name,"src_")
-    table_folder=f"{source_target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/sql-scripts")
-    create_folder_if_not_exist(f"{table_folder}/tests")
+    table_folder=create_folder_structure(table_name,"tests","dedups",source_target_path)
     create_ddl_squeleton(table_name,f"{table_folder}/tests")
+    create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")    
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
-    create_makefile(table_name, "tests", "sql-scripts", table_folder)
     # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
-def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent: bool = False):
+def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_parent: bool = False):
     """
     Transform stage, fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -215,23 +221,19 @@ def process_fact_dim_sql_file(src_file_name: str, target_path: str, walk_parent:
     :param walk_parent: Assess if it needs to process the dependencies
     """
     table_name = extract_table_name(src_file_name)
-    table_folder=f"{target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/sql-scripts")
-    create_folder_if_not_exist(f"{table_folder}/tests")
-    create_makefile(table_name, "sql-scripts", "sql-scripts", table_folder)
+    table_folder=create_folder_structure(table_name,"sql-scripts", "sql-scripts",source_target_path)
     parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()
         parents=get_dependencies(table_name, sql_content)
+        parents=remove_already_processed_table(parents)
         merge_items_in_reporting_file(parents,TABLES_TO_PROCESS)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
         save_dml_ddl(table_folder, table_name, dml, ddl)
         merge_items_in_reporting_file([table_name],TABLES_DONE)   # add the current table to the processed tables
-    
-        # not sure we want that: merge_items_in_processing_file([table_name], TABLES_DONE)
     if walk_parent:
-        for parent in parents:
-            process_from_table_name(parent, target_path, walk_parent)
+        for parent_table_name in parents:
+            process_from_table_name(parent_table_name, source_target_path, walk_parent)
 
 
 
@@ -255,14 +257,12 @@ def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, 
     """
     print("\n\n-----------------------------")
     table_name = extract_table_name(sql_file_path)
-    if not find_table_already_processed(table_name, TABLES_DONE):
-        print(f"\t PROCESS file: {sql_file_path}")
-        if sql_file_path.find("source") > 0:
-            process_src_sql_file(sql_file_path, source_target_path)
-        else:
-            process_fact_dim_sql_file(sql_file_path, source_target_path, walk_parent)
+    print(f"\t PROCESS file: {sql_file_path}")
+    if sql_file_path.find("source") > 0:
+        process_src_sql_file(sql_file_path, source_target_path)
     else:
-        print(f"\t Table: {table_name} already processed.")
+        process_fact_dim_sql_file(sql_file_path, source_target_path, walk_parent)
+
 
 def process_files_in_folder(args):
     """

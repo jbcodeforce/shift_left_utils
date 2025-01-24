@@ -15,6 +15,7 @@ from langchain_ollama.llms import OllamaLLM
 from langchain_core.output_parsers import StrOutputParser
 import re
 
+
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
     description='Test Flink sql generation from a dbt sql file'
@@ -29,6 +30,7 @@ Create Flink SQL with a set of agents working within the following workflow
 3. be sure the Flink SQL is syntactically correct
 4. Generate the matching DDL for the dml
 """
+
 
 def extract_sql_blocks(text) -> str:
     """
@@ -63,9 +65,7 @@ Keep all the select statement defined with WITH keyword.
 Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 
 Do not use VARCHAR prefer STRING. 
-Do not wrap CONCAT statement with SHA.
-Transform sentence like: "to_date(concat_ws('-', year, right(concat('0', cast(month AS STRING)), 2), right(concat('0', cast(day AS STRING)), 2)))"
-to concat_ws('-', year, right(concat('0', cast(month AS STRING)), 2), right(concat('0', cast(day AS STRING)), 2)).toDate()
+Do not wrap CONCAT statement with SHA or MDA.
 
 Start the generated code with:
 
@@ -77,11 +77,11 @@ Question: {sql_input}
 
 flink_sql_syntaxic_template="""
 you are qwen-coder an agent expert in Apache Flink SQL syntax expert and your goal is to generate a cleaner Apache Flink SQL
-statement from the following {flink_sql}.
+statement from the following  statement: {flink_sql}.
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-Transform the column name `dl_landed_at` within a SELECT to `$rowtime` as dl_landed_at.
+When there is `dl_landed_at` within a SELECT, transform it to `$rowtime` as dl_landed_at.
 
 Do not generate explanations for the fixes you did.
 """
@@ -110,7 +110,7 @@ Finish the statement with the following declaration:
    'value.fields-include' = 'all'
 )
 
-Do not generate explanations for the fixes you did.
+Do not generate explanations for the generated text you did.
 """
 
 def remove_noise_in_sql(sql: str) -> str:
@@ -134,7 +134,7 @@ def define_flink_sql_agent():
     
     def run_translator_agent(state):
         """
-        change the sql_input string to the matching flink sql statement
+        change the sql_input string to the matching flink sql statement, and keep in state.flink_sql
         """
         print(f"\n--- Start translator Agent ---")
         prompt = ChatPromptTemplate.from_template(translator_template) 
@@ -173,15 +173,15 @@ def define_flink_sql_agent():
     
 
     workflow = StateGraph(AgentState)
-    workflow.add_node("translator", run_translator_agent)
-    workflow.add_node("cleaner", clean_sqls)
-    workflow.add_node("syntaxic_cleaner", syntax_cleaner)
+    workflow.add_node("translator", run_translator_agent)  # will update flink_sql
+    workflow.add_node("cleaner", clean_sqls)  # will update flink_sql
+    workflow.add_node("syntaxic_cleaner", syntax_cleaner)  # will update flink_sql
     workflow.add_node("ddl_generation", ddl_generation)
-    workflow.set_entry_point("translator")
 
-    workflow.add_edge("translator", "cleaner")
-    workflow.add_edge("cleaner","syntaxic_cleaner")
-    workflow.add_edge("syntaxic_cleaner", "ddl_generation")
+    workflow.set_entry_point("translator")
+    workflow.add_edge("translator", "syntaxic_cleaner")
+    workflow.add_edge("syntaxic_cleaner","cleaner")
+    workflow.add_edge("cleaner", "ddl_generation")
     workflow.add_edge("ddl_generation", END)
     app = workflow.compile()
     return app

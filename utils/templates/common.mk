@@ -2,7 +2,7 @@
 ENV_NAME=aws-west
 CLOUD=aws
 REGION=us-west-2
-MY_CONTEXT= 
+MY_CONTEXT= ${CCLOUD_CONTEXT}
 DB_NAME=cluster_0
 
 	
@@ -28,16 +28,16 @@ create_flink_statement = \
 	echo $$CPOOL_ID;\
 	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $$CPOOL_ID  --environment $$ENV_ID --context $(MY_CONTEXT) --wait 
 
+
+describe_flink_statement = \
+	confluent flink statement describe $1 --cloud $(CLOUD) --region $(REGION) 
+	
 pause_flink_statement = \
-	CPOOL_ID=$$(confluent flink compute-pool list | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1);\
-	echo $$CPOOL_ID;\
 	confluent flink statement stop $1 --cloud $(CLOUD) --region $(REGION) 
 
 resume_flink_statement = \
-	CPOOL_ID=$$(confluent flink compute-pool list | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1);\
-	echo $$CPOOL_ID;\
 	confluent flink statement resume $1 --cloud $(CLOUD) --region $(REGION) 
-
+	
 delete_flink_statement = \
 	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --context $(MY_CONTEXT)
 

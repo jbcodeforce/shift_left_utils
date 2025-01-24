@@ -25,8 +25,14 @@ create_{{ table_name }}: create_flink_ddl  create_flink_dml
 create_flink_ddl: 
 	$(call create_flink_statement, ddl-{{ statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
 
+describe_flink_ddl:
+	$(call describe_flink_statement,  ddl-{{ statement_name }})
+
 delete_flink_ddl:
 	$(call delete_flink_statement, ddl-{{ statement_name }})
+
+describe_flink_dml:
+	$(call describe_flink_statement,  dml-{{ statement_name }})
 
 create_flink_dml:
 	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 

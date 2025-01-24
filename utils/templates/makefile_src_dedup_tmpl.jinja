@@ -33,6 +33,9 @@ delete_flink_ddl:
 create_flink_dml:
 	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
 
+describe_flink_dml:
+	$(call describe_flink_statement,  dml-{{ statement_name }})
+	
 delete_flink_dml:
 	$(call delete_flink_statement, dml-{{ statement_name }})
 
