@@ -108,11 +108,12 @@ def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: 
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
 
-def create_tracking_doc(table_name: str,  out_dir: str):
+def create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=FileSystemLoader('.'))
     tracking_tmpl = env.get_template(f"{TMPL_FOLDER}/tracking_tmpl.jinja")
     context = {
         'table_name': table_name,
+        'src_file_name': src_file_name,
     }
     rendered_tracking_md = tracking_tmpl.render(context)
     with open(out_dir + '/tracking.md', 'w') as f:
@@ -155,7 +156,10 @@ def get_dependencies(table_name, dbt_script_content) -> list[str]:
     return dependencies
 
 def save_one_file(fname: str, content: str):
-    print(f"Write {fname}")
+    if "dml" in fname:
+        print(f"DML write: {fname}")
+    else:
+        print(f"DDL write: {fname}")
     with open(fname,"w") as f:
         f.write(content)
 
@@ -163,10 +167,10 @@ def save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
-    save_one_file(f"{content_path}/sql-scripts/dml.{table_name}.sql",dml)
     ddl_fn=f"{content_path}/sql-scripts/ddl.{table_name}.sql"
     save_one_file(ddl_fn,ddl)
     process_ddl_file(f"{content_path}/sql-scripts/",ddl_fn)
+    save_one_file(f"{content_path}/sql-scripts/dml.{table_name}.sql",dml)
 
 
 def remove_already_processed_table(parents: list[str]) -> list[str]:
@@ -176,18 +180,24 @@ def remove_already_processed_table(parents: list[str]) -> list[str]:
     """
     newParents=[]
     for parent in parents:
-        table_name=parent.replace("int_","").replace("_deduped","").strip()
+        table_name=parent.replace("src_","").strip()
         if not search_table_in_processed_tables(table_name):
-            newParents.append(table_name)
+            newParents.append(parent)
+        else:
+            print(f"{table_name} already processed")
     return newParents
 
-def create_folder_structure(table_name: str, ddl_folder_name:str, dml_folder_name:str, target_path: str):
+def create_folder_structure(src_file_name: str, ddl_folder_name:str, dml_folder_name:str, target_path: str):
+    if "src_" in src_file_name:
+        table_name = extract_table_name(src_file_name,"src_")
+    else:
+        table_name = extract_table_name(src_file_name)  
     table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/{dml_folder_name}")
     create_folder_if_not_exist(f"{table_folder}/{ddl_folder_name}")
     create_makefile(table_name, ddl_folder_name, dml_folder_name, table_folder)
-    create_tracking_doc(table_name,table_folder)
-    return table_folder
+    create_tracking_doc(table_name,src_file_name,table_folder)
+    return table_folder, table_name
 
 # ----- more specific functions
 def process_src_sql_file(src_file_name: str, source_target_path: str):
@@ -203,8 +213,7 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     :param source_target_path: the path for the newly created Flink sql file
 
     """
-    table_name = extract_table_name(src_file_name,"src_")
-    table_folder=create_folder_structure(table_name,"tests","dedups",source_target_path)
+    table_folder, table_name=create_folder_structure(src_file_name,"tests","dedups",source_target_path)
     create_ddl_squeleton(table_name,f"{table_folder}/tests")
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")    
     create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
@@ -220,8 +229,8 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     """
-    table_name = extract_table_name(src_file_name)
-    table_folder=create_folder_structure(table_name,"sql-scripts", "sql-scripts",source_target_path)
+    
+    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts", "sql-scripts",source_target_path)
     parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()
@@ -255,7 +264,6 @@ def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, 
     :param: the source folder  
     :param: the flag to process the parent hierarchy
     """
-    print("\n\n-----------------------------")
     table_name = extract_table_name(sql_file_path)
     print(f"\t PROCESS file: {sql_file_path}")
     if sql_file_path.find("source") > 0:
@@ -331,7 +339,8 @@ def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_par
 
     matching_sql_file=search_table_in_inventory(table_name, all_files)
     if matching_sql_file:
-        print(f"Start processing the table: {table_name} from the dbt file: {matching_sql_file}")
+        print(f"\n\n------------------------------------------")
+        print(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
         process_one_file(matching_sql_file, pipeline_folder_path, walk_parent)
     else:
         print("Matching sql file not found !")

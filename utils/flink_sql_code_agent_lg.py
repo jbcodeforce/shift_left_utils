@@ -4,15 +4,10 @@ from datetime import datetime
 from typing import Annotated, TypedDict, Union, Tuple
 
 from pathlib import Path
-from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.messages import BaseMessage
-from langchain_core.tools import tool
-from langchain.agents import create_react_agent
 from langgraph.graph import END, StateGraph
-from langgraph.prebuilt import ToolExecutor, ToolInvocation
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
-from langchain_core.output_parsers import StrOutputParser
+
 import re
 
 
@@ -32,24 +27,7 @@ Create Flink SQL with a set of agents working within the following workflow
 """
 
 
-def extract_sql_blocks(text) -> str:
-    """
-    Extract SQL code blocks from a given text.
-    
-    Args:
-        text (str): The input text containing SQL code blocks
-    
-    Returns:
-        list: A list of SQL code blocks found in the text
-    """
-    if text.find("```sql") > 0:
-        sql_blocks = re.findall(r'```sql\n(.*?)```', text, re.DOTALL) 
-        sql_block = ""
-        for line in sql_blocks: # back in one string
-            sql_block += line
-        return sql_block
-    else:
-        return text
+
 
 model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
 llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
@@ -81,7 +59,7 @@ statement from the following  statement: {flink_sql}.
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-When there is `dl_landed_at` within a SELECT, transform it to `$rowtime` as dl_landed_at.
+When there is `dl_landed_at` within a SELECT, transform it as: `$rowtime` as dl_landed_at
 
 Do not generate explanations for the fixes you did.
 """
@@ -113,6 +91,25 @@ Finish the statement with the following declaration:
 Do not generate explanations for the generated text you did.
 """
 
+def extract_sql_blocks(text) -> str:
+    """
+    Extract SQL code blocks from a given text.
+    
+    Args:
+        text (str): The input text containing SQL code blocks
+    
+    Returns:
+        list: A list of SQL code blocks found in the text
+    """
+    if text.find("```sql") > 0:
+        sql_blocks = re.findall(r'```sql\n(.*?)```', text, re.DOTALL) 
+        sql_block = ""
+        for line in sql_blocks: # back in one string
+            sql_block += line
+        return sql_block
+    else:
+        return text
+    
 def remove_noise_in_sql(sql: str) -> str:
     """
     remove final AS ( 

@@ -44,17 +44,29 @@ def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | Non
     else:
         return None
 
-def search_table_in_processed_tables(table_name: str) -> bool:
+def generic_search_in_processed_tables(table_name: str, root_folder: str) -> bool:
     """
-    It is assume that the table_name will a folder name in the tree from the pipeline folder
+    It is assume that the table_name will a folder name in the tree from the root folder
     """
-    pipeline_path=os.getenv("PIPELINE_FOLDER","../pipelines")
-    for root, dirs, files in os.walk(pipeline_path):
+    for root, dirs, files in os.walk(root_folder):
         for dir in dirs:
             if table_name == dir:
                 return True
     else:
         return False
+    
+    
+def search_table_in_processed_tables(table_name: str) -> bool:
+    """
+    Search in pipeline  and staging folders
+    """
+    pipeline_path=os.getenv("PIPELINE_FOLDER","../pipelines")
+    if not generic_search_in_processed_tables(table_name,pipeline_path):
+        staging_path=os.getenv("STAGING","../staging")
+        return generic_search_in_processed_tables(table_name,staging_path)
+    else:
+      return True
+
 
 def update_with_uri(file: str):
     """
