@@ -1,4 +1,0 @@
-export STAGING=../../data-platform-flink/staging
-export SRC_FOLDER=../../de-datawarehouse/models
-export CONFIG_FILE=../../data-platform-flink/config.yaml 
-export CCLOUD_CONTEXT=login-jboyer@mastercontrol.com-https://confluent.cloud
