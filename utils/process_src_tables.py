@@ -13,6 +13,7 @@ from flink_sql_code_agent_lg import translate_to_flink_sqls
 from jinja2 import Environment, FileSystemLoader
 import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
+from get_schema_for_src_table import search_matching_topic
 from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
 from clean_sql import process_ddl_file
 from kafka.app_config import get_config
@@ -79,9 +80,10 @@ def create_dedup_dml_squeleton(table_name:str, target_folder: str):
     file_name=f"{target_folder}/dml.{table_name}.sql" 
     env = Environment(loader=FileSystemLoader('.'))
     sql_template = env.get_template(f"{TMPL_FOLDER}/{DML_DEDUP_TMPL}")
-
+    topic_name=search_matching_topic(table_name)
     context = {
         'table_name': table_name,
+        'topic_name': topic_name
     }
     rendered_sql = sql_template.render(context)
     print(f"writing file {file_name}")

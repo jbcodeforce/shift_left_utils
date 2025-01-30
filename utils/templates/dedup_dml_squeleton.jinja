@@ -9,7 +9,8 @@ FROM (
       ROW_NUMBER() OVER (
         PARTITION BY `__db`
         ORDER
-          BY $rowtime ASC
+          BY __source_ts_ms DESC,
+          __ts_ms DESC
       ) AS row_num
-    FROM {{ table_name }}_raw
+    FROM {{ topic_name }}
 ) WHERE row_num = 1;
