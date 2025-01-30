@@ -1,8 +1,10 @@
--- recall that this is a temporary DDL as the CDC Debezium should create those topic and Flink CC create implicit table.
-CREATE TABLE IF NOT EXISTS {{ table_name }}_raw (
+CREATE TABLE IF NOT EXISTS {{ table_name }} (
   -- put columns here- BE SURE to put NOT NULL to the potential primary fields to avoid Flink SQL statement execution error on dedup DMLs
-) WITH (
-    'changelog.mode' = 'append',
-    'value.format' = 'avro-registry',
-    'value.fields-include' = 'all'
-);
+  PRIMARY KEY(__db) NOT ENFORCED
+) DISTRIBUTED BY (`__db`) INTO 1 BUCKETS
+WITH (
+  'changelog.mode' = 'upsert',
+  'key.format' = 'avro-registry',
+  'value.format' = 'avro-registry',
+   'value.fields-include' = 'all'
+)

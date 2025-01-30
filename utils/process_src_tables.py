@@ -22,7 +22,9 @@ TABLES_TO_PROCESS="./reports/tables_to_process.txt"
 TABLES_DONE="./reports/tables_done.txt"
 CREATE_TABLE_TMPL="create_table_squeleton.jinja"
 #DML_DEDUP_TMPL="dedup_dml_squeleton.jinja"
-DML_DEDUP_TMPL="dml_to_upsert.jinja"
+DML_DEDUP_TMPL="dedup_dml_squeleton.jinja"
+TEST_DEDUL_TMPL="test_dedup_statement.jinja"
+INPUT_TOPIC_LIST=os.getenv("STAGING") + "/src_topic_list.txt"
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
@@ -86,16 +88,26 @@ def create_dedup_dml_squeleton(table_name:str, target_folder: str):
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
 
+def create_test_dedup(table_name: str, target_folder: str):
+    file_name=f"{target_folder}/validate_no_duplicate.sql" 
+    env = Environment(loader=FileSystemLoader('.'))
+    sql_template = env.get_template(f"{TMPL_FOLDER}/{TEST_DEDUL_TMPL}")
+    context = {
+        'table_name': table_name,
+    }
+    rendered_sql = sql_template.render(context)
+    print(f"writing file {file_name}")
+    with open(file_name, 'w') as f:
+        f.write(rendered_sql)
+    
+
 def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str):
     """
     Create a makefile to help deploy Flink statements for the given table name
     When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
     """
     env = Environment(loader=FileSystemLoader('.'))
-    if dml_folder == "dedups":
-        makefile_template = env.get_template(f"{TMPL_FOLDER}/makefile_src_dedup_tmpl.jinja")
-    else:
-        makefile_template = env.get_template(f"{TMPL_FOLDER}/makefile_ddl_dml_tmpl.jinja")
+    makefile_template = env.get_template(f"{TMPL_FOLDER}/makefile_ddl_dml_tmpl.jinja")
     
     context = {
         'table_name': table_name,
@@ -195,6 +207,7 @@ def create_folder_structure(src_file_name: str, ddl_folder_name:str, dml_folder_
     table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/{dml_folder_name}")
     create_folder_if_not_exist(f"{table_folder}/{ddl_folder_name}")
+    create_folder_if_not_exist(f"{table_folder}/tests")
     create_makefile(table_name, ddl_folder_name, dml_folder_name, table_folder)
     create_tracking_doc(table_name,src_file_name,table_folder)
     return table_folder, table_name
@@ -203,9 +216,7 @@ def create_folder_structure(src_file_name: str, ddl_folder_name:str, dml_folder_
 def process_src_sql_file(src_file_name: str, source_target_path: str):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
-    It creates a tests folder for the ddl source raw table creation. This is done in the tests folder
-    as in staging or production environment the CDC Debezium tool will create those topics so tables.
-    The dedups folder includes a dml to dedup records from the raw table records.
+    It creates a tests folder.
 
     The source file is added to the table to process tracking file
 
@@ -213,10 +224,10 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     :param source_target_path: the path for the newly created Flink sql file
 
     """
-    table_folder, table_name=create_folder_structure(src_file_name,"tests","dedups",source_target_path)
-    create_ddl_squeleton(table_name,f"{table_folder}/tests")
-    create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")    
-    create_dedup_dml_squeleton(table_name,f"{table_folder}/dedups")
+    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts","sql-scripts",source_target_path)
+    create_ddl_squeleton(f"int_{table_name}_deduped",f"{table_folder}/sql-scripts")
+    create_dedup_dml_squeleton(f"{table_name}",f"{table_folder}/sql-scripts")   
+    create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
     # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 

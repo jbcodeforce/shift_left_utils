@@ -1,11 +1,6 @@
 
-CREATE TABLE IF NOT EXIST {{ table_name }}_dedup (
-  PRIMARY KEY(__db) NOT ENFORCED
-) DISTRIBUTED BY (__db) INTO 1 BUCKETS
-WITH (
-    'changelog.mode' = 'upsert',
-    'value.fields-include' = 'all'
-) AS SELECT
+INSERT INTO int_{{ table_name }}_deduped 
+SELECT
     *,
     -- change key and add columns
 FROM (

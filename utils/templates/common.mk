@@ -3,8 +3,7 @@ ENV_NAME=aws-west
 CLOUD=aws
 REGION=us-west-2
 MY_CONTEXT= ${CCLOUD_CONTEXT}
-DB_NAME=cluster_0
-
+DB_NAME=${CCLOUD_KAFKA_CLUSTER}
 	
 
 # --- common functions
@@ -42,13 +41,11 @@ delete_flink_statement = \
 	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --context $(MY_CONTEXT)
 
 list_topic_content = \
-	ENV_ID=$$(confluent environment list | grep ${ENV_NAME} | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}'); \
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
 	confluent kafka topic consume $1 --cluster $$CLUSTER_ID --environment $$ENV_ID --from-beginning
 
 # --- common
 list_topics: 
-	ENV_ID=$$(confluent environment list | grep ${ENV_NAME} | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}'); \
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
 	confluent kafka topic list --cluster  $$CLUSTER_ID --environment $$ENV_ID
 	
@@ -64,7 +61,6 @@ start_flink_shell:
 # -- init to get environments and compute pool
 init: 
 	@echo "Set env variables from $(ENV_NAME)"; \
-	export ENV_ID=$$(confluent environment list | grep ${ENV_NAME} | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}'); \
 	export CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
 	export CPOOL_ID=$$(confluent flink compute-pool list | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
 	echo $$ENV_ID $$CLUSTER_ID $$CPOOL_ID
