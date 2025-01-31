@@ -44,6 +44,7 @@ Do not add suggestions or explanations in the response, just return the structur
 
 Do not use VARCHAR prefer STRING. 
 Do not wrap CONCAT statement with SHA or MDA.
+When there is `dl_landed_at` within a SELECT, transform it as: `$rowtime` as dl_landed_at.
 
 Start the generated code with:
 
@@ -172,12 +173,12 @@ def define_flink_sql_agent():
     workflow = StateGraph(AgentState)
     workflow.add_node("translator", run_translator_agent)  # will update flink_sql
     workflow.add_node("cleaner", clean_sqls)  # will update flink_sql
-    workflow.add_node("syntaxic_cleaner", syntax_cleaner)  # will update flink_sql
+    #workflow.add_node("syntaxic_cleaner", syntax_cleaner)  # will update flink_sql
     workflow.add_node("ddl_generation", ddl_generation)
 
     workflow.set_entry_point("translator")
-    workflow.add_edge("translator", "syntaxic_cleaner")
-    workflow.add_edge("syntaxic_cleaner","cleaner")
+    workflow.add_edge("translator", "cleaner")
+    #workflow.add_edge("syntaxic_cleaner","cleaner")
     workflow.add_edge("cleaner", "ddl_generation")
     workflow.add_edge("ddl_generation", END)
     app = workflow.compile()

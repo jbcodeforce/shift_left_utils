@@ -83,7 +83,7 @@ def create_dedup_dml_squeleton(table_name:str, target_folder: str):
     topic_name=search_matching_topic(table_name)
     context = {
         'table_name': table_name,
-        'topic_name': topic_name
+        'topic_name': f"`{topic_name}`"
     }
     rendered_sql = sql_template.render(context)
     print(f"writing file {file_name}")
