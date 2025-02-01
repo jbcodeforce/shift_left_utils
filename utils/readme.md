@@ -1,5 +1,4 @@
 
-
 ## Summary of commands
 
 This section is quick summary of the full content of this readme.
@@ -7,33 +6,33 @@ This section is quick summary of the full content of this readme.
 * Get the parent hierarchy for a fact or dimension table:
 
 ```shs
-python find_pipeline.py -f ../../de-datawarehouse-main/models/facts/qx/fct_training_jobcode_unit.sql
+python find_pipeline.py -f $SRC_FOLDER/facts/fact_orders.sql
 ```
 
 * Generate from dbt source tables the matching Flink SQL DDL and Dedup DMLs into a temporary folder to finalize manually to the final pipelines folder:
 
 ```sh
-python process_src_tables.py -f ../../de-datawarehouse-main/models/sources -o to_process_staging/sources
+python process_src_tables.py -f $SRC_FOLDER/sources -o $STAGING/sources
 ```
 
 * Generate Flink SQL from one dbt file to the staging temporary folder
 
 ```sh
-python process_src_tables.py -f ../../de-datawarehouse-main/models/facts/qx/fct_training_jobcode_unit.sql -o to_process_staging/qx
+python process_src_tables.py -f $SRC_FOLDER/facts/fact_orders.sql -o $STAGING/orders
 ```
 
 * Once the Source DDL is executed successful, generate test data, 5 records, to send to the matching topic. It is 
 
 ```sh
 # -o is for the output file to get the json array of json objects to be send to the topic, -t is for table name, and -n is for the number of records to create
-python generate_data_for_table.py -o data.json -t tdc_sys_user_raw -n 5 
+python generate_data_for_table.py -o data.json -t fact_orders -n 5 
 ```
 
 * Send the test data to the target topic
 
 ```sh
 # -t for the topic name and -s source for prtal 
-python kafka_avro_producer.py -t portal_role_raw -s ../pipelines/sources/portal_role
+python kafka_avro_producer.py -t fact_orders -s $STAGING/pipelines/sources/orders
 ```
 
 ## Source and target folder structure
@@ -46,76 +45,47 @@ The target structure will look like in the following example:
 ```sh
 pipelines
 ├── dimensions
-│   └── qx
-│       ├── dim_trainee
+│       ├── dim_users
 │       │   ├── Makefile
 │       │   ├── sql-scripts
-│       │   │   ├── ddl.dim_trainee.sql
-│       │   │   └── dml.dim_trainee.sql
+│       │   │   ├── ddl.dim_users.sql
+│       │   │   └── dml.dim_users.sql
 │       │   └── tests
-│       └── dim_training_data
+│       └── dim_orders
 │           ├── Makefile
 │           ├── sql-scripts
-│           │   ├── ddl.dim_training_data.sql
-│           │   └── dml.dim_training_data.sql
+│           │   ├── ddl.dim_orders.sql
+│           │   └── dml.dim_orders.sql
 │           └── tests
 ├── facts
-│   └── qx
-│       ├── fct_training_data
+│       ├── fact_orders
 │       │   ├── Makefile
 │       │   ├── sql-scripts
-│       │   │   ├── ddl.fct_training_data.sql
-│       │   │   └── dml.fct_training_data.sql
+│       │   │   ├── ddl.fact_orders.sql
+│       │   │   └── dml.fact_orders.sql
 │       │   └── tests
-│       └── fct_user_role
-│           ├── Makefile
-│           ├── connector_config
-│           ├── sql-scripts
-│           │   ├── ddl.fct_user_role.sql
-│           │   └── dml.fct_user_role.sql
-│           └── tests
 ├── intermediates
-│   ├── int_training_data_unformatted
+│   ├── int_products
 │   │   ├── Makefile
 │   │   ├── sql-scripts
-│   │   │   ├── ddl.int_training_data_unformatted.sql
-│   │   │   └── dml.int_training_data_unformatted.sql
+│   │   │   ├── ddl.int_products.sql
+│   │   │   └── dml.int_products.sql
 │   │   └── tests
-│   └── qx
+
 ├── sources
-│   ├── exam_data
+│   ├── orders
 │   │   ├── Makefile
-│   │   ├── dedups
-│   │   │   └── dml.exam_data.sql
+│   │   ├── sql-scripts
+│   │   │   └── dml.orders.sql
+│   │       └── ddl.orders.sql
 │   │   └── tests
-│   │       └── ddl.exam_data.sql
-│   ├── mc_version
+│   ├── users
 │   │   ├── Makefile
-│   │   ├── dedups
-│   │   │   └── dml.mc_version.sql
+│   │   ├── sql-scripts
+│   │   │   └── dml.users.sql
+│   │       └── ddl.users.sql
 │   │   └── tests
-│   │       └── ddl.mc_version.sql
-│   ├── portal_role
-│   │   ├── Makefile
-│   │   ├── dedups
-│   │   │   └── dml.portal_role.sql
-│   │   └── tests
-│   │       ├── data.json
-│   │       └── ddl.portal_role.sql
-│   ├── portal_role_member
-│   │   ├── Makefile
-│   │   ├── dedups
-│   │   │   └── dml.portal_role_member.sql
-│   │   └── tests
-│   │       └── ddl.portal_role_member.sql
-│   ├── tdc_sys_user
-│   │   ├── Makefile
-│   │   ├── dedups
-│   │   │   └── dml.tdc_sys_user.sql
-│   │   └── tests
-│   │       ├── data.json
-│   │       ├── data.tdc_sys_user.sql
-│   │       └── ddl.tdc_sys_user.sql
+
 
 ```
 
@@ -125,17 +95,8 @@ The tool is `find_pipeline.py` which needs only one argument, the sql file name 
 
 ```sh
 # under utils folder
-python find_pipeline.py -f ../../de-datawarehouse-main/models/facts/qx/fct_user_role.sql
+python find_pipeline.py -f $SRC_FOLDER/facts/fact_users.sql
 ```
-
-Should return something like:
-
-('src_tdc_sys_user', None)
-('int_portal_role_deduped', '../../de-datawarehouse-main/models/intermediates/dedups/int_portal_role_deduped.sql')
-('int_tdc_sys_user_deduped', '../../de-datawarehouse-main/models/intermediates/dedups/int_tdc_sys_user_deduped.sql')
-('int_portal_role_member_deduped', '../../de-datawarehouse-main/models/intermediates/dedups/int_portal_role_member_deduped.sql')
-('src_portal_role_member', None)
-('src_portal_role', None)
 
 Source tables have no parent. 
 
@@ -168,33 +129,20 @@ The command arguments are:
 The following example will create a DML based on the same logic as the one in the sql script, and will add corresponding DDL to create the sink table:
 
 ```sh
-python process_src_tables.py -f ../../de-datawarehouse-main/models/facts/qx/fct_user_role.sql -o to_process_staging/qx
+python process_src_tables.py -f $SRC_FOLDER/facts/fact_users.sql -o $STAGING/users
 ```
 
 The tool also lists the dependencies in term of parent tables, up to the source files. It reuses the same functions of the `find_pipeline.py` module:
 
 ```sh
-Process the table: fct_user_role
+Process the table: fact_users
 Dependencies found:
-  - depends on : int_tdc_sys_user_deduped
-  - depends on : int_portal_role_member_deduped
-  - depends on : int_portal_role_deduped
+  - depends on : int_users_deduped
+  - depends on : int_user_roles_deduped
+  - depends on : int_user_groups_deduped
 ```
 
 For a given table, the tool creates one folder with the table name, a Makefile to help managing the Flink Statements with confluent cli, a `sql-scripts` folder for Flink ddl and dml statements. A `tests` folder to add `data.json` (using another tool) to do some basic testing.
-
-Example of created folders:
-
-```sh
-facts
-└──qx
-    └── fct_user_role
-        ├── Makefile
-        ├── sql-scripts
-        │   ├── ddl.fct_user_role.sql
-        │   └── dml.fct_user_role.sql
-        └── tests
-```
 
 As part of the process, developers need to validate the generated DDL and update the PRIMARY key to refect the expected key. This information is hidden in lot of files in the dbt, and it is not yet fully automated for the migration.
 
@@ -227,73 +175,15 @@ The `process_src_tables.py` creates or updates two tracking files under `process
 
 ```sh
 table_name, Type of dbt, DDL, DML, URI_SRC, URI_TGT
-fct_user_role,fact,T,T,facts/qx/fct_user_role.sql,pipelines/facts/qx/fct_user_role
+int_user_roles,fact,T,T,intermediates/int_user_roles.sql,pipelines/intermediates/user_role
 ```
-
-## Process from a table name
-
-To continue the example above, suppose the DDL was successfully created, to be able to get the dml, we need to process the parent tables as defined by the dependencies graph. `fct_user_role` depends on : `int_tdc_sys_user_deduped, int_portal_role_member_deduped, int_portal_role_deduped`
-
-We can launch the same tool to process the tables one by one given their name, the tool will search in the source dbt file for the table reference:
-
-```sh
-python process_src_tables.py  -t int_tdc_sys_user_deduped  -o ../to_process_staging/qx
-```
-
-Process the table: int_tdc_sys_user_deduped
-Dependencies found:
-  - depends on : src_tdc_sys_user
-
-```
-intermediates
-└── qx
-    └── int_tdc_sys_user_deduped
-        ├── Makefile
-        ├── sql-scripts
-        │   ├── ddl.int_tdc_sys_user_deduped.sql
-        │   └── dml.int_tdc_sys_user_deduped.sql
-        └── tests
-```
-
-! This is when it becomes a little bit tricky, as analysis should lead to refectoring.  Intermediate tables, name starting with `int_`, include some transformation and filtering logic or but also some deduplication.  It was decided to do the deduplication as early as possible. close to the raw data. So when migrating source table, the tool prepare a dml to do the dedup, which means partitioning on the `__db` field and the primary key of the table. It is also leveraging the Flink table changelog format as `upsert` to keet the last record for a given key.
-
-The source table is coming from a topic and the `src_tdc_sys_user.sql` as the following source structure:
-
-```sql
-with 
-tdc_sys_user as (select * from {{ source('mc_qx','tdc_sys_user') }})
-
-,final as (
-
-    select 
-        * 
-    from tdc_sys_user
-    {{limit_tenants()}}
-    {{limit_ts_ms()}}
-
-)
-
-select * from final
-```
-
-The tool has identified the source of `int_tdc_sys_user_deduped` is `src_tdc_sys_user` and this sql file uses `tdc_sys_user` as the source table. This source table structure is defined in Databrick, so using Databricks console, we can update the generated DDL to complete the column definitions. 
-
-The conditions in previous example, use the `limit_tenants` and `limit_ts_ms` which may not be relevant when running in Flink as this logic is used to filter out records in the batch processing as the order of records is not guarantee. In Kafka topic the records are in append mode so ordered over time and each records with the same key will be in the same topic/partition. 
-
-Doing the following command creates the source ddl and dml statements to do the dedups for this source table. The logic of the tool is to look at the table name pattern so `src_` is a source table. We could find a better heuristic in the future.
-
-```sh
-python process_src_tables.py -t src_tdc_sys_user -o to_process_staging/qx
-```
-
-To complete the dedup logic it is import to understand the dbt dedup macro and the intermediate sql to see if there is something important to add and definitively to get the goof column names used for partitioning.
 
 ## Create test data from schema registry 
 
 Once the source DDL is completed in Flink, the Topic is created in Kafka and the value and key schemas are published to the schema registry. In future development those topics and schemas are created in the MC platform.
 
 ```sh
-python generate_data_for_table.py -o data.json -t tdc_sys_user_raw -n 5 
+python generate_data_for_table.py -o data.json -t fact_users -n 5 
 ```
 
 Send the test data to the target topic

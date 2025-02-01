@@ -4,6 +4,11 @@ import os, argparse
 from collections import deque
 from pathlib import Path
 
+"""
+Provides a set of function to search dependencies from one sink table up to the sources.
+It reads the from logic for each sql file and build a queue of tables to seach.
+"""
+
 files_to_process= deque()
 dependency_list = set()
 
@@ -17,9 +22,12 @@ parser.add_argument('-s', '--save_file_name', required=True, help="name of the f
 
 def process_files_from_queue(files_to_process, all_files):
     """
-    For each file in the queue get the parents (dependencies) of the table
-    declare in the file. Get the matching file name in the dbt project of each of those parent table,
-    when found at this file to the queue so this code can build the dependency pipeline
+    For each file in the queue get the parents (dependencies) of the table declared in the file. 
+    Get the matching file name in the dbt project of each of those parent table,
+    when found add the filename to the queue so this code can build the dependency pipeline.
+
+    :parameter: files to process
+    :parameter: all_files: an inventory of all sql file in a project.
     """
     if (len(files_to_process) > 0):
         fn = files_to_process.popleft()
@@ -58,12 +66,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_files= build_all_file_inventory()
     files_to_process.append(args.file_name)
-    dl=process_files_from_queue(files_to_process, all_files)
-    output=generate_tracking_output(args.file_name, dl)
+    dependencies=process_files_from_queue(files_to_process, all_files)
+    output=generate_tracking_output(args.file_name, dependencies)
     if args.save_file_name:
         with open(args.save_file_name, "w") as f:
             f.write(output)
-            print(f"\n Saved to {args.save_file_name}")
+            print(f"\n Save result to {args.save_file_name}")
     print(output)
 
         
