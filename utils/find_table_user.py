@@ -2,6 +2,17 @@ import os, argparse
 from functools import lru_cache
 from process_src_tables import list_sql_files
 
+"""
+Find the consumers of a given table by searching the table name used in the FROM within
+Flink SQL statement.
+The tool search from a root folder given in parameter.
+
+For example to search for the existing pipelines the call will be
+
+python find_table_user.py -r ../pipelines/ -t mc_users -s list_tables.txt
+"""
+
+
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
     description='Get the flink sqls which are referencing the named table'
@@ -25,10 +36,17 @@ def build_all_file_inventory(root_folder: str) -> set[str]:
         return set()
 
 def extract_table_name(file_path: str) -> str:
+    """
+    Given the file path that includes the name of the table return the last element of the path
+    ehich should be a table_name
+    """
     last_name = file_path.split("/")[-1]
     return last_name
 
 def process_each_sql_file(table_name: str, file_path: str) -> str:
+    """
+    Search if the table name is referenced in the file content specified by the file_path
+    """
     if table_name in file_path:
         # do not want to reference itself
         return None
@@ -40,6 +58,9 @@ def process_each_sql_file(table_name: str, file_path: str) -> str:
     return None
 
 def build_report(table_name: str, results):
+    """
+    Create a human readable report.
+    """
     output=f"# {table_name} is referenced in "
     if len(results) == 0:
         output+="\n\t no table ... yet"

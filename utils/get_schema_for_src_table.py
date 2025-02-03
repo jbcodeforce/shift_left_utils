@@ -1,5 +1,9 @@
 """
-Get the SQL schema given a topic name, using the `show create table ` and the REST API
+Set of function to get table information, mostly for source topics.
+
+* Function to get the matching topic name given a table name.
+* Get the SQL schema given a topic name, using the `show create table ` and 
+the Confluent Cloud Flink REST API.
 """
 
 import os, time
@@ -11,11 +15,13 @@ TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 BEARER_TOKEN=os.getenv("API_SECRET")
 
 class ConfluentFlinkClient:
+    """
+    Confluent Cloud client to connect to CC and execute queries using REST API.
+    """
     def __init__(self, api_key, api_secret, cloud_api_endpoint):
         self.api_key = api_key
         self.api_secret = api_secret
         self.cloud_api_endpoint = cloud_api_endpoint
-
         self.auth_header = self._generate_auth_header()
         
     def _generate_auth_header(self):
@@ -24,7 +30,7 @@ class ConfluentFlinkClient:
         encoded_credentials = b64encode(credentials.encode('utf-8')).decode('utf-8')
         return f"Basic {encoded_credentials}"
     
-    def _make_request(self, method, endpoint, data=None):
+    def make_request(self, method, endpoint, data=None):
         """Make HTTP request to Confluent Cloud API"""
         headers = {
             "Authorization": self.auth_header,
@@ -32,50 +38,34 @@ class ConfluentFlinkClient:
         }
         
         url = f"{self.cloud_api_endpoint}{endpoint}"
-        print(headers)
         response = requests.request(
             method=method,
             url=url,
             headers=headers,
             json=data
         )
-        
+        if response.status_code in [200,202]:
+            print(response.request.body)
+            print("Response headers:", response.headers)
+            print("Response content:", response.content)
+        else:
+            print("Request failed:", response.status_code)
         response.raise_for_status()
         return response.json()
-    
-    def execute_flink_sql(self, organization_id, environment_id, statement_name, sql_statement):
-        """Execute a Flink SQL statement"""
-        
-        # Create the SQL statement
-        statement_data = {
-            "name": statement_name,
-            "statement": sql_statement,
-            "properties": {
-                "execution.runtime-mode": "STREAMING"
-            }
-        }
-        
-        # Submit the statement
-        endpoint = f"/sql/v1/organizations/{organization_id}/environments/{environment_id}/statements"
-        response = self._make_request("POST", endpoint, statement_data)
-        statement_id = response["id"]
-        
-        # Poll for statement completion
-        while True:
-            status = self.get_statement_status(endpoint, statement_id)
-            print(status)
-            if status["phase"] in ["COMPLETED", "FAILED"]:
-                return status
-            time.sleep(5)
     
     def get_statement_status(self, endpoint, statement_id):
         """Get the status of a Flink SQL statement"""
         endpoint = f"{endpoint}/{statement_id}"
-        return self._make_request("GET", endpoint)
+        return self.make_request("GET", endpoint)["status"]
     
 
 
 def find_sub_string(table_name, topic_name) -> bool:
+    """
+    Topic name may includes words separated by ., and table may have words
+    separated by _, so try to find all the words defining the name of the table
+    to be in the topic name
+    """
     words=table_name.split("_")
     subparts=topic_name.split(".")
     all_present = True
@@ -86,6 +76,9 @@ def find_sub_string(table_name, topic_name) -> bool:
     return all_present
 
 def search_matching_topic(table_name: str) -> str:
+    """
+    Given the table name search in the list of topics the potential matching topic.
+    """
     with open(TOPIC_LIST_FILE,"r") as f:
         for line in f:
             if table_name == line:
@@ -94,45 +87,93 @@ def search_matching_topic(table_name: str) -> str:
                 return line
             elif find_sub_string(table_name,line):
                 return line
+            else:
+                print(f"{table_name} not found in topic list")
     return table_name
 
 
-def post_show_create_table(config):
-    url=f"https://flink.{config["confluent_cloud"]["region"]}.{config["confluent_cloud"]["provider"]}.confluent.prod"
-    print(url)
-    client = ConfluentFlinkClient(config["flink"]["api_key"], config["flink"]["api_secret"], url)
-    sql_statement = """
-    SHOW CREATE TABLE `clone.prod.mc.dbo.training_competency`
-    """
-    
-    try:
-        # Execute the SQL statement
-        result = client.execute_flink_sql(
-            organization_id=config["confluent_cloud"]["organization_id"],
-            environment_id=config["confluent_cloud"]["environment_id"],
-            statement_name="example_query",
-            sql_statement=sql_statement
-        )
-        
-        print("Statement execution result:", json.dumps(result, indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error executing Flink SQL: {e}")
-
 def get_environment_list(config):
+    """
+    Get the list of environments. use the CC resource api_key
+    """
     url=f"https://{config["confluent_cloud"]["base_api"]}"
     client = ConfluentFlinkClient(config["confluent_cloud"]["api_key"], config["confluent_cloud"]["api_secret"], url)
     try:
-        # Execute the SQL statement
-        result = client._make_request("GET","/environments")
-        
+        result = client.make_request("GET","/environments")
         print("Statement execution result:", json.dumps(result, indent=2))
+        return result
     except requests.exceptions.RequestException as e:
         print(f"Error executing rest call: {e}")
 
+def _build_flink_client(config):
+    region=config["confluent_cloud"]["region"]
+    cloud_provider=config["confluent_cloud"]["provider"]
+    organization_id=config["confluent_cloud"]["organization_id"]
+    env_id=config["confluent_cloud"]["environment_id"]
+    url=f"https://flink.{region}.{cloud_provider}.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
+    return ConfluentFlinkClient(config["flink"]["api_key"], config["flink"]["api_secret"], url), url
+   
+
+def get_flink_statement_list(config): 
+    client, _ = _build_flink_client(config)
+    try:
+        result = client.make_request("GET","/statements")
+        print("Statement execution result:", json.dumps(result, indent=2))
+        return result
+    except requests.exceptions.RequestException as e:
+        print(f"Error executing rest call: {e}")
+
+def get_compute_pool_list(config): 
+    env_id=config["confluent_cloud"]["environment_id"]
+    url=f"https://confluent.cloud/api/fcpm/v2/compute-pools?environment={env_id}"
+    client=ConfluentFlinkClient(config["confluent_cloud"]["api_key"], config["confluent_cloud"]["api_secret"], url)
+    try:
+        result = client.make_request("GET","")
+        print("Statement execution result:", json.dumps(result, indent=2))
+        return result
+    except requests.exceptions.RequestException as e:
+        print(f"Error executing rest call: {e}")
+
+def post_flink_statement(config, statement_name: str, sql_statement: str, stopped: False): 
+    client, url = _build_flink_client(config)
+    statement_data = {
+            "name": statement_name,
+            "organization_id": config["confluent_cloud"]["organization_id"],
+            "environment_id": config["confluent_cloud"]["environment_id"],
+            "spec": {
+                "statement": sql_statement,
+                "compute_pool_id":  config["flink"]["compute_pool_id"],
+                "stopped": stopped
+            }
+        }
+    try:
+        response = client.make_request("POST","/statements", statement_data)
+        print(response)
+        statement_id = response["metadata"]["uid"]
+        while True:
+            status = client.get_statement_status("/statements", statement_name)
+            if status["phase"] in ["COMPLETED"]:
+                results=client.make_request("GET",f"/statements/{statement_name}/results")
+                return results.data[0]["row"]
+            time.sleep(5)
+    except requests.exceptions.RequestException as e:
+        print(f"Error executing rest call: {e}")
+
+def delete_flink_statement(config, statement_name):
+    client, url = _build_flink_client(config)
+    try:
+        status=client.make_request("DELETE",f"/statements/{statement_name}")
+        print(status)
+    except requests.exceptions.RequestException as e:
+        print(f"Error executing rest call: {e}")
 
 if __name__ == "__main__":
     config=get_config()
-    get_environment_list(config)
+    #get_environment_list(config)
+    #get_compute_pool_list(config)
+    #get_flink_statement_list(config)
+    schema=post_flink_statement(config,"show-ct-1","show create table `j9r-env`.`j9r-kafka`.`order_enriched`;", True)
+    print(schema)
+    delete_flink_statement(config,"show-ct-1")
     #print(search_matching_topic("production_record_status"))
     #print(search_matching_topic("tdc_doc_document_type"))
