@@ -1,7 +1,7 @@
 
-INSERT INTO int_{{ table_name }}_deduped 
+INSERT INTO {{ table_name }}
 SELECT
-    *,
+    {{ fields }}
     -- change key and add columns
 FROM (
     select
@@ -9,8 +9,7 @@ FROM (
       ROW_NUMBER() OVER (
         PARTITION BY `__db`
         ORDER
-          BY __source_ts_ms DESC,
-          __ts_ms DESC
+          BY `$rowtime` ASC
       ) AS row_num
     FROM {{ topic_name }}
 ) WHERE row_num = 1;

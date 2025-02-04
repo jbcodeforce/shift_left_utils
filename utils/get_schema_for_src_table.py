@@ -78,17 +78,17 @@ def find_sub_string(table_name, topic_name) -> bool:
 def search_matching_topic(table_name: str) -> str:
     """
     Given the table name search in the list of topics the potential matching topic.
+    return the topic name if found otherwise return the table name
     """
     with open(TOPIC_LIST_FILE,"r") as f:
         for line in f:
+            line=line.strip()
             if table_name == line:
                 return line
             elif table_name in line:
                 return line
             elif find_sub_string(table_name,line):
                 return line
-            else:
-                print(f"{table_name} not found in topic list")
     return table_name
 
 
@@ -110,7 +110,10 @@ def _build_flink_client(config):
     cloud_provider=config["confluent_cloud"]["provider"]
     organization_id=config["confluent_cloud"]["organization_id"]
     env_id=config["confluent_cloud"]["environment_id"]
-    url=f"https://flink.{region}.{cloud_provider}.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
+    if config["flink"]["url_scope"].lower() == "private":
+        url=f"https://flink.{region}.{cloud_provider}.private.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
+    else:
+        url=f"https://flink.{region}.{cloud_provider}.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
     return ConfluentFlinkClient(config["flink"]["api_key"], config["flink"]["api_secret"], url), url
    
 
@@ -154,7 +157,7 @@ def post_flink_statement(config, statement_name: str, sql_statement: str, stoppe
             status = client.get_statement_status("/statements", statement_name)
             if status["phase"] in ["COMPLETED"]:
                 results=client.make_request("GET",f"/statements/{statement_name}/results")
-                return results.data[0]["row"]
+                return results
             time.sleep(5)
     except requests.exceptions.RequestException as e:
         print(f"Error executing rest call: {e}")
@@ -167,13 +170,47 @@ def delete_flink_statement(config, statement_name):
     except requests.exceptions.RequestException as e:
         print(f"Error executing rest call: {e}")
 
+def mock_result() -> dict:
+    return {'api_version': 'sql/v1', 'kind': 'StatementResult', 'metadata': {'created_at': '2025-02-03T20:18:11.285278Z', 'next': '', 'self': 'https://flink.us-west-2.aws.private.confluent.cloud/sql/v1/organizations/5329e19e-9edd-4b41-9dcf-fa5710edbd96/environments/env-p6272/statements/show-ct-1/results'}, 'results': {'data': [{'row': ["CREATE TABLE `development_non-prod-TG`.`development-us-west-2-dedicated`.`clone.prod.mc.dbo.web_business_unit` (\n  `key` VARBINARY(2147483647),\n  `unit_id` VARCHAR(2147483647) NOT NULL,\n  `unit_name` VARCHAR(2147483647) NOT NULL,\n  `__op` VARCHAR(2147483647),\n  `__db` VARCHAR(2147483647),\n  `__snapshot` VARCHAR(2147483647),\n  `__source_ts_ms` BIGINT,\n  `__ts_ms` BIGINT,\n  `__deleted` VARCHAR(2147483647),\n  `__keys` VARCHAR(2147483647) NOT NULL\n)\nDISTRIBUTED BY HASH(`key`) INTO 1 BUCKETS\nWITH (\n  'changelog.mode' = 'append',\n  'connector' = 'confluent',\n  'kafka.cleanup-policy' = 'delete',\n  'kafka.max-message-size' = '4194328 bytes',\n  'kafka.retention.size' = '0 bytes',\n  'kafka.retention.time' = '0 ms',\n  'key.format' = 'raw',\n  'scan.bounded.mode' = 'unbounded',\n  'scan.startup.mode' = 'earliest-offset',\n  'value.avro-registry.schema-context' = '.cluster_link',\n  'value.format' = 'avro-registry'\n)\n"]}]}}
+
+def extract_column_definitions(sql_str: str) -> tuple[str,str]:
+    result=""
+    fields=""
+    lines = sql_str.split("\n")
+    for line in lines:
+        if "CREATE TABLE" in line or " `key` VARBINARY" in line:
+            continue
+        if "DISTRIBUTED" in line:
+            break
+        else:
+            if line.strip() != ")":
+                result+=line + "\n"
+                fields+=line.strip().split(" ")[0]+",\n"
+    return result[:-1]+",", fields[:-2]
+
+def get_column_definitions(table_name: str, config) -> tuple[str,str]:
+    src_topic_name = search_matching_topic(table_name)
+    if src_topic_name:
+        response= post_flink_statement(config,"show-ct-1", f"show create table `{config["flink"]['catalog_name']}`.`{config["flink"]['database_name']}`.`{src_topic_name}`;", True)
+        delete_flink_statement(config,"show-ct-1")
+        return extract_column_definitions(response["results"]["data"][0]["row"][0])
+    else:
+        return "",""
+    
 if __name__ == "__main__":
     config=get_config()
+    columns,fields = get_column_definitions("training_unit",config)
+
+
     #get_environment_list(config)
     #get_compute_pool_list(config)
     #get_flink_statement_list(config)
-    schema=post_flink_statement(config,"show-ct-1","show create table `j9r-env`.`j9r-kafka`.`order_enriched`;", True)
-    print(schema)
-    delete_flink_statement(config,"show-ct-1")
-    #print(search_matching_topic("production_record_status"))
+    #schema=post_flink_statement(config,"show-ct-1","show create table `development_non-prod-TG`.`development-us-west-2-dedicated`.`clone.prod.mc.dbo.web_business_unit`;", True)
+    #schema=mock_result()
+    #sql_str=schema["results"]["data"][0]["row"][0]
+    #columns,fields=extract_column_definitions(sql_str)
+    print(columns)
+    print(fields)
+    # delete_flink_statement(config,"show-ct-1")
+    #print(search_matching_topic("training_unit"))
     #print(search_matching_topic("tdc_doc_document_type"))

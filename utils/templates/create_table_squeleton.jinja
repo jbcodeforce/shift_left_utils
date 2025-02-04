@@ -1,9 +1,8 @@
 CREATE TABLE IF NOT EXISTS {{ table_name }} (
-  
-  -- put columns here- BE SURE to put NOT NULL to the potential primary fields to avoid Flink SQL statement execution error on dedup DMLs
 
-  PRIMARY KEY(__db) NOT ENFORCED
-) DISTRIBUTED BY HASH(`__db`) INTO 1 BUCKETS
+  {{ column_definitions }}
+  PRIMARY KEY({{ default_PK }}) NOT ENFORCED
+) DISTRIBUTED BY HASH({{ default_PK }}) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
   'key.format' = 'avro-registry',

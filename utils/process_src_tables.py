@@ -13,7 +13,7 @@ from flink_sql_code_agent_lg import translate_to_flink_sqls
 from jinja2 import Environment, FileSystemLoader
 import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
-from get_schema_for_src_table import search_matching_topic
+from get_schema_for_src_table import search_matching_topic, get_column_definitions
 from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
 from clean_sql import process_ddl_file
 from kafka.app_config import get_config
@@ -49,7 +49,7 @@ def create_file_if_not_exist(new_file):
            f.write("")
 
 
-def create_ddl_squeleton(table_name:str, target_folder: str):
+def create_ddl_squeleton(table_name:str, config: dict, target_folder: str):
     """
     Create in the target folder a ddl sql squeleton file for the given table name
 
@@ -57,19 +57,28 @@ def create_ddl_squeleton(table_name:str, target_folder: str):
     :param target_folder: The folder where to create the ddl statement as sql file
     :return: create a file in the target folder
     """
-    file_name=f"{target_folder}/ddl.{table_name}.sql" 
+    if config["app"]["default_PK"]:
+        pk_to_use= config["app"]["default_PK"]
+    else:
+        pk_to_use="__pd"
+    fname=config["app"]["dedup_table_name_prefix"] + table_name + config["app"]["dedup_table_name_suffix"]
+    file_name=f"{target_folder}/ddl.{fname}.sql" 
+
     env = Environment(loader=FileSystemLoader('.'))
     sql_template = env.get_template(f"{TMPL_FOLDER}/{CREATE_TABLE_TMPL}")
-
+    column_definitions, fields=get_column_definitions(table_name, config)
     context = {
-        'table_name': table_name,
+        'table_name': fname,
+        'column_definitions': column_definitions,
+        'default_PK': pk_to_use
     }
     rendered_sql = sql_template.render(context)
     print(f"writing file {file_name}")
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
+    return fields
 
-def create_dedup_dml_squeleton(table_name:str, target_folder: str):
+def create_dedup_dml_squeleton(table_name:str, target_folder: str, fields: str):
     """
     Create in the target folder a dml sql squeleton file for the given table name
 
@@ -78,12 +87,14 @@ def create_dedup_dml_squeleton(table_name:str, target_folder: str):
     :return: create a file in the target folder
     """
     file_name=f"{target_folder}/dml.{table_name}.sql" 
+    fname=config["app"]["dedup_table_name_prefix"] + table_name + config["app"]["dedup_table_name_suffix"]
     env = Environment(loader=FileSystemLoader('.'))
     sql_template = env.get_template(f"{TMPL_FOLDER}/{DML_DEDUP_TMPL}")
     topic_name=search_matching_topic(table_name)
     context = {
-        'table_name': table_name,
-        'topic_name': f"`{topic_name}`"
+        'table_name': fname,
+        'topic_name': f"`{topic_name}`",
+        'fields': fields
     }
     rendered_sql = sql_template.render(context)
     print(f"writing file {file_name}")
@@ -215,7 +226,7 @@ def create_folder_structure(src_file_name: str, ddl_folder_name:str, dml_folder_
     return table_folder, table_name
 
 # ----- more specific functions
-def process_src_sql_file(src_file_name: str, source_target_path: str):
+def process_src_sql_file(src_file_name: str, generated_code_folder_name: str, config: dict):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
     It creates a tests folder.
@@ -226,14 +237,14 @@ def process_src_sql_file(src_file_name: str, source_target_path: str):
     :param source_target_path: the path for the newly created Flink sql file
 
     """
-    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts","sql-scripts",source_target_path)
-    create_ddl_squeleton(f"int_{table_name}_deduped",f"{table_folder}/sql-scripts")
-    create_dedup_dml_squeleton(f"{table_name}",f"{table_folder}/sql-scripts")   
+    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts","sql-scripts",generated_code_folder_name)
+    fields=create_ddl_squeleton(table_name,config, f"{table_folder}/sql-scripts")
+    create_dedup_dml_squeleton(f"{table_name}",f"{table_folder}/sql-scripts", fields)   
     create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
     # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
-def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_parent: bool = False):
+def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_parent: bool = False, config: dict= {}):
     """
     Transform stage, fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -255,7 +266,7 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
         merge_items_in_reporting_file([table_name],TABLES_DONE)   # add the current table to the processed tables
     if walk_parent:
         for parent_table_name in parents:
-            process_from_table_name(parent_table_name, source_target_path, walk_parent)
+            process_from_table_name(parent_table_name, source_target_path, walk_parent, config)
 
 
 
@@ -270,19 +281,18 @@ def create_target_folder(target_root_folder: str) -> str:
     return sources_path
 
 
-def select_src_sql_file_processing(sql_file_path: str, source_target_path: str, walk_parent: bool = False):
+def select_src_sql_file_processing(sql_file_path: str, generated_code_folder_name: str, walk_parent: bool = False, config: dict = {}):
     """
     Routing fct to select the relevant processing for the given SQL source file.
     :param: the sql file to process
-    :param: the source folder  
-    :param: the flag to process the parent hierarchy
+    :param: the generated code folder name e.g. $STAGING/ab 
+    :param: the flag to process the parent hierarchy or not
     """
-    table_name = extract_table_name(sql_file_path)
     print(f"\t PROCESS file: {sql_file_path}")
     if sql_file_path.find("source") > 0:
-        process_src_sql_file(sql_file_path, source_target_path)
+        process_src_sql_file(sql_file_path, generated_code_folder_name, config)
     else:
-        process_fact_dim_sql_file(sql_file_path, source_target_path, walk_parent)
+        process_fact_dim_sql_file(sql_file_path, generated_code_folder_name, walk_parent, config)
 
 
 def process_files_in_folder(args):
@@ -297,10 +307,10 @@ def process_files_in_folder(args):
         print("\n\n----------")
 
 
-def process_one_file(src_file: str, target_folder: str, process_dependency: bool = False):
+def process_one_file(src_file: str, target_folder: str, process_dependency: bool = False, config: dict = {}):
     """ Process one sql file """
-    sources_path=create_target_folder(target_folder)
-    select_src_sql_file_processing(src_file, sources_path, process_dependency)
+    generated_code_folder_name=create_target_folder(target_folder)
+    select_src_sql_file_processing(src_file, generated_code_folder_name, process_dependency, config)
 
 
 def merge_items_in_reporting_file(dependencies: list[str], persistent_file):
@@ -324,6 +334,8 @@ def merge_items_in_reporting_file(dependencies: list[str], persistent_file):
             for element in elements_to_add:
                 file.write(f"{element}\n")
 
+
+
 def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
     """
     List the dependencies for the given file, or all the dependencies of all tables in the given folder
@@ -339,9 +351,9 @@ def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
     else:
         # loop over the files in the folder
         for file in list_sql_files(file_or_folder):
-            list_dependencies(file)
+            list_dependencies(file,persist_dependencies)
 
-def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool):
+def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool, config: dict):
     """
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
@@ -354,7 +366,7 @@ def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_par
     if matching_sql_file:
         print(f"\n\n------------------------------------------")
         print(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
-        process_one_file(matching_sql_file, pipeline_folder_path, walk_parent)
+        process_one_file(matching_sql_file, pipeline_folder_path, walk_parent, config)
     else:
         print("Matching sql file not found !")
     
@@ -372,11 +384,11 @@ if __name__ == "__main__":
         sys.exit()
     if args.folder_path:
         if args.folder_path.endswith(".sql"):
-            process_one_file(args.folder_path, args.pipeline_folder_path, args.pd)
+            process_one_file(args.folder_path, args.pipeline_folder_path, args.pd, config)
         else:    
             process_files_in_folder(args)
     elif args.table_name:
-        process_from_table_name(args.table_name, args.pipeline_folder_path, args.pd)
+        process_from_table_name(args.table_name, args.pipeline_folder_path, args.pd, config)
 
     print("\n\nDone !")
     
