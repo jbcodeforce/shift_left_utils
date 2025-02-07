@@ -7,5 +7,8 @@ WITH (
   'changelog.mode' = 'upsert',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
-   'value.fields-include' = 'all'
+  'kafka.retention.time' = '0',
+   'scan.bounded.mode' = 'unbounded',
+   'scan.startup.mode' = 'earliest-offset',
+  'value.fields-include' = 'all'
 )

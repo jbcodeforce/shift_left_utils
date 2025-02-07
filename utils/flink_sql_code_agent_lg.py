@@ -34,16 +34,16 @@ llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
 translator_template = """
-you are qwen-coder an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
+you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
 You need to translate the dbt sql statement given as sql input and transform it into a
-Flink SQL statement with same semantic.
+Flink SQL statement with the same semantic.
 
-Keep all the select statement defined with WITH keyword.
+Keep all the select statements defined with the WITH keyword.
 
 Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 
 Do not use VARCHAR prefer STRING. 
-Do not wrap CONCAT statement with SHA or MDA.
+
 When there is `dl_landed_at` within a SELECT, transform it as: `$rowtime` as dl_landed_at.
 
 Start the generated code with:
@@ -75,7 +75,7 @@ The resulting ddl for the table {table_name} should include STRING for any _id c
 
 Do not use VARCHAR prefer STRING. 
 
-Use CREATE TABLE IF NOT EXIST instead of CREATE TABLE
+Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
@@ -84,8 +84,12 @@ Remove column name dl_landed_at within create table or select.
 Finish the statement with the following declaration:
 
    PRIMARY KEY(ID) NOT ENFORCED -- VERIFY KEY
-) WITH ( 'changelog.mode' = 'upsert',
+) WITH ( 'changelog.mode' = 'retract',
    'value.format' = 'avro-registry',
+   'kafka.retention.time' = '0',
+   'key.format' = 'avro-registry',
+   'scan.bounded.mode' = 'unbounded',
+   'scan.startup.mode' = 'earliest-offset',
    'value.fields-include' = 'all'
 )
 
