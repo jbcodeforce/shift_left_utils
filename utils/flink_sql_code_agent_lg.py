@@ -58,8 +58,6 @@ statement from the following  statement: {flink_sql}.
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-When there is `dl_landed_at` within a SELECT, transform it as: `$rowtime` as dl_landed_at
-
 Do not generate explanations for the fixes you did.
 """
 

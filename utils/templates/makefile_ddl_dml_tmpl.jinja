@@ -23,12 +23,19 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, ddl-{{ statement_name }})
 
+drop_table_mc_version: 
+	$(call drop_table, drop-{{ statement_name }} {{ table_name }})
+	$(call delete_flink_statement, drop-{{ statement_name }})
+
 # --- DML
 describe_flink_dml:
 	$(call describe_flink_statement,  dml-{{ statement_name }})
 
 create_flink_dml:
 	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
+
+create_flink_dev:
+	$(call create_flink_statement, dml-{{ statement_name }}, ./tests/dml.{{ table_name }}.sql) 
 
 delete_flink_dml:
 	$(call delete_flink_statement, dml-{{ statement_name }})
