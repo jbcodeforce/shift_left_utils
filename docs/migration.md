@@ -1,6 +1,6 @@
 # Migration process
 
-This chapter covers a straightforward migration process from fact tables to source tables. Ensure you have completed the project setup using one of the two options explained [in this note](./setup.md).
+This chapter covers a straightforward migration process from ETL fact tables up to source tables to FLINK SQL pipelines. Ensure you have completed the project setup using one of the two options explained [in this note](./setup.md).
 
 All the dbt source tables are defined in the #SRC_FOLDER folder. 
 

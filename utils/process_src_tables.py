@@ -8,11 +8,11 @@ there is one pipeline per sink table.
 
 """
 import os, argparse, sys
-from pathlib import Path
-from flink_sql_code_agent_lg import translate_to_flink_sqls
+
 from jinja2 import Environment, FileSystemLoader
 import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
+from create_sink_structure import create_folder_structure, create_folder_if_not_exist, extract_table_name
 from get_schema_for_src_table import search_matching_topic, get_column_definitions
 from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
 from clean_sql import process_ddl_file
@@ -39,9 +39,7 @@ parser.add_argument('-pd', action=argparse.BooleanOptionalAction, default= False
 # Attention pd is for taking a sink and process up to all sources.
 
 # --- utilities functions
-def create_folder_if_not_exist(new_path):
-    if not os.path.exists(new_path):
-        os.makedirs(new_path)
+
 
 def create_file_if_not_exist(new_file):
     if not os.path.exists(new_file):
@@ -61,7 +59,7 @@ def create_ddl_squeleton(table_name:str, config: dict, target_folder: str):
         pk_to_use= config["app"]["default_PK"]
     else:
         pk_to_use="__pd"
-    fname=config["app"]["dedup_table_name_prefix"] + table_name + config["app"]["dedup_table_name_suffix"]
+    fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     file_name=f"{target_folder}/ddl.{fname}.sql" 
 
     env = Environment(loader=FileSystemLoader('.'))
@@ -87,7 +85,7 @@ def create_dedup_dml_squeleton(table_name:str, target_folder: str, fields: str):
     :return: create a file in the target folder
     """
     file_name=f"{target_folder}/dml.{table_name}.sql" 
-    fname=config["app"]["dedup_table_name_prefix"] + table_name + config["app"]["dedup_table_name_suffix"]
+    fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     env = Environment(loader=FileSystemLoader('.'))
     sql_template = env.get_template(f"{TMPL_FOLDER}/{DML_DEDUP_TMPL}")
     topic_name=search_matching_topic(table_name)
@@ -113,46 +111,6 @@ def create_test_dedup(table_name: str, target_folder: str):
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
     
-
-def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str):
-    """
-    Create a makefile to help deploy Flink statements for the given table name
-    When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
-    """
-    env = Environment(loader=FileSystemLoader('.'))
-    makefile_template = env.get_template(f"{TMPL_FOLDER}/makefile_ddl_dml_tmpl.jinja")
-    
-    context = {
-        'table_name': table_name,
-        'statement_name': table_name.replace("_","-"),
-        'ddl_folder': ddl_folder,
-        'dml_folder': dml_folder
-    }
-    rendered_makefile = makefile_template.render(context)
-    # Write the rendered Makefile to a file
-    with open(out_dir + '/Makefile', 'w') as f:
-        f.write(rendered_makefile)
-
-def create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
-    env = Environment(loader=FileSystemLoader('.'))
-    tracking_tmpl = env.get_template(f"{TMPL_FOLDER}/tracking_tmpl.jinja")
-    context = {
-        'table_name': table_name,
-        'src_file_name': src_file_name,
-    }
-    rendered_tracking_md = tracking_tmpl.render(context)
-    with open(out_dir + '/tracking.md', 'w') as f:
-        f.write(rendered_tracking_md)
-
-
-def extract_table_name(src_file_name: str, prefix_to_remove: str = None) -> str:
-    the_path= Path(src_file_name)
-
-    table_name = the_path.stem
-    if prefix_to_remove:
-        table_name = table_name.replace(prefix_to_remove,"")
-    print(f"Process the table: {table_name}")
-    return table_name
 
 def parse_sql(table_name,sql_content):
     """
@@ -212,18 +170,6 @@ def remove_already_processed_table(parents: list[str]) -> list[str]:
             print(f"{table_name} already processed")
     return newParents
 
-def create_folder_structure(src_file_name: str, ddl_folder_name:str, dml_folder_name:str, target_path: str):
-    if "src_" in src_file_name:
-        table_name = extract_table_name(src_file_name,"src_")
-    else:
-        table_name = extract_table_name(src_file_name)  
-    table_folder=f"{target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/{dml_folder_name}")
-    create_folder_if_not_exist(f"{table_folder}/{ddl_folder_name}")
-    create_folder_if_not_exist(f"{table_folder}/tests")
-    create_makefile(table_name, ddl_folder_name, dml_folder_name, table_folder)
-    create_tracking_doc(table_name,src_file_name,table_folder)
-    return table_folder, table_name
 
 # ----- more specific functions
 def process_src_sql_file(src_file_name: str, generated_code_folder_name: str, config: dict):
@@ -237,7 +183,7 @@ def process_src_sql_file(src_file_name: str, generated_code_folder_name: str, co
     :param source_target_path: the path for the newly created Flink sql file
 
     """
-    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts","sql-scripts",generated_code_folder_name)
+    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts", generated_code_folder_name)
     fields=create_ddl_squeleton(table_name,config, f"{table_folder}/sql-scripts")
     create_dedup_dml_squeleton(f"{table_name}",f"{table_folder}/sql-scripts", fields)   
     create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
@@ -254,7 +200,7 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     :param walk_parent: Assess if it needs to process the dependencies
     """
     
-    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts", "sql-scripts",source_target_path)
+    table_folder, table_name=create_folder_structure(src_file_name,"sql-scripts",source_target_path)
     parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()
@@ -267,8 +213,6 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     if walk_parent:
         for parent_table_name in parents:
             process_from_table_name(parent_table_name, source_target_path, walk_parent, config)
-
-
 
 
 def create_target_folder(target_root_folder: str) -> str:

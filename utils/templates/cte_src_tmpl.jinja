@@ -1,8 +1,4 @@
 INSERT INTO {{ table_name }}
-WITH 
- reduced_scope (
-    select *  {{ src_topic}} 
- ) 
 {{ sql_part }}
-from reduced_scope
+
 {{ where_part }}

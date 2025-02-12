@@ -92,12 +92,12 @@ pipelines
 
 ## Source Topic management
 
-In some ETL or ELT pipelines the Kafka topic may be the source of the pipeline. A classical example is when a change data capture mechanism is deployed and get records from existing SQL database. The architecture looks like in the following diagram:
+In some ETL or ELT pipelines, Kafka topics may be the source of the pipeline. A classical example is when a change data capture mechanism is deployed and get records from existing SQL database to Kafka Topics. One topic per table. The architecture looks like in the following diagram:
 
 ![](./images/elt_pipe.drawio.png)
 
-When migrating to real-time processing, using Confluent Cloud and Flink compute pool, the source topics may be reused and the Flink Statement will do mostly the same processing as the ELT. But Confluent Cloud for Flink creates table from topic and get the schema from the schema registry.
+When migrating to real-time processing, using Confluent Cloud and Flink compute pool, the source topics may be reused and the Flink Statement will do mostly the same processing as the ELT. Confluent Cloud for Flink creates tables from topic and get the schema from the schema registry.
 
 The name of the table matches the name of the topic and the table schema maps to the topic-value schema. 
 
-Leverage the naming convention from the change data capture, like Debezium for the topic. Any naming convention based on the environment like dev, staging, or production, will impact any DML statements. In Confluent Cloud the environment feature groups 1 to many Kafka cluster and Flink compute pool. The topic name can be the same between Kafka cluster so the same DML statement can be used in different conpute pool.
+Adopt the naming convention from the change data capture, like Debezium for the topic. Any naming convention based on the environment like dev, staging, or production, will impact any DML statements. In Confluent Cloud the environment groups one to many Kafka clusters and multiple Flink compute pools. The topic name can be the same between Kafka cluster so the same DML statement can be used in different conpute pool.

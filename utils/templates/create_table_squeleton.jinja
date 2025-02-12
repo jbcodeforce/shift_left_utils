@@ -8,6 +8,7 @@ WITH (
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',
+    'kafka.cleanup-policy'= 'compact',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
   'value.fields-include' = 'all'

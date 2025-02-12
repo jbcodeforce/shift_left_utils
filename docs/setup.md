@@ -81,7 +81,7 @@ registry:
   registry_key_secret: <registry-key-secrets>
 ``` 
 
-  Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
+Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
 
 * Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`. The first lines of this common makefile file have some variables set up:
 

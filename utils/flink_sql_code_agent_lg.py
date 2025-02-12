@@ -44,8 +44,6 @@ Do not add suggestions or explanations in the response, just return the structur
 
 Do not use VARCHAR prefer STRING. 
 
-When there is `dl_landed_at` within a SELECT, transform it as: `$rowtime` as dl_landed_at.
-
 Start the generated code with:
 
 INSERT INTO {table_name}
@@ -83,9 +81,10 @@ Remove column name dl_landed_at within create table or select.
 
 Finish the statement with the following declaration:
 
-   PRIMARY KEY(ID) NOT ENFORCED -- VERIFY KEY
+   PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
 ) WITH ( 'changelog.mode' = 'retract',
    'value.format' = 'avro-registry',
+      'kafka.cleanup-policy'= 'compact',
    'kafka.retention.time' = '0',
    'key.format' = 'avro-registry',
    'scan.bounded.mode' = 'unbounded',
