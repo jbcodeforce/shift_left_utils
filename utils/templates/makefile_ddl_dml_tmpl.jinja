@@ -23,7 +23,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, ddl-{{ statement_name }})
 
-drop_table_mc_version: 
+drop_table_{{ table_name }}: 
 	$(call drop_table, drop-{{ statement_name }} {{ table_name }})
 	$(call delete_flink_statement, drop-{{ statement_name }})
 

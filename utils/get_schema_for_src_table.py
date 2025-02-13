@@ -1,5 +1,5 @@
 """
-Set of function to get table information, mostly for source topics.
+Set of functions to get table information, mostly for source topics.
 
 * Function to get the matching topic name given a table name.
 * Get the SQL schema given a topic name, using the `show create table ` and 
@@ -83,11 +83,16 @@ def search_matching_topic(table_name: str) -> str:
     with open(TOPIC_LIST_FILE,"r") as f:
         for line in f:
             line=line.strip()
-            if table_name == line:
+            if ',' in line:
+                keyname=line.split(',')[0]
+                line=line.split(',')[1].strip()
+            else:
+                keyname=line
+            if table_name == keyname:
                 return line
-            elif table_name in line:
+            elif table_name in keyname:
                 return line
-            elif find_sub_string(table_name,line):
+            elif find_sub_string(table_name,keyname):
                 return line
     return table_name
 
@@ -199,18 +204,18 @@ def get_column_definitions(table_name: str, config) -> tuple[str,str]:
     
 if __name__ == "__main__":
     config=get_config()
-    columns,fields = get_column_definitions("training_unit",config)
+    #columns,fields = get_column_definitions("training_unit",config)
 
 
     #get_environment_list(config)
-    #get_compute_pool_list(config)
+    get_compute_pool_list(config)
     #get_flink_statement_list(config)
     #schema=post_flink_statement(config,"show-ct-1","show create table `development_non-prod-TG`.`development-us-west-2-dedicated`.`clone.prod.mc.dbo.web_business_unit`;", True)
     #schema=mock_result()
     #sql_str=schema["results"]["data"][0]["row"][0]
     #columns,fields=extract_column_definitions(sql_str)
-    print(columns)
-    print(fields)
+   # print(columns)
+    #print(fields)
     # delete_flink_statement(config,"show-ct-1")
-    #print(search_matching_topic("training_unit"))
-    #print(search_matching_topic("tdc_doc_document_type"))
+    print(search_matching_topic("recordexecution_task"))
+    print(search_matching_topic("tdc_doc_document_type"))
