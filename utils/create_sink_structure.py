@@ -16,7 +16,8 @@ parser = argparse.ArgumentParser(
     description='Generate flink project for a given dbt starting code - different options'
 )
 parser.add_argument('-o', '--pipeline_folder_path', required=True, help="name of the folder output of the pipelines")
-parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
+parser.add_argument('-t', '--table_name', required=True, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
+parser.add_argument('-m', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile")
 
 def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
@@ -84,5 +85,9 @@ def create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    create_sink_table_structure(args.pipeline_folder_path, "sql-scripts", args.table_name)
+    if args.m:
+        existing_path=args.pipeline_folder_path + "/" + args.table_name
+        create_makefile( args.table_name, "sql-scripts", "sql-scripts", existing_path)
+    else:    
+        create_sink_table_structure(args.pipeline_folder_path, "sql-scripts", args.table_name)
     print("\n\nDone !")

@@ -61,12 +61,12 @@ def build_report(table_name: str, results):
     """
     Create a human readable report.
     """
-    output=f"# {table_name} is referenced in {len(results)} Flink SQL statements:"
+    output=f"## {table_name} is referenced in {len(results)} Flink SQL statements:\n"
     if len(results) == 0:
         output+="\n\t no table ... yet"
     else:
         for t in results:
-            output+=f"\n\t{t}"
+            output+=f"\n* {t}\n"
     return output
 
 def main():

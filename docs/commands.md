@@ -11,12 +11,26 @@ export CONFIG_FILE=../../flink-project/config.yaml
 
 ## Get parent pipeline
 
-To get the parent hierarchy for a fact or dimension table, use the `find_pipeline.py` tool. The output will report the dependent tables up to the sources
+To get the parent hierarchy for a fact or dimension table, use the `pipeline_helper.py` tool. The output will report the dependent tables up to the sources from the inventory of sql files.
+This inventory will be built from the source folder specified with the -i or --inventory argument
+
+* Example to search in the dbt or source project
 
 ```sh
-python find_pipeline.py -f $SRC_FOLDER/facts/fct_training_doc.sql
+python pipeline_helper.py -f $SRC_FOLDER/facts/fct_users.sql -i $SRC_FOLDER
 ```
 
+* Example of searching the pipeline of a migrated file from the migrated content
+
+```sh
+python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGING/../pipelines
+```
+
+* same but for the staged content
+
+```sh
+python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGING
+```
 
 [See this section for details](./migration.md#1---discover-the-current-pipeline)
 

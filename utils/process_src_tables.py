@@ -10,13 +10,13 @@ there is one pipeline per sink table.
 import os, argparse, sys
 
 from jinja2 import Environment, FileSystemLoader
-import re
 from flink_sql_code_agent_lg import translate_to_flink_sqls
-from create_sink_structure import create_folder_structure, create_folder_if_not_exist, extract_table_name
+from create_sink_structure import create_folder_structure, create_folder_if_not_exist
 from get_schema_for_src_table import search_matching_topic, get_column_definitions
-from find_path_for_table import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
+from pipeline_helper import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
 from clean_sql import process_ddl_file
 from kafka.app_config import get_config
+
 
 TMPL_FOLDER="./templates"
 TABLES_TO_PROCESS="./reports/tables_to_process.txt"
@@ -111,32 +111,6 @@ def create_test_dedup(table_name: str, target_folder: str):
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
     
-
-def parse_sql(table_name,sql_content):
-    """
-    Extract the sql dependant table
-    """
-    #regex = r'{{\s*ref\([\'"]([^\']+)[\'"]\)\s*}}'
-    #regex= r'{{\s*ref\(["\']([^"\']+)"\')\s*}}'
-    regex=r'ref\([\'"]([^\'"]+)[\'"]\)'
-    matches = re.findall(regex, sql_content)
-    return matches
-
-def get_dependencies(table_name, dbt_script_content) -> list[str]:
-    """
-    For a given table and dbt script content, get the dependent tables using the dbt { ref: } template
-    """
-    dependencies = []
-    dependency_names = parse_sql(table_name, dbt_script_content)
-
-    if (len(dependency_names) > 0):
-        print("Dependencies found:")
-        for dependency in dependency_names:
-            print(f"- depends on : {dependency}")
-            dependencies.append(dependency)
-    else:
-        print("  - No dependency")
-    return dependencies
 
 def save_one_file(fname: str, content: str):
     if "dml" in fname:
@@ -279,23 +253,6 @@ def merge_items_in_reporting_file(dependencies: list[str], persistent_file):
                 file.write(f"{element}\n")
 
 
-
-def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
-    """
-    List the dependencies for the given file, or all the dependencies of all tables in the given folder
-    """
-    if file_or_folder.endswith(".sql"):
-        table_name = extract_table_name(file_or_folder)
-        with open(file_or_folder) as f:
-            sql_content= f.read()
-            l=get_dependencies(table_name, sql_content)
-            if persist_dependencies:
-                merge_items_in_reporting_file(l,TABLES_TO_PROCESS)
-            return l
-    else:
-        # loop over the files in the folder
-        for file in list_sql_files(file_or_folder):
-            list_dependencies(file,persist_dependencies)
 
 def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool, config: dict):
     """
