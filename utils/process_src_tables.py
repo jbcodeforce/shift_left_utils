@@ -13,7 +13,7 @@ from jinja2 import Environment, FileSystemLoader
 from flink_sql_code_agent_lg import translate_to_flink_sqls
 from create_sink_structure import create_folder_structure, create_folder_if_not_exist
 from get_schema_for_src_table import search_matching_topic, get_column_definitions
-from pipeline_helper import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables
+from pipeline_helper import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables, get_dependencies
 from clean_sql import process_ddl_file
 from kafka.app_config import get_config
 
