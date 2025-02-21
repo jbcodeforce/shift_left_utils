@@ -7,9 +7,7 @@ create_{{ table_name }}: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
-delete_topic_{{ table_name }}:
-	@confluent kafka topic delete {{ table_name }} --force; 
-
+s
 list_record_data_from_topic:
 	$(call list_topic_content, {{ table_name }})
 

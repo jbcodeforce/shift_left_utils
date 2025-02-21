@@ -53,7 +53,7 @@ Question: {sql_input}
 """
 
 flink_sql_syntaxic_template="""
-you are qwen-coder an agent expert in Apache Flink SQL syntax expert and your goal is to generate a cleaner Apache Flink SQL
+you are qwen-coder, an agent expert in Apache Flink SQL syntax. Your goal is to generate a cleaner Apache Flink SQL
 statement from the following  statement: {flink_sql}.
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
@@ -75,10 +75,9 @@ Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-Remove column name dl_landed_at within create table or select.
+Remove column named: dl_landed_at, __ts_ms, __source_ms within create table or  select statement.
 
 Finish the statement with the following declaration:
-
    PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
 ) WITH ( 'changelog.mode' = 'retract',
    'value.format' = 'avro-registry',
@@ -174,12 +173,12 @@ def define_flink_sql_agent():
     workflow = StateGraph(AgentState)
     workflow.add_node("translator", run_translator_agent)  # will update flink_sql
     workflow.add_node("cleaner", clean_sqls)  # will update flink_sql
-    #workflow.add_node("syntaxic_cleaner", syntax_cleaner)  # will update flink_sql
+    workflow.add_node("syntaxic_cleaner", syntax_cleaner)  # will update flink_sql
     workflow.add_node("ddl_generation", ddl_generation)
 
     workflow.set_entry_point("translator")
-    workflow.add_edge("translator", "cleaner")
-    #workflow.add_edge("syntaxic_cleaner","cleaner")
+    workflow.add_edge("translator", "syntaxic_cleaner")
+    workflow.add_edge("syntaxic_cleaner","cleaner")
     workflow.add_edge("cleaner", "ddl_generation")
     workflow.add_edge("ddl_generation", END)
     app = workflow.compile()

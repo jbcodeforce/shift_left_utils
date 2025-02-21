@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument('-o', '--pipeline_folder_path', required=True, help="name of the folder output of the pipelines")
 parser.add_argument('-t', '--table_name', required=True, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
-parser.add_argument('-m', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile")
+parser.add_argument('-m', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile only")
 
 def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
@@ -51,6 +51,8 @@ def create_sink_table_structure(target_path: str, sql_folder_name:str, table_nam
     create_folder_if_not_exist(f"{table_folder}/tests")
     create_makefile(table_name, sql_folder_name, sql_folder_name, table_folder)
     create_tracking_doc(table_name,"",table_folder)
+    create_ddl_skeleton(table_name,table_folder)
+    create_dml_skeleton(table_name,table_folder)
     return table_folder, table_name
 
 def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str):
@@ -83,6 +85,31 @@ def create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     with open(out_dir + '/tracking.md', 'w') as f:
         f.write(rendered_tracking_md)
 
+def create_ddl_skeleton(table_name: str,out_dir: str):
+    env = Environment(loader=FileSystemLoader('.'))
+    ddl_tmpl = env.get_template(f"{TMPL_FOLDER}/create_table_squeleton.jinja")
+    context = {
+        'table_name': table_name,
+        'default_PK': 'default_key',
+        'column_definitions': '-- put here column definitions'
+    }
+    rendered_ddl = ddl_tmpl.render(context)
+    with open(out_dir + '/sql-scripts/ddl.' + table_name + ".sql", 'w') as f:
+        f.write(rendered_ddl)
+
+def create_dml_skeleton(table_name: str,out_dir: str):
+    env = Environment(loader=FileSystemLoader('.'))
+    dml_tmpl = env.get_template(f"{TMPL_FOLDER}/dml_src_tmpl.jinja")
+    context = {
+        'table_name': table_name,
+        'sql_part': '-- part to select stuff',
+        'where_part': '-- where condition or remove it',
+        'src_table': 'src_table'
+    }
+    rendered_dml = dml_tmpl.render(context)
+    with open(out_dir + '/sql-scripts/dml.' + table_name + ".sql", 'w') as f:
+        f.write(rendered_dml)
+        
 if __name__ == "__main__":
     args = parser.parse_args()
     if args.m:

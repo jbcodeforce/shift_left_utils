@@ -5,11 +5,12 @@ from collections import deque
 from pathlib import Path
 from create_sink_structure import extract_table_name
 from sql_parser import SQLparser
+import logging
 
 """
 Provides a set of functions to search dependencies from one sink table up to the sources from the dbt project
-or from the migrated project.
-It reads the from logic for each sql file and build a queue of tables to search.
+or from the migrated Flink SQL project.
+It reads the SQL FROM statement logic for each given sql file and build a queue of the table to search from.
 """
 
 files_to_process= deque()   # keep a list file to process, as when parsing a sql we can find a lot of dependencies
@@ -56,6 +57,7 @@ def build_all_file_inventory(src_path= os.getenv("SRC_FOLDER","../dbt-src/models
     file_paths.update(list_sql_files(f"{src_path}/facts"))
     file_paths.update(list_sql_files(f"{src_path}/sources"))
     file_paths.update(list_sql_files(f"{src_path}/dedups"))
+    logging.info("Done building file inventory")
     return file_paths
 
 def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:
@@ -69,7 +71,7 @@ def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | Non
         return None
     
 
-def get_dependencies(table_name, dbt_script_content) -> list[str]:
+def get_dependencies(table_name: str, dbt_script_content: str) -> list[str]:
     """
     For a given table and dbt script content, get the dependent tables using the dbt { ref: } template
     """
@@ -112,15 +114,17 @@ def process_files_from_queue(files_to_process, all_files):
     """
     if (len(files_to_process) > 0):
         fn = files_to_process.popleft()
-        #print(f"\n\n-- Process file: {fn}")
-        current_dependencies=set(list_dependencies(fn))
-        for dep in current_dependencies:
-            matching_sql_file=search_table_in_inventory(dep, all_files)
-            if matching_sql_file:
-                dependency_list.add((dep, matching_sql_file))
-                files_to_process.append(matching_sql_file)
-            else:
-                dependency_list.add((dep,None))
+        logging.info(f"\n\n-- Process file: {fn}")
+        all_dependencies=list_dependencies(fn)
+        if all_dependencies:
+            current_dependencies=set(all_dependencies)
+            for dep in current_dependencies:
+                matching_sql_file=search_table_in_inventory(dep, all_files)
+                if matching_sql_file:
+                    dependency_list.add((dep, matching_sql_file))
+                    files_to_process.append(matching_sql_file)
+                else:
+                    dependency_list.add((dep,None))
         return process_files_from_queue(files_to_process, all_files)
     else:
         return dependency_list

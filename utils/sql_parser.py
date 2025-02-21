@@ -39,10 +39,17 @@ class SQLparser:
         regex=r'ref\([\'"]([^\'"]+)[\'"]\)'
         matches = re.findall(regex, sql_content, re.IGNORECASE)
         if len(matches) == 0:
+            # look a Flink SQL reference
             pairs = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
             matches=set(match[1] for match in pairs)
         return matches
 
+    def extract_table_name_from_insert(self, sql_content):
+        sql_content=self._normalize_sql(sql_content)
+        regex=r'\b(\s*INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
+        tbname = re.findall(regex, sql_content, re.IGNORECASE)
+        return tbname[0][1]
+    
     def parse_file(self, file_path):
         """
         Parse SQL file and extract table names
@@ -87,6 +94,7 @@ if __name__ == "__main__":
         print(f"\nTest Case {i}:")
         print("SQL:", query.strip())
         print("Tables found:", parser.extract_table_references(query))
+        
 
     sql_content2 = """
     -- a comment
@@ -96,3 +104,4 @@ with exam_def as (select * from {{ ref('int_exam_def_deduped') }} )
 ,training_data as (select * from {{ ref('int_training_data_deduped') }} )
 """
     print(parser.extract_table_references(sql_content2))
+    print(parser.extract_table_name_from_insert(" INSERT INTO mytablename\nSELECT a,b,c\nFROM src_table"))
