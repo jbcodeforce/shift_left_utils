@@ -7,7 +7,6 @@ create_{{ table_name }}: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
-s
 list_record_data_from_topic:
 	$(call list_topic_content, {{ table_name }})
 
@@ -22,7 +21,7 @@ delete_flink_ddl:
 	$(call delete_flink_statement, ddl-{{ statement_name }})
 
 drop_table_{{ table_name }}: 
-	$(call drop_table, drop-{{ statement_name }} {{ table_name }})
+	$(call drop_table, drop-{{ statement_name }}, {{ table_name }})
 	$(call delete_flink_statement, drop-{{ statement_name }})
 
 # --- DML

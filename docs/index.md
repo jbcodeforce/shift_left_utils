@@ -2,16 +2,19 @@
 
 ???- info "Versions"
     Created 12/2024
-    
+    Updated 02/23: new pipeline helper functions to support sink to source pipeline metadata creation or source to sink.
+
 ## Introduction
 
-Shift Left means taking bach-processing jobs and try to refactor them to real-time processing using a product such as Apache Flink. In batch processing a lot of projects use SQL and dbt (Data build tool) to define the logic of the data pipeline. In real-time processing, Apache Kafka is a de-facto middleware to persist immutable records, and for SQL, Python and Java based real-time processing, Apache Flink is also the preferred platform.
+Shift Left means taking bach-processing jobs and try to refactor them to real-time processing using product such as Apache Flink. In batch processing a lot of projects use SQL and dbt (Data build tool) to define the logic of the data pipeline. In real-time processing, Apache Kafka is a de-facto middleware to persist immutable records, and for SQL, Python and Java based real-time processing, Apache Flink is also the preferred platform.
 
-To organize batch processing and data pipelines to Datawarehouse, some compagnies are using the [Kimball guidelines](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/) and best practices.
+To organize batch processing and data pipelines to Datawarehouse, some compagnies are adopting the [Kimball guidelines](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/) and best practices.
 
-Working on this kind of refactoring projects is taking some time and is challenging. AI Agentic solution should help data engineers to shift their data pipelines to the real-time processing by offering flexible SQL translation tools.
+Working on this kind of refactoring projects is taking  time and is challenging. Large Language Model and AI Agentic solution should help data engineers to shift their data pipelines to the real-time processing by offering flexible SQL translation tools.
 
-This repository is a tentative to develop and share some of those tools and practices for running such projects.
+Also organizing Flink project using the Kimball guidelines is possible and even recommended. 
+
+This repository is a tentative to develop and share some of the tools and practices needed for running such shift-leet projects.
 
 As of now the utilities are oriented to use Confluent Cloud for Kafka and for Flink, but running local Flink and Kafka should be easy to support.
 
@@ -24,9 +27,13 @@ Two important concepts of this practice:
 
 ## Context
 
-The target environment will be Apache Flink running within the Confluent Cloud as a managed service. The source of the batch processing is defined within a dbt (Data build tool) project and the refactored SQL are produced under the `pipelines` folder.
+The target environment will be Apache Flink running within the Confluent Cloud as a managed service or in th future running in standalone cluster. The source of the batch processing is defined within a dbt (Data build tool) project or within a SQL project and the refactored SQL are produced under the `pipelines` folder.
 
-The following diagram illustrates the development environment whicj, mainly, uses 2 containers:
+At the system context level of the tools of this repository we can see the following high level components:
+
+![](./images/components.drawio.png)
+
+The following diagram illustrates the development environment which, mainly, uses 2 containers:
 
 ![](./images/environment.drawio.png)
 

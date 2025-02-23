@@ -6,7 +6,7 @@ Dedicated class to parse a SQL statement and extract elements like table name
 class SQLparser:
     def __init__(self):
         self.table_pattern = r'\b(\s*FROM|JOIN)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
-
+        self.cte_pattern = r'WITH\s+(\w+)\s+AS\s*\('
 
     def _normalize_sql(self, sql_script):
         """
@@ -40,8 +40,12 @@ class SQLparser:
         matches = re.findall(regex, sql_content, re.IGNORECASE)
         if len(matches) == 0:
             # look a Flink SQL reference
-            pairs = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
-            matches=set(match[1] for match in pairs)
+            tables = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
+            ctes = re.findall(self.cte_pattern, sql_content, re.IGNORECASE)
+            matches=[]
+            for table in tables:
+                if not table[1] in ctes:
+                    matches.append(table[1])
         return matches
 
     def extract_table_name_from_insert(self, sql_content):
