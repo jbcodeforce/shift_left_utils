@@ -29,11 +29,22 @@ Two important concepts of this practice:
 
 The target environment will be Apache Flink running within the Confluent Cloud as a managed service or in th future running in standalone cluster. The source of the batch processing is defined within a dbt (Data build tool) project or within a SQL project and the refactored SQL are produced under the `pipelines` folder.
 
-At the system context level of the tools of this repository we can see the following high level components:
+At the system context level, for the tools of this repository, we can see the following high level components:
 
 ![](./images/components.drawio.png)
 
-The following diagram illustrates the development environment which, mainly, uses 2 containers:
+1. The source project to migrate: could be dbt or SQL
+1. The new Flink project repository, where the project structure is built with a specific tool
+1. An automatic migration tool, using Agentic App, used by developers to migrate one pipeline at a time. A pipeline is from a fact or dimension table up to the sources. The landing zone is a `staging folder` in the repository.
+1. Tested and finalized pipelines are saved under the `pipelines folder`.
+1. Test harness helps to validate complex Flink statement by isolation, using mockup data and test topics.
+1. Pipeline dependencies is a tool to get understanding of the sink to source pipeline and from the source to sink too. There is another tool that help assess which tables use a given table.
+1. Finally pipeline deployment help to automate, and pace the deployment of a given pipeline.
+
+???+ warning
+    Not all those tools are implemented, see utils folder, and [tool references]()
+
+The following diagram illustrates the development environment which, mainly, uses two docker container containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
 
 ![](./images/environment.drawio.png)
 

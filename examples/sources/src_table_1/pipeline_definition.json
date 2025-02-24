@@ -10,28 +10,22 @@
          "type": "intermediate",
          "ddl_ref": "../examples/intermediates/int_table_1/sql-scripts/ddl.int_table_1.sql",
          "dml_ref": "../examples/intermediates/int_table_1/sql-scripts/dml.int_table_1.sql",
-         "parents": [],
+         "parents": [
+            "src_table_1"
+         ],
          "children": [
             {
                "table_name": "fct_order",
                "type": "fact",
                "ddl_ref": "../examples/facts/fct_order/sql-scripts/ddl.fct_order.sql",
                "dml_ref": "../examples/facts/fct_order/sql-scripts/dml.fct_order.sql",
-               "parents": [],
+               "parents": [
+                  "int_table_1"
+               ],
                "children": [
                   null
                ]
             }
-         ]
-      },
-      {
-         "table_name": "fct_order",
-         "type": "fact",
-         "ddl_ref": "../examples/facts/fct_order/sql-scripts/ddl.fct_order.sql",
-         "dml_ref": "../examples/facts/fct_order/sql-scripts/dml.fct_order.sql",
-         "parents": [],
-         "children": [
-            null
          ]
       }
    ]

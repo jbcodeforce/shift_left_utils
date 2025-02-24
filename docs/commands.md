@@ -1,4 +1,4 @@
-# Command Summary
+# Commands Summary
 
 
 This section presents a quick summary of the tools used for migration. Be sure to have set environment variables: SRC_FOLDER, STAGING and CONFIG_FILE:
@@ -14,7 +14,7 @@ export CONFIG_FILE=../../flink-project/config.yaml
 To get the parent hierarchy for a fact or dimension table, use the `pipeline_helper.py` tool. The output will report the dependent tables up to the sources from the inventory of sql files.
 This inventory will be built from the source folder specified with the -i or --inventory argument
 
-* Example to search in the dbt or source project
+* Example to search in the dbt or SQL source project
 
 ```sh
 python pipeline_helper.py -f $SRC_FOLDER/facts/fct_users.sql -i $SRC_FOLDER
@@ -42,7 +42,7 @@ python find_table_user.py -t table_name -r root_folder_to_search_in
 python find_table_user.py -t users -r $STAGING
 ```
 
-## Process a fact or dimenstion table
+## Process a fact or dimension table
 
 
 * Generate Flink SQLs from one Fact or Dimension table using a recurcive processing up to the source tables. The SQL created statements are saved into the staging temporary folder
@@ -59,14 +59,15 @@ python process_src_tables.py -f $SRC_FOLDER/facts/fct_users.sql -o $STAGING/app 
 python process_src_tables.py -f $SRC_FOLDER/sources -o $STAGING/sources
 ```
 
-## Create a sink table structure
+## Create a table structure
 
 The goal of this tool is to create a folder structure to start migrating SQL manually:
 
 ```sh
-python  create_sink_structure.py -t fct_user -o $STAGING/fct_user
+python  create_table_structure.py -t fct_user -o $STAGING/fct_user
 ```
 
+[See reference](references.md#create-table-structure)
 
 ## Update the source sql to do some update
 

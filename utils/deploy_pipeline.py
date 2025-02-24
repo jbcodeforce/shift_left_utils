@@ -42,6 +42,8 @@ def test_debug():
     print(hierarchy.model_dump_json(indent=3))
 
 def run():
+    """
+    """
     args = parser.parse_args()
     metadata_file_name=assess_pipeline_definition_exists(args.file_name)
     if metadata_file_name:
@@ -57,8 +59,8 @@ def run():
         print(hierarchy)
 
 if __name__ == "__main__":
-    run()
-
+    #run()
+    test_debug()
  
    
     

@@ -1,7 +1,5 @@
 """
-Set of function and main to create the sink table folder structure and makefile
-
-For a given table name create under pipelines
+Set of functions and a main() to create the table folder structure and makefile for a sink, an intermediate or a source table.
 """
 
 import argparse
@@ -34,10 +32,11 @@ def extract_table_name(src_file_name: str) -> str:
 
 def create_folder_structure(src_file_name: str, sql_folder_name:str, target_path: str):
     """
-    create a folder structure like for example:
-    target_path/table_name/sql-scripts/ddl. and dml.
-    target_path/table_name/tests
-    target_path/table_name/Makefile
+    Create the folder structure for the given table name, under the target path. The structure looks like:
+    
+    * `target_path/table_name/sql-scripts/`:  with two template file, one for ddl. and one for dml.
+    * `target_path/table_name/tests`: for test harness content
+    * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
     table_name = extract_table_name(src_file_name)  
     table_folder, table_name = create_sink_table_structure(target_path, sql_folder_name, table_name)
@@ -109,12 +108,24 @@ def create_dml_skeleton(table_name: str,out_dir: str):
     rendered_dml = dml_tmpl.render(context)
     with open(out_dir + '/sql-scripts/dml.' + table_name + ".sql", 'w') as f:
         f.write(rendered_dml)
-        
+
+def main(arguments):
+    """
+    Process the creation of the folder structure given the table name as part of the program arguments.
+
+    **Arguments:**
+
+    * `-t or --table_name` name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file
+    * `-o or --pipeline_folder_path`, required=True, help="name of the folder output of the pipelines"
+    * `-m `: Flag to generate a makefile only
+    """
+    if arguments.m:
+        existing_path=args.pipeline_folder_path + "/" + arguments.table_name
+        create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path)
+    else:    
+        create_sink_table_structure(args.pipeline_folder_path, "sql-scripts", arguments.table_name)
+    print("\n\nDone !")
+
 if __name__ == "__main__":
     args = parser.parse_args()
-    if args.m:
-        existing_path=args.pipeline_folder_path + "/" + args.table_name
-        create_makefile( args.table_name, "sql-scripts", "sql-scripts", existing_path)
-    else:    
-        create_sink_table_structure(args.pipeline_folder_path, "sql-scripts", args.table_name)
-    print("\n\nDone !")
+    

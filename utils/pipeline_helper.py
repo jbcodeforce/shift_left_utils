@@ -5,7 +5,7 @@ from typing import List, Optional, Any, Tuple
 import os, argparse
 from collections import deque
 from pathlib import Path
-from create_sink_structure import extract_table_name
+from create_table_folder_structure import extract_table_name
 from sql_parser import SQLparser
 import json
 import logging
@@ -212,94 +212,84 @@ def get_table_type_from_file_path(file_name: str) -> str:
 
 def _change_source_parent(from_src: FlinkStatementHierarchy) -> FlinkStatementHierarchy:
     """
-    To avoid circular reference the sink parent should only have parent name for the source to sink tree.
-    return a modifile source to sink tree, with source parent not being a list of FlinkStatementHierarchy
-    but a list of strings
+    To avoid circular reference the sink.parents should only have parent name for the source to sink tree.
+    Return a modified source to sink tree, with source parent not being a list of FlinkStatementHierarchy
+    but a list of strings.
     """
     for child in from_src.children:
-        if not child.type == "fact":
-            return _change_source_parent(child)
+        if not child.type in ["fact", "dimension"]:
+            child.parents=[from_src.table_name]
+            from_src=_change_source_parent(child)
         else:
             new_child=child.model_copy(deep=True)
+            new_child.parents=[from_src.table_name]
             for parent in child.parents:
                 if isinstance(parent,FlinkStatementHierarchy):
                     new_child.parents.append(parent.table_name)
                 else:
                     new_child.parents.append(parent)
             from_src.children=[new_child]
+            new_child.parents=list(set(new_child.parents))
     return from_src
             
 
-def merge_src_definition(src: FlinkStatementHierarchy, child: FlinkStatementHierarchy):
+
+def build_pipeline_definition_from_source(current: FlinkStatementHierarchy, child: FlinkStatementHierarchy, all_files):
     """
-    The source tree is different than the sink to parent tree, and a src
-    table may be shared by multiple pipelines so we need to merge with
-    existing definition of source pipeline without creating duplicates in the children.
+    Source pipeline may be built from the current pipeline defined while building the sing to source pipeline.
+    Current is a source with no parent, child is the hierachy reaching this source. A source table may be shared
+    by multiple pipelines, so an existing pipeline definition for this source, may be merged with the new content coming
+    from the child pipeline.
     """
-    metadata_file_name = _get_path_to_pipeline_file(src.dml_ref)
+    sink_to_source_pipeline=child.model_copy(deep=True)
+    sink_to_source_pipeline.parents=[current.table_name]
+    metadata_file_name = _get_path_to_pipeline_file(current.dml_ref)
     if not os.path.exists(metadata_file_name):
-        src = _change_source_parent(src)
+        _change_source_parent(current)
         with open( metadata_file_name, "w") as f:
-            f.write(src.model_dump_json(indent=3))
+            f.write(current.model_dump_json(indent=3))
     else:
         # load previous definition
         with open(metadata_file_name, "r") as f:
             old_definition = FlinkStatementHierarchy.model_validate_json(f.read())
             for old_child in old_definition.children:
                 if child.table_name != old_child["table_name"]:
-                    src.children.append(old_child)
+                    current.children.append(old_child)
             f.close()
         with open( metadata_file_name, "w") as f:
-            f.write(src.model_dump_json(indent=3))
-
-
-
-def build_pipeline_definition_from_source(current: FlinkStatementHierarchy, child: FlinkStatementHierarchy, all_files):
-    """
-    For a source table, build the pipeline using the children relation, and parents list keeps only
-    the name of the parent.
-    Current is a source with no parent, child is the hierachy reaching this source. 
-    Update the current children list by changing parent
-    """
-    current_child=child.model_copy(deep=True)
-    current_child.parents=[current.table_name]
-    merge_src_definition(current, current_child)
-  
+            f.write(current.model_dump_json(indent=3))
 
 
 def build_pipeline_definition_from_table(dml_file_name: str, child: FlinkStatementHierarchy, all_files) -> Tuple[str, FlinkStatementHierarchy]:
     """
     From the DML file name, build a pipeline definition taking into account the parents
-    of the given table. The file includes INSERT INTO and then one to many FROM or JOIN statements.
+    of the given table. The DML file includes INSERT INTO and then one to many FROM or JOIN statements.
     Those FROM and JOIN help getting the parent tables needed by the current table.
     The outcome is a hierarchy of parents with the references on how to build them.
-    :all_files: includes the list of all dml files in the project
-    :dml_file_name: is the current node to process, dml file name as a base to build the higher hiearchy level
-    :child: the hierarchy tree so far.
+
+    * `all_files`: includes the list of all dml files in the project.
+    * `dml_file_name`: is the current node to process, dml file name as a base to build the higher hiearchy level.
+    * `child`: the hierarchy tree down so far and defined at the child level of the current node of the hierarch defined in dml_file_name.
     """
     directory = os.path.dirname(dml_file_name)
-    ddl_file_name=_is_ddl_exists(directory)
-    level=get_table_type_from_file_path(dml_file_name)
-    table_name, parents=get_dependent_tables(dml_file_name)
+    ddl_file_name = _is_ddl_exists(directory)
+    level = get_table_type_from_file_path(dml_file_name)
+    table_name, parent_names = get_dependent_tables(dml_file_name)
     children_name = child.table_name if child else None
-    current = FlinkStatementHierarchy.model_validate({"table_name": table_name, 
+    current_hierarchy = FlinkStatementHierarchy.model_validate({"table_name": table_name, 
                                           "type": level, 
                                           "ddl_ref": directory+"/"+ddl_file_name, 
                                           "dml_ref":  dml_file_name, 
                                           "parents": [], 
                                           "children": [child]})
     if not "source" in level:
-        for parent in parents:
-            parent_dml_file= search_table_in_inventory(parent, all_files)
-            tn,ph = build_pipeline_definition_from_table(parent_dml_file, current, all_files)
-            if current.type == "fact" or current.type  == "dimension":
-                current.parents.append(ph)
-            else:
-                current.parents.append(tn)
+        for parent_table_name in parent_names:
+            parent_dml_file= search_table_in_inventory(parent_table_name, all_files)
+            build_pipeline_definition_from_table(parent_dml_file, current_hierarchy, all_files)
     else:
-        build_pipeline_definition_from_source(current, child, all_files)
-    print(current.model_dump_json(indent=3))
-    return table_name, current
+        build_pipeline_definition_from_source(current_hierarchy, child, all_files)
+    print(current_hierarchy.model_dump_json(indent=3))
+    return table_name, current_hierarchy
 
 
 def _get_path_to_pipeline_file(file_name: str) -> str:
