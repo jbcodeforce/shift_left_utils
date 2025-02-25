@@ -38,7 +38,7 @@ def get_path_to_pipeline_file(file_name: str) -> str:
 
 def test_debug():
     all_files=build_all_file_inventory("../examples")
-    table_name, hierarchy=build_pipeline_definition_from_table("../examples/facts/fct_order/sql-scripts/dml.fct_order.sql", None, all_files)
+    hierarchy=build_pipeline_definition_from_table("../examples/facts/fct_order/sql-scripts/dml.fct_order.sql", [], all_files)
     print(hierarchy.model_dump_json(indent=3))
 
 def run():
@@ -59,8 +59,8 @@ def run():
         print(hierarchy)
 
 if __name__ == "__main__":
-    run()
-    #test_debug()
+    #run()
+    test_debug()
  
    
     

@@ -1,32 +1,11 @@
 {
    "table_name": "src_table_3",
    "type": "source",
+   "pipe_definition": "../examples/sources/src_table_3/pipeline_definition.json",
    "ddl_ref": "../examples/sources/src_table_3/sql-scripts/ddl.src_table_3.sql",
    "dml_ref": "../examples/sources/src_table_3/sql-scripts/dml.src_table_3.sql",
    "parents": [],
    "children": [
-      {
-         "table_name": "int_table_1",
-         "type": "intermediate",
-         "ddl_ref": "../examples/intermediates/int_table_1/sql-scripts/ddl.int_table_1.sql",
-         "dml_ref": "../examples/intermediates/int_table_1/sql-scripts/dml.int_table_1.sql",
-         "parents": [
-            "src_table_3"
-         ],
-         "children": [
-            {
-               "table_name": "fct_order",
-               "type": "fact",
-               "ddl_ref": "../examples/facts/fct_order/sql-scripts/ddl.fct_order.sql",
-               "dml_ref": "../examples/facts/fct_order/sql-scripts/dml.fct_order.sql",
-               "parents": [
-                  "int_table_1"
-               ],
-               "children": [
-                  null
-               ]
-            }
-         ]
-      }
+      "int_table_1"
    ]
 }

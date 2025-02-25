@@ -19,6 +19,7 @@ PIPELINE_JSON_FILE_NAME="pipeline_definition.json"
 
 files_to_process= deque()   # keep a list file to process, as when parsing a sql we can find a lot of dependencies
 dependency_list = set()
+node_to_process = deque()
 
 """
 Program arguments definition
@@ -40,6 +41,7 @@ class FlinkStatementHierarchy(BaseModel):
     """
     table_name: str 
     type: str
+    pipe_definition: str
     ddl_ref: str
     dml_ref: str
     parents: Optional[List[Any]]
@@ -210,86 +212,58 @@ def get_table_type_from_file_path(file_name: str) -> str:
     else:
         return "dimension"
 
-def _change_source_parent(from_src: FlinkStatementHierarchy) -> FlinkStatementHierarchy:
-    """
-    To avoid circular reference the sink.parents should only have parent name for the source to sink tree.
-    Return a modified source to sink tree, with source parent not being a list of FlinkStatementHierarchy
-    but a list of strings.
-    """
-    for child in from_src.children:
-        if not child.type in ["fact", "dimension"]:
-            child.parents=[from_src.table_name]
-            from_src=_change_source_parent(child)
-        else:
-            new_child=child.model_copy(deep=True)
-            new_child.parents=[from_src.table_name]
-            for parent in child.parents:
-                if isinstance(parent,FlinkStatementHierarchy):
-                    new_child.parents.append(parent.table_name)
-                else:
-                    new_child.parents.append(parent)
-            from_src.children=[new_child]
-            new_child.parents=list(set())
-    return from_src
-            
 
-
-def build_pipeline_definition_from_source(current: FlinkStatementHierarchy, child: FlinkStatementHierarchy, all_files):
-    """
-    Source pipeline may be built from the current pipeline defined while building the sing to source pipeline.
-    Current is a source with no parent, child is the hierachy reaching this source. A source table may be shared
-    by multiple pipelines, so an existing pipeline definition for this source, may be merged with the new content coming
-    from the child pipeline.
-    """
-    sink_to_source_pipeline=child.model_copy(deep=True)
-    sink_to_source_pipeline.parents=[current.table_name]
-    metadata_file_name = _get_path_to_pipeline_file(current.dml_ref)
-    if not os.path.exists(metadata_file_name):
-        _change_source_parent(current)
-        with open( metadata_file_name, "w") as f:
-            f.write(current.model_dump_json(indent=3))
-    else:
-        # load previous definition
-        with open(metadata_file_name, "r") as f:
-            old_definition = FlinkStatementHierarchy.model_validate_json(f.read())
-            for old_child in old_definition.children:
-                if child.table_name != old_child["table_name"]:
-                    current.children.append(old_child)
-            f.close()
-        with open( metadata_file_name, "w") as f:
-            f.write(current.model_dump_json(indent=3))
-
-
-def build_pipeline_definition_from_table(dml_file_name: str, child: FlinkStatementHierarchy, all_files) -> Tuple[str, FlinkStatementHierarchy]:
-    """
-    From the DML file name, build a pipeline definition taking into account the parents
-    of the given table. The DML file includes INSERT INTO and then one to many FROM or JOIN statements.
-    Those FROM and JOIN help getting the parent tables needed by the current table.
-    The outcome is a hierarchy of parents with the references on how to build them.
-
-    * `all_files`: includes the list of all dml files in the project.
-    * `dml_file_name`: is the current node to process, dml file name as a base to build the higher hiearchy level.
-    * `child`: the hierarchy tree down so far and defined at the child level of the current node of the hierarch defined in dml_file_name.
-    """
+def _create_node_of_hierarchy(dml_file_name: str, table_name: str, parent_names: List[str], children: List[str]) -> FlinkStatementHierarchy:
     directory = os.path.dirname(dml_file_name)
-    ddl_file_name = _is_ddl_exists(directory)
+    d2=os.path.dirname(directory)
     level = get_table_type_from_file_path(dml_file_name)
-    table_name, parent_names = get_dependent_tables(dml_file_name)
-    children_name = child.table_name if child else None
-    current_hierarchy = FlinkStatementHierarchy.model_validate({"table_name": table_name, 
+    ddl_file_name = _is_ddl_exists(directory)
+    return FlinkStatementHierarchy.model_validate({"table_name": table_name, 
                                           "type": level, 
+                                          "pipe_definition": d2+"/pipeline_definition.json",
                                           "ddl_ref": directory+"/"+ddl_file_name, 
                                           "dml_ref":  dml_file_name, 
-                                          "parents": [], 
-                                          "children": [child]})
-    if not "source" in level:
-        for parent_table_name in parent_names:
-            parent_dml_file= search_table_in_inventory(parent_table_name, all_files)
-            build_pipeline_definition_from_table(parent_dml_file, current_hierarchy, all_files)
+                                          "parents": parent_names, 
+                                          "children": children })
+
+def _create_or_merge(current: FlinkStatementHierarchy):
+    if not os.path.exists(current.pipe_definition):
+        with open( current.pipe_definition, "w") as f:
+            f.write(current.model_dump_json(indent=3))
     else:
-        build_pipeline_definition_from_source(current_hierarchy, child, all_files)
-    print(current_hierarchy.model_dump_json(indent=3))
-    return table_name, current_hierarchy
+        with open(current.pipe_definition, "r") as f:
+            old_definition = FlinkStatementHierarchy.model_validate_json(f.read())
+            combined_children=set(old_definition.children).union(set(current.children))
+            combined_parents=set(old_definition.parents).union(set(current.parents))
+        current.children=combined_children
+        current.parents=combined_parents
+        with open( current.pipe_definition, "w") as f:
+            f.write(current.model_dump_json(indent=3))
+
+def _process_next_node(node_to_process, all_files):
+    if len(node_to_process) > 0:
+        current_hierarchy = node_to_process.popleft()
+        for parent_table_name in current_hierarchy.parents:
+            parent_dml_file= search_table_in_inventory(parent_table_name, all_files)
+            table_name, parent_names = get_dependent_tables(parent_dml_file)
+            parent_hierarchy=_create_node_of_hierarchy(parent_dml_file, table_name, parent_names, [current_hierarchy.table_name])
+            node_to_process.append(parent_hierarchy)
+        _create_or_merge(current_hierarchy)
+        _process_next_node(node_to_process, all_files)
+
+def build_pipeline_definition_from_table(dml_file_name: str, children: List[str], all_files):
+    """
+    1/  From the DML file name build the hierarchy from sink as the root of the tree, and sources as the leaf
+    2/ at each level of the tree is info_node with data to be able to run a statement for the current node
+    3/ write at each level the list of parents and children and meta-data. Keep only the name
+    """
+    table_name, parent_names = get_dependent_tables(dml_file_name)
+    current_node= _create_node_of_hierarchy(dml_file_name, table_name, parent_names, children)
+    node_to_process.append(current_node)
+    _process_next_node(node_to_process, all_files)
+    return current_node
+
+
 
 
 def _get_path_to_pipeline_file(file_name: str) -> str:
@@ -332,8 +306,8 @@ def process_files_from_queue(files_to_process, all_files):
     if (len(files_to_process) > 0):
         fn = files_to_process.popleft()
         logging.info(f"\n\n-- Process file: {fn}")
-        if not assess_pipeline_definition_exists(fn):
-            table_name, hierarchy=build_pipeline_definition_from_table(args.file_name)
+        #if not assess_pipeline_definition_exists(fn):
+        #    table_name, hierarchy=build_pipeline_definition_from_table(args.file_name,None,all_files)
    
         all_dependencies=list_dependencies(fn)
         if all_dependencies:
