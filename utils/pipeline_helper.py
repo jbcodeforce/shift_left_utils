@@ -41,7 +41,7 @@ class FlinkStatementHierarchy(BaseModel):
     """
     table_name: str 
     type: str
-    pipe_definition: str
+    path: str
     ddl_ref: str
     dml_ref: str
     parents: Optional[List[Any]]
@@ -215,13 +215,13 @@ def get_table_type_from_file_path(file_name: str) -> str:
 
 def _create_node_of_hierarchy(dml_file_name: str, table_name: str, parent_names: List[str], children: List[str]) -> FlinkStatementHierarchy:
     directory = os.path.dirname(dml_file_name)
-    d2=os.path.dirname(directory)
+    table_folder=os.path.dirname(directory)
     level = get_table_type_from_file_path(dml_file_name)
     ddl_file_name = _is_ddl_exists(directory)
     return FlinkStatementHierarchy.model_validate({"table_name": table_name, 
                                           "type": level, 
-                                          "pipe_definition": d2+"/pipeline_definition.json",
-                                          "ddl_ref": directory+"/"+ddl_file_name, 
+                                          "pipe_definition": table_folder,
+                                          "ddl_ref":  ddl_file_name, 
                                           "dml_ref":  dml_file_name, 
                                           "parents": parent_names, 
                                           "children": children })
@@ -253,7 +253,7 @@ def _process_next_node(node_to_process, all_files):
 
 def build_pipeline_definition_from_table(dml_file_name: str, children: List[str], all_files):
     """
-    1/  From the DML file name build the hierarchy from sink as the root of the tree, and sources as the leaf
+    1/  From the DML file name, build the hierarchy from sink as the root of the tree, and sources as the leaf
     2/ at each level of the tree is info_node with data to be able to run a statement for the current node
     3/ write at each level the list of parents and children and meta-data. Keep only the name
     """

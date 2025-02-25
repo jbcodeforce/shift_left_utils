@@ -12,13 +12,13 @@ list_record_data_from_topic:
 
 # --- DDL 
 create_flink_ddl: 
-	$(call create_flink_statement, ddl-{{ statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
+	$(call create_flink_statement, {{ ddl_statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
 
 describe_flink_ddl:
-	$(call describe_flink_statement,  ddl-{{ statement_name }})
+	$(call describe_flink_statement,  {{ ddl_statement_name }})
 
 delete_flink_ddl:
-	$(call delete_flink_statement, ddl-{{ statement_name }})
+	$(call delete_flink_statement, {{ ddl_statement_name }})
 
 drop_table_{{ table_name }}: 
 	$(call drop_table, drop-{{ statement_name }}, {{ table_name }})
@@ -26,22 +26,22 @@ drop_table_{{ table_name }}:
 
 # --- DML
 describe_flink_dml:
-	$(call describe_flink_statement,  dml-{{ statement_name }})
+	$(call describe_flink_statement,  {{ dml_statement_name }})
 
 create_flink_dml:
-	$(call create_flink_statement, dml-{{ statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
+	$(call create_flink_statement, {{ dml_statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
 
 create_flink_dev:
-	$(call create_flink_statement, dml-{{ statement_name }}, ./tests/dml.{{ table_name }}.sql) 
+	$(call create_flink_statement, {{ dml_statement_name }}, ./tests/dml.{{ table_name }}.sql) 
 
 delete_flink_dml:
-	$(call delete_flink_statement, dml-{{ statement_name }})
+	$(call delete_flink_statement, {{ dml_statement_name }})
 
 pause_flink_dml:
-	$(call pause_flink_statement dml-{{ statement_name }})
+	$(call pause_flink_statement {{ dml_statement_name }})
 
 resume_flink_dml:
-	$(call resume_flink_statement dml-{{ statement_name }})
+	$(call resume_flink_statement {{ dml_statement_name }})
 
 delete_schemas:
 	$(call delete_schema, {{ table_name }}-value)

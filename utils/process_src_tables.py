@@ -11,7 +11,7 @@ import os, argparse
 import logging
 from jinja2 import Environment, FileSystemLoader
 from flink_sql_code_agent_lg import translate_to_flink_sqls
-from create_table_folder_structure import create_folder_structure, create_folder_if_not_exist
+from create_table_folder_structure import create_folder_structure_for_table, create_folder_if_not_exist
 from get_schema_for_src_table import search_matching_topic, get_column_definitions
 from pipeline_helper import build_all_file_inventory, search_table_in_inventory, list_sql_files, search_table_in_processed_tables, get_dependencies
 from clean_sql import process_ddl_file
@@ -161,7 +161,7 @@ def _process_src_sql_file(src_file_name: str, generated_code_folder_name: str, c
 
     """
     logging.debug(f"process src SQL file {src_file_name}")
-    table_folder, table_name = create_folder_structure(src_file_name, "sql-scripts", generated_code_folder_name, config)
+    table_folder, table_name = create_folder_structure_for_table(src_file_name, "sql-scripts", generated_code_folder_name, config)
     fields = _create_src_ddl_statement(table_name, config, f"{table_folder}/sql-scripts")
     _create_dml_statement(f"{table_name}", f"{table_folder}/sql-scripts", fields, config)   
     _create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
@@ -178,7 +178,7 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     :param walk_parent: Assess if it needs to process the dependencies
     """
     
-    table_folder, table_name=create_folder_structure(src_file_name, "sql-scripts", source_target_path, config)
+    table_folder, table_name=create_folder_structure_for_table(src_file_name, "sql-scripts", source_target_path, config)
     parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()

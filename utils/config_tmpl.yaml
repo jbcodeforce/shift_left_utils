@@ -1,10 +1,16 @@
 kafka:
   bootstrap.servers:  <TO_FILL>
+  cluster_id: lkc-jq9kq
+  pkafka_cluster: pkc-gwq2v
+  api_key: <kafka-api-key>
+  api_secret: <kafka-api-key_secret>
   security.protocol: SASL_SSL
   sasl.mechanisms: PLAIN
   sasl.username:  <TO_FILL>
   sasl.password:  <TO_FILL>
   session.timeout.ms: 5000
+  reject_topics_prefixes: ["clone","dim_","src_"]
+  cluster_type: dev
 registry:
   url: https://psrc-zw3e6jo.us-west-2.aws.confluent.cloud
   registry_key_name:   <TO_FILL>
@@ -30,4 +36,5 @@ app:
   default_PK: __db
   src_table_name_suffix: ""
   src_table_name_prefix: src_
+  logging: INFO
  

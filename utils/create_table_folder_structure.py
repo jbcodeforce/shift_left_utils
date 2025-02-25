@@ -7,7 +7,9 @@ import os
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from kafka.app_config import get_config
+import logging
 
+logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
 TMPL_FOLDER="./templates"
 
 parser = argparse.ArgumentParser(
@@ -32,7 +34,14 @@ def extract_table_name(src_file_name: str) -> str:
         table_name = table_name.replace("src_","",1)
     return table_name
 
-def create_folder_structure(src_file_name: str, sql_folder_name:str, target_path: str, config):
+def extract_product_name(existing_path: str) -> str:
+    parent_folder=os.path.dirname(existing_path).split("/")[-1]
+    if parent_folder not in ["facts", "intermediates", "sources"]:
+        return parent_folder
+    else:
+        return None
+    
+def create_folder_structure_for_table(src_file_name: str, sql_folder_name:str, target_path: str, config):
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
     
@@ -46,23 +55,29 @@ def create_folder_structure(src_file_name: str, sql_folder_name:str, target_path
     create_folder_if_not_exist(f"{table_folder}/tests")
     if "source" in target_path:
         internal_table_name=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
-    create_makefile(internal_table_name, sql_folder_name, sql_folder_name, table_folder)
+    product_name = extract_product_name(table_folder)
+    create_makefile(internal_table_name, sql_folder_name, sql_folder_name, table_folder, config["kafka"]["cluster_type"], product_name)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
     return table_folder, table_name
 
-def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str):
+def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str, cluster_type: str, product_name: str):
     """
     Create a makefile to help deploy Flink statements for the given table name
     When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
     """
+    logging.debug(f"Create makefile for {table_name} in {out_dir}")
     env = Environment(loader=FileSystemLoader('.'))
     makefile_template = env.get_template(f"{TMPL_FOLDER}/makefile_ddl_dml_tmpl.jinja")
-    
+    if product_name:
+        prefix=cluster_type + "-" + product_name
+    else:
+        prefix=cluster_type
     context = {
         'table_name': table_name,
-        'statement_name': table_name.replace("_","-"),
+        'ddl_statement_name': prefix+ "-ddl-" + table_name.replace("_","-"),
+        'dml_statement_name': prefix + "-dml-" + table_name.replace("_","-"),
         'ddl_folder': ddl_folder,
         'dml_folder': dml_folder
     }
@@ -118,12 +133,18 @@ def main(arguments):
     * `-m `: Flag to generate a makefile only
     """
     if arguments.m:
-        existing_path=args.pipeline_folder_path + "/" + arguments.table_name
-        create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path)
+        if args.pipeline_folder_path and arguments.table_name:
+            existing_path=args.pipeline_folder_path
+            product_name=extract_product_name(existing_path)
+            create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path, get_config()["kafka"]["cluster_type"], product_name)
+        else:
+            print("\nERROR: you need to specify the pipeline_folder_path and table_name when redoing a makefile")
+            exit()
     else:    
-        create_folders_structure_for_table(args.pipeline_folder_path, "sql-scripts", arguments.table_name, get_config())
+        create_folder_structure_for_table(args.pipeline_folder_path, "sql-scripts", arguments.table_name, get_config())
     print("\n\nDone !")
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    main(args)
     
