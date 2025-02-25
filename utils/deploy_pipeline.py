@@ -59,8 +59,8 @@ def run():
         print(hierarchy)
 
 if __name__ == "__main__":
-    #run()
-    test_debug()
+    run()
+    #test_debug()
  
    
     

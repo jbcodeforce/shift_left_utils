@@ -3,13 +3,4 @@ INSERT INTO {{ table_name }}
 SELECT
     {{ fields }}
     -- change key and add columns
-FROM (
-    select
-      *,
-      ROW_NUMBER() OVER (
-        PARTITION BY `__db`
-        ORDER
-          BY `$rowtime` ASC
-      ) AS row_num
-    FROM {{ topic_name }}
-) WHERE row_num = 1;
+FROM {{ topic_name }};

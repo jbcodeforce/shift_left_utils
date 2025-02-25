@@ -229,7 +229,7 @@ def _change_source_parent(from_src: FlinkStatementHierarchy) -> FlinkStatementHi
                 else:
                     new_child.parents.append(parent)
             from_src.children=[new_child]
-            new_child.parents=list(set(new_child.parents))
+            new_child.parents=list(set())
     return from_src
             
 
