@@ -8,7 +8,7 @@ from pathlib import Path
 import json
 from sql_parser import SQLparser
 from kafka.app_config import get_config
-from pipeline_helper import FlinkStatementHierarchy, search_table_in_inventory, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table, build_all_file_inventory
+from pipeline_helper import FlinkStatementHierarchy, FlinkTableReference,  search_table_in_inventory, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table, build_all_file_inventory
 import logging
 
 logging.basicConfig(filename='pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
@@ -34,17 +34,13 @@ def _read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
 def _visit_parents(current_hierarchy, all_files) -> str:
     report = []
     for parent in current_hierarchy.parents:
-        path=os.path.dirname(search_table_in_inventory(parent, all_files))
-        base_table_folder = os.path.dirname(path)
-        report.append({"table_name": parent, "path": base_table_folder })
+        report.append({"table_name": parent.table_name, "path": parent.table_folder_name })
     return report
 
 def _visit_children(current_hierarchy, all_files) -> str:
     report = []
     for child in current_hierarchy.children:
-        path=os.path.dirname(search_table_in_inventory(child, all_files))
-        base_table_folder = os.path.dirname(path)
-        report.append({"table_name": child, "path": base_table_folder })
+        report.append({"table_name": child.table_name, "path": child.table_folder_name })
     return report
 
 def get_path_to_pipeline_file(file_name: str) -> str:
@@ -60,7 +56,7 @@ def _walk_the_hierarchy_for_report(pipeline_def_fname: str, all_files) -> dict:
     parents = _visit_parents(current_hierarchy, all_files)
     children = _visit_children(current_hierarchy, all_files)
     return {"table_name" : current_hierarchy.table_name, 
-            "path": os.path.dirname(current_hierarchy.pipe_definition),
+            "path": current_hierarchy.path,
             "parents": parents, 
             "children": children}
 
@@ -120,8 +116,8 @@ def run():
         print(hierarchy)
 
 if __name__ == "__main__":
-    #run()
-    test_debug2()
+    run()
+    #test_debug2()
  
    
     
