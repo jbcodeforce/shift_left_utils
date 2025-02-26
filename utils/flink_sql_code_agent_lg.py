@@ -33,7 +33,7 @@ model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
 llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
-translator_template = """
+translator_template_old = """
 you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
 You need to translate the dbt sql statement given as sql input and transform it into a
 Flink SQL statement with the same semantic.
@@ -50,6 +50,24 @@ INSERT INTO {table_name}
 
 Question: {sql_input}
 
+"""
+
+translator_template = """
+you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
+Translate the following DML SQL batch script into Apache Flink SQL for real-time processing.
+Replace dbt utility functions with equivalent Flink SQL functions.
+Maintain the original logic and functionality.
+
+* Keep all the select statements defined with the WITH keyword.
+* Do not add suggestions or explanations in the response, just return the structured Flink sql output.
+* Do not use VARCHAR prefer STRING. 
+* Transform the dbt function `surrogate_key` to a MD5(CONCAT()) equivalent.
+
+Start the generated code with:
+
+INSERT INTO {table_name}
+
+Question: {sql_input}
 """
 
 flink_sql_syntaxic_template="""

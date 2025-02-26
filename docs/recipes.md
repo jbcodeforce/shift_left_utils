@@ -43,7 +43,7 @@ python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGI
 python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGING
 ```
 
-[See this section for details](./migration.md#1---discover-the-current-pipeline)
+[See this section for details](./migration.md)
 
 ## Get what are the tables using another table
 

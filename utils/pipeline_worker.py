@@ -105,7 +105,7 @@ def run():
     if metadata_file_name:
         logging.info(f"Found {PIPELINE_JSON_FILE_NAME}")
         if args.r:
-            print(_walk_the_hierarchy_for_report(metadata_file_name, all_files))
+            print(json.dumps(_walk_the_hierarchy_for_report(metadata_file_name, all_files), indent=3))
     else:
         print(f"{PIPELINE_JSON_FILE_NAME} not found")
         hierarchy=build_pipeline_definition_from_table(args.file_name, [], all_files)

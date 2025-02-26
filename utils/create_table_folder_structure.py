@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from kafka.app_config import get_config
 import logging
-
+from sql_parser import SQLparser
 logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
 TMPL_FOLDER="./templates"
 
@@ -87,6 +87,19 @@ def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: 
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
 
+def _read_table_name_from_ddl(table_folder: str) -> str:
+    sql_dir=table_folder + "/sql-scripts"
+    for file in os.listdir(sql_dir):
+        if file.startswith("dml"):
+            parser = SQLparser()
+            with open(sql_dir + "/" + file, "r") as f:
+                sql_content= f.read()
+                table_name=parser.extract_table_name_from_insert(sql_content)
+                return table_name
+    logging.warning(f"table name not found in dml file in {table_folder}")
+    return extract_table_name(table_folder)
+
+
 def _change_all_makefiles_from(root_folder: str, config):
     """
     For each folder under this folder_root, each table folder, rebuild the makefile
@@ -97,9 +110,9 @@ def _change_all_makefiles_from(root_folder: str, config):
             if "Makefile" == file:
                 table_folder = os.path.dirname(file_path)
                 product_name = extract_product_name(table_folder)
-                internal_table_name = extract_table_name(table_folder)
+                internal_table_name = _read_table_name_from_ddl(table_folder)
                 sql_folder_name="sql-scripts"
-                print(f"create_makefile({internal_table_name}, {sql_folder_name}, sql_folder_name, {table_folder}, {config["kafka"]["cluster_type"]}, {product_name})")
+                print(f"create_makefile({internal_table_name}, {sql_folder_name}, {sql_folder_name}, {table_folder}, {config["kafka"]["cluster_type"]}, {product_name})")
                 create_makefile(internal_table_name, sql_folder_name, sql_folder_name, table_folder, config["kafka"]["cluster_type"], product_name)
 
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
