@@ -11,7 +11,8 @@ from kafka.app_config import get_config
 from pipeline_helper import FlinkStatementHierarchy, search_table_in_inventory, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table, build_all_file_inventory
 import logging
 
-logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
+logging.basicConfig(filename='pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
+                    format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),

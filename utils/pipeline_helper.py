@@ -1,7 +1,7 @@
 
 from functools import lru_cache
 from pydantic import BaseModel, ValidationError, ConfigDict
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Set, Final
 import os, argparse
 from collections import deque
 from pathlib import Path
@@ -18,10 +18,10 @@ or from a migrated Flink SQL project. The structure of the project is important 
 shift_left_project_setup.py.
 """
 PIPELINE_JSON_FILE_NAME="pipeline_definition.json"
-formatter= logging.Formatter('%(levelname)s: %(message)s')
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-logging.basicConfig(level=get_config()["app"]["logging"])
+
+logging.basicConfig(filename='pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
+                    format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
 
 
 files_to_process= deque()   # keep a list file to process, as when parsing a sql we can find a lot of dependencies
@@ -42,8 +42,11 @@ parser.add_argument('-t', '--table_name', required=False, help="Table name to bu
 
 
 class FlinkTableReference(BaseModel):
-    table_name: str 
+    table_name: Final[str] 
+    dml_ref: str
     table_folder_name: str
+    def __hash__(self):
+        return hash((type(self),) + tuple(self.table_name))
 
 class FlinkStatementHierarchy(BaseModel):
     """
@@ -54,8 +57,8 @@ class FlinkStatementHierarchy(BaseModel):
     path: str
     ddl_ref: str
     dml_ref: str
-    parents: Optional[List[FlinkTableReference]]
-    children: Optional[List[FlinkTableReference]]
+    parents: Optional[Set[FlinkTableReference]]
+    children: Optional[Set[FlinkTableReference]]
 
 
 def _is_ddl_exists(folder_path: str) -> str:
@@ -81,10 +84,11 @@ def list_sql_files(folder_path: str) -> set[str]:
     """
     sql_files = set()
     for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.endswith('.sql'):
-                if not file.startswith("ddl"):
-                    sql_files.add(os.path.join(root, file))   
+        if "tests" not in root:
+            for file in files:
+                if file.endswith('.sql'):
+                    if not file.startswith("ddl"):
+                        sql_files.add(os.path.join(root, file))   
     return sql_files
 
 
@@ -117,7 +121,14 @@ def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | Non
             list_potential.append(apath)
     logging.debug(f"Found potential results: {list_potential}")
     if len(list_potential) == 0:
+        if table_name.startswith("src"):
+            table_name=table_name.replace("src_","",1)
+            return search_table_in_inventory(table_name, inventory)
         return None
+    # BIG HACK
+    for sql in list_potential:
+        if not "/mx/" in sql:
+            return sql
     return list_potential[0]
     
 
@@ -193,7 +204,16 @@ def generate_tracking_output(file_name: str, dep_list) -> str:
     output+="Created with tool and updated to make the final join working on the merge conditions:\n"
     return output
 
-def get_parent_tables_from_sql(file_name: str) -> List[FlinkTableReference]:
+def _build_table_reference(table_name: str, dml_file_name: str, table_folder: str = None) -> FlinkTableReference:
+    if not table_folder:
+        directory = os.path.dirname(dml_file_name)
+        table_folder=os.path.dirname(directory)
+    return FlinkTableReference.model_validate(
+                        {"table_name": table_name,
+                         "dml_ref": dml_file_name,
+                         "table_folder_name": table_folder})
+
+def get_parent_tables_from_sql(file_name: str, all_files) -> Set[FlinkTableReference]:
     """
     From the given sql file name, use sql parser to get the tables used by this sql
     content, and return the list of table names
@@ -203,17 +223,17 @@ def get_parent_tables_from_sql(file_name: str) -> List[FlinkTableReference]:
             sql_content= f.read()
             parser = SQLparser()
             table_name=parser.extract_table_name_from_insert(sql_content)
-            dependencies = []
+            dependencies = set()
             dependency_names = parser.extract_table_references(sql_content)
             if (len(dependency_names) > 0):
                 for dependency in dependency_names:
                     logging.info(f"{table_name} - depends on : {dependency}")
-                    ftr = FlinkTableReference.model_validate({"table_name":dependency,"table_folder_name": ""})
-                    dependencies.append(ftr)
+                    dml_file= search_table_in_inventory(dependency, all_files)
+                    dependencies.add(_build_table_reference(dependency,dml_file))
             return table_name, dependencies
     except Exception as e:
         logging.error(e)
-        return "", []
+        return "",  set()
     
 def get_table_type_from_file_path(file_name: str) -> str:
     """
@@ -232,8 +252,8 @@ def get_table_type_from_file_path(file_name: str) -> str:
 
 def _create_node_of_hierarchy(dml_file_name: str, 
                               table_name: str, 
-                              parent_names: List[FlinkTableReference], 
-                              children: List[FlinkTableReference]) -> FlinkStatementHierarchy:
+                              parent_names: Set[FlinkTableReference], 
+                              children: Set[FlinkTableReference]) -> FlinkStatementHierarchy:
     """
     Create the Hierarchy object with needed information
     """
@@ -261,24 +281,34 @@ def _create_or_merge(current: FlinkStatementHierarchy):
             old_definition = FlinkStatementHierarchy.model_validate_json(f.read())
             combined_children=set(old_definition.children).union(set(current.children))
             combined_parents=set(old_definition.parents).union(set(current.parents))
-        current.children=list(combined_children)
-        current.parents=list(combined_parents)
+        current.children=combined_children
+        current.parents=combined_parents
         with open( pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
 
-def _process_next_node(node_to_process, all_files):
-    if len(node_to_process) > 0:
-        current_hierarchy = node_to_process.popleft()
-        logging.debug(f"\t... processing the node {current_hierarchy}")
-        for parent_table_ref in current_hierarchy.parents:
-            parent_dml_file= search_table_in_inventory(parent_table_ref.table_name, all_files)
-            parent_table_ref.table_folder_name=parent_dml_file
-            table_name, parent_names = get_parent_tables_from_sql(parent_dml_file)
-            child = FlinkTableReference.model_validate({"table_name": current_hierarchy.table_name,"table_folder_name": current_hierarchy.path})
-            parent_hierarchy=_create_node_of_hierarchy(parent_dml_file, table_name, parent_names, [child])
-            node_to_process.append(parent_hierarchy)
+def _add_parents_for_future_process(current_hierarchy, nodes_to_process, processed_nodes, all_files):
+    """
+    loop on the parents of the current node, for each of those parent research they own parents.
+    Set the child reference for those parent to the current node
+    add the newly create parent node to the list to process
+    """
+    for parent_table_ref in current_hierarchy.parents:
+        table_name, parent_names = get_parent_tables_from_sql(parent_table_ref.dml_ref, all_files)
+        if not table_name  in processed_nodes:
+            child = _build_table_reference(current_hierarchy.table_name, current_hierarchy.dml_ref, current_hierarchy.path)
+            parent_hierarchy=_create_node_of_hierarchy(parent_table_ref.dml_ref, table_name, parent_names, [child])
+            nodes_to_process.append(parent_hierarchy)
+    return nodes_to_process
+
+def _process_next_node(nodes_to_process, processed_nodes,  all_files):
+    if len(nodes_to_process) > 0:
+        current_hierarchy = nodes_to_process.pop()
+        logging.debug(f"\n\n\t... processing the node {current_hierarchy}")
+        nodes_to_process = _add_parents_for_future_process(current_hierarchy, nodes_to_process, processed_nodes, all_files)
+        print(f"\n\t{len(nodes_to_process)}")
         _create_or_merge(current_hierarchy)
-        _process_next_node(node_to_process, all_files)
+        processed_nodes[current_hierarchy.table_name]=current_hierarchy
+        _process_next_node(nodes_to_process, processed_nodes, all_files)
 
 def build_pipeline_definition_from_table(dml_file_name: str, children: List[str], all_files):
     """
@@ -286,10 +316,10 @@ def build_pipeline_definition_from_table(dml_file_name: str, children: List[str]
     2/ at each level of the tree is info_node with data to be able to run a statement for the current node
     3/ write at each level the list of parents and children and meta-data. Keep only the name
     """
-    table_name, parent_names = get_parent_tables_from_sql(dml_file_name)
+    table_name, parent_names = get_parent_tables_from_sql(dml_file_name, all_files)
     current_node= _create_node_of_hierarchy(dml_file_name, table_name, parent_names, children)
     node_to_process.append(current_node)
-    _process_next_node(node_to_process, all_files)
+    _process_next_node(node_to_process, dict(), all_files)
     return current_node
 
 
