@@ -1,0 +1,14 @@
+{
+   "table_name": "int_table_1",
+   "type": "intermediate",
+   "path": "../examples/intermediates/p1/int_table_1",
+   "ddl_ref": "sql-scripts/ddl.int_table_1.sql",
+   "dml_ref": "sql-scripts/dml.int_table_1.sql",
+   "parents": [
+      "src_table_1",
+      "src_table_3"
+   ],
+   "children": [
+      "fct_order"
+   ]
+}

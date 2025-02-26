@@ -13,6 +13,7 @@ list_record_data_from_topic:
 # --- DDL 
 create_flink_ddl: 
 	$(call create_flink_statement, {{ ddl_statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
+	$(call delete_flink_statement, {{ ddl_statement_name }} )
 
 describe_flink_ddl:
 	$(call describe_flink_statement,  {{ ddl_statement_name }})
@@ -21,8 +22,8 @@ delete_flink_ddl:
 	$(call delete_flink_statement, {{ ddl_statement_name }})
 
 drop_table_{{ table_name }}: 
-	$(call drop_table, drop-{{ statement_name }}, {{ table_name }})
-	$(call delete_flink_statement, drop-{{ statement_name }})
+	$(call drop_table, drop-{{ table_name }}, {{ table_name }})
+	$(call delete_flink_statement, drop-{{ table_name }})
 
 # --- DML
 describe_flink_dml:

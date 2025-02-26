@@ -8,7 +8,9 @@ from pathlib import Path
 from create_table_folder_structure import extract_table_name
 from sql_parser import SQLparser
 import json
+import sys
 import logging
+from kafka.app_config import get_config
 
 """
 Provides a set of functions to search for table dependencies from one Flink table up to the sources from the SQL project
@@ -16,9 +18,13 @@ or from a migrated Flink SQL project. The structure of the project is important 
 shift_left_project_setup.py.
 """
 PIPELINE_JSON_FILE_NAME="pipeline_definition.json"
+formatter= logging.Formatter('%(levelname)s: %(message)s')
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logging.basicConfig(level=get_config()["app"]["logging"])
+
 
 files_to_process= deque()   # keep a list file to process, as when parsing a sql we can find a lot of dependencies
-dependency_list = set()
 node_to_process = deque()
 
 """
@@ -35,6 +41,10 @@ parser.add_argument('-s', '--save_file_name', required=False, help="name of the 
 parser.add_argument('-t', '--table_name', required=False, help="Table name to build a pipeline or to process a pipeline on.")
 
 
+class FlinkTableReference(BaseModel):
+    table_name: str 
+    table_folder_name: str
+
 class FlinkStatementHierarchy(BaseModel):
     """
     The metadata definition for a given table. As a source it will not have parent, as a sink it will not have child.
@@ -44,8 +54,8 @@ class FlinkStatementHierarchy(BaseModel):
     path: str
     ddl_ref: str
     dml_ref: str
-    parents: Optional[List[Any]]
-    children: Optional[List[Any]]
+    parents: Optional[List[FlinkTableReference]]
+    children: Optional[List[FlinkTableReference]]
 
 
 def _is_ddl_exists(folder_path: str) -> str:
@@ -72,8 +82,9 @@ def list_sql_files(folder_path: str) -> set[str]:
     sql_files = set()
     for root, dirs, files in os.walk(folder_path):
         for file in files:
-            if file.endswith('.sql') and file.startswith("dml"):
-                sql_files.add(os.path.join(root, file))   
+            if file.endswith('.sql'):
+                if not file.startswith("ddl"):
+                    sql_files.add(os.path.join(root, file))   
     return sql_files
 
 
@@ -90,57 +101,63 @@ def build_all_file_inventory(src_path= os.getenv("SRC_FOLDER","../dbt-src/models
     file_paths.update(list_sql_files(f"{src_path}/facts"))
     file_paths.update(list_sql_files(f"{src_path}/sources"))
     file_paths.update(list_sql_files(f"{src_path}/dedups"))
-    logging.info("Done building file inventory")
+    logging.info(f"Done building file inventory from {src_path}")
     return file_paths
 
 def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:
     """
-    :return: the path to access the sql file for the matching table: the filename has to include the table name
+    :return: the path to access the sql file for the matching table: 
+    the dml script filename has to include the table name
     """
+    logging.debug(f"Search {table_name} in inventory of files")
+    table_name=table_name.split(".sql")[0]    # legacy table name
+    list_potential=[]
     for apath in inventory:
-        if table_name+'.' in apath:
-            return apath
-    else:
+        if table_name in apath:
+            list_potential.append(apath)
+    logging.debug(f"Found potential results: {list_potential}")
+    if len(list_potential) == 0:
         return None
+    return list_potential[0]
     
 
-def get_dependencies(table_name: str, dbt_script_content: str) -> list[str]:
+def get_dependencies(dbt_script_content: str) -> list[str]:
     """
-    For a given table and dbt script content, get the dependent tables using the dbt { ref: } template
+    For a given table and dbt script content, get the dependent tables using the dbt { ref: } or FROM or JOINS
     """
     parser = SQLparser()
-    dependencies = []
+    dependencies = set()
     dependency_names = parser.extract_table_references(dbt_script_content)
 
     if (len(dependency_names) > 0):
-        print("Dependencies found:")
+        logging.debug("Dependencies found:")
         for dependency in dependency_names:
-            print(f"- depends on : {dependency}")
-            dependencies.append(dependency)
+            logging.debug(f"- depends on : {dependency}")
+            dependencies.add(dependency)
     else:
-        print("  - No dependency")
+        logging.debug("  - No dependency")
     return dependencies
 
-def list_dependencies(file_or_folder: str, persist_dependencies: bool = False):
+def list_parents_from_sql_content(file_or_folder: str):
     """
     List the dependencies for the given file, or all the dependencies of all tables in the given folder
     """
     if file_or_folder.endswith(".sql"):
-        table_name = extract_table_name(file_or_folder)
         with open(file_or_folder) as f:
             sql_content= f.read()
-            l=get_dependencies(table_name, sql_content)
+            l=get_dependencies(sql_content)
             return l
     else:
         # loop over the files in the folder
         for file in list_sql_files(file_or_folder):
-            list_dependencies(file,persist_dependencies)
+            list_parents_from_sql_content(file)
 
 
 
 def generic_search_in_processed_tables(table_name: str, root_folder: str) -> bool:
     """
-    It assumes that the table_name will be a folder name in the tree from the root folder
+    As a first heuristic, it assumes that the table_name will be a folder name in the tree from the root folder,
+    but we cannot be 100% sure so 
     """
     for root, dirs, files in os.walk(root_folder):
         for dir in dirs:
@@ -155,9 +172,9 @@ def search_table_in_processed_tables(table_name: str) -> bool:
     Search in pipeline  and staging folders
     """
     pipeline_path=os.getenv("PIPELINE_FOLDER","../pipelines")
-    if not generic_search_in_processed_tables(table_name,pipeline_path):
+    if not generic_search_in_processed_tables(table_name, pipeline_path):
         staging_path=os.getenv("STAGING","../staging")
-        return generic_search_in_processed_tables(table_name,staging_path)
+        return generic_search_in_processed_tables(table_name, staging_path)
     else:
       return True
     
@@ -176,7 +193,7 @@ def generate_tracking_output(file_name: str, dep_list) -> str:
     output+="Created with tool and updated to make the final join working on the merge conditions:\n"
     return output
 
-def get_dependent_tables(file_name: str) -> List[str]:
+def get_parent_tables_from_sql(file_name: str) -> List[FlinkTableReference]:
     """
     From the given sql file name, use sql parser to get the tables used by this sql
     content, and return the list of table names
@@ -191,10 +208,11 @@ def get_dependent_tables(file_name: str) -> List[str]:
             if (len(dependency_names) > 0):
                 for dependency in dependency_names:
                     logging.info(f"{table_name} - depends on : {dependency}")
-                    dependencies.append(dependency)
+                    ftr = FlinkTableReference.model_validate({"table_name":dependency,"table_folder_name": ""})
+                    dependencies.append(ftr)
             return table_name, dependencies
     except Exception as e:
-        print(e)
+        logging.error(e)
         return "", []
     
 def get_table_type_from_file_path(file_name: str) -> str:
@@ -212,41 +230,52 @@ def get_table_type_from_file_path(file_name: str) -> str:
     else:
         return "dimension"
 
-
-def _create_node_of_hierarchy(dml_file_name: str, table_name: str, parent_names: List[str], children: List[str]) -> FlinkStatementHierarchy:
+def _create_node_of_hierarchy(dml_file_name: str, 
+                              table_name: str, 
+                              parent_names: List[FlinkTableReference], 
+                              children: List[FlinkTableReference]) -> FlinkStatementHierarchy:
+    """
+    Create the Hierarchy object with needed information
+    """
+    logging.debug(f"_create_node_of_hierarchy( {dml_file_name}, {table_name},  {parent_names}, {children})")
     directory = os.path.dirname(dml_file_name)
     table_folder=os.path.dirname(directory)
     level = get_table_type_from_file_path(dml_file_name)
-    ddl_file_name = _is_ddl_exists(directory)
+    ddl_file_name = "sql-scripts/" + _is_ddl_exists(directory)
+    dml_file_name = "sql-scripts/" + dml_file_name.split("/")[-1]
     return FlinkStatementHierarchy.model_validate({"table_name": table_name, 
                                           "type": level, 
-                                          "pipe_definition": table_folder,
+                                          "path": table_folder,
                                           "ddl_ref":  ddl_file_name, 
                                           "dml_ref":  dml_file_name, 
                                           "parents": parent_names, 
                                           "children": children })
 
 def _create_or_merge(current: FlinkStatementHierarchy):
-    if not os.path.exists(current.pipe_definition):
-        with open( current.pipe_definition, "w") as f:
+    pipe_definition_fn=current.path+"/"+PIPELINE_JSON_FILE_NAME
+    if not os.path.exists(pipe_definition_fn):
+        with open( pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
     else:
-        with open(current.pipe_definition, "r") as f:
+        with open(pipe_definition_fn, "r") as f:
             old_definition = FlinkStatementHierarchy.model_validate_json(f.read())
             combined_children=set(old_definition.children).union(set(current.children))
             combined_parents=set(old_definition.parents).union(set(current.parents))
-        current.children=combined_children
-        current.parents=combined_parents
-        with open( current.pipe_definition, "w") as f:
+        current.children=list(combined_children)
+        current.parents=list(combined_parents)
+        with open( pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
 
 def _process_next_node(node_to_process, all_files):
     if len(node_to_process) > 0:
         current_hierarchy = node_to_process.popleft()
-        for parent_table_name in current_hierarchy.parents:
-            parent_dml_file= search_table_in_inventory(parent_table_name, all_files)
-            table_name, parent_names = get_dependent_tables(parent_dml_file)
-            parent_hierarchy=_create_node_of_hierarchy(parent_dml_file, table_name, parent_names, [current_hierarchy.table_name])
+        logging.debug(f"\t... processing the node {current_hierarchy}")
+        for parent_table_ref in current_hierarchy.parents:
+            parent_dml_file= search_table_in_inventory(parent_table_ref.table_name, all_files)
+            parent_table_ref.table_folder_name=parent_dml_file
+            table_name, parent_names = get_parent_tables_from_sql(parent_dml_file)
+            child = FlinkTableReference.model_validate({"table_name": current_hierarchy.table_name,"table_folder_name": current_hierarchy.path})
+            parent_hierarchy=_create_node_of_hierarchy(parent_dml_file, table_name, parent_names, [child])
             node_to_process.append(parent_hierarchy)
         _create_or_merge(current_hierarchy)
         _process_next_node(node_to_process, all_files)
@@ -257,7 +286,7 @@ def build_pipeline_definition_from_table(dml_file_name: str, children: List[str]
     2/ at each level of the tree is info_node with data to be able to run a statement for the current node
     3/ write at each level the list of parents and children and meta-data. Keep only the name
     """
-    table_name, parent_names = get_dependent_tables(dml_file_name)
+    table_name, parent_names = get_parent_tables_from_sql(dml_file_name)
     current_node= _create_node_of_hierarchy(dml_file_name, table_name, parent_names, children)
     node_to_process.append(current_node)
     _process_next_node(node_to_process, all_files)
@@ -287,14 +316,14 @@ def assess_pipeline_definition_exists(file_name: str) -> str:
                     json.load(f)
                 return pname
             except json.JSONDecodeError:
-                print("ERROR {pname} not a json file")
+                logging.error("ERROR {pname} not a json file")
                 return None
         else:
             return None
     except Exception as e:
         return None
     
-def process_files_from_queue(files_to_process, all_files):
+def process_files_from_queue(files_to_process, all_files, dependency_list):
     """
     For each file in the queue get the parents (dependencies) of the table declared in the file. 
     Get the matching file name in the dbt or Flink project of each of those parent table,
@@ -309,17 +338,18 @@ def process_files_from_queue(files_to_process, all_files):
         #if not assess_pipeline_definition_exists(fn):
         #    table_name, hierarchy=build_pipeline_definition_from_table(args.file_name,None,all_files)
    
-        all_dependencies=list_dependencies(fn)
-        if all_dependencies:
-            current_dependencies=set(all_dependencies)
+        current_parents=list_parents_from_sql_content(fn)
+        if current_parents:
+            current_dependencies=set(current_parents)
             for dep in current_dependencies:
-                matching_sql_file=search_table_in_inventory(dep, all_files)
-                if matching_sql_file:
-                    dependency_list.add((dep, matching_sql_file))
-                    files_to_process.append(matching_sql_file)
+                matching_sql_filename=search_table_in_inventory(dep, all_files)
+                if matching_sql_filename:
+                    if not (dep,matching_sql_filename) in dependency_list:
+                        dependency_list.add((dep, matching_sql_filename))
+                        files_to_process.append(matching_sql_filename)
                 else:
                     dependency_list.add((dep,None))
-        return process_files_from_queue(files_to_process, all_files)
+        return process_files_from_queue(files_to_process, all_files, dependency_list)
     else:
         return dependency_list
     
@@ -335,7 +365,8 @@ if __name__ == "__main__":
         all_files= build_all_file_inventory()
     if args.file_name:
         files_to_process.append(args.file_name)
-        dependencies=process_files_from_queue(files_to_process, all_files)
+        dependency_list = set()
+        dependencies=process_files_from_queue(files_to_process, all_files, dependency_list)
         output=generate_tracking_output(args.file_name, dependencies)
     
         if args.save_file_name:

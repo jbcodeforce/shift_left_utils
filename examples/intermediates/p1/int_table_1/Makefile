@@ -7,42 +7,42 @@ create_int_table_1: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
-s
 list_record_data_from_topic:
 	$(call list_topic_content, int_table_1)
 
 # --- DDL 
 create_flink_ddl: 
-	$(call create_flink_statement, ddl-int-table-1, ./sql-scripts/ddl.int_table_1.sql) 
+	$(call create_flink_statement, dev-p1-ddl-int-table-1, ./sql-scripts/ddl.int_table_1.sql) 
+	$(call delete_flink_statement, dev-p1-ddl-int-table-1 )
 
 describe_flink_ddl:
-	$(call describe_flink_statement,  ddl-int-table-1)
+	$(call describe_flink_statement,  dev-p1-ddl-int-table-1)
 
 delete_flink_ddl:
-	$(call delete_flink_statement, ddl-int-table-1)
+	$(call delete_flink_statement, dev-p1-ddl-int-table-1)
 
 drop_table_int_table_1: 
-	$(call drop_table, drop-int-table-1 int_table_1)
-	$(call delete_flink_statement, drop-int-table-1)
+	$(call drop_table, drop-int_table_1, int_table_1)
+	$(call delete_flink_statement, drop-int_table_1)
 
 # --- DML
 describe_flink_dml:
-	$(call describe_flink_statement,  dml-int-table-1)
+	$(call describe_flink_statement,  dev-p1-dml-int-table-1)
 
 create_flink_dml:
-	$(call create_flink_statement, dml-int-table-1, ./sql-scripts/dml.int_table_1.sql) 
+	$(call create_flink_statement, dev-p1-dml-int-table-1, ./sql-scripts/dml.int_table_1.sql) 
 
 create_flink_dev:
-	$(call create_flink_statement, dml-int-table-1, ./tests/dml.int_table_1.sql) 
+	$(call create_flink_statement, dev-p1-dml-int-table-1, ./tests/dml.int_table_1.sql) 
 
 delete_flink_dml:
-	$(call delete_flink_statement, dml-int-table-1)
+	$(call delete_flink_statement, dev-p1-dml-int-table-1)
 
 pause_flink_dml:
-	$(call pause_flink_statement dml-int-table-1)
+	$(call pause_flink_statement dev-p1-dml-int-table-1)
 
 resume_flink_dml:
-	$(call resume_flink_statement dml-int-table-1)
+	$(call resume_flink_statement dev-p1-dml-int-table-1)
 
 delete_schemas:
 	$(call delete_schema, int_table_1-value)

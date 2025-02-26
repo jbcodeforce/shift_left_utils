@@ -182,7 +182,7 @@ def process_fact_dim_sql_file(src_file_name: str, source_target_path: str, walk_
     parents=[]
     with open(src_file_name) as f:
         sql_content= f.read()
-        parents=get_dependencies(table_name, sql_content)
+        parents=get_dependencies(sql_content)
         parents=remove_already_processed_table(parents)
         merge_items_in_reporting_file(parents,TABLES_TO_PROCESS)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)

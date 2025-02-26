@@ -5,7 +5,7 @@ copyright: Copyright &copy; 2024 Jerome Boyer
 nav:
   - Introduction: index.md
   - Setup: setup.md
-  - Commands: commands.md
+  - Recipes: recipes.md
   - Migration Process: migration.md 
   - Tool References: references.md
 theme: 

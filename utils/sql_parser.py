@@ -6,7 +6,10 @@ Dedicated class to parse a SQL statement and extract elements like table name
 class SQLparser:
     def __init__(self):
         self.table_pattern = r'\b(\s*FROM|JOIN)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
-        self.cte_pattern = r'WITH\s+(\w+)\s+AS\s*\('
+        self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
+        self.cte_pattern_2 = r'\s+(\w+)\s+AS\s*\('
+        
+    
 
     def _normalize_sql(self, sql_script):
         """
@@ -41,10 +44,11 @@ class SQLparser:
         if len(matches) == 0:
             # look a Flink SQL reference
             tables = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
-            ctes = re.findall(self.cte_pattern, sql_content, re.IGNORECASE)
+            ctes1 = re.findall(self.cte_pattern_1, sql_content, re.IGNORECASE)
+            ctes2 = re.findall(self.cte_pattern_2, sql_content, re.IGNORECASE)
             matches=[]
             for table in tables:
-                if not table[1] in ctes:
+                if not table[1] in ctes1 and not table[1] in ctes2:
                     matches.append(table[1])
         return matches
 
@@ -91,6 +95,20 @@ if __name__ == "__main__":
         SELECT * 
         FROM table1
         RIGHT OUTER JOIN table2 ON table1.id = table2.id
+        FULL JOIN table3 ON table2.id = table3.id
+        """,
+        """
+        WITH cte1 AS (
+           SELECT a,b,c
+           FROM table1
+        ),
+        cte2 AS (
+            SELECT d,b,e
+           FROM table2
+        )
+        SELECT * 
+        FROM cte1
+        RIGHT OUTER JOIN cte2 ON table1.id = table2.id
         FULL JOIN table3 ON table2.id = table3.id
         """
     ]

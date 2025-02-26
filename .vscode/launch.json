@@ -10,7 +10,10 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "cwd": "${fileDirname}"
+            "cwd": "${fileDirname}",
+            "env": {
+                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml"
+              }
         }
     ]
 }

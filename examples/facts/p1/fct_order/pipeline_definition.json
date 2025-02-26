@@ -1,0 +1,12 @@
+{
+   "table_name": "fct_order",
+   "type": "fact",
+   "path": "../examples/facts/p1/fct_order",
+   "ddl_ref": "sql-scripts/ddl.fct_order.sql",
+   "dml_ref": "sql-scripts/dml.fct_order.sql",
+   "parents": [
+      "int_table_1",
+      "int_table_2"
+   ],
+   "children": []
+}

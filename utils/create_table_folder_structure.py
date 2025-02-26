@@ -17,8 +17,9 @@ parser = argparse.ArgumentParser(
     description='Generate flink project for a given dbt starting code - different options'
 )
 parser.add_argument('-o', '--pipeline_folder_path', required=True, help="name of the folder output of the pipelines")
-parser.add_argument('-t', '--table_name', required=True, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
+parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
 parser.add_argument('-m', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile only")
+parser.add_argument('-rm', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
 
 def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
@@ -45,7 +46,7 @@ def create_folder_structure_for_table(src_file_name: str, sql_folder_name:str, t
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
     
-    * `target_path/table_name/sql-scripts/`:  with two template file, one for ddl. and one for dml.
+    * `target_path/table_name/sql-scripts/`:  with two template files, one for ddl. and one for dml.
     * `target_path/table_name/tests`: for test harness content
     * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
@@ -85,6 +86,21 @@ def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: 
     # Write the rendered Makefile to a file
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
+
+def _change_all_makefiles_from(root_folder: str, config):
+    """
+    For each folder under this folder_root, each table folder, rebuild the makefile
+    """
+    for root, dirs, files in os.walk(root_folder):
+        for file in files:
+            file_path=os.path.join(root, file)
+            if "Makefile" == file:
+                table_folder = os.path.dirname(file_path)
+                product_name = extract_product_name(table_folder)
+                internal_table_name = extract_table_name(table_folder)
+                sql_folder_name="sql-scripts"
+                print(f"create_makefile({internal_table_name}, {sql_folder_name}, sql_folder_name, {table_folder}, {config["kafka"]["cluster_type"]}, {product_name})")
+                create_makefile(internal_table_name, sql_folder_name, sql_folder_name, table_folder, config["kafka"]["cluster_type"], product_name)
 
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=FileSystemLoader('.'))
@@ -139,6 +155,12 @@ def main(arguments):
             create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path, get_config()["kafka"]["cluster_type"], product_name)
         else:
             print("\nERROR: you need to specify the pipeline_folder_path and table_name when redoing a makefile")
+            exit()
+    elif arguments.rm:
+        if args.pipeline_folder_path:
+                _change_all_makefiles_from(args.pipeline_folder_path, get_config())
+        else:
+            print("\nERROR: you need to specify the pipeline_folder_path and updating all the makefiles for a given folder tree")
             exit()
     else:    
         create_folder_structure_for_table(args.pipeline_folder_path, "sql-scripts", arguments.table_name, get_config())

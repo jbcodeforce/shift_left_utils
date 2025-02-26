@@ -1,0 +1,11 @@
+{
+   "table_name": "src_table_1",
+   "type": "source",
+   "path": "../examples/sources/src_table_1",
+   "ddl_ref": "sql-scripts/ddl.src_table_1.sql",
+   "dml_ref": "sql-scripts/dml.src_table_1.sql",
+   "parents": [],
+   "children": [
+      "int_table_1"
+   ]
+}

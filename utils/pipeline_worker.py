@@ -7,9 +7,11 @@ import os, argparse
 from pathlib import Path
 import json
 from sql_parser import SQLparser
+from kafka.app_config import get_config
 from pipeline_helper import FlinkStatementHierarchy, search_table_in_inventory, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table, build_all_file_inventory
+import logging
 
-
+logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
@@ -75,7 +77,12 @@ def _delete_metada_file(root_folder: str, file_to_delete: str):
 
 def test_debug():
     all_files=build_all_file_inventory("../examples")
-    hierarchy=build_pipeline_definition_from_table("../examples/facts/fct_order/sql-scripts/dml.fct_order.sql", [], all_files)
+    hierarchy=build_pipeline_definition_from_table("../examples/facts/p1/fct_order/sql-scripts/dml.fct_order.sql", [], all_files)
+    print(hierarchy.model_dump_json(indent=3))
+
+def test_debug2():
+    all_files=build_all_file_inventory("../../data-platform-flink/staging/../pipelines")
+    hierarchy=build_pipeline_definition_from_table("../../data-platform-flink/staging/../pipelines/dimensions/aqem/dim_tag/sql-scripts/dml.aqem_dim_tag.sql", [], all_files)
     print(hierarchy.model_dump_json(indent=3))
 
 def run():
@@ -92,16 +99,19 @@ def run():
             print("\n\tDone!")
             exit()
 
+    if not args.file_name:
+        print("\nERROR -f file_name is mandatory")
+        exit()
+
     metadata_file_name=assess_pipeline_definition_exists(args.file_name)
     all_files=build_all_file_inventory(args.inventory)
     if metadata_file_name:
-        print(f"Found {PIPELINE_JSON_FILE_NAME}")
+        logging.info(f"Found {PIPELINE_JSON_FILE_NAME}")
         if args.r:
             print(_walk_the_hierarchy_for_report(metadata_file_name, all_files))
     else:
         print(f"{PIPELINE_JSON_FILE_NAME} not found")
-        all_files=build_all_file_inventory( args.inventory)
-        table_name, hierarchy=build_pipeline_definition_from_table(args.file_name, None, all_files)
+        hierarchy=build_pipeline_definition_from_table(args.file_name, [], all_files)
         metadata_file_name=get_path_to_pipeline_file(args.file_name)
         print(hierarchy.model_dump_json(indent=3))
         with open( metadata_file_name, "w") as f:
@@ -109,8 +119,8 @@ def run():
         print(hierarchy)
 
 if __name__ == "__main__":
-    run()
-    #test_debug()
+    #run()
+    test_debug2()
  
    
     

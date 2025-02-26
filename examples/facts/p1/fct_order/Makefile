@@ -13,6 +13,7 @@ list_record_data_from_topic:
 # --- DDL 
 create_flink_ddl: 
 	$(call create_flink_statement, dev-p1-ddl-fct-order, ./sql-scripts/ddl.fct_order.sql) 
+	$(call delete_flink_statement, dev-p1-ddl-fct-order )
 
 describe_flink_ddl:
 	$(call describe_flink_statement,  dev-p1-ddl-fct-order)
@@ -21,8 +22,8 @@ delete_flink_ddl:
 	$(call delete_flink_statement, dev-p1-ddl-fct-order)
 
 drop_table_fct_order: 
-	$(call drop_table, drop-, fct_order)
-	$(call delete_flink_statement, drop-)
+	$(call drop_table, drop-fct_order, fct_order)
+	$(call delete_flink_statement, drop-fct_order)
 
 # --- DML
 describe_flink_dml:
