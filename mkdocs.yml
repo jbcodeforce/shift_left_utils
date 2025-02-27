@@ -7,7 +7,6 @@ nav:
   - Setup: setup.md
   - Recipes: recipes.md
   - Migration Process: migration.md 
-  - Tool References: references.md
 theme: 
   name: material
   logo: assets/logo.drawio.png

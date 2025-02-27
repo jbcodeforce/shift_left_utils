@@ -52,11 +52,14 @@ class SQLparser:
                     matches.append(table[1])
         return matches
 
-    def extract_table_name_from_insert(self, sql_content):
+    def extract_table_name_from_insert(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
+        regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_`]*)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
-        return tbname[0][1]
+        if len(tbname) > 0:
+            tb=tbname[0][1].replace("`","")
+            return tb
+        return "No-Table"
     
     def parse_file(self, file_path):
         """

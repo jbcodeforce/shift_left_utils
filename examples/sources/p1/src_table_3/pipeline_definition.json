@@ -1,11 +1,15 @@
 {
    "table_name": "src_table_3",
    "type": "source",
-   "path": "../examples/sources/p1/src_table_3",
+   "path": "./examples/sources/p1/src_table_3",
    "ddl_ref": "sql-scripts/ddl.src_table_3.sql",
    "dml_ref": "sql-scripts/dml.src_table_3.sql",
    "parents": [],
    "children": [
-      "int_table_1"
+      {
+         "table_name": "int_table_1",
+         "dml_ref": "sql-scripts/dml.int_table_1.sql",
+         "table_folder_name": "./examples/intermediates/p1/int_table_1"
+      }
    ]
 }

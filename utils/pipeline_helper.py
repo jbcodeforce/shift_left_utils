@@ -123,7 +123,10 @@ def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | Non
     if len(list_potential) == 0:
         if table_name.startswith("src"):
             table_name=table_name.replace("src_","",1)
-            return search_table_in_inventory(table_name, inventory)
+            for apath in inventory:
+                if table_name in apath and "source" in apath:
+                    return apath
+            return None
         return None
     # BIG HACK
     for sql in list_potential:
@@ -271,6 +274,11 @@ def _create_node_of_hierarchy(dml_file_name: str,
                                           "parents": parent_names, 
                                           "children": children })
 
+def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
+    with open(file_name, "r") as f:
+        content = FlinkStatementHierarchy.model_validate_json(f.read())
+        return content
+    
 def _create_or_merge(current: FlinkStatementHierarchy):
     pipe_definition_fn=current.path+"/"+PIPELINE_JSON_FILE_NAME
     if not os.path.exists(pipe_definition_fn):
@@ -286,28 +294,49 @@ def _create_or_merge(current: FlinkStatementHierarchy):
         with open( pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
 
+def _modify_children(current: FlinkStatementHierarchy, parent_ref: FlinkTableReference):
+    """
+    Verify the current is in the children of the parent.
+    It may happend that parent was already processed, but the current is referencing it another time,
+    in this case we need to add to the children of the parent
+    """
+    child= _build_table_reference(current.table_name, current.dml_ref)
+    pipe_definition_fn=parent_ref.table_folder_name+"/"+PIPELINE_JSON_FILE_NAME
+    parent = read_pipeline_metadata(pipe_definition_fn)
+    parent.children.add(child)
+    _create_or_merge(parent)
+
+def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):
+    try: 
+        nodes_to_process.index(current_hierarchy)
+    except ValueError:
+        nodes_to_process.append(current_hierarchy)
+
 def _add_parents_for_future_process(current_hierarchy, nodes_to_process, processed_nodes, all_files):
     """
-    loop on the parents of the current node, for each of those parent research they own parents.
-    Set the child reference for those parent to the current node
-    add the newly create parent node to the list to process
+    loop on the parents of the current node, for each parent, research they own parents to create FlinkTableReferences
+    add the newly create parent node to the list of node to process
     """
     for parent_table_ref in current_hierarchy.parents:
-        table_name, parent_names = get_parent_tables_from_sql(parent_table_ref.dml_ref, all_files)
-        if not table_name  in processed_nodes:
-            child = _build_table_reference(current_hierarchy.table_name, current_hierarchy.dml_ref, current_hierarchy.path)
-            parent_hierarchy=_create_node_of_hierarchy(parent_table_ref.dml_ref, table_name, parent_names, [child])
-            nodes_to_process.append(parent_hierarchy)
+        if not parent_table_ref.table_name in processed_nodes:
+            table_name, parent_names = get_parent_tables_from_sql(parent_table_ref.dml_ref, all_files)
+            if not table_name  in processed_nodes:
+                child = _build_table_reference(current_hierarchy.table_name, current_hierarchy.dml_ref, current_hierarchy.path)
+                parent_hierarchy=_create_node_of_hierarchy(parent_table_ref.dml_ref, table_name, parent_names, [child])
+                _add_node_to_process_if_not_present(parent_hierarchy, nodes_to_process)
+            else:
+                _modify_children(current_hierarchy, parent_table_ref)
+        else:
+            _modify_children(current_hierarchy, parent_table_ref)
     return nodes_to_process
 
 def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     if len(nodes_to_process) > 0:
         current_hierarchy = nodes_to_process.pop()
         logging.debug(f"\n\n\t... processing the node {current_hierarchy}")
-        nodes_to_process = _add_parents_for_future_process(current_hierarchy, nodes_to_process, processed_nodes, all_files)
-        print(f"\n\t{len(nodes_to_process)}")
         _create_or_merge(current_hierarchy)
         processed_nodes[current_hierarchy.table_name]=current_hierarchy
+        nodes_to_process = _add_parents_for_future_process(current_hierarchy, nodes_to_process, processed_nodes, all_files)
         _process_next_node(nodes_to_process, processed_nodes, all_files)
 
 def build_pipeline_definition_from_table(dml_file_name: str, children: List[str], all_files):

@@ -14,6 +14,17 @@
             "env": {
                 "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml"
               }
+        },
+        {
+            "name": "Debug tests",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "env": {
+                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml"
+              }
         }
     ]
 }

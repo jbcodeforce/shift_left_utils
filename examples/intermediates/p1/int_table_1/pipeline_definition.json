@@ -1,14 +1,26 @@
 {
    "table_name": "int_table_1",
    "type": "intermediate",
-   "path": "../examples/intermediates/p1/int_table_1",
+   "path": "./examples/intermediates/p1/int_table_1",
    "ddl_ref": "sql-scripts/ddl.int_table_1.sql",
    "dml_ref": "sql-scripts/dml.int_table_1.sql",
    "parents": [
-      "src_table_1",
-      "src_table_3"
+      {
+         "table_name": "src_table_3",
+         "dml_ref": "./examples/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
+         "table_folder_name": "./examples/sources/p1/src_table_3"
+      },
+      {
+         "table_name": "src_table_1",
+         "dml_ref": "./examples/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "table_folder_name": "./examples/sources/src_table_1"
+      }
    ],
    "children": [
-      "fct_order"
+      {
+         "table_name": "fct_order",
+         "dml_ref": "sql-scripts/dml.fct_order.sql",
+         "table_folder_name": "./examples/facts/p1/fct_order"
+      }
    ]
 }

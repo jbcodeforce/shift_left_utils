@@ -1,12 +1,20 @@
 {
    "table_name": "fct_order",
    "type": "fact",
-   "path": "../examples/facts/p1/fct_order",
+   "path": "./examples/facts/p1/fct_order",
    "ddl_ref": "sql-scripts/ddl.fct_order.sql",
    "dml_ref": "sql-scripts/dml.fct_order.sql",
    "parents": [
-      "int_table_1",
-      "int_table_2"
+      {
+         "table_name": "int_table_1",
+         "dml_ref": "./examples/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
+         "table_folder_name": "./examples/intermediates/p1/int_table_1"
+      },
+      {
+         "table_name": "int_table_2",
+         "dml_ref": "./examples/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
+         "table_folder_name": "./examples/intermediates/p1/int_table_2"
+      }
    ],
    "children": []
 }
