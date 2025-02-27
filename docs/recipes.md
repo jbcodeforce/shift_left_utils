@@ -1,72 +1,195 @@
 # Recipes Summary
 
 
-This section presents a quick summary of the tools used for migration. Be sure to have set environment variables: SRC_FOLDER, STAGING and CONFIG_FILE:
+This section presents a quick summary of the tools used for migration and to address specific use cases. Be sure to have set environment variables: SRC_FOLDER, STAGING and CONFIG_FILE:
+
+* As an example for a real project where the source repository is cloned to the `your-src-dbt-folder` folder and the new flink_project is `flink-project`, the setting will look like:
 
 ```sh
 export SRC_FOLDER=../../your-src-dbt-folder/models
 export STAGING=../../flink-project/staging
+export PIPELINES=../../flink-project/pipelines
 export CONFIG_FILE=../../flink-project/config.yaml
 ```
 
-## Create a table structure
+To clarrify how the projects are organized see the components high level view:
+
+![](./images/components.drawio.png)
+
+## Environment preparation
+
+### What to add to the config.yaml
+
+[See the setup guide](./setup.md), but Confluent Cloud security keys are needed when using Confluent Cloud.
+
+### Create a Flink project structure
+
+TO BE DONE 
+
+### Create a table structure
 
 The goal of this tool is to create a folder structure to start migrating SQL manually:
 
 ```sh
-python  create_table_structure.py -t fct_user -o $STAGING/fct_user
+python  create_table_folder_structure.py -t fct_user -o ../examples/flink_project/pipelines/facts/p1
 ```
+
+???- info "Output"
+
+        ```
+        └── p1
+            └── fct_user
+                ├── Makefile
+                ├── sql-scripts
+                │   ├── ddl.fct_user.sql
+                │   └── dml.fct_user.sql
+                ├── tests
+                └── tracking.md
+        ```
 
 [See reference](references.md#create-table-structure)
 
+## Work with pipelines
 
-## Get parent pipeline
+### Get parent pipeline for human
+
+???+ info "For structure ouput"
+    See the pipeline definition creation in [this section](#build-structured-pipeline-metadata-and-walk-through).
 
 To get the parent hierarchy for a fact or dimension table, use the `pipeline_helper.py` tool. The output will report the dependent tables up to the sources from the inventory of sql files.
 This inventory will be built from the source folder specified with the -i or --inventory argument
 
-* Example to search in the dbt or SQL source project
+* Example to get the parents used in a given dbt or SQL source project:
 
 ```sh
-python pipeline_helper.py -f $SRC_FOLDER/facts/fct_users.sql -i $SRC_FOLDER
+python pipeline_helper.py -f $SRC_FOLDER/facts/fct_orders.sql -i $SRC_FOLDER
 ```
 
-* Example of searching the pipeline of a migrated file from the migrated content
+* Example of searching the pipeline of a migrated file from the migrated content:
 
 ```sh
-python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGING/../pipelines
+python pipeline_helper.py -f $PIPELINES/facts/fct_users.sql -i $PIPELINES
 ```
 
-* same but for the staged content
+* The same but for the staging content
 
 ```sh
-python pipeline_helper.py -f $STAGING/../pipelines/facts/fct_users.sql -i $STAGING
+python pipeline_helper.py -f $PIPELINES/facts/fct_users.sql -i $STAGING
 ```
 
 [See this section for details](./migration.md)
 
-## Get what are the tables using another table
+### Get what are the Flink SQL statement  using a specified table
 
 This is helpful to understand what are the "consumers" of a table.
 
 ```sh
 python find_table_user.py -t table_name -r root_folder_to_search_in
 # example
-python find_table_user.py -t users -r $STAGING
+python find_table_user.py -t users -r $PIPELINES
 ```
 
-## Build a report of for a pipeline
 
-A pipeline is discovered by walking from the sink to the sources via intermediates. The s
+### Build an inventory of Flink SQL DML statements
 
-## How to migrate an existing dbt or sql table to matching Flink Table
+The inventory is built by crowling the `pipelines` folder and looking at each dml to get the table name. The inventory is a hashmap with the key being the table name and the value is a TableReference defined as:
 
-The tool is process_src_tables.py but it will do different migration approach, depending of the type of table: sources or facts,dimensions or intermediates
+```python
+class FlinkTableReference(BaseModel):
+    table_name: Final[str] 
+    dml_ref: Optional[str]
+    table_folder_name: str
+```
+
+* To build an inventory file do the following command:
+
+```sh
+python create_table_folder_structure.py --build-inventory --inventory-folder $PIPELINES --root-folder $PIPELINES
+```
+
+???- info "Example of inventory"
+
+        ```json
+        "src_table_2": {
+            "table_name": "src_table_2",
+            "dml_ref": "../examples/flink_project/pipelines/sources/p1/src_table_2/sql-scripts/dml.src_table_2.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/sources/p1/src_table_2"
+        },
+        "src_table_3": {
+            "table_name": "src_table_3",
+            "dml_ref": "../examples/flink_project/pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/sources/p1/src_table_3"
+        },
+        "src_table_1": {
+            "table_name": "src_table_1",
+            "dml_ref": "../examples/flink_project/pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/sources/src_table_1"
+        },
+        "int_table_2": {
+            "table_name": "int_table_2",
+            "dml_ref": "../examples/flink_project/pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/intermediates/p1/int_table_2"
+        },
+        "int_table_1": {
+            "table_name": "int_table_1",
+            "dml_ref": "../examples/flink_project/pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/intermediates/p1/int_table_1"
+        },
+        "fct_order": {
+            "table_name": "fct_order",
+            "dml_ref": "../examples/flink_project/pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+            "table_folder_name": "../examples/flink_project/pipelines/facts/p1/fct_order"
+        }
+        ```
+
+### Build structured pipeline metadata and walk through
+
+A pipeline is discovered by walking from the sink to the sources via intermediate statements. Each pipeline is a list of existing dimension and fact tables, and for each table the tool creates the `pipeline_definition.json`.
+
+The structured folder for a table looks like:
+
+`<facts | intermediate | dimensions | sources>/<product_name>/<table_name>`
+
+The `pipeline_definition.json` is persisted under the <table_name> folder.
+
+The tool needs to get an up-to-date inventory, see [previous section to build it](#build-an-inventory-of-flink-sql-dml-statements).
+
+* Build all the `pipeline_definition.json` from a sink:
+
+```sh
+python pipeline_worker.py -f $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql  --build
+```
+
+### Build pipeline reports 
+
+* Get a report from one sink to n sources:
+
+```sh
+python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_definition.json -report
+```
+
+* Get a report from one source to n sinks:
+
+```sh
+python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_definition.json -report
+```
+
+* Delete all the `pipeline_definition.json` files from a given folder. It goes down recursively.
+
+```sh
+python pipeline_worker.py -d $PIPELINES/sources/product_1
+```
+
+## Migration
+
+### How to migrate an existing dbt or sql script to the matching Apache Flink SQL statement 
+
+The tool is `process_src_tables.py` but it will do different migration approach, depending of the type of table: sources or facts,dimensions or intermediates
 
 The syntax is:
 
 ```sh
-python process_src_tables.py -f $SRC_FOLDER/facts/product_name/fct_users.sql -o $STAGING/facts/product_name -pd
+python process_src_tables.py -f $SRC_FOLDER/facts/product_name/fct_users.sql -o $STAGING/facts/product_name --walk-up
 ```
 
 * Generate Flink SQLs from one Fact or Dimension table using a recurcive processing up to the source tables. The SQL created statements are saved into the staging temporary folder
@@ -82,8 +205,9 @@ python process_src_tables.py -f $SRC_FOLDER/sources -o $STAGING/sources
 ```
 
 
+## Day to day maintenance
 
-## Update the source sql to do some update
+### Update the source sql to do some update
 
 The typical update will be the source table name to be used as it may change per environment. So this tool can help do a global change. Another use case is to limit the data to use for developement to a spesific set of record, so a where statement can be done.
 
@@ -91,7 +215,7 @@ The typical update will be the source table name to be used as it may change per
 python change_src_sql.py -s <source_folder> -w "where condition as string"
 ```
 
-## Change Makefile definition for one table
+### Change Makefile definition for one table
 
 During development we face the need to adapt the Makefile quite often depending of project structure and naming convention. The following code helps to do so:
 
@@ -106,7 +230,11 @@ Also if we want to change all the Makefiles within a specific folder and its sub
 python create_table_folder_structure.py -rm -o ../examples/facts/
 ```
 
+
+## Deploy using the pipeline definition
+
 ## Others - Need to be updated
+
 * Once the Source DDL is executed successfully, generate test data, with 5 records, and send them to the matching topic. 
 
 ```sh

@@ -9,18 +9,87 @@ from pathlib import Path
 from kafka.app_config import get_config
 import logging
 from sql_parser import SQLparser
-logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
+import json
+from pydantic import BaseModel
+from typing import Optional, Final
+
+logging.basicConfig(filename='pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
+                    format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+
+
 TMPL_FOLDER="./templates"
 
 parser = argparse.ArgumentParser(
     prog=os.path.basename(__file__),
     description='Generate flink project for a given dbt starting code - different options'
 )
-parser.add_argument('-o', '--pipeline_folder_path', required=True, help="name of the folder output of the pipelines")
-parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
-parser.add_argument('-m', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile only")
-parser.add_argument('-rm', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
 
+parser.add_argument('-o', '--pipeline_folder_path', required=False, help="name of the folder output of the pipelines")
+parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
+parser.add_argument('--build-makefile', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile only")
+parser.add_argument('-rm', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
+parser.add_argument('--build-inventory', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
+parser.add_argument('--root-folder', required=False, help="Folder to search the Flink SQL statements")
+parser.add_argument('-if', '--inventory-folder', required=False, help="Folder to persist repository information.")
+
+
+def main(arguments):
+    """
+    Process the creation of the folder structure given the table name as part of the program arguments.
+
+    **Arguments:**
+
+    * `-t or --table_name` name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file
+    * `-o or --pipeline_folder_path`, required=True, help="name of the folder output of the pipelines"
+    * `-m `: Flag to generate a makefile only
+    * --build-inventory
+    """
+    if arguments.build_inventory:
+        if args.root_folder and args.inventory_folder:
+            print("-"*20 + "\nPrepare an image of current pipeline content for inventory")
+            get_or_build_inventory_from_ddl(args.root_folder,args.inventory_folder,True)
+            print("Done !")
+            exit(0)
+        else:
+            print("ERROR for building inventory, specify the folder where the Flink sql statements are")
+            print("   and the folder name for where to persist the inventory. It is used by other tools.")
+            exit(1)
+
+    if arguments.build_makefile:
+        if args.pipeline_folder_path and arguments.table_name:
+            existing_path=args.pipeline_folder_path
+            product_name=extract_product_name(existing_path)
+            create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path, get_config()["kafka"]["cluster_type"], product_name)
+            exit(0)
+        else:
+            print("\nERROR: you need to specify the pipeline_folder_path and table_name when redoing a makefile")
+            exit(1)
+    elif arguments.rm:
+        if args.pipeline_folder_path:
+            _change_all_makefiles_from(args.pipeline_folder_path, get_config())
+            print("Done processing the makefiles")
+            exit(1)
+        else:
+            print("\nERROR: you need to specify the pipeline_folder_path and updating all the makefiles for a given folder tree")
+            exit(1)
+    elif arguments.pipeline_folder_path:
+        if arguments.table_name:
+            fn=os.path.join(arguments.pipeline_folder_path,arguments.table_name)
+            create_folder_structure_for_table(fn, "sql-scripts", arguments.pipeline_folder_path, get_config())
+            print("\n\nDone !")
+            exit(0)
+        else:
+            print("\nERROR: you need to specify the table_name to create a folder structure")
+            exit(1)
+
+class FlinkTableReference(BaseModel):
+    table_name: Final[str] 
+    dml_ref: Optional[str]
+    table_folder_name: str
+    def __hash__(self):
+        return hash((type(self),) + tuple(self.table_name))
+    
 def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
         os.makedirs(new_path)
@@ -36,8 +105,11 @@ def extract_table_name(src_file_name: str) -> str:
     return table_name
 
 def extract_product_name(existing_path: str) -> str:
+    """
+    Given an existing folder path, get the name of the folder below one of the structural folder as it is the name of the data product.
+    """
     parent_folder=os.path.dirname(existing_path).split("/")[-1]
-    if parent_folder not in ["facts", "intermediates", "sources"]:
+    if parent_folder not in ["facts", "intermediates", "sources", "dimensions"]:
         return parent_folder
     else:
         return None
@@ -50,17 +122,21 @@ def create_folder_structure_for_table(src_file_name: str, sql_folder_name:str, t
     * `target_path/table_name/tests`: for test harness content
     * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
+    logging.info(f"Create folder {src_file_name}")
     table_name = extract_table_name(src_file_name)  
     table_folder=f"{target_path}/{table_name}"
     create_folder_if_not_exist(f"{table_folder}/{sql_folder_name}")
     create_folder_if_not_exist(f"{table_folder}/tests")
     if "source" in target_path:
         internal_table_name=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
+    else:
+        internal_table_name=table_name
     product_name = extract_product_name(table_folder)
     create_makefile(internal_table_name, sql_folder_name, sql_folder_name, table_folder, config["kafka"]["cluster_type"], product_name)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
+    logging.info(f"Create folder {table_folder} for the table {table_name}")
     return table_folder, table_name
 
 def create_makefile(table_name: str, ddl_folder: str, dml_folder: str, out_dir: str, cluster_type: str, product_name: str):
@@ -151,33 +227,43 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
     with open(out_dir + '/sql-scripts/dml.' + table_name + ".sql", 'w') as f:
         f.write(rendered_dml)
 
-def main(arguments):
-    """
-    Process the creation of the folder structure given the table name as part of the program arguments.
 
-    **Arguments:**
-
-    * `-t or --table_name` name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file
-    * `-o or --pipeline_folder_path`, required=True, help="name of the folder output of the pipelines"
-    * `-m `: Flag to generate a makefile only
+def get_or_build_inventory_from_ddl(root_folder: str, target_path: str, recreate: bool= False) -> dict:
     """
-    if arguments.m:
-        if args.pipeline_folder_path and arguments.table_name:
-            existing_path=args.pipeline_folder_path
-            product_name=extract_product_name(existing_path)
-            create_makefile( arguments.table_name, "sql-scripts", "sql-scripts", existing_path, get_config()["kafka"]["cluster_type"], product_name)
-        else:
-            print("\nERROR: you need to specify the pipeline_folder_path and table_name when redoing a makefile")
-            exit()
-    elif arguments.rm:
-        if args.pipeline_folder_path:
-                _change_all_makefiles_from(args.pipeline_folder_path, get_config())
-        else:
-            print("\nERROR: you need to specify the pipeline_folder_path and updating all the makefiles for a given folder tree")
-            exit()
-    else:    
-        create_folder_structure_for_table(args.pipeline_folder_path, "sql-scripts", arguments.table_name, get_config())
-    print("\n\nDone !")
+    From the root folder where all the ddl are saved. e.g. the pipelines folder navigate to get the dml
+    open each dml file to get the table name and build and inventory, table_name, FlinkTableReference
+    """
+    create_folder_if_not_exist(target_path)
+    inventory_path= os.path.join(target_path,"inventory.json")
+    inventory={}
+    if recreate or not os.path.exists(inventory_path):
+        parser = SQLparser()
+        for root, dirs, files in os.walk(root_folder):
+            for file in files:
+                if file.startswith('dml'):
+                    dml_file_name=os.path.join(root,file)
+                    logging.debug(f"process file {dml_file_name}")
+                    with open(dml_file_name, "r") as f:
+                        sql_content= f.read()
+                        table_name=parser.extract_table_name_from_insert(sql_content)
+                        directory = os.path.dirname(dml_file_name)
+                        table_folder=os.path.dirname(directory)
+                        ref= FlinkTableReference.model_validate(
+                                    {"table_name": table_name,
+                                    "dml_ref": dml_file_name,
+                                    "table_folder_name": table_folder})
+                        logging.debug(ref)
+                        inventory[ref.table_name]= ref.model_dump()
+        with open(inventory_path, "w") as f:
+            json.dump(inventory, f, indent=4)
+        logging.info(f"Create inventory file {inventory_path}")
+    else:
+        with open(inventory_path, "r") as f:
+            inventory= json.load(f)
+    return inventory
+           
+
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

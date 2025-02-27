@@ -1,16 +1,15 @@
 
 from functools import lru_cache
-from pydantic import BaseModel, ValidationError, ConfigDict
-from typing import List, Optional, Any, Tuple, Set, Final
+from pydantic import BaseModel
+from typing import List, Optional, Set
 import os, argparse
 from collections import deque
 from pathlib import Path
-from create_table_folder_structure import extract_table_name
 from sql_parser import SQLparser
 import json
-import sys
 import logging
 from kafka.app_config import get_config
+from create_table_folder_structure import get_or_build_inventory_from_ddl, FlinkTableReference
 
 """
 Provides a set of functions to search for table dependencies from one Flink table up to the sources from the SQL project
@@ -41,12 +40,7 @@ parser.add_argument('-s', '--save_file_name', required=False, help="name of the 
 parser.add_argument('-t', '--table_name', required=False, help="Table name to build a pipeline or to process a pipeline on.")
 
 
-class FlinkTableReference(BaseModel):
-    table_name: Final[str] 
-    dml_ref: str
-    table_folder_name: str
-    def __hash__(self):
-        return hash((type(self),) + tuple(self.table_name))
+
 
 class FlinkStatementHierarchy(BaseModel):
     """
@@ -108,7 +102,16 @@ def build_all_file_inventory(src_path= os.getenv("SRC_FOLDER","../dbt-src/models
     logging.info(f"Done building file inventory from {src_path}")
     return file_paths
 
-def search_table_in_inventory(table_name: str, inventory: set[str]) -> str | None:
+def search_table_in_inventory(table_name: str, inventory: dict) -> str | None:
+    
+    table_name=table_name.split(".sql")[0]    # legacy table name
+    table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
+    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
+    if table_ref and table_ref.dml_ref:
+        return table_ref.dml_ref
+    return
+
+def search_table_in_inventory_all_files(table_name: str, inventory: set[str]) -> str | None:
     """
     :return: the path to access the sql file for the matching table: 
     the dml script filename has to include the table name
@@ -207,7 +210,7 @@ def generate_tracking_output(file_name: str, dep_list) -> str:
     output+="Created with tool and updated to make the final join working on the merge conditions:\n"
     return output
 
-def _build_table_reference(table_name: str, dml_file_name: str, table_folder: str = None) -> FlinkTableReference:
+def build_table_reference(table_name: str, dml_file_name: str, table_folder: str = None) -> FlinkTableReference:
     if not table_folder:
         directory = os.path.dirname(dml_file_name)
         table_folder=os.path.dirname(directory)
@@ -232,7 +235,7 @@ def get_parent_tables_from_sql(file_name: str, all_files) -> Set[FlinkTableRefer
                 for dependency in dependency_names:
                     logging.info(f"{table_name} - depends on : {dependency}")
                     dml_file= search_table_in_inventory(dependency, all_files)
-                    dependencies.add(_build_table_reference(dependency,dml_file))
+                    dependencies.add(build_table_reference(dependency, dml_file))
             return table_name, dependencies
     except Exception as e:
         logging.error(e)
@@ -300,7 +303,7 @@ def _modify_children(current: FlinkStatementHierarchy, parent_ref: FlinkTableRef
     It may happend that parent was already processed, but the current is referencing it another time,
     in this case we need to add to the children of the parent
     """
-    child= _build_table_reference(current.table_name, current.dml_ref)
+    child= build_table_reference(current.table_name, current.dml_ref)
     pipe_definition_fn=parent_ref.table_folder_name+"/"+PIPELINE_JSON_FILE_NAME
     parent = read_pipeline_metadata(pipe_definition_fn)
     parent.children.add(child)
@@ -321,7 +324,7 @@ def _add_parents_for_future_process(current_hierarchy, nodes_to_process, process
         if not parent_table_ref.table_name in processed_nodes:
             table_name, parent_names = get_parent_tables_from_sql(parent_table_ref.dml_ref, all_files)
             if not table_name  in processed_nodes:
-                child = _build_table_reference(current_hierarchy.table_name, current_hierarchy.dml_ref, current_hierarchy.path)
+                child = build_table_reference(current_hierarchy.table_name, current_hierarchy.dml_ref, current_hierarchy.path)
                 parent_hierarchy=_create_node_of_hierarchy(parent_table_ref.dml_ref, table_name, parent_names, [child])
                 _add_node_to_process_if_not_present(parent_hierarchy, nodes_to_process)
             else:
@@ -418,12 +421,13 @@ if __name__ == "__main__":
     the tables referenced in the sql file specified in parameter
     """
     args = parser.parse_args()
-    if args.inventory:
-        all_files= build_all_file_inventory(args.inventory)
-    else:
-        all_files= build_all_file_inventory()
+    if not args.inventory:
+        print("ERROR you need an inventory folder name")
+        exit(1)
+
     if args.file_name:
         files_to_process.append(args.file_name)
+        all_files= get_or_build_inventory_from_ddl(args.inventory, args.inventor, False)
         dependency_list = set()
         dependencies=process_files_from_queue(files_to_process, all_files, dependency_list)
         output=generate_tracking_output(args.file_name, dependencies)

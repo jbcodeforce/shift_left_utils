@@ -8,6 +8,7 @@ from pathlib import Path
 import json
 from sql_parser import SQLparser
 from kafka.app_config import get_config
+from create_table_folder_structure import get_or_build_inventory_from_ddl
 from pipeline_helper import FlinkStatementHierarchy, FlinkTableReference,  read_pipeline_metadata, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table, build_all_file_inventory
 import logging
 
@@ -23,7 +24,8 @@ parser.add_argument('-f', '--file_name', required=False, help="File name for the
 parser.add_argument('-d', '--delete_file_from', required=False, help="Delete all the metadata files from the root folder given as argument")
 parser.add_argument('-t', '--table_name', required=False, help="Table name to build a pipeline or to process a pipeline on.")
 parser.add_argument('-i', '--inventory', required=False, help="name of the folder used to get all the context for the search, the inventory of table")
-parser.add_argument('-report', action=argparse.BooleanOptionalAction, default= False, help="Run a static report for given table")
+parser.add_argument('--report', action=argparse.BooleanOptionalAction, default= False, help="Run a static report for given table")
+parser.add_argument('--build', action=argparse.BooleanOptionalAction, default= False, help="Build the pipeline metadata files from sink to source")
 
 
 
@@ -58,7 +60,7 @@ def get_path_to_pipeline_file(file_name: str) -> str:
     return pname 
 
 def walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> dict:
-    current_hierarchy= _read_pipeline_metadata(pipeline_definition_fname)
+    current_hierarchy= read_pipeline_metadata(pipeline_definition_fname)
     parents = _visit_parents(current_hierarchy)["parents"]
     children = _visit_children(current_hierarchy)["children"]
     return {"table_name" : current_hierarchy.table_name, 
@@ -94,7 +96,7 @@ def run():
         exit()
 
     if not args.file_name:
-        print("\nERROR -f file_name is mandatory")
+        print("\nERROR -f DML sql file_name is mandatory")
         exit()
 
     metadata_file_name=assess_pipeline_definition_exists(args.file_name)
@@ -103,15 +105,15 @@ def run():
         logging.info(f"Found {PIPELINE_JSON_FILE_NAME}")
         if args.report:
             print(json.dumps(walk_the_hierarchy_for_report(metadata_file_name), indent=3))
-    else:
-        print(f"{PIPELINE_JSON_FILE_NAME} not found")
-        all_files=build_all_file_inventory(args.inventory)
-        hierarchy=build_pipeline_definition_from_table(args.file_name, [], all_files)
+    elif args.build:
+        if not args.inventory:
+            print("\nERROR -i <folder_to_build_file_inventory from")
+            exit()
+        inventory=get_or_build_inventory_from_ddl(args.inventory, args.inventory, False)
+        hierarchy=build_pipeline_definition_from_table(args.file_name, [], inventory)
         metadata_file_name=get_path_to_pipeline_file(args.file_name)
         print(hierarchy.model_dump_json(indent=3))
-        with open( metadata_file_name, "w") as f:
-            f.write(hierarchy.model_dump_json())
-        print(hierarchy)
+
 
 if __name__ == "__main__":
     #run()
