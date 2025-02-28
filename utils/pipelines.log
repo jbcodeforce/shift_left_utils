@@ -1,3 +1,0 @@
-2025-02-26 23:26:47 - INFO - Done building file inventory from ../../data-platform-flink/staging/../pipelines
-2025-02-26 23:26:50 - INFO - aqem_dim_tag - depends on : int_aqem_tag_tag_dummy
-2025-02-26 23:26:50 - ERROR - 'set' object is not subscriptable

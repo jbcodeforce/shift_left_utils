@@ -5,15 +5,33 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Python Debugger: Worker with Arguments",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml"
-              }
+                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml",
+                "PIPELINES": "${fileDirname}/../../data-platform-flink/pipelines"
+              },
+              "args": [
+                "-i", "${fileDirname}/../../data-platform-flink/pipelines",
+                "-f", "${fileDirname}/../../data-platform-flink/pipelines/dimensions/aqem/dim_tag/sql-scripts/dml.aqem_dim_tag.sql",
+                "--build"
+            ],
+        },
+        {
+            "name": "Python Debugger: current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "env": {
+                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml",
+                "PIPELINES": "${fileDirname}/../../data-platform-flink/pipelines"
+              },
         },
         {
             "name": "Debug tests",
@@ -23,7 +41,10 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileDirname}/../../data-platform-flink/config.yaml"
+                "CONFIG_FILE": "${fileDirname}/../config.yaml",
+                //"PIPELINES": "${fileDirname}/../../data-platform-flink/pipelines",
+                "PIPELINES": "${fileDirname}/../examples/flink_project/pipelines",
+                "PYTHONPATH": "${fileDirname}/utils"
               }
         }
     ]

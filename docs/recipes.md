@@ -160,6 +160,14 @@ The tool needs to get an up-to-date inventory, see [previous section to build it
 python pipeline_worker.py -f $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql  --build
 ```
 
+### Delete pipeline_defition.json file for a given folder
+
+Delete all the `pipeline_definition.json` files from a given folder. It goes down recursively.
+
+```sh
+python pipeline_worker.py -d $PIPELINES/sources/product_1
+```
+
 ### Build pipeline reports 
 
 * Get a report from one sink to n sources:
@@ -174,11 +182,7 @@ python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_
 python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_definition.json -report
 ```
 
-* Delete all the `pipeline_definition.json` files from a given folder. It goes down recursively.
 
-```sh
-python pipeline_worker.py -d $PIPELINES/sources/product_1
-```
 
 ## Migration
 
@@ -215,19 +219,21 @@ The typical update will be the source table name to be used as it may change per
 python change_src_sql.py -s <source_folder> -w "where condition as string"
 ```
 
-### Change Makefile definition for one table
+### Create one Makefile definition for a given table
 
 During development we face the need to adapt the Makefile quite often depending of project structure and naming convention. The following code helps to do so:
 
 
 ```sh
-python create_table_folder_structure.py -m -o ../examples/facts/p1/fct_order -t fct_order
+python create_table_folder_structure.py --build-makefile -o ../examples/facts/p1/fct_order -t fct_order
 ```
+
+### Updates to all Makefiles in a folder 
 
 Also if we want to change all the Makefiles within a specific folder and its sub-folders:
 
 ```sh
-python create_table_folder_structure.py -rm -o ../examples/facts/
+python create_table_folder_structure.py --update-makefiles -o ../examples/facts/
 ```
 
 

@@ -1,0 +1,10 @@
+export STAGING=./examples/flink_project/staging
+export CCLOUD_CONTEXT=login-jboyer@mastercontrol.com-https://confluent.cloud
+export CPOOL_ID=
+export TOPIC_LIST_FILE=./examples/src_topic_list.txt 
+export REPORT_DIR=./reports
+export CONFIG_FILE=./config.yaml
+export PIPELINES=./examples/flink_project/pipelines
+export PYTHONPATH=./utils
+export DB_NAME=
+export ENV_NAME=development_stage

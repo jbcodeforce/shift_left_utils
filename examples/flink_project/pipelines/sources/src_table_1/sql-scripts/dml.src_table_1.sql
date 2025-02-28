@@ -1,0 +1,2 @@
+INSERT INTO src_table_1
+VALUES ()

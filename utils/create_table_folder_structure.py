@@ -11,9 +11,9 @@ import logging
 from sql_parser import SQLparser
 import json
 from pydantic import BaseModel
-from typing import Optional, Final
+from typing import Optional, Final, Tuple
 
-logging.basicConfig(filename='pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
+logging.basicConfig(filename='logs/table_folder_struct.log',  filemode='w', level=get_config()["app"]["logging"], 
                     format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 
@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-o', '--pipeline_folder_path', required=False, help="name of the folder output of the pipelines")
 parser.add_argument('-t', '--table_name', required=False, help="name of the table to process - as dependencies are derived it is useful to give the table name as parameter and search for the file.")
 parser.add_argument('--build-makefile', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to generate a makefile only")
-parser.add_argument('-rm', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
+parser.add_argument('--update-makefiles', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
 parser.add_argument('--build-inventory', action=argparse.BooleanOptionalAction, default= False, required=False, help="Flag to recursively modify the makefile from the -o folder")
 parser.add_argument('--root-folder', required=False, help="Folder to search the Flink SQL statements")
 parser.add_argument('-if', '--inventory-folder', required=False, help="Folder to persist repository information.")
@@ -65,7 +65,7 @@ def main(arguments):
         else:
             print("\nERROR: you need to specify the pipeline_folder_path and table_name when redoing a makefile")
             exit(1)
-    elif arguments.rm:
+    elif arguments.update_makefiles:
         if args.pipeline_folder_path:
             _change_all_makefiles_from(args.pipeline_folder_path, get_config())
             print("Done processing the makefiles")
@@ -86,9 +86,30 @@ def main(arguments):
 class FlinkTableReference(BaseModel):
     table_name: Final[str] 
     dml_ref: Optional[str]
+    ddl_ref: Optional[str]
     table_folder_name: str
     def __hash__(self):
-        return hash((type(self),) + tuple(self.table_name))
+        return hash((self.table_name))
+    def __eq__(self, other):
+        if not isinstance(other, FlinkTableReference):
+            return NotImplemented
+        return self.table_name == other.table_name
+    
+def from_absolute_to_pipeline(file_or_folder_name) -> str:
+    if not file_or_folder_name.startswith("pipeline"):
+        index = file_or_folder_name.find("pipelines") 
+        new_path = file_or_folder_name[index:] if index != -1 else file_or_folder_name
+        return new_path
+    else:
+        return file_or_folder_name
+
+def from_pipeline_to_absolute(file_or_folder_name) -> str:
+    if file_or_folder_name.startswith("pipeline"):
+        root = os.path.dirname(os.getenv("PIPELINES"))
+        new_path = os.path.join(root,file_or_folder_name)
+        return new_path
+    else:
+        return file_or_folder_name
     
 def create_folder_if_not_exist(new_path):
     if not os.path.exists(new_path):
@@ -170,7 +191,7 @@ def _read_table_name_from_ddl(table_folder: str) -> str:
             parser = SQLparser()
             with open(sql_dir + "/" + file, "r") as f:
                 sql_content= f.read()
-                table_name=parser.extract_table_name_from_insert(sql_content)
+                table_name=parser.extract_table_name_from_insert_into_statement(sql_content)
                 return table_name
     logging.warning(f"table name not found in dml file in {table_folder}")
     return extract_table_name(table_folder)
@@ -228,10 +249,31 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
         f.write(rendered_dml)
 
 
+def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
+    ddl_file_name = None
+    dml_file_name = None
+    base_scripts=os.path.join(root,dir)
+    for file in os.listdir(base_scripts):
+        if file.startswith("ddl"):
+            ddl_file_name=os.path.join(base_scripts,file)
+        if file.startswith('dml'):
+            dml_file_name=os.path.join(base_scripts,file)
+    if ddl_file_name is None:
+        logging.error(f"No DDL file found in the directory: {base_scripts}")
+    if dml_file_name is None:
+        logging.error(f"No DML file found in the directory: {base_scripts}")
+    return ddl_file_name, dml_file_name
+
+def remove_folder_prefix(folder_or_file_name: str):
+    if folder_or_file_name:
+        return folder_or_file_name.replace(os.getenv("PIPELINES"),"pipelines")
+    return ""
+
 def get_or_build_inventory_from_ddl(root_folder: str, target_path: str, recreate: bool= False) -> dict:
     """
     From the root folder where all the ddl are saved. e.g. the pipelines folder navigate to get the dml
     open each dml file to get the table name and build and inventory, table_name, FlinkTableReference
+    Root_folder should be absolute path
     """
     create_folder_if_not_exist(target_path)
     inventory_path= os.path.join(target_path,"inventory.json")
@@ -239,21 +281,23 @@ def get_or_build_inventory_from_ddl(root_folder: str, target_path: str, recreate
     if recreate or not os.path.exists(inventory_path):
         parser = SQLparser()
         for root, dirs, files in os.walk(root_folder):
-            for file in files:
-                if file.startswith('dml'):
-                    dml_file_name=os.path.join(root,file)
+            for dir in dirs:
+                if "sql-scripts" == dir:
+                    ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
                     logging.debug(f"process file {dml_file_name}")
-                    with open(dml_file_name, "r") as f:
-                        sql_content= f.read()
-                        table_name=parser.extract_table_name_from_insert(sql_content)
-                        directory = os.path.dirname(dml_file_name)
-                        table_folder=os.path.dirname(directory)
-                        ref= FlinkTableReference.model_validate(
-                                    {"table_name": table_name,
-                                    "dml_ref": dml_file_name,
-                                    "table_folder_name": table_folder})
-                        logging.debug(ref)
-                        inventory[ref.table_name]= ref.model_dump()
+                    if dml_file_name:
+                        with open(dml_file_name, "r") as f:
+                            sql_content= f.read()
+                            table_name=parser.extract_table_name_from_insert_into_statement(sql_content)
+                            directory = os.path.dirname(dml_file_name)
+                            table_folder=remove_folder_prefix(os.path.dirname(directory))
+                            ref= FlinkTableReference.model_validate(
+                                        {"table_name": table_name,
+                                        "ddl_ref": remove_folder_prefix(ddl_file_name),
+                                        "dml_ref": remove_folder_prefix(dml_file_name),
+                                        "table_folder_name": table_folder})
+                            logging.debug(ref)
+                            inventory[ref.table_name]= ref.model_dump()
         with open(inventory_path, "w") as f:
             json.dump(inventory, f, indent=4)
         logging.info(f"Create inventory file {inventory_path}")

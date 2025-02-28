@@ -5,3 +5,5 @@ utils/reports
 git_context.sh
 set_env
 site/
+.aider*
+**/logs/*.log
