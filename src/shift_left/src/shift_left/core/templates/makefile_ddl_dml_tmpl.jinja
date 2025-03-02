@@ -1,0 +1,53 @@
+include ../../../common.mk
+
+# --- {{ table_name }}
+
+# --- Entry point
+create_{{ table_name }}: create_flink_ddl  create_flink_dml
+
+
+# --- Topic used as source
+list_record_data_from_topic:
+	$(call list_topic_content, {{ table_name }})
+
+# --- DDL 
+create_flink_ddl: 
+	$(call create_flink_statement, {{ ddl_statement_name }}, ./{{ ddl_folder }}/ddl.{{ table_name }}.sql) 
+	$(call delete_flink_statement, {{ ddl_statement_name }} )
+
+describe_flink_ddl:
+	$(call describe_flink_statement,  {{ ddl_statement_name }})
+
+delete_flink_ddl:
+	$(call delete_flink_statement, {{ ddl_statement_name }})
+
+drop_table_{{ table_name }}: 
+	$(call drop_table, drop-{{ table_name }}, {{ table_name }})
+	$(call delete_flink_statement, drop-{{ table_name }})
+
+# --- DML
+describe_flink_dml:
+	$(call describe_flink_statement,  {{ dml_statement_name }})
+
+create_flink_dml:
+	$(call create_flink_statement, {{ dml_statement_name }}, ./{{ dml_folder }}/dml.{{ table_name }}.sql) 
+
+create_flink_dev:
+	$(call create_flink_statement, {{ dml_statement_name }}, ./tests/dml.{{ table_name }}.sql) 
+
+delete_flink_dml:
+	$(call delete_flink_statement, {{ dml_statement_name }})
+
+pause_flink_dml:
+	$(call pause_flink_statement {{ dml_statement_name }})
+
+resume_flink_dml:
+	$(call resume_flink_statement {{ dml_statement_name }})
+
+delete_schemas:
+	$(call delete_schema, {{ table_name }}-value)
+	$(call delete_schema, {{ table_name }}-key)
+
+delete_flink_statements: delete_flink_ddl delete_flink_dml
+
+delete_data: delete_schemas delete_topic_{{ table_name }}

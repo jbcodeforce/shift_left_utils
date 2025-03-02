@@ -7,3 +7,5 @@ set_env
 site/
 .aider*
 **/logs/*.log
+**/tmp
+**/.venv

@@ -8,9 +8,11 @@ from pathlib import Path
 import json
 from sql_parser import SQLparser
 from kafka.app_config import get_config
-from create_table_folder_structure import get_or_build_inventory_from_ddl
+from create_table_folder_structure import get_or_build_inventory
 from pipeline_helper import FlinkStatementHierarchy, FlinkTableReference,  read_pipeline_metadata, assess_pipeline_definition_exists, PIPELINE_JSON_FILE_NAME, build_pipeline_definition_from_table
 import logging
+from pydantic import BaseModel
+from typing import Any, Optional
 
 logging.basicConfig(filename='logs/pipelines.log',  filemode='w', level=get_config()["app"]["logging"], 
                     format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -27,29 +29,33 @@ parser.add_argument('-i', '--inventory', required=False, help="name of the folde
 parser.add_argument('--report', action=argparse.BooleanOptionalAction, default= False, help="Run a static report for given table")
 parser.add_argument('--build', action=argparse.BooleanOptionalAction, default= False, help="Build the pipeline metadata files from sink to source")
 
-
-
-
+class ReportInfoNode(BaseModel):
+    table_name: str
+    base_path: str
+    ddl_path: str
+    dml_path: str
+    parents: Optional[Any]
+    children: Optional[Any]
 
 def _get_matching_node_pipeline_info(access_info: FlinkTableReference) -> FlinkStatementHierarchy:
     if access_info.table_folder_name:
         return read_pipeline_metadata(access_info.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME)
 
-def _visit_parents(current_hierarchy: FlinkStatementHierarchy) -> dict:
+def _visit_parents(current_node: FlinkStatementHierarchy) -> dict:
     parents = []
-    print(f"->> {current_hierarchy.table_name}")
-    for parent in current_hierarchy.parents:
+    print(f"->> {current_node.table_name}")
+    for parent in current_node.parents:
         parent_info = _get_matching_node_pipeline_info(parent)
         rep=_visit_parents(parent_info)
         parents.append(rep)
-    return {"table_name": current_hierarchy.table_name, "path": current_hierarchy.path, "parents": parents }
+    return {"table_name": current_node.table_name, "ddl_path": current_node.ddl_ref, "dml_path": current_node.dml_ref, "base_path": current_node.path, "parents": parents }
 
 
-def _visit_children(current_hierarchy: FlinkStatementHierarchy) -> dict:
+def _visit_children(current_node: FlinkStatementHierarchy) -> dict:
     children = []
-    for child in current_hierarchy.children:
+    for child in current_node.children:
         children.append(_visit_children(_get_matching_node_pipeline_info(child)))
-    return {"table_name": current_hierarchy.table_name, "path": current_hierarchy.path , "children": children}
+    return {"table_name": current_node.table_name, "ddl_path": current_node.ddl_ref, "dml_path": current_node.dml_ref, "base_path": current_node.path, "children": children }
 
 def get_path_to_pipeline_file(file_name: str) -> str:
     directory = os.path.dirname(file_name)
@@ -60,11 +66,13 @@ def get_path_to_pipeline_file(file_name: str) -> str:
     return pname 
 
 def walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> dict:
-    current_hierarchy= read_pipeline_metadata(pipeline_definition_fname)
+    current_hierarchy: FlinkStatementHierarchy= read_pipeline_metadata(pipeline_definition_fname)
     parents = _visit_parents(current_hierarchy)["parents"]
     children = _visit_children(current_hierarchy)["children"]
     return {"table_name" : current_hierarchy.table_name, 
-            "path": current_hierarchy.path,
+            "base_path": current_hierarchy.path,
+            "ddl_path": current_hierarchy.ddl_ref,
+            "dml_path": current_hierarchy.dml_ref,
             "parents": parents, 
             "children": children}
 
@@ -105,7 +113,7 @@ def run():
             print("\nERROR need to provide the path where the inventory is saved via: -i <folder_for_file_inventory>")
             print("\te.g.: python pipeline_worker.py -f $PIPELINES/dimensions/p1/dim_name/sql-scripts/dml.p1_dim_name.sql --build -i $PIPELINES")
             exit()
-        inventory=get_or_build_inventory_from_ddl(args.inventory, args.inventory, False)
+        inventory=get_or_build_inventory(args.inventory, args.inventory, False)
         hierarchy=build_pipeline_definition_from_table(args.file_name, [], inventory)
         print(hierarchy.model_dump_json(indent=3))
         print("Done !")
@@ -113,7 +121,7 @@ def run():
 
 def _debug():
     pipeline_folder= os.getenv("PIPELINES")
-    all_files=get_or_build_inventory_from_ddl(root_folder="", target_path=pipeline_folder)
+    all_files=get_or_build_inventory(root_folder="", target_path=pipeline_folder)
     hierarchy=build_pipeline_definition_from_table(pipeline_folder + "/dimensions/aqem/dim_tag/sql-scripts/dml.aqem_dim_tag.sql", [], all_files)
     print(hierarchy.model_dump_json(indent=3))
 

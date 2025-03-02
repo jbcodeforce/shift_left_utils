@@ -9,16 +9,15 @@ from sql_parser import SQLparser
 import json
 import logging
 from kafka.app_config import get_config
-from create_table_folder_structure import get_or_build_inventory_from_ddl, FlinkTableReference, from_absolute_to_pipeline, from_pipeline_to_absolute
+from create_table_folder_structure import get_or_build_inventory, FlinkTableReference, from_absolute_to_pipeline, from_pipeline_to_absolute
 
 """
 Provides a set of functions to search for table dependencies from one Flink table up to the sources from the SQL project
-or from a migrated Flink SQL project. The structure of the project is important and should be built with 
-shift_left_project_setup.py.
+or from a migrated Flink SQL project.
 """
 PIPELINE_JSON_FILE_NAME="pipeline_definition.json"
 
-logging.basicConfig(filename='logs/pipeline_helper.log',  filemode='w', level=get_config()["app"]["logging"], 
+logging.basicConfig(filename='logs/pipelines.log',  filemode='a', level=get_config()["app"]["logging"], 
                     format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 #logging.basicConfig(level=get_config()["app"]["logging"],format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -276,6 +275,7 @@ def _create_node(dml_file_name: str,
                                           "children": children })
 
 def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
+    file_name=from_pipeline_to_absolute(file_name)
     with open(file_name, "r") as f:
         content = FlinkStatementHierarchy.model_validate_json(f.read())
         return content
@@ -450,7 +450,7 @@ if __name__ == "__main__":
 
     if args.file_name:
         files_to_process.append(args.file_name)
-        all_files= get_or_build_inventory_from_ddl(args.inventory, args.inventor, False)
+        all_files= get_or_build_inventory(args.inventory, args.inventor, False)
         dependency_list = set()
         dependencies=process_files_from_queue(files_to_process, all_files, dependency_list)
         output=generate_tracking_output(args.file_name, dependencies)

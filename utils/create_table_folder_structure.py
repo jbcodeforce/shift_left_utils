@@ -13,7 +13,7 @@ import json
 from pydantic import BaseModel
 from typing import Optional, Final, Tuple
 
-logging.basicConfig(filename='logs/table_folder_struct.log',  filemode='w', level=get_config()["app"]["logging"], 
+logging.basicConfig(filename='logs/pipelines.log',  filemode='a', level=get_config()["app"]["logging"], 
                     format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 
@@ -48,7 +48,7 @@ def main(arguments):
     if arguments.build_inventory:
         if args.root_folder and args.inventory_folder:
             print("-"*20 + "\nPrepare an image of current pipeline content for inventory")
-            get_or_build_inventory_from_ddl(args.root_folder,args.inventory_folder,True)
+            get_or_build_inventory(args.root_folder,args.inventory_folder,True)
             print("Done !")
             exit(0)
         else:
@@ -269,7 +269,7 @@ def remove_folder_prefix(folder_or_file_name: str):
         return folder_or_file_name.replace(os.getenv("PIPELINES"),"pipelines")
     return ""
 
-def get_or_build_inventory_from_ddl(root_folder: str, target_path: str, recreate: bool= False) -> dict:
+def get_or_build_inventory(root_folder: str, target_path: str, recreate: bool= False) -> dict:
     """
     From the root folder where all the ddl are saved. e.g. the pipelines folder navigate to get the dml
     open each dml file to get the table name and build and inventory, table_name, FlinkTableReference

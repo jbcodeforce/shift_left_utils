@@ -173,13 +173,13 @@ python pipeline_worker.py -d $PIPELINES/sources/product_1
 * Get a report from one sink to n sources:
 
 ```sh
-python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_definition.json -report
+python pipeline_worker.py -f $PIPELINES/facts/product_1/fct_table/pipeline_definition.json --report
 ```
 
 * Get a report from one source to n sinks:
 
 ```sh
-python pipeline_worker.py -f $PIPELINES/sources/product_1/aqem_tag_tag/pipeline_definition.json -report
+python pipeline_worker.py -f $PIPELINES/sources/product_1/src_table/pipeline_definition.json --report
 ```
 
 
