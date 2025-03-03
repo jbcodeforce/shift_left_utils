@@ -9,3 +9,4 @@ site/
 **/logs/*.log
 **/tmp
 **/.venv
+**/.env

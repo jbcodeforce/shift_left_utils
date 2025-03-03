@@ -16,38 +16,92 @@ To create this EC2 machine, Terraform configurations are defined in [the IaC fol
     * Linux: ```sudo apt-get install build-essential```
 
 * All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html)
-* Go to the folder parent to the dbt source project. For example if your dbt project is in /home/user/code then be in this code folder.
+* All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
+
+* Create a virtual environment:
+
+```sh
+python -m venv .venv
+```
+
+* Activate the environment:
+
+```sh
+source .venv/bin/activate
+```
+
 * Clone this repository: 
 
 ```sh
 git clone  https://github.com/jbcodeforce/shift_left_utils.git
 ```
 
-* Use the `setup.sh` script to create the project structure, and copy some important files, for the new flink project: 
+* Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): 
 
 ```sh
-cd shift_left_utils
-./setup.sh <a_flink_project_name | default is flink_project>
+pip install src/shift_left/dist/shift_left-0.1.0-py3-none-any.whl
+```
+
+* Validate the CLI is available via:
+
+```sh
+shift_left --help
+```
+
+???- info "Rebuild the CLI"
+      The way the CLI is built, is by using [uv](https://docs.astral.sh/uv) and the command:
+      `uv build` 
+
+## Create a new Flink data project
+
+This is step is only valuable when starting a new project, or a new data product using Flink. 
+
+```sh
+shift_left project init <project_name> <project_path> --project-type 
+# example for a default Kimball project
+shift_left project init flink-project ../
+# For a project more focused on developing data product
+shift_left project init flink-project ../ --project-type data-product
 ```
 
 At this stage, you should have three folders for the project: flink_project, the dbt_source, the shift_left_utils. For the flink_project a pipelines folder with the same structure as defined by the Kimball guidelines:
 
 ```sh
 ├── flink-project
-│   ├── docker-compose.yaml
 │   ├── pipelines
-│   │   ├── common.mk
-│   │   ├── dimensions
-│   │   ├── facts
-│   │   ├── intermediates
-│   │   ├── sources
-│   │   └── stage
-│   └── start-ollama.sh
-├── shift_left_utils
+│      ├── common.mk
+│      ├── dimensions
+│      ├── facts
+│      ├── intermediates
+│      ├── sources
+│      └── stage
 └── src_dbt_project
 ```
 
-* Connect to Confluent Cloud with CLI, then get environment and compute pool identifiers:
+or for a data product:
+
+```sh
+├── pipelines
+│   ├── common.mk
+│   └── data_product_1
+│       ├── dimensions
+│       ├── facts
+│       │   └── fct_order
+│       │       ├── Makefile
+│       │       ├── sql-scripts
+│       │       │   ├── ddl.fct_order.sql
+│       │       │   └── dml.fct_order.sql
+│       │       ├── tests
+│       │       └── tracking.md
+│       ├── intermediates
+│       └── sources
+└── staging
+```
+
+## Working in a project
+
+* Start a Terminal
+* Connect to Confluent Cloud with CLI, then get the environment and compute pool identifiers:
 
 ```sh
 confluent login --save
@@ -59,8 +113,22 @@ confluent login --save
 confluent flink quickstart --name dbt-migration --max-cfu 50 --region us-west-2 --cloud aws
 ```
 
+* Define environment variables in the .env file
 
-* Modify the `config.yaml` with the corresponding values. The Kafka section is to access the topics
+```sh
+FLINK_PROJECT=.
+CCLOUD_ENV_NAME=
+CLOUD_PROVIDER=
+CLOUD_REGION=
+CCLOUD_CONTEXT=
+CCLOUD_KAFKA_CLUSTER=
+CCLOUD_COMPUTE_POOL_ID=
+SRC_FOLDER=../../src-dbt-project/models
+STAGING=$FLINK_PROJECT/staging
+PIPELINES=$FLINK_PROJECT/pipelines
+```
+
+* Modify the `config.yaml` in the root of the Flink project, with the corresponding values. The Kafka section is to access the Kafka Cluster and topics:
 
 ```yaml
 kafka:
@@ -81,104 +149,21 @@ registry:
   registry_key_secret: <registry-key-secrets>
 ``` 
 
-Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitons from the Schema Registy. (see utils/kafka/app_config.py code)
+Those declarations are loaded by the Kafka Producer and Consumer and with tools accessing the model definitions from the Schema Registy.
 
-* Modify the value for the cloud provider, the environment name, and the confluent context in the file `pipelines/common.mk`. The first lines of this common makefile file have some variables set up:
-
-```
-ENV_NAME=aws-west    # name of the Confluent Cloud environment
-CLOUD=aws            # cloud provider
-REGION=us-west-2     # cloud provider region where compute pool and kakfa cluster run
-MY_CONTEXT= login-jboyer@confluent.io-https://confluent.cloud 
-DB_NAME=cluster_0.   # Name of the Kafka Cluster, mapped to Database name in Flink
-```
 
 ???- warning "Security access"
   The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 
-## Using Python Virtual Environment
 
-### Pre-requisites
 
-* All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
-* Create a virtual environment:
+You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process) or use the [recipes](./recipes.md) to get how to do some common activities.
 
-```sh
-python -m venv .venv
-```
 
-* Activate the environment:
-
-```sh
-source .venv/bin/activate
-```
-
-* Work from the shift_left_utils folder
-* Install the needed Python modules
-
-```sh
-# under the shift_left_utils folder
-pip install -r utils/requirements.txt
-```
-
-* Define environment variables, change the flink_project folder to reflect your own settings:
-
-```sh
-export CONFIG_FILE=../../flink-project/config.yaml
-export SRC_FOLDER=../../src-dbt-project/models
-export STAGING=../../flink-project/staging
-export REPORT_FOLDER=../../flink-project/reports
-```
+## Working with the migration AI agent
 
 * Install Ollama: [using one of the downloads](https://ollama.com/download).
 * Start Ollama using `ollama serve` then download the one of the Qwen model used by the AI Agent: `qwen2.5-coder:32b` or `qwen2.5-coder:14b` depending of your memory and GPU resources.
-
-You are ready to use the different tools, as a next step, read the migration approach in [this note](./migration.md#migration-process)
-
-## Using Docker Pythonenv image
-
-Use this set up if you do not want to use a virtual environment.
-
-### Pre-requisites
-
-* All platforms - [install Docker](https://docs.docker.com/engine/install/)
-
-    * On Linux - complete post-install for docker without sudo
-    * With Nvidia GPU - [install NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installation)
-    * On Windows - [enable Docker in WSL2](https://docs.docker.com/desktop/wsl/#enabling-docker-support-in-wsl-2-distros)
-
-* All Platforms - [install Docker Compose plugin](https://docs.docker.com/compose/install/)
-
-* The docker version used for the test and development of this repository was"
-
-```sh
-docker version 
-version 27.3.1, build ce12230
-```
-
-If for some reason, you could not use Docker Desktop, you can try [Colima](https://github.com/abiosoft/colima/blob/main/README.md), Ranger Desktop, or podman.
-
-For colima the following configuration was used to run those tools on Mac M3 64Gb ram: 
-
-```sh
-colima start --cpu 4 -m 48 -d 100 -r docker
-```
-
-### Project setup
-
-* Modify the `docker-compose.yaml` file to reference the source code folder path mapped to dbt-src folder. For example, using a source project, named `src-dbt-project`, defined at the same level as the root folder of this repository, the statement looks like:
-
-```yaml
-  pythonenv:
-    image: jbcodeforce/shift-left-utils
-    # ... more config here
-    volumes:
-    # change the path below
-    - ../src-dbt-project/:/app/dbt-src
-    # do not touch the other mounted volumes
-```
-
-You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process)
 
 
 

@@ -4,7 +4,7 @@ import requests
 from base64 import b64encode
 from typing import List, Dict
 
-from shift_left.core.config import get_config
+from shift_left.core.app_config import get_config
 
 class ConfluentFlinkClient:
     """

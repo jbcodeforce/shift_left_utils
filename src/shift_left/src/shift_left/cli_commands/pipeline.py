@@ -4,8 +4,7 @@ from rich.tree import Tree
 from rich.console import Console
 from shift_left.core.pipeline_mgr import build_pipeline_definition_from_table, walk_the_hierarchy_for_report_from_table, delete_metada_files
 from typing_extensions import Annotated
-from shift_left.core.pipeline_mgr import PipelineNodeData
-from shift_left.core.deployment import deploy_pipeline_from_table
+from shift_left.core.deployment_mgr import deploy_pipeline_from_table
 import yaml
 import json
 import os
@@ -61,10 +60,10 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
 
     if to_yaml:
         print("[bold]YAML:[/bold]")
-        print(yaml.dump(pipeline_def))
+        print(yaml.dump(pipeline_def.dict()))
     if to_json:
         print("[bold]JSON:[/bold]")
-        print(pipeline_def.model_dump_json())
+        print(pipeline_def.model_dump_json(indent=3))
 
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
