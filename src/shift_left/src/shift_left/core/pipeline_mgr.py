@@ -298,7 +298,7 @@ def get_parent_table_references_from_sql_content(
         logging.error(e)
         return "", set()
 
-def get_table_type_from_file_path(file_name: str) -> str:
+def _get_table_type_from_file_path(file_name: str) -> str:
     """Determine table type from file path.
     
     Args:
@@ -338,7 +338,7 @@ def _create_table_hierarchy_node(
     """
     logging.info(f"_create_table_hierarchy_node( {dml_file_name}, {table_name},  {parent_names}, {children})")
    
-    table_type = get_table_type_from_file_path(dml_file_name)
+    table_type = _get_table_type_from_file_path(dml_file_name)
     directory = os.path.dirname(dml_file_name)
     base_path = os.path.dirname(directory)
     
@@ -416,7 +416,7 @@ def get_ddl_file_name(folder_path: str) -> str:
                 return from_absolute_to_pipeline(os.path.join(root, file))
     return ""
 
-def get_table_type_from_file_path(file_name: str) -> str:
+def _get_table_type_from_file_path(file_name: str) -> str:
     """
     Determine the type of table one of fact, intermediate, source, stage or dimension
     """
@@ -629,4 +629,6 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
     return walk_the_hierarchy_for_report(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 if __name__ == "__main__":
-    print(json.dumps(walk_the_hierarchy_for_report_from_table("aqem_dim_tag", os.getenv("PIPELINES") ), indent=4))
+    #print(json.dumps(walk_the_hierarchy_for_report_from_table("aqem_dim_tag", os.getenv("PIPELINES") ), indent=4))
+    pipeline_path="/Users/jerome//Code/customers/master-control/data-platform-flink/pipelines"
+    print(json.dumps(build_pipeline_definition_from_table(pipeline_path + "/dimensions/aqem/dim_user/sql-scripts/dml.aqem_dim_user.sql", pipeline_path ), indent=4))

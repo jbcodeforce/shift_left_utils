@@ -119,6 +119,7 @@ def _create_makefile(table_name: str,
         'table_name': table_name,
         'ddl_statement_name': prefix+ "-ddl-" + table_name.replace("_","-"),
         'dml_statement_name': prefix + "-dml-" + table_name.replace("_","-"),
+        'drop_statement_name': table_name.replace("_","-"),
         'ddl_folder': ddl_folder,
         'dml_folder': dml_folder
     }

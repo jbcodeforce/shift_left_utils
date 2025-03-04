@@ -2,12 +2,11 @@ import os
 import subprocess
 import logging
 import shutil
-from pathlib import Path
 from typing import Tuple
 
-DATA_PRODUCT_PROJECT_TYPE="data-product"
+DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
-TMPL_FOLDER = os.path.join(os.path.dirname(__file__), "templates")
+TMPL_FOLDER="./templates"
 
 def create_folder_if_not_exist(new_path: str):
     if not os.path.exists(new_path):
@@ -45,27 +44,11 @@ def build_project_structure(project_name: str, project_path: str, project_type: 
     add_important_files(project_folder)
         
 def add_important_files(project_folder: str):    
-    """Add template files to the project folder.
-    
-    Args:
-        project_folder: Target project folder where files should be copied
-    """
-    logging.info(f"Adding template files to {project_folder}")
-    template_files = {
-        "common.mk": "pipelines/common.mk",
-        "config.yaml": "config.yaml",
-        ".env_tmpl": ".env",
-        ".gitignore_tmpl": ".gitignore"
-    }
-    
-    for src, dst in template_files.items():
-        src_path = os.path.join(TMPL_FOLDER, src)
-        dst_path = os.path.join(project_folder, dst)
-        if os.path.exists(src_path):
-            shutil.copyfile(src_path, dst_path)
-            logging.info(f"Copied {src} to {dst_path}")
-        else:
-            logging.error(f"Template file not found: {src_path}")
+    logging.info(f"add_important_files({project_folder}")
+    for file in ["common.mk", "config.yaml"]:
+        shutil.copyfile(os.path.join(TMPL_FOLDER, file), os.path.join(project_folder, file))
+    shutil.copyfile(os.path.join(TMPL_FOLDER, ".env_tmpl"), os.path.join(project_folder, ".env"))
+    shutil.copyfile(os.path.join(TMPL_FOLDER, ".gitignore_tmpl"), os.path.join(project_folder, ".gitignore"))
 
 def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """

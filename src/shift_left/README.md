@@ -1,10 +1,11 @@
 # A shift left project management CLI
 
-[See the product documentation]()
+[See the shift_left documentation](https://jbcodeforce.github.io/shift_left_utils/). This section is to keep information for developing the CLI and core functions.
 
 ## Settings
 
-For testing with examples content define the following environment variables from the project folder.
+* install [uv](https://docs.astral.sh/uv) and [pytest](https://docs.pytest.org/en/latest/)
+* For testing with examples content, define the following environment variables from the project folder.
 
 ```sh
 export PIPELINES=$(pwd)/examples/flink-project/pipelines
@@ -29,6 +30,13 @@ uv run pytest -s tests/cli/test_project_cli.py
 ```
 
 ## Test CLI with python
+
+```sh
+python src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
+```
+
+## Debug core functions
+
 
 
 ## Package CLI

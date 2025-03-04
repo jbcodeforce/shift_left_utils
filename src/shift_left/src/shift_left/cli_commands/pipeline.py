@@ -25,6 +25,10 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument()],
     """
     Build a pipeline from a sink table: add or update {} each table in the pipeline
     """
+    if not dml_file_name.endswith(".sql"):
+        print(f"[red]Error: the first parameter needs to be a dml sql file[/red]")
+        raise typer.Exit(1)
+
     print(f"Build pipeline from sink table {dml_file_name}")
     if pipeline_path and pipeline_path != os.getenv("PIPELINES"):
         print(f"Using pipeline path {pipeline_path}")
