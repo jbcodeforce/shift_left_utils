@@ -40,6 +40,19 @@ parser.add_argument('-s', '--save_file_name', required=False, help="name of the 
 parser.add_argument('-t', '--table_name', required=False, help="Table name to build a pipeline or to process a pipeline on.")
 
 
+@lru_cache
+def build_all_file_inventory(root_folder: str) -> set[str]:
+    """
+    There are two folders to keep the flink sql, the final pipelines, and the staging
+    where flink sql are under development.
+    """
+    print(root_folder)
+    if root_folder:
+        file_paths=list_sql_files(f"{root_folder}")
+        return file_paths
+    else:
+        return set()
+
 
 
 class FlinkStatementHierarchy(BaseModel):
@@ -450,7 +463,7 @@ if __name__ == "__main__":
 
     if args.file_name:
         files_to_process.append(args.file_name)
-        all_files= get_or_build_inventory(args.inventory, args.inventor, False)
+        all_files= get_or_build_inventory(args.inventory, args.inventory, False)
         dependency_list = set()
         dependencies=process_files_from_queue(files_to_process, all_files, dependency_list)
         output=generate_tracking_output(args.file_name, dependencies)

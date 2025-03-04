@@ -37,6 +37,8 @@ python src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_ord
 
 ## Debug core functions
 
+```sh
+```
 
 
 ## Package CLI

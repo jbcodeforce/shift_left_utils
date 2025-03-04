@@ -231,14 +231,14 @@ def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str)
     Returns:
         FlinkStatementHierarchy for the table and its dependencies
     """
-    dml_file_name = from_absolute_to_pipeline(dml_file_name)
+    #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     all_files = load_existing_inventory(pipeline_path)
     
     table_name, parent_references = get_parent_table_references_from_sql_content(
         dml_file_name, all_files
     )
     
-    current_node = _create_table_hierarchy_node(dml_file_name, table_name, parent_references, set())
+    current_node = _create_table_hierarchy_node(from_absolute_to_pipeline(dml_file_name), table_name, parent_references, set())
     node_to_process.append(current_node)
     _process_next_node(node_to_process, dict(), all_files)
     
@@ -284,6 +284,8 @@ def get_parent_table_references_from_sql_content(
             dependency_names = parser.extract_table_references(sql_content)
             if dependency_names:
                 for dependency in dependency_names:
+                    if not dependency in all_files:
+                        continue
                     logging.info(f"{table_name} - depends on: {dependency}")
                     ddl_file_name, dml_file_name = get_table_ddl_dml_from_inventory(
                         dependency, all_files
@@ -439,8 +441,8 @@ def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
         logging.debug(f"\n\n\t... processing the node {current_node}")
-        nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         _create_or_merge(current_node)
+        nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         processed_nodes[current_node.table_name]=current_node
         _process_next_node(nodes_to_process, processed_nodes, all_files)
 
@@ -631,4 +633,4 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
 if __name__ == "__main__":
     #print(json.dumps(walk_the_hierarchy_for_report_from_table("aqem_dim_tag", os.getenv("PIPELINES") ), indent=4))
     pipeline_path="/Users/jerome//Code/customers/master-control/data-platform-flink/pipelines"
-    print(json.dumps(build_pipeline_definition_from_table(pipeline_path + "/dimensions/aqem/dim_user/sql-scripts/dml.aqem_dim_user.sql", pipeline_path ), indent=4))
+    print(build_pipeline_definition_from_table(pipeline_path + "/dimensions/aqem/dim_user/sql-scripts/dml.aqem_dim_user.sql", pipeline_path ))

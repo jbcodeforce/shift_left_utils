@@ -8,6 +8,7 @@ class SQLparser:
         self.table_pattern = r'\b(\s*FROM|JOIN)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS\s*\('
+        self.not_wanted_words= r'\b(\s*CROSS JOIN UNNEST)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
         
     
 
@@ -30,6 +31,14 @@ class SQLparser:
         
         return sql.strip()
 
+    def remove_junk_words(self, table_name: str) -> str:
+        """
+        Remove junk words from the table name
+        """
+        for not_wanted_word in ['UNNEST']:
+            if not_wanted_word in table_name.upper():
+                return None
+        return table_name.strip()
 
     def extract_table_references(self, sql_content):
         """
@@ -42,14 +51,18 @@ class SQLparser:
         regex=r'ref\([\'"]([^\'"]+)[\'"]\)'
         matches = re.findall(regex, sql_content, re.IGNORECASE)
         if len(matches) == 0:
-            # look a Flink SQL reference
+            # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
             ctes1 = re.findall(self.cte_pattern_1, sql_content, re.IGNORECASE)
             ctes2 = re.findall(self.cte_pattern_2, sql_content, re.IGNORECASE)
-            matches=[]
+            not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
+            matches=set()
             for table in tables:
-                if not table[1] in ctes1 and not table[1] in ctes2:
-                    matches.append(table[1])
+                if not table[1] in ctes1 and not table[1] in ctes2 and not table[1] in not_wanted:
+                    table_name=self.remove_junk_words(table[1])
+                    if table_name is not None:
+                        matches.add(table_name)
+            return matches
         return matches
 
     def extract_table_name_from_insert_into_statement(self, sql_content) -> str:
@@ -113,6 +126,7 @@ if __name__ == "__main__":
         FROM cte1
         RIGHT OUTER JOIN cte2 ON table1.id = table2.id
         FULL JOIN table3 ON table2.id = table3.id
+        CROSS JOIN unnest(split(trim(BOTH '[]' FROM y.target_value),','))  as user_id
         """
     ]
     for i, query in enumerate(test_queries, 1):
@@ -130,3 +144,8 @@ with exam_def as (select * from {{ ref('int_exam_def_deduped') }} )
 """
     print(parser.extract_table_references(sql_content2))
     print(parser.extract_table_name_from_insert_into_statement(" INSERT INTO mytablename\nSELECT a,b,c\nFROM src_table"))
+    sql_content_3 = """
+     
+
+"""
+    print(parser.extract_table_references(sql_content_3))
