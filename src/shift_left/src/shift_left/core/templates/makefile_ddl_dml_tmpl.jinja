@@ -22,8 +22,8 @@ delete_flink_ddl:
 	$(call delete_flink_statement, {{ ddl_statement_name }})
 
 drop_table_{{ table_name }}: 
-	$(call drop_table, drop-{{ drop_statement }}, {{ table_name }})
-	$(call delete_flink_statement, drop-{{ drop_statement }})
+	$(call drop_table, drop-{{ drop_statement_name }}, {{ table_name }})
+	$(call delete_flink_statement, drop-{{ drop_statement_name }})
 
 # --- DML
 describe_flink_dml:

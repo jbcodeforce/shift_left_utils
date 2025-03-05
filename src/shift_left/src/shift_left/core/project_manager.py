@@ -3,15 +3,13 @@ import subprocess
 import logging
 import shutil
 from typing import Tuple
+from shift_left.core.utils.file_search import create_folder_if_not_exist
 
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
 TMPL_FOLDER="./templates"
 
-def create_folder_if_not_exist(new_path: str):
-    if not os.path.exists(new_path):
-        os.makedirs(new_path)
-        logging.info(f"{new_path} folder created")
+
 
 def _define_dp_structure(pipeline_folder: str):
     data_folder=pipeline_folder + "/data_product_1"
@@ -50,23 +48,7 @@ def add_important_files(project_folder: str):
     shutil.copyfile(os.path.join(TMPL_FOLDER, ".env_tmpl"), os.path.join(project_folder, ".env"))
     shutil.copyfile(os.path.join(TMPL_FOLDER, ".gitignore_tmpl"), os.path.join(project_folder, ".gitignore"))
 
-def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
-    """
-    Returns the name of the ddl or dml files
-    """
-    ddl_file_name = None
-    dml_file_name = None
-    base_scripts=os.path.join(root,dir)
-    for file in os.listdir(base_scripts):
-        if file.startswith("ddl"):
-            ddl_file_name=os.path.join(base_scripts,file)
-        if file.startswith('dml'):
-            dml_file_name=os.path.join(base_scripts,file)
-    if ddl_file_name is None:
-        logging.error(f"No DDL file found in the directory: {base_scripts}")
-    if dml_file_name is None:
-        logging.error(f"No DML file found in the directory: {base_scripts}")
-    return ddl_file_name, dml_file_name
+
 
 
 def _initialize_git_repo(project_folder: str):

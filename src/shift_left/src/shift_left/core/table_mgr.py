@@ -3,17 +3,21 @@ import logging
 import os
 from pathlib import Path
 from shift_left.core.project_manager import create_folder_if_not_exist
-from shift_left.core.app_config import get_config
+from shift_left.core.pipeline_mgr import get_table_ref_from_inventory, read_pipeline_metadata, PIPELINE_JSON_FILE_NAME
+
+from shift_left.core.utils.app_config import get_config
 from jinja2 import Environment, PackageLoader
+from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.utils.file_search import FlinkTableReference, get_or_build_source_file_inventory, SCRIPTS_DIR, PIPELINE_FOLDER_NAME, load_existing_inventory
+from typing import Set, Dict
+
 
 """
 Table management is for managing table folder content
 """
 
-SCRIPTS_FOLDER="sql-scripts"
-
 # --------- Public APIs ---------------
-def build_folder_structure_for_table(table_name: str, target_path: str):
+def build_folder_structure_for_table(table_file_name: str, target_path: str):
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
     
@@ -21,26 +25,105 @@ def build_folder_structure_for_table(table_name: str, target_path: str):
     * `target_path/table_name/tests`: for test harness content
     * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
-    logging.info(f"Create folder {table_name}")
+    logging.info(f"Create folder {table_file_name}")
     config = get_config()
-    table_name = _extract_table_name(table_name)  
+    table_name = extract_table_name(table_file_name)  
     table_folder = f"{target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/"+ SCRIPTS_FOLDER)
+    create_folder_if_not_exist(f"{table_folder}/"+  SCRIPTS_DIR)
     create_folder_if_not_exist(f"{table_folder}/tests")
     if "source" in target_path:
         internal_table_name = config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     else:
         internal_table_name=table_name
     product_name = _extract_product_name(table_folder)
-    _create_makefile(internal_table_name, SCRIPTS_FOLDER, SCRIPTS_FOLDER, table_folder, config["kafka"]["cluster_type"], product_name)
+    _create_makefile(internal_table_name, SCRIPTS_DIR, SCRIPTS_DIR, table_folder, config["kafka"]["cluster_type"], product_name)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
     logging.info(f"Created folder {table_folder} for the table {table_name}")
     return table_folder, table_name
 
+def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_folder: str) -> str:
+    """
+    Search from the source project the dependencies for a given table.
+    """
+    logging.info(f"Search source dependencies for table {sql_file_name} in {src_project_folder}")
+    with open(sql_file_name, "r") as f:
+        sql_content = f.read()
+        parser = SQLparser()
+        table_names = parser.extract_table_references(sql_content)
+        if table_names:
+            all_src_files = get_or_build_source_file_inventory(src_project_folder)
+            dependencies = []
+            for table in table_names:
+                if not table in all_src_files:
+                    logging.error(f"Table {table} not found in the source project")
+                    continue
+                dependencies.append({"table": table, "src_dbt": all_src_files[table]})
+            return dependencies
+    return []
+
+def extract_table_name(src_file_name: str) -> str:
+    """
+    Extract the name of the table given a src file name
+    """
+    the_path= Path(src_file_name)
+    table_name = the_path.stem
+    if table_name.startswith("src_"):
+        table_name = table_name.replace("src_","",1)
+    return table_name
+
+def build_update_makefile(pipeline_folder: str, table_name: str):
+    inventory = load_existing_inventory(pipeline_folder)
+    if table_name not in inventory:
+        logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
+        return
+    existing_path = inventory[table_name]["table_folder_name"]
+    table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
+    _create_makefile( table_name, 
+                    SCRIPTS_DIR, 
+                    SCRIPTS_DIR, 
+                    table_folder, 
+                    get_config()["kafka"]["cluster_type"],
+                    None)
+
+def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
+    """
+    When pipeline definitions is present for this table, return the list of children
+    """
+    inventory = load_existing_inventory(pipeline_folder)
+    tab_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
+    if tab_ref is None:
+        logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
+    else:
+        results =  read_pipeline_metadata(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
+        output=f"## {table_name} is referenced in {len(results)} Flink SQL statements:\n"
+        if len(results) == 0:
+            output+="\n\t no table ... yet"
+        else:
+             for t in results:
+                output+=f"\n* {t.table_name} DML: {t.dml_ref}\n"
+        return output
+
+
 
 # --------- Private APIs ---------------
+
+def _generate_tracking_output(file_name: str, dep_list) -> str:
+    the_path= Path(file_name)
+    table_name = the_path.stem
+    output=f"""## Tracking the pipeline implementation for table: {table_name}
+    
+    -- Processed file: {file_name}
+
+    --- Final result is a list of tables in the pipeline:
+    """
+    output+="\n"
+    output+="\n".join(f"NOT_TESTED || OK | Table: {str(d[0])},\tSrc dbt: {str(d[1])}" for d in dep_list)
+    output+="\n\n## Data\n"
+    output+="Created with tool and updated to make the final join working on the merge conditions:\n"
+    return output
+
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     tracking_tmpl = env.get_template(f"tracking_tmpl.jinja")
@@ -54,7 +137,7 @@ def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
 
 def _create_ddl_skeleton(table_name: str,out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    ddl_tmpl = env.get_template(f"create_table_squeleton.jinja")
+    ddl_tmpl = env.get_template(f"create_table_skeleton.jinja")
     context = {
         'table_name': table_name,
         'default_PK': 'default_key',
@@ -78,15 +161,7 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
         f.write(rendered_dml)
 
 
-def _extract_table_name(src_file_name: str) -> str:
-    """
-    Extract the name of the table given a src file name
-    """
-    the_path= Path(src_file_name)
-    table_name = the_path.stem
-    if table_name.startswith("src_"):
-        table_name = table_name.replace("src_","",1)
-    return table_name
+
 
 def _extract_product_name(existing_path: str) -> str:
     """
@@ -96,7 +171,7 @@ def _extract_product_name(existing_path: str) -> str:
     if parent_folder not in ["facts", "intermediates", "sources", "dimensions"]:
         return parent_folder
     else:
-        return None
+        return ""
     
 def _create_makefile(table_name: str, 
                      ddl_folder: str,
@@ -127,3 +202,6 @@ def _create_makefile(table_name: str,
     # Write the rendered Makefile to a file
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
+
+def get_column_definitions(table_name: str, config) -> tuple[str,str]:
+    return "-- put here column definitions", "-- put here column definitions"

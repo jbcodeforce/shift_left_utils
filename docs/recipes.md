@@ -85,6 +85,14 @@ shift_left table init fct_user $PIPELINES/facts/p1
         ```
 
 
+## Migrate SQL tables from source to staging
+
+As introduced before the migration involves a Local LLM running with Ollama, so you need this environment to be able to run this command.
+
+```sql
+shift_left table migrate $SRC_FOLDER/facts/aqem/aqem.fct_event.sql $STAGING --recursive
+```
+
 
 ## Build an inventory of Flink SQL DDL and DML statements
 

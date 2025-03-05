@@ -1,12 +1,14 @@
 import typer
+import os
 from rich import print
 import shift_left.core.pipeline_mgr as pm 
 from typing_extensions import Annotated
-from shift_left.core.table_mgr import build_folder_structure_for_table
-#from shift_left.core.process_src_tables import process_one_file
+from shift_left.core.table_mgr import build_folder_structure_for_table, search_source_dependencies_for_dbt_table, extract_table_name, build_update_makefile
+from shift_left.core.process_src_tables import process_one_file
 """
 Manage the table entities.
 - build an inventory of all the tables in the project with the basic metadata per table
+
 """
 app = typer.Typer()
 
@@ -30,22 +32,45 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     inventory= pm.build_inventory(pipeline_path)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
-"""
 @app.command()
-def migrate(sql_src_file_name: Annotated[str, typer.Argument()],
-         target_path: Annotated[str, typer.Argument()],
-         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources")):
-    
-    Build a new table structure under the specified path. For example to add a source table structure
-    use table init src_table_1 $PIPELINES/sources/p1
-    
+def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argument()],
+                                src_project_folder: Annotated[str, typer.Argument(envvar=["SRC_FOLDER"])]):
+    """
+    Search the parent for a given table from the source project.
+    """
+    if not table_sql_file_name.endswith(".sql"):
+        exit(1)
+    print(f"The dependencies for {table_sql_file_name} from the {src_project_folder} project are:")
+    dependencies = search_source_dependencies_for_dbt_table(table_sql_file_name, src_project_folder)
+    table_name = extract_table_name(table_sql_file_name)
+    print(f"Table {table_name} in the SQL {table_sql_file_name} depends on:")
+    for table in dependencies:
+        print(f"  - {table['table']} (in {table['src_dbt']})")
+    print("#" * 80)
+        
+
+@app.command()
+def migrate(sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
+         target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
+         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
+    """
+    Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
+    """
     print("#" * 30 + f" Migrate source SQL Table defined in {sql_src_file_name}")
     if not sql_src_file_name.endswith(".sql"):
         exit(1)
-    process_one_file(sql_src_file_name, target_path, recursive)
+    process_one_file(sql_src_file_name, os.getenv("STAGING"), target_path, recursive)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 
-"""
+@app.command()
+def build_makefile(pipeline_folder_name: Annotated[str, typer.Argument()], table_name: Annotated[str, typer.Argument()]):
+    """ Update existing Makefile for a given table or build a new one """
+
+    build_update_makefile(pipeline_folder_name, table_name)
+    print(f"Makefile updated for table {table_name}")
 
 
-    
+@app.command()
+def find_table_users(table_name: Annotated[str, typer.Argument()]):
+    """ Find the users of a given table """
+    pass

@@ -9,26 +9,21 @@ there is one pipeline per sink table.
 """
 import os
 import logging
-from jinja2 import Environment, FileSystemLoader
-from shift_left.core.flink_sql_code_agent_lg import translate_to_flink_sqls
-from shift_left.core.project_manager import create_folder_if_not_exist
+from pathlib import Path
+from jinja2 import Environment, PackageLoader
+from shift_left.core.utils.flink_sql_code_agent_lg import translate_to_flink_sqls
+from shift_left.core.utils.file_search import create_folder_if_not_exist, SCRIPTS_DIR, get_or_build_source_file_inventory
+from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.utils.ccloud_client import search_matching_topic
+from shift_left.core.table_mgr import build_folder_structure_for_table, extract_table_name, get_column_definitions
 
-from create_table_folder_structure import create_folder_structure_for_table
-from get_schema_for_src_table import search_matching_topic, get_column_definitions
-from pipeline_helper import build_all_file_inventory, search_table_in_inventory, search_table_in_processed_tables, get_dependencies
-
-from shift_left.core.app_config import get_config
 
 logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
-TMPL_FOLDER="./templates"
-TABLES_TO_PROCESS="./reports/tables_to_process.txt"
-TABLES_DONE="./reports/tables_done.txt"
-CREATE_TABLE_TMPL="create_table_squeleton.jinja"
-#DML_DEDUP_TMPL="dedup_dml_squeleton.jinja"
-DML_DEDUP_TMPL="dedup_dml_squeleton.jinja"
+TMPL_FOLDER="templates"
+CREATE_TABLE_TMPL="create_table_skeleton.jinja"
+DML_DEDUP_TMPL="dedup_dml_skeleton.jinja"
 TEST_DEDUL_TMPL="test_dedup_statement.jinja"
-INPUT_TOPIC_LIST=os.getenv("STAGING") + "/src_topic_list.txt"
-
 
 # --- utilities functions
 
@@ -47,8 +42,8 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
     fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     file_name=f"{target_folder}/ddl.{fname}.sql" 
     logging.info(f"Create DDL Skeleton for {fname}")
-    env = Environment(loader=FileSystemLoader('.'))
-    sql_template = env.get_template(f"{TMPL_FOLDER}/{CREATE_TABLE_TMPL}")
+    env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
     try:
         logging.info("try to get the column definitions by calling Confluent Cloud REST API")
         column_definitions, fields=get_column_definitions(table_name, config)
@@ -78,9 +73,9 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     if "source" in target_folder:
         table_fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     file_name=f"{target_folder}/dml.{table_fname}.sql" 
-    env = Environment(loader=FileSystemLoader('.'))
-    sql_template = env.get_template(f"{TMPL_FOLDER}/{DML_DEDUP_TMPL}")
-    topic_name=search_matching_topic(table_name, config["kafka"]["reject_topics_prefixes"])
+    env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
+    topic_name=search_matching_topic(table_name)
     context = {
         'table_name': table_fname,
         'topic_name': f"`{topic_name}`",
@@ -93,8 +88,8 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
 
 def _create_test_dedup(table_name: str, target_folder: str):
     file_name=f"{target_folder}/validate_no_duplicate.sql" 
-    env = Environment(loader=FileSystemLoader('.'))
-    sql_template = env.get_template(f"{TMPL_FOLDER}/{TEST_DEDUL_TMPL}")
+    env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    sql_template = env.get_template(f"{TEST_DEDUL_TMPL}")
     context = {
         'table_name': table_name,
     }
@@ -103,47 +98,59 @@ def _create_test_dedup(table_name: str, target_folder: str):
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
     
-def process_ddl_file(file_path: str, sql_file: str):
-    print(f"Process {sql_file}")
-    with fileinput.input(sql_file, inplace=True) as f:
-        for line in f:
-            if "```" in line or "final AS (" in line or "SELECT * FROM final" in line:
-                pass
-            else:
-                print(line,end='')
+def _process_ddl_file(file_path: str, sql_file: str):
+    """
+    Process a ddl file, replacing the ``` final AS (``` and SELECT * FROM final 
+    """
+    print(f"Process {sql_file} in {file_path}")
+    file_name=Path(sql_file)
+    content = file_name.read_text()
+    update_content = content.replace("``` final AS (","```").replace("SELECT * FROM final","")
+    file_name.write_text(update_content)
 
-def save_one_file(fname: str, content: str):
+
+def _save_one_file(fname: str, content: str):
     logging.debug(f"Write: {fname}")
     with open(fname,"w") as f:
         f.write(content)
 
-def save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
+def _save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
-    ddl_fn=f"{content_path}/sql-scripts/ddl.{table_name}.sql"
-    save_one_file(ddl_fn, ddl)
-    process_ddl_file(f"{content_path}/sql-scripts/",ddl_fn)
-    save_one_file(f"{content_path}/sql-scripts/dml.{table_name}.sql",dml)
+    ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
+    _save_one_file(ddl_fn, ddl)
+    _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
+    _save_one_file(f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql",dml)
 
 
-def remove_already_processed_table(parents: list[str]) -> list[str]:
+def _remove_already_processed_table(parents: list[str]) -> list[str]:
     """
-    If a table in the provided list of parents table is already processed, remove it from the list.
+    If a table in the provided list of parents is already processed, remove it from the list.
     A processed table is one already define in the pipelines folder hierarchy.
     """
     newParents=[]
     for parent in parents:
         table_name=parent.replace("src_","").strip()
-        if not search_table_in_processed_tables(table_name):
+        if not _search_table_in_processed_tables(table_name):
             newParents.append(parent)
         else:
             logging.info(f"{table_name} already processed")
     return newParents
 
 
-# ----- more specific functions
-def _process_src_sql_file(src_file_name: str, generated_code_folder_name: str, config: dict):
+
+def _search_table_in_processed_tables(table_name: str) -> bool:
+    pipeline_path=os.getenv("PIPELINES","../pipelines")
+    for _, dirs, _ in os.walk(pipeline_path):
+        for dir in dirs:
+            if table_name == dir:
+                return True
+    else:
+        return False
+
+
+def _process_source_sql_file(src_file_name: str, target_path: str):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
     It creates a tests folder.
@@ -154,16 +161,18 @@ def _process_src_sql_file(src_file_name: str, generated_code_folder_name: str, c
     :param source_target_path: the path for the newly created Flink sql file
 
     """
-    logging.debug(f"process src SQL file {src_file_name}")
-    table_folder, table_name = create_folder_structure_for_table(src_file_name, "sql-scripts", generated_code_folder_name, config)
-    fields = _create_src_ddl_statement(table_name, config, f"{table_folder}/sql-scripts")
-    _create_dml_statement(f"{table_name}", f"{table_folder}/sql-scripts", fields, config)   
+    print(f"process src SQL file {src_file_name} from {target_path}")
+    table_name = extract_table_name(src_file_name)
+    table_folder, table_name = build_folder_structure_for_table(table_name,  target_path + "/sources")
+    config = get_config()
+    fields = _create_src_ddl_statement(table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
+    _create_dml_statement(f"{table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
     _create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
-    # merge_items_in_reporting_file([table_name], TABLES_TO_PROCESS)
 
 
 def _process_non_source_sql_file(src_file_name: str, 
-                                 source_target_path: str, 
+                                 target_path: str, 
+                                src_folder_path: str,
                                  walk_parent: bool = False):
     """
     Transform intermediate or fact or dimension sql file to Flink SQL. 
@@ -173,49 +182,51 @@ def _process_non_source_sql_file(src_file_name: str,
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     """
-    
-    table_folder, table_name=create_folder_structure_for_table(src_file_name, "sql-scripts", source_target_path, config)
+    logging.debug(f"process SQL file {src_file_name}")
+    product_path = os.path.dirname(src_file_name).replace(src_folder_path, "",1)
+    where_to_write_path = target_path + product_path
+    table_folder, table_name=build_folder_structure_for_table(src_file_name, where_to_write_path)
     parents=[]
-    with open(src_file_name) as f:
+    with open(src_file_name, "r") as f:
         sql_content= f.read()
-        parents=get_dependencies(sql_content)
-        parents=remove_already_processed_table(parents)
-        merge_items_in_reporting_file(parents,TABLES_TO_PROCESS)
+        parser = SQLparser()
+        parents=parser.extract_table_references(sql_content)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
-        save_dml_ddl(table_folder, table_name, dml, ddl)
-        merge_items_in_reporting_file([table_name],TABLES_DONE)   # add the current table to the processed tables
+        _save_dml_ddl(table_folder, table_name, dml, ddl)
     if walk_parent:
+        parents=_remove_already_processed_table(parents)
         for parent_table_name in parents:
-            process_from_table_name(parent_table_name, source_target_path, walk_parent, config)
+            process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
 
 
 # ---- PUBLIC APIs ----
 
 def process_one_file(src_file: str, 
                     target_folder: str, 
+                    src_folder_path: str,
                     process_dependency: bool = False):
     """ Process one sql file """
     logging.info(f"process_one_file: {src_file} - {target_folder}")
     generated_code_folder_name = create_folder_if_not_exist(target_folder)
     if src_file.find("source") > 0:
-        _process_src_sql_file(src_file, generated_code_folder_name, config)
+        _process_source_sql_file(src_file, generated_code_folder_name)
     else:
-        _process_non_source_sql_file(src_file, generated_code_folder_name, walk_parent, config)
+        _process_non_source_sql_file(src_file, generated_code_folder_name, src_folder_path, process_dependency)
 
 
-def process_from_table_name(table_name: str, pipeline_folder_path: str, walk_parent: bool):
+def process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
     """
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
 
     :param: the table name
     """
-    all_files= build_all_file_inventory()
-
-    matching_sql_file=search_table_in_inventory(table_name, all_files)
+    all_files= get_or_build_source_file_inventory(src_folder_path)
+    print(all_files)
+    matching_sql_file=all_files[table_name]
     if matching_sql_file:
         logging.info(f"\n\n------------------------------------------")
         logging.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
-        process_one_file(matching_sql_file, pipeline_folder_path, walk_parent)
+        process_one_file(matching_sql_file, staging_folder, src_folder_path, walk_parent)
     else:
         logging.info("Matching sql file not found !")

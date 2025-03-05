@@ -1,6 +1,6 @@
 
 from shift_left.core.pipeline_mgr import ReportInfoNode   
-from shift_left.core.ccloud_client import ConfluentFlinkClient
+from shift_left.core.utils.ccloud_client import ConfluentFlinkClient
 
 def _get_current_compute_pool_cfu(compute_pool_id: str, environment_id: str):
     """

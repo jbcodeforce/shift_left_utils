@@ -1,4 +1,5 @@
 import re
+from typing import Set
 """
 Dedicated class to parse a SQL statement and extract elements like table name
 """
@@ -40,7 +41,7 @@ class SQLparser:
                 return None
         return table_name.strip()
 
-    def extract_table_references(self, sql_content):
+    def extract_table_references(self, sql_content) -> Set[str]:
         """
         Extract the table reference from the sql_content
         """

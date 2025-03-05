@@ -151,7 +151,7 @@ def define_flink_sql_agent():
         """
         change the sql_input string to the matching flink sql statement, and keep in state.flink_sql
         """
-        print(f"\n--- Start translator Agent ---")
+        print(f"\n--- Start translator AI Agent ---")
         prompt = ChatPromptTemplate.from_template(translator_template) 
         chain = prompt | model 
         llm_out = chain.invoke(state)
@@ -163,7 +163,7 @@ def define_flink_sql_agent():
         """
         Verify the Flink SQL syntax is correct
         """
-        print(f"\n--- Start syntax_cleaner Agent ---")
+        print(f"\n--- Start syntax_cleaner AI Agent ---")
         prompt = ChatPromptTemplate.from_template(flink_sql_syntaxic_template) 
         chain = prompt | model 
         agent_outcome = chain.invoke(state)
@@ -171,7 +171,7 @@ def define_flink_sql_agent():
         return {"flink_sql": agent_outcome}
 
     def ddl_generation(state):
-        print(f"\n--- Start ddl_generation Agent ---")
+        print(f"\n--- Start ddl_generation AI Agent ---")
         prompt = ChatPromptTemplate.from_template(flink_ddl_generation_template) 
         chain = prompt | model 
         llm_out = chain.invoke(state)
@@ -180,7 +180,7 @@ def define_flink_sql_agent():
         return {"derived_ddl": derived_ddl}
 
     def clean_sqls(state):
-        print(f"\n--- Start clean_sql Agent ---")
+        print(f"\n--- Start clean_sql AI Agent ---")
         sql = state["flink_sql"]
         better_sql=extract_sql_blocks(sql)
         print(f" --- Done Clean SQL Agent: \n{better_sql}")

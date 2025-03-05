@@ -4,7 +4,7 @@ import requests
 from base64 import b64encode
 from typing import List, Dict
 
-from shift_left.core.app_config import get_config
+from shift_left.core.utils.app_config import get_config
 
 class ConfluentFlinkClient:
     """
@@ -56,3 +56,7 @@ class ConfluentFlinkClient:
     def get_compute_pool_list(self):
         """Get the list of compute pools"""
         return self.make_request("GET", "/compute-pools")
+
+
+def search_matching_topic(table_name):
+    return None

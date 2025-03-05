@@ -14,11 +14,12 @@ from pathlib import Path
 from typing import Dict, Optional, Final, Any, Set, List, Tuple
 
 from pydantic import BaseModel
+from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.file_search import from_absolute_to_pipeline, from_pipeline_to_absolute, FlinkTableReference, load_existing_inventory
 
-from shift_left.core.project_manager import create_folder_if_not_exist, get_ddl_dml_from_folder
-from shift_left.core.sql_parser import SQLparser
-from shift_left.core.app_config import get_config
-
+SCRIPTS_DIR: Final[str] = "sql-scripts"
+PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 # Configure logging
 logging.basicConfig(
     filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'pipelines.log'),
@@ -29,29 +30,13 @@ logging.basicConfig(
 )
 
 # Constants
-SCRIPTS_DIR: Final[str] = "sql-scripts"
-INVENTORY_FILE_NAME: Final[str] = "inventory.json"
-PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
 
 # Global queues for processing
 files_to_process: deque = deque()  # Files to process when parsing SQL dependencies
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
 
-class FlinkTableReference(BaseModel):
-    """Reference to a Flink table including its metadata and location information."""
-    table_name: Final[str]
-    dml_ref: Optional[str]
-    ddl_ref: Optional[str]
-    table_folder_name: str
 
-    def __hash__(self) -> int:
-        return hash(self.table_name)
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FlinkTableReference):
-            return NotImplemented
-        return self.table_name == other.table_name
 
 class FlinkStatementHierarchy(BaseModel):
     """Metadata definition for a table in the pipeline hierarchy.
@@ -112,114 +97,6 @@ def _build_table_reference(
         "table_folder_name": table_folder
     })
 
-def build_inventory(pipeline_folder: str) -> Dict:
-    """Build inventory from pipeline folder.
-    
-    Args:
-        pipeline_folder: Root folder containing pipeline definitions
-        
-    Returns:
-        Dictionary mapping table names to their FlinkTableReference metadata
-    """
-    return get_or_build_inventory(pipeline_folder, pipeline_folder, True)
-
-def from_absolute_to_pipeline(file_or_folder_name: str) -> str:
-    """Convert absolute path to pipeline-relative path.
-    
-    Args:
-        file_or_folder_name: Absolute path to convert
-        
-    Returns:
-        Path relative to pipeline root
-    """
-    if not file_or_folder_name or file_or_folder_name.startswith(PIPELINE_FOLDER_NAME):
-        return file_or_folder_name
-        
-    index = file_or_folder_name.find(PIPELINE_FOLDER_NAME)
-    return file_or_folder_name[index:] if index != -1 else file_or_folder_name
-
-def from_pipeline_to_absolute(file_or_folder_name: str) -> str:
-    """Convert pipeline-relative path to absolute path.
-    
-    Args:
-        file_or_folder_name: Pipeline-relative path
-        
-    Returns:
-        Absolute path
-    """
-    if not file_or_folder_name or not file_or_folder_name.startswith(PIPELINE_FOLDER_NAME):
-        return file_or_folder_name
-        
-    root = os.path.dirname(os.getenv("PIPELINES"))
-    return os.path.join(root, file_or_folder_name)
-
-def get_or_build_inventory(
-    pipeline_folder: str,
-    target_path: str,
-    recreate: bool = False
-) -> Dict:
-    """Get existing inventory or build new one if needed.
-    
-    Args:
-        pipeline_folder: Root folder containing pipeline definitions
-        target_path: Path to store inventory file
-        recreate: Whether to force recreation of inventory
-        
-    Returns:
-        Dictionary mapping table names to their FlinkTableReference metadata
-    """
-    create_folder_if_not_exist(target_path)
-    inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
-    
-    if not recreate and os.path.exists(inventory_path):
-        return load_existing_inventory(target_path)
-        
-    inventory = {}
-    parser = SQLparser()
-    
-    for root, dirs, _ in os.walk(pipeline_folder):
-        for dir in dirs:
-            if SCRIPTS_DIR == dir:
-                ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
-                if not dml_file_name:
-                    continue
-                    
-                logging.debug(f"Processing file {dml_file_name}")
-                # extract table name from dml filefrom sql script   
-                with open(dml_file_name, "r") as f:
-                    sql_content = f.read()
-                    table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
-                    directory = os.path.dirname(dml_file_name)
-                    table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
-                    
-                    ref = FlinkTableReference.model_validate({
-                        "table_name": table_name,
-                        "ddl_ref": from_absolute_to_pipeline(ddl_file_name),
-                        "dml_ref": from_absolute_to_pipeline(dml_file_name),
-                        "table_folder_name": table_folder
-                    })
-                    
-                    logging.debug(ref)
-                    inventory[ref.table_name] = ref.model_dump()
-                    
-    with open(inventory_path, "w") as f:
-        json.dump(inventory, f, indent=4)
-    logging.info(f"Created inventory file {inventory_path}")
-    
-    return inventory
-
-def load_existing_inventory(target_path: str) -> Dict:
-    """Load existing inventory from file.
-    
-    Args:
-        target_path: Path containing inventory file
-        
-    Returns:
-        Dictionary containing inventory data
-    """
-    inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
-    with open(inventory_path, "r") as f:
-        return json.load(f)
 
 def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkStatementHierarchy:
     """Build pipeline definition hierarchy starting from given table.
@@ -375,12 +252,12 @@ def walk_the_hierarchy_for_report_from_table(
     if table_name not in inventory:
         return None
         
-    table_ref = _get_table_ref_from_inventory(table_name, inventory)
+    table_ref = get_table_ref_from_inventory(table_name, inventory)
     return walk_the_hierarchy_for_report(
         assess_pipeline_definition_exists(table_ref.dml_ref)
     )
 
-def _get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTableReference:
+def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTableReference:
     """Get table reference from inventory.
     
     Args:
@@ -627,7 +504,7 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
     The parents are a list of dictionnary with the same structure, and so on.
     """
     inventory = load_existing_inventory(inventory_path)
-    table_ref: FlinkTableReference = _get_table_ref_from_inventory(table_name, inventory)
+    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
     return walk_the_hierarchy_for_report(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 if __name__ == "__main__":
