@@ -19,11 +19,50 @@ from shift_left.core.utils.ccloud_client import search_matching_topic
 from shift_left.core.table_mgr import build_folder_structure_for_table, extract_table_name, get_column_definitions
 
 
-logging.basicConfig(level=get_config()["app"]["logging"], format='%(levelname)s: %(message)s')
+logging.basicConfig(
+    filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'process_src_tables.log'),
+    level=get_config()["app"]["logging"], 
+    format='%(levelname)s: %(message)s')
 TMPL_FOLDER="templates"
 CREATE_TABLE_TMPL="create_table_skeleton.jinja"
 DML_DEDUP_TMPL="dedup_dml_skeleton.jinja"
 TEST_DEDUL_TMPL="test_dedup_statement.jinja"
+
+# ---- PUBLIC APIs ----
+
+def process_one_file(table_name: str,
+                     sql_src_file: str, 
+                    staging_target_folder: str, 
+                    src_folder_path: str,
+                    process_parents: bool = False):
+    """ Process one source sql file to extract code and migrate to Flink SQL """
+    logging.debug(f"Migration process_one_file: {sql_src_file} - {staging_target_folder} as {table_name}")
+    if sql_src_file.endswith(".sql"):
+        create_folder_if_not_exist(staging_target_folder)
+        if sql_src_file.find("source") > 0:
+            _process_source_sql_file(table_name,sql_src_file, staging_target_folder)
+        else:
+            _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
+    else:
+        raise Exception("Error: the first parameter needs to be a sql file")
+        
+
+def process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
+    """
+    Load matching sql file given the table name as input.
+    This method may be useful when we get the table name from the dependencies list of another table.
+
+    :param: the table name
+    """
+    all_files= get_or_build_source_file_inventory(src_folder_path)
+    print(all_files)
+    matching_sql_file=all_files[table_name]
+    if matching_sql_file:
+        logging.info(f"\n\n------------------------------------------")
+        logging.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
+        process_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
+    else:
+        logging.info("Matching sql file not found !")
 
 # --- utilities functions
 
@@ -150,7 +189,9 @@ def _search_table_in_processed_tables(table_name: str) -> bool:
         return False
 
 
-def _process_source_sql_file(src_file_name: str, target_path: str):
+def _process_source_sql_file(table_name: str,
+                            src_file_name: str, 
+                             target_path: str):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
     It creates a tests folder.
@@ -162,7 +203,6 @@ def _process_source_sql_file(src_file_name: str, target_path: str):
 
     """
     print(f"process src SQL file {src_file_name} from {target_path}")
-    table_name = extract_table_name(src_file_name)
     table_folder, table_name = build_folder_structure_for_table(table_name,  target_path + "/sources")
     config = get_config()
     fields = _create_src_ddl_statement(table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
@@ -170,10 +210,11 @@ def _process_source_sql_file(src_file_name: str, target_path: str):
     _create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
 
 
-def _process_non_source_sql_file(src_file_name: str, 
-                                 target_path: str, 
+def _process_non_source_sql_file(table_name: str, 
+                                sql_src_file_name: str, 
+                                target_path: str, 
                                 src_folder_path: str,
-                                 walk_parent: bool = False):
+                                walk_parent: bool = False):
     """
     Transform intermediate or fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -182,12 +223,12 @@ def _process_non_source_sql_file(src_file_name: str,
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     """
-    logging.debug(f"process SQL file {src_file_name}")
-    product_path = os.path.dirname(src_file_name).replace(src_folder_path, "",1)
-    where_to_write_path = target_path + product_path
-    table_folder, table_name=build_folder_structure_for_table(src_file_name, where_to_write_path)
+    logging.debug(f"process SQL file {sql_src_file_name}")
+    product_path = os.path.dirname(sql_src_file_name).replace(src_folder_path, "",1)[1:]
+    where_to_write_path = os.path.join(target_path, product_path)
+    table_folder, _ = build_folder_structure_for_table(table_name, where_to_write_path)
     parents=[]
-    with open(src_file_name, "r") as f:
+    with open(sql_src_file_name, "r") as f:
         sql_content= f.read()
         parser = SQLparser()
         parents=parser.extract_table_references(sql_content)
@@ -199,34 +240,3 @@ def _process_non_source_sql_file(src_file_name: str,
             process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
 
 
-# ---- PUBLIC APIs ----
-
-def process_one_file(src_file: str, 
-                    target_folder: str, 
-                    src_folder_path: str,
-                    process_dependency: bool = False):
-    """ Process one sql file """
-    logging.info(f"process_one_file: {src_file} - {target_folder}")
-    generated_code_folder_name = create_folder_if_not_exist(target_folder)
-    if src_file.find("source") > 0:
-        _process_source_sql_file(src_file, generated_code_folder_name)
-    else:
-        _process_non_source_sql_file(src_file, generated_code_folder_name, src_folder_path, process_dependency)
-
-
-def process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
-    """
-    Load matching sql file given the table name as input.
-    This method may be useful when we get the table name from the dependencies list of another table.
-
-    :param: the table name
-    """
-    all_files= get_or_build_source_file_inventory(src_folder_path)
-    print(all_files)
-    matching_sql_file=all_files[table_name]
-    if matching_sql_file:
-        logging.info(f"\n\n------------------------------------------")
-        logging.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
-        process_one_file(matching_sql_file, staging_folder, src_folder_path, walk_parent)
-    else:
-        logging.info("Matching sql file not found !")

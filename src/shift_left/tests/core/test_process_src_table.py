@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch
 import os
-import json 
 from shift_left.core.process_src_tables import process_one_file
 
 DDL="""
@@ -42,10 +41,11 @@ def test_process_one_file(mock_llm_result):
         os.environ["SRC_PROJECT"] = "./tests/data/src-project"
         os.environ["STAGING"] = "./tests/data/flink-project/staging"
         mock_translate.return_value = (DDL, DML)
-        process_one_file("./tests/data/src-project/facts/a.sql",   
-                        "./tests/data/flink-project/staging",   # target folder
-                        "./tests/data/src-project",
-                        False)
+        process_one_file("a_table",
+            "./tests/data/src-project/facts/a.sql",   
+            "./tests/data/flink-project/staging",   
+            "./tests/data/src-project",
+            False)
         assert os.path.exists("./tests/data/flink-project/staging/facts/a")
 
 def test_process_one_file_recurring(mock_llm_result):
@@ -55,13 +55,30 @@ def test_process_one_file_recurring(mock_llm_result):
         os.environ["SRC_PROJECT"] = "./tests/data/src-project"
         os.environ["STAGING"] = "./tests/data/flink-project/staging"
         mock_translate.return_value = (DDL, DML)
-        process_one_file("./tests/data/src-project/facts/a.sql",
-                        "./tests/data/flink-project/staging",
-                         "./tests/data/src-project",
-                        True)
+        process_one_file("a_table",
+            "./tests/data/src-project/facts/a.sql",
+            "./tests/data/flink-project/staging",
+             "./tests/data/src-project",
+            True)
         assert os.path.exists("./tests/data/flink-project/staging/sources/s1")
         assert os.path.exists("./tests/data/flink-project/staging/sources/s2")
         assert os.path.exists("./tests/data/flink-project/staging/intermediates/it1")
 
+def _test_migrate_one_file(self):
+        print(f"test_migrate_one_file  {os.getcwd}")
+        os.environ["CONFIG_FILE"] = "../../config.yaml"
+        os.environ["STAGING"] = "../tmp/staging"
+        os.environ["PIPELINES"] = "../tmp/pipelines"
+        try:
+            process_one_file("dim_event_action_item",
+            os.path.join(os.getenv("SRC_FOLDER"), "dimensions/aqem/aqem.dim_event_action_item.sql"),
+            "../tmp/staging",
+             os.getenv("SRC_FOLDER"),
+            False)
+        except Exception as e:
+            print(e)
+            self.fail()
+            
 if __name__ == "__main__":
+    test_process_one_file(mock_llm_result)
     test_process_one_file_recurring(mock_llm_result)

@@ -1,10 +1,14 @@
 import typer
 import os
 from rich import print
-import shift_left.core.pipeline_mgr as pm 
 from typing_extensions import Annotated
-from shift_left.core.table_mgr import build_folder_structure_for_table, search_source_dependencies_for_dbt_table, extract_table_name, build_update_makefile
+from shift_left.core.table_mgr import (
+    build_folder_structure_for_table, 
+    search_source_dependencies_for_dbt_table, 
+    extract_table_name, build_update_makefile, 
+    get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
+
 """
 Manage the table entities.
 - build an inventory of all the tables in the project with the basic metadata per table
@@ -29,7 +33,8 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     Build the table inventory from the PIPELINES path.
     """
     print("#" * 30 + f" Build Inventory in {pipeline_path}")
-    inventory= pm.build_inventory(pipeline_path)
+    inventory= get_or_create_inventory(pipeline_path)
+    print(inventory)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
 @app.command()
@@ -50,20 +55,26 @@ def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argumen
         
 
 @app.command()
-def migrate(sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
-         target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
-         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
+def migrate(
+        table_name: Annotated[str, typer.Argument(help= "the name of the table once migrated.")],
+        sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
+        target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
+        recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
     """
     Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
     """
     print("#" * 30 + f" Migrate source SQL Table defined in {sql_src_file_name}")
     if not sql_src_file_name.endswith(".sql"):
+        print("[red]Error: the first parameter needs to be a dml sql file[/red]")
         exit(1)
-    process_one_file(sql_src_file_name, os.getenv("STAGING"), target_path, recursive)
+    print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} with its pipeline: {recursive}")
+    process_one_file(table_name, sql_src_file_name, os.getenv("STAGING"), target_path, recursive)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 
 @app.command()
-def build_makefile(pipeline_folder_name: Annotated[str, typer.Argument()], table_name: Annotated[str, typer.Argument()]):
+def update_makefile(
+        table_name: Annotated[str, typer.Argument()],
+        pipeline_folder_name: Annotated[str, typer.Argument()]):
     """ Update existing Makefile for a given table or build a new one """
 
     build_update_makefile(pipeline_folder_name, table_name)

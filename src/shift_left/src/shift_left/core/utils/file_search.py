@@ -113,7 +113,7 @@ def load_existing_inventory(target_path: str) -> Dict:
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):
         os.makedirs(new_path)
-        logging.info(f"{new_path} folder created")
+        logging.debug(f"{new_path} folder created")
     return new_path
 
 def from_absolute_to_pipeline(file_or_folder_name: str) -> str:
@@ -145,6 +145,18 @@ def from_pipeline_to_absolute(file_or_folder_name: str) -> str:
         
     root = os.path.dirname(os.getenv("PIPELINES"))
     return os.path.join(root, file_or_folder_name)
+
+def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTableReference:
+    """Get table reference from inventory.
+    
+    Args:
+        table_name: Name of table
+        inventory: Dictionary of inventory data
+        
+    Returns:
+        FlinkTableReference for the table
+    """
+    return FlinkTableReference.model_validate(inventory[table_name])
     
 def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """

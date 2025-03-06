@@ -16,11 +16,18 @@ from typing import Dict, Optional, Final, Any, Set, List, Tuple
 from pydantic import BaseModel
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import from_absolute_to_pipeline, from_pipeline_to_absolute, FlinkTableReference, load_existing_inventory
+from shift_left.core.utils.file_search import (
+    from_absolute_to_pipeline, 
+    from_pipeline_to_absolute, 
+    FlinkTableReference, 
+    get_table_ref_from_inventory,
+    load_existing_inventory
+)
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 # Configure logging
+
 logging.basicConfig(
     filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'pipelines.log'),
     filemode='w',
@@ -69,34 +76,57 @@ class ReportInfoNode(BaseModel):
     parents: Optional[Any]
     children: Optional[Any]
 
-def _build_table_reference(
+
+def walk_the_hierarchy_for_report_from_table(
     table_name: str,
-    dml_file_name: str,
-    ddl_file_name: str,
-    table_folder: Optional[str] = None
-) -> FlinkTableReference:
-    """Build a FlinkTableReference object from table metadata.
+    inventory_path: str = None
+) -> Dict:
+    """Generate report of pipeline hierarchy from table name.
     
     Args:
-        table_name: Name of the table
-        dml_file_name: Path to DML file
-        ddl_file_name: Path to DDL file
-        table_folder: Optional folder containing the table files
-    
+        table_name: Name of table to start from
+        inventory_path: Optional path to inventory file
+        
     Returns:
-        FlinkTableReference object
+        Dictionary containing hierarchy report
     """
-    if not table_folder:
-        directory = os.path.dirname(dml_file_name)
-        table_folder = os.path.dirname(directory)
+    if not inventory_path:
+        inventory_path = os.getenv("PIPELINES")
+    inventory = load_existing_inventory(inventory_path)
     
-    return FlinkTableReference.model_validate({
-        "table_name": table_name,
-        "dml_ref": dml_file_name,
-        "ddl_ref": ddl_file_name,
-        "table_folder_name": table_folder
-    })
+    if table_name not in inventory:
+        return None
+        
+    table_ref = get_table_ref_from_inventory(table_name, inventory)
+    return walk_the_hierarchy_for_report(
+        assess_pipeline_definition_exists(table_ref.dml_ref)
+    )
 
+
+def get_table_ddl_dml_from_inventory(table_name: str, inventory: dict) -> Tuple[str,str]:
+    """
+    Given the table name, search the matching information from the inventory.
+    returns ddl and dml file name, relative to pipelines folder
+    """
+    if table_name.endswith(".sql"):
+        table_name=table_name.split(".sql")[0]    # legacy table name
+    table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
+    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
+    if table_ref and table_ref.dml_ref:
+        return table_ref.ddl_ref, table_ref.dml_ref
+    return "", ""
+
+def get_ddl_file_name(folder_path: str) -> str:
+    """
+    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
+    or includes a CREATE TABLE statement
+    """
+    folder_path = from_pipeline_to_absolute(folder_path)
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.startswith('ddl'):
+                return from_absolute_to_pipeline(os.path.join(root, file))
+    return ""
 
 def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkStatementHierarchy:
     """Build pipeline definition hierarchy starting from given table.
@@ -232,68 +262,35 @@ def _create_table_hierarchy_node(
     })
 
 
-def walk_the_hierarchy_for_report_from_table(
+def _build_table_reference(
     table_name: str,
-    inventory_path: str = None
-) -> Dict:
-    """Generate report of pipeline hierarchy from table name.
+    dml_file_name: str,
+    ddl_file_name: str,
+    table_folder: Optional[str] = None
+) -> FlinkTableReference:
+    """Build a FlinkTableReference object from table metadata.
     
     Args:
-        table_name: Name of table to start from
-        inventory_path: Optional path to inventory file
-        
-    Returns:
-        Dictionary containing hierarchy report
-    """
-    if not inventory_path:
-        inventory_path = os.getenv("PIPELINES")
-    inventory = load_existing_inventory(inventory_path)
+        table_name: Name of the table
+        dml_file_name: Path to DML file
+        ddl_file_name: Path to DDL file
+        table_folder: Optional folder containing the table files
     
-    if table_name not in inventory:
-        return None
-        
-    table_ref = get_table_ref_from_inventory(table_name, inventory)
-    return walk_the_hierarchy_for_report(
-        assess_pipeline_definition_exists(table_ref.dml_ref)
-    )
-
-def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTableReference:
-    """Get table reference from inventory.
-    
-    Args:
-        table_name: Name of table
-        inventory: Dictionary of inventory data
-        
     Returns:
-        FlinkTableReference for the table
+        FlinkTableReference object
     """
-    return FlinkTableReference.model_validate(inventory[table_name])
+    if not table_folder:
+        directory = os.path.dirname(dml_file_name)
+        table_folder = os.path.dirname(directory)
+    
+    return FlinkTableReference.model_validate({
+        "table_name": table_name,
+        "dml_ref": dml_file_name,
+        "ddl_ref": ddl_file_name,
+        "table_folder_name": table_folder
+    })
 
 
-def get_table_ddl_dml_from_inventory(table_name: str, inventory: dict) -> Tuple[str,str]:
-    """
-    Given the table name, search the matching information from the inventory.
-    returns ddl and dml file name, relative to pipelines folder
-    """
-    if table_name.endswith(".sql"):
-        table_name=table_name.split(".sql")[0]    # legacy table name
-    table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
-    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
-    if table_ref and table_ref.dml_ref:
-        return table_ref.ddl_ref, table_ref.dml_ref
-    return "", ""
-
-def get_ddl_file_name(folder_path: str) -> str:
-    """
-    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
-    or includes a CREATE TABLE statement
-    """
-    folder_path = from_pipeline_to_absolute(folder_path)
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.startswith('ddl'):
-                return from_absolute_to_pipeline(os.path.join(root, file))
-    return ""
 
 def _get_table_type_from_file_path(file_name: str) -> str:
     """

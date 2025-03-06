@@ -1,4 +1,4 @@
-import os, argparse
+:import os, argparse
 from functools import lru_cache
 from process_src_tables import list_sql_files
 

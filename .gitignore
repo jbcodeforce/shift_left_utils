@@ -10,3 +10,4 @@ site/
 **/tmp
 **/.venv
 **/.env
+tmp/

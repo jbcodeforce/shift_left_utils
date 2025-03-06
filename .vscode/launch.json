@@ -12,8 +12,8 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "/Users/jerome//Code/customers/master-control/data-platform-flink/config.yaml",
-                "PIPELINES": "/Users/jerome//Code/customers/master-control/data-platform-flink/pipelines"
+                "CONFIG_FILE": "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml",
+                "PIPELINES": "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
               },
               "args": [
                 "-i", "${fileDirname}/../../data-platform-flink/pipelines",
@@ -27,10 +27,22 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "env": {
+                "CONFIG_FILE": "${fileWorkspaceFolder}/config.yaml",
+                "SRC_FOLDER": "${fileWorkspaceFolder}/../de-datawarehouse/models"
+              },
+        },
+        {
+            "name": "Debugger: src-project",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
             "cwd": "${fileDirname}/../..",
             "env": {
-                "CONFIG_FILE": "/Users/jerome//Code/customers/master-control/data-platform-flink/config.yaml",
-                "PIPELINES": "/Users/jerome//Code/customers/master-control/data-platform-flink/pipelines"
+                "CONFIG_FILE": "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml",
+                "PIPELINES": "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
               },
         },
         {
@@ -41,9 +53,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileDirname}/../config.yaml",
-                //"PIPELINES": "${fileDirname}/../../data-platform-flink/pipelines",
-                "PIPELINES": "${fileDirname}/../examples/flink_project/pipelines",
+
                 "PYTHONPATH": "${fileDirname}/utils"
               }
         }

@@ -3,12 +3,21 @@ import logging
 import os
 from pathlib import Path
 from shift_left.core.project_manager import create_folder_if_not_exist
-from shift_left.core.pipeline_mgr import get_table_ref_from_inventory, read_pipeline_metadata, PIPELINE_JSON_FILE_NAME
+from shift_left.core.pipeline_mgr import ( 
+    read_pipeline_metadata, 
+    PIPELINE_JSON_FILE_NAME,
+    PIPELINE_FOLDER_NAME)
 
 from shift_left.core.utils.app_config import get_config
 from jinja2 import Environment, PackageLoader
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.file_search import FlinkTableReference, get_or_build_source_file_inventory, SCRIPTS_DIR, PIPELINE_FOLDER_NAME, load_existing_inventory
+from shift_left.core.utils.file_search import (
+    FlinkTableReference, 
+    get_or_build_source_file_inventory, 
+    load_existing_inventory,
+    SCRIPTS_DIR, 
+    get_table_ref_from_inventory,
+    get_or_build_inventory)
 from typing import Set, Dict
 
 
@@ -17,7 +26,8 @@ Table management is for managing table folder content
 """
 
 # --------- Public APIs ---------------
-def build_folder_structure_for_table(table_file_name: str, target_path: str):
+def build_folder_structure_for_table(table_name: str, 
+                                    target_path: str):
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
     
@@ -25,11 +35,12 @@ def build_folder_structure_for_table(table_file_name: str, target_path: str):
     * `target_path/table_name/tests`: for test harness content
     * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
-    logging.info(f"Create folder {table_file_name}")
+    logging.info(f"Create folder {table_name} in {target_path}")
     config = get_config()
-    table_name = extract_table_name(table_file_name)  
+    if table_name.startswith("src_"):
+        table_name = table_name.replace("src_", "")
     table_folder = f"{target_path}/{table_name}"
-    create_folder_if_not_exist(f"{table_folder}/"+  SCRIPTS_DIR)
+    create_folder_if_not_exist(f"{table_folder}/" +  SCRIPTS_DIR)
     create_folder_if_not_exist(f"{table_folder}/tests")
     if "source" in target_path:
         internal_table_name = config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
@@ -40,7 +51,7 @@ def build_folder_structure_for_table(table_file_name: str, target_path: str):
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
-    logging.info(f"Created folder {table_folder} for the table {table_name}")
+    logging.debug(f"Created folder {table_folder} for the table {table_name}")
     return table_folder, table_name
 
 def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_folder: str) -> str:
@@ -105,6 +116,12 @@ def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
                 output+=f"\n* {t.table_name} DML: {t.dml_ref}\n"
         return output
 
+def get_or_create_inventory(pipeline_folder: str):
+    """
+    Build the table inventory from the PIPELINES path. This is a service API for the CLI, so it is kept here even
+    if it delegates to file_search.build_inventory
+    """
+    return get_or_build_inventory(pipeline_folder, pipeline_folder, True)
 
 
 # --------- Private APIs ---------------
