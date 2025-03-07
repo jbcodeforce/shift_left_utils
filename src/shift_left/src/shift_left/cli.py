@@ -1,6 +1,10 @@
 import typer
+import sys
 from rich import print
 from shift_left.cli_commands import project, table, pipeline
+import logging
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 """
 Core cli for the shift-left project management.

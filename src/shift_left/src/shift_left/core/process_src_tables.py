@@ -16,7 +16,7 @@ from shift_left.core.utils.file_search import create_folder_if_not_exist, SCRIPT
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import search_matching_topic
-from shift_left.core.table_mgr import build_folder_structure_for_table, extract_table_name, get_column_definitions
+from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
 
 
 logging.basicConfig(

@@ -2,13 +2,19 @@ import typer
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
-from shift_left.core.pipeline_mgr import build_pipeline_definition_from_table, walk_the_hierarchy_for_report_from_table, delete_metada_files
+from shift_left.core.pipeline_mgr import (
+    build_pipeline_definition_from_table, 
+    walk_the_hierarchy_for_report_from_table, 
+    delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table
-import yaml
-import json
-import os
 
+import yaml
+import os
+import sys
+import logging
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 """
 Manage a pipeline entity:
 - build the inventory of tables
@@ -58,6 +64,9 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
     print(f"Generating pipeline report for table {table_name}")
     try:
         pipeline_def=walk_the_hierarchy_for_report_from_table(table_name,inventory_path )
+        if pipeline_def is None:
+            print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
+            raise typer.Exit(1)
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -107,15 +116,17 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
 
 @app.command()
 def deploy(table_name:  Annotated[str, typer.Argument()],
- inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")]):
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
+        compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID")]):
     """
     Deploy a pipeline from a given folder
     """
+    print(f"Deploy pipeline from folder")
     try:
-        pipeline_def=walk_the_hierarchy_for_report_from_table(table_name,inventory_path )
+        deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id)
+
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
-    print(f"Deploy pipeline from folder")
-    deploy_pipeline_from_table(pipeline_def)
+
     print(f"Pipeline deployed from {table_name}")

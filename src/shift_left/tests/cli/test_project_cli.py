@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 
 from shift_left.cli_commands.project import app
 
-class TestTableCLI(unittest.TestCase):
+class TestProjectCLI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):

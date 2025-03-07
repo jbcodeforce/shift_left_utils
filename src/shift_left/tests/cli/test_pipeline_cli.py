@@ -7,7 +7,7 @@ import logging
 import os
 from pathlib import Path
 
-runner = CliRunner()
+from shift_left.cli_commands.project import app
 
 @pytest.fixture(autouse=True)
 def mock_environment(tmp_path):
@@ -44,25 +44,34 @@ def mock_pipeline_data():
         "children": []
     }
 
-def test_report_command_success(mock_pipeline_data):
-    """Test successful execution of the report command"""
-    with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
-        mock_walk.return_value = mock_pipeline_data
-        
-        result = runner.invoke(app, ['report', 'test_table'])
-        
-        assert result.exit_code == 0
-        assert "test_table" in result.stdout
-        assert "parent_table1" in result.stdout
-        mock_walk.assert_called_once_with('test_table')
+class TestPipelineCLI(unittest.TestCase):
 
-def test_report_command_error():
-    """Test error handling when pipeline data cannot be retrieved"""
-    with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
-        mock_walk.side_effect = Exception("Pipeline definition not found")
-        
-        result = runner.invoke(app, ['report', 'non_existent_table'])
-        
-        assert result.exit_code == 1
-        assert "Error: Pipeline definition not found" in result.stdout
-        mock_walk.assert_called_once_with('non_existent_table')
+    @classmethod
+    def setUpClass(cls):
+        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
+        os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
+        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
+        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
+
+    def test_report_command_success(self, mock_pipeline_data):
+        """Test successful execution of the report command"""
+        with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
+            mock_walk.return_value = mock_pipeline_data
+            runner = CliRunner()
+            result = runner.invoke(app, ['report', 'test_table'])
+            assert result.exit_code == 0
+            assert "test_table" in result.stdout
+            assert "parent_table1" in result.stdout
+            mock_walk.assert_called_once_with('test_table')
+
+    def test_report_command_error(self):
+        """Test error handling when pipeline data cannot be retrieved"""
+        with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
+            mock_walk.side_effect = Exception("Pipeline definition not found")
+            runner = CliRunner()
+            result = runner.invoke(app, ['report', 'non_existent_table'])
+            
+            assert result.exit_code == 1
+            assert "Error: Pipeline definition not found" in result.stdout
+            mock_walk.assert_called_once_with('non_existent_table')

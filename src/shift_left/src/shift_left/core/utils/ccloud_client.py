@@ -10,7 +10,7 @@ from shift_left.core.utils.app_config import get_config
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
-class ConfluentFlinkClient:
+class ConfluentCloudClient:
     """
     Client to connect to Confluent Cloud and execute Flink SQL queries using the REST API.
     """
@@ -33,7 +33,6 @@ class ConfluentFlinkClient:
             "Authorization": self.auth_header,
             "Content-Type": "application/json"
         }
-        print(headers)
         print(url)
         response = requests.request(
             method=method,
@@ -41,7 +40,7 @@ class ConfluentFlinkClient:
             headers=headers,
             json=data
         )
-        print(response)
+        print(response.request.body)
         if response.status_code in [200,202]:
             logging.debug(response.request.body)
             logging.debug("Response headers:", response.headers)
@@ -70,9 +69,19 @@ class ConfluentFlinkClient:
     def get_compute_pool_list(self):
         """Get the list of compute pools"""
         env_id=self.config["confluent_cloud"]["environment_id"]
-        url=f"https://confluent.cloud/api/fcpm/v2/compute-pools?environment={env_id}"
+        region=self.config["confluent_cloud"]["region"]
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}"
         return self.make_request("GET", url)
 
+    def get_compute_pool_info(self, compute_pool_id: str):
+        """Get the info of a compute pool"""
+        self.api_key = self.config["confluent_cloud"]["api_key"]
+        self.api_secret = self.config["confluent_cloud"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
+        env_id=self.config["confluent_cloud"]["environment_id"]
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
+        return self.make_request("GET", url)
+    
     def list_topics(self):
         """List the topics in the environment"""
         region=self.config["confluent_cloud"]["region"]
@@ -88,7 +97,7 @@ class ConfluentFlinkClient:
         except requests.exceptions.RequestException as e:
             logging.error(e)
 
-    def _build_flink_client(self):
+    def _build_flink_url_and_auth_header(self):
         region=self.config["confluent_cloud"]["region"]
         cloud_provider=self.config["confluent_cloud"]["provider"]
         organization_id=self.config["confluent_cloud"]["organization_id"]
@@ -103,13 +112,61 @@ class ConfluentFlinkClient:
         return url
 
     def get_flink_statement_list(self): 
-        url = self._build_flink_client()
+        url = self._build_flink_url_and_auth_header()
         try:
             result = self.make_request("GET", url+"/statements")
-            logging.info("Statement execution result:", json.dumps(result, indent=2))
+            logging.debug("Statement execution result:", result)
             return result
         except requests.exceptions.RequestException as e:
             logging.info(f"Error executing rest call: {e}")
+
+    def _wait_response(statement_name: str):
+        try:
+            while True:
+                status = self.get_statement_status("/statements", statement_name)
+                if status["phase"] in ["COMPLETED"]:
+                    results=self.make_request("GET",f"/statements/{statement_name}/results")
+                    logging.debug(f"Response to the get statement results: {results}")
+                    return results
+                time.sleep(5)
+        except Exception as e:
+            logging.error(f"Error waiting for response {e}")
+            return ""
+
+    def post_flink_statement(self, compute_pool_id: str,  statement_name: str, sql_statement: str, stopped: False): 
+        """
+        POST to the statements API to execute a SQL statement.
+        """
+        url = self._build_flink_url_and_auth_header()
+        statement_data = {
+                "name": statement_name,
+                "organization_id": self.config["confluent_cloud"]["organization_id"],
+                "environment_id": self.config["confluent_cloud"]["environment_id"],
+                "spec": {
+                    "statement": sql_statement,
+                    "compute_pool_id":  compute_pool_id,
+                    "stopped": stopped
+                }
+            }
+        try:
+            logging.info(f"Send POST request to Flink statement api with {statement_data}")
+            response = self.make_request("POST", url + "/statements", statement_data)
+            statement_id = response["metadata"]["uid"]
+            logging.debug(f"Statement id for post request: {statement_id}")
+            return self._wait_response(statement_name)
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error executing rest call: {e}")
+
+    def delete_flink_statement(self, statement_name):
+        url = _build_flink_url_and_auth_header(config)
+        try:
+            status=self.make_request("DELETE",f"{url}/statements/{statement_name}")
+            logging.info(f" delete_flink_statement: {status}")
+            return self._wait_response(statement_name)
+        except requests.exceptions.RequestException as e:
+            logging.info(f"Error executing rest call: {e}")
+
+# --- Public APIs ---
 
 def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
     """
@@ -152,6 +209,17 @@ def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
             return ""
         logging.debug(f"Take the following topic: {narrow_list[0]}")
         return narrow_list[0]
+
+def verify_compute_pool_exists(compute_pool_id: str) -> dict:
+    """
+    Verify the existence of the compute pool
+    """
+    client=ConfluentCloudClient(get_config())
+    result=client.get_compute_pool_info(compute_pool_id)
+    if result.status_code != 200:
+        logging.error(f"Error getting compute pool {compute_pool_id}: {result.text}")
+        exit()
+    return result.json()
 
 def _find_sub_string(table_name, topic_name) -> bool:
     """

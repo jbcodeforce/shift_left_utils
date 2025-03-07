@@ -6,6 +6,7 @@ import logging
 from functools import lru_cache
 from pydantic import BaseModel
 from shift_left.core.utils.sql_parser import SQLparser
+
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -18,6 +19,7 @@ PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 class FlinkTableReference(BaseModel):
     """Reference to a Flink table including its metadata and location information."""
     table_name: Final[str]
+    type: Final[str]
     dml_ref: Optional[str]
     ddl_ref: Optional[str]
     table_folder_name: str
@@ -81,9 +83,10 @@ def get_or_build_inventory(
                     table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
                     directory = os.path.dirname(dml_file_name)
                     table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
-                    
+                    table_type = get_table_type_from_file_path(dml_file_name)
                     ref = FlinkTableReference.model_validate({
                         "table_name": table_name,
+                        "type": table_type,
                         "ddl_ref": from_absolute_to_pipeline(ddl_file_name),
                         "dml_ref": from_absolute_to_pipeline(dml_file_name),
                         "table_folder_name": table_folder
@@ -109,6 +112,21 @@ def load_existing_inventory(target_path: str) -> Dict:
     inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
     with open(inventory_path, "r") as f:
         return json.load(f)
+
+def get_table_type_from_file_path(file_name: str) -> str:
+    """
+    Determine the type of table one of fact, intermediate, source, stage or dimension
+    """
+    if "fact" in file_name:
+        return "fact"
+    elif "dimension" in file_name:
+        return "dimension"
+    elif "source" in file_name:
+        return "source"
+    elif "stage" in file_name:
+        return "stage"
+    else:
+        return "intermediate"
 
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):

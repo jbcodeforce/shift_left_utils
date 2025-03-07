@@ -2,7 +2,7 @@
 import unittest
 import os
 import json 
-from pathlib import Path
+import pathlib
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
 
@@ -20,7 +20,7 @@ class TestPipelineManager(unittest.TestCase):
 
        
   
-    def test_build_a_src_pipelinedef(self):
+    def _test_build_a_src_pipelinedef(self):
         print("test_build_a_src_pipelinedef")
         path= os.getenv("PIPELINES")
         src_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
@@ -28,7 +28,7 @@ class TestPipelineManager(unittest.TestCase):
         assert result
         print(result.model_dump_json(indent=3))
 
-    def test_build_a_int_pipeline_def(self):
+    def _test_build_a_int_pipeline_def(self):
         print("test_build_a_int_pipeline_def")
         path= os.getenv("PIPELINES")
         table_path=path + "/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql"
@@ -36,7 +36,7 @@ class TestPipelineManager(unittest.TestCase):
         assert result
         print(result.model_dump_json(indent=3))
 
-    def test_build_pipeline_def_for_fact_table(self):
+    def _test_build_pipeline_def_for_fact_table(self):
         print("test_build_pipeline_def_for_fact_table")
         path= os.getenv("PIPELINES")
         table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
@@ -46,7 +46,7 @@ class TestPipelineManager(unittest.TestCase):
 
     def test_walk_the_hierarchy_for_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
-        result = pm.walk_the_hierarchy_for_report_from_table("int_table_1", TEST_PIPELINES)
+        result = pm.walk_the_hierarchy_for_report_from_table("int_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
     

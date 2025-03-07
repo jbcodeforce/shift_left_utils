@@ -5,7 +5,7 @@ import shutil
 import importlib.resources 
 from typing import Tuple
 from shift_left.core.utils.file_search import create_folder_if_not_exist
-from shift_left.core.utils.ccloud_client import ConfluentFlinkClient
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
 DATA_PRODUCT_PROJECT_TYPE="data_product"
@@ -33,7 +33,7 @@ def build_project_structure(project_name: str,
         
 
 def get_topic_list(file_name: str):
-    ccloud = ConfluentFlinkClient(get_config())
+    ccloud = ConfluentCloudClient(get_config())
     topics = ccloud.list_topics()
     with open(file_name, "w") as f:
             for topic in topics["data"]:

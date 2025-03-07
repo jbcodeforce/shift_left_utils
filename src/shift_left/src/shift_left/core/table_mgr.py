@@ -17,7 +17,7 @@ from shift_left.core.utils.file_search import (
     load_existing_inventory,
     SCRIPTS_DIR, 
     get_table_ref_from_inventory,
-    get_or_build_inventory)
+    build_inventory)
 from typing import Set, Dict
 
 
@@ -121,8 +121,7 @@ def get_or_create_inventory(pipeline_folder: str):
     Build the table inventory from the PIPELINES path. This is a service API for the CLI, so it is kept here even
     if it delegates to file_search.build_inventory
     """
-    return get_or_build_inventory(pipeline_folder, pipeline_folder, True)
-
+    return build_inventory(pipeline_folder)
 
 # --------- Private APIs ---------------
 
