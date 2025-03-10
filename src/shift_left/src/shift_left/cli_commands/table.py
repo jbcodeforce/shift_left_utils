@@ -6,6 +6,7 @@ from shift_left.core.table_mgr import (
     build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
     extract_table_name, build_update_makefile, 
+    search_users_of_table,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 
@@ -82,6 +83,9 @@ def update_makefile(
 
 
 @app.command()
-def find_table_users(table_name: Annotated[str, typer.Argument()]):
-    """ Find the users of a given table """
-    pass
+def find_table_users(table_name: Annotated[str, typer.Argument()],
+                     pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+    """ Find the Flink Statements user of a given table """
+    print("#" * 30 + f" find_table_users for  {table_name}")
+    out=search_users_of_table(table_name, pipeline_path)
+    print(out)

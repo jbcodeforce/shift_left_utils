@@ -108,12 +108,12 @@ def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
         logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
     else:
         results =  read_pipeline_metadata(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
-        output=f"## {table_name} is referenced in {len(results)} Flink SQL statements:\n"
+        output=f"## `{table_name}` is referenced in {len(results)} Flink SQL statements:\n"
         if len(results) == 0:
             output+="\n\t no table ... yet"
         else:
              for t in results:
-                output+=f"\n* {t.table_name} DML: {t.dml_ref}\n"
+                output+=f"\n* `{t.table_name}` with the DML: {t.dml_ref}\n"
         return output
 
 def get_or_create_inventory(pipeline_folder: str):
