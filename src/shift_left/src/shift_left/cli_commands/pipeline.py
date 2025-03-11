@@ -5,6 +5,7 @@ from rich.console import Console
 from shift_left.core.pipeline_mgr import (
     build_pipeline_definition_from_table, 
     walk_the_hierarchy_for_report_from_table, 
+    build_all_pipeline_definitions,
     delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table
@@ -53,6 +54,16 @@ def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument()]
 
 
 @app.command()
+def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+    """
+    Go to the hierarchy of folders for dimensions and facts and build the pipeline definitions for each table found using recurring walk through
+    """
+    print("Build all pipeline definitions for dimension and fact tables")
+    build_all_pipeline_definitions(pipeline_path)
+    print("Done")
+    
+
+@app.command()
 def report(table_name: Annotated[str, typer.Argument(help="The table name (folder name) containing pipeline_definition.json")],
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
@@ -73,7 +84,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
 
     if to_yaml:
         print("[bold]YAML:[/bold]")
-        print(yaml.dump(pipeline_def.dict()))
+        print(yaml.dump(pipeline_def.model_dump()))
     if to_json:
         print("[bold]JSON:[/bold]")
         print(pipeline_def.model_dump_json(indent=3))

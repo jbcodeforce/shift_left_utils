@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Final, Dict, Set, Optional, Any, Tuple
 import json
 import logging
@@ -134,7 +134,7 @@ def create_folder_if_not_exist(new_path: str) -> str:
         logging.debug(f"{new_path} folder created")
     return new_path
 
-def from_absolute_to_pipeline(file_or_folder_name: str) -> str:
+def from_absolute_to_pipeline(file_or_folder_name) -> str:
     """Convert absolute path to pipeline-relative path.
     
     Args:
@@ -143,11 +143,16 @@ def from_absolute_to_pipeline(file_or_folder_name: str) -> str:
     Returns:
         Path relative to pipeline root
     """
-    if not file_or_folder_name or file_or_folder_name.startswith(PIPELINE_FOLDER_NAME):
-        return file_or_folder_name
+    if isinstance(file_or_folder_name,  PosixPath):
+        str_file_path=str(file_or_folder_name.resolve())
+    else:
+        str_file_path = file_or_folder_name
         
-    index = file_or_folder_name.find(PIPELINE_FOLDER_NAME)
-    return file_or_folder_name[index:] if index != -1 else file_or_folder_name
+    if not str_file_path or str_file_path.startswith(PIPELINE_FOLDER_NAME):
+        return str_file_path
+        
+    index = str_file_path.find(PIPELINE_FOLDER_NAME)
+    return str_file_path[index:] if index != -1 else str_file_path
 
 def from_pipeline_to_absolute(file_or_folder_name: str) -> str:
     """Convert pipeline-relative path to absolute path.

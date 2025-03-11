@@ -102,6 +102,13 @@ def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str)
     
     return current_node
 
+def build_all_pipeline_definitions(pipeline_path: str):
+    dimensions_path = Path(pipeline_path) / "dimensions"
+    _process_one_sink_folder(dimensions_path, pipeline_path)
+    facts_path = Path(pipeline_path) / "facts"
+    _process_one_sink_folder(facts_path, pipeline_path)
+    
+
 def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: str) -> ReportInfoNode:
     """
     Walk the hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
@@ -118,12 +125,21 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
     except Exception as e:
         print(f"Error table not found in inventory: {e}")
-        raise typer.Exit(1)
+        raise Exception("Error table not found in inventory")
     return _walk_the_hierarchy_for_report(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 
 
 # ---- Private APIs ---- 
+
+def _process_one_sink_folder(sink_folder_path, pipeline_path):
+    for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
+        if sql_scripts_path.is_dir():
+            for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
+                if file_path.is_file() and file_path.name.startswith("dml"):
+                    print(f"Process the dml {file_path}")
+                    build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
+    
 
 def _walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> ReportInfoNode:
     """
@@ -302,7 +318,7 @@ def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logging.debug(f"\n\n\t... processing the node {current_node}")
+        print(f"\n\n\t... processing the node {current_node}")
         _create_or_merge(current_node)
         nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         processed_nodes[current_node.table_name]=current_node
