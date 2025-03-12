@@ -74,8 +74,8 @@ def migrate(
 
 @app.command()
 def update_makefile(
-        table_name: Annotated[str, typer.Argument()],
-        pipeline_folder_name: Annotated[str, typer.Argument()]):
+        table_name: Annotated[str, typer.Argument(help= "Name of the table to process and update the Makefile from.")],
+        pipeline_folder_name: Annotated[str, typer.Argument(help= "Pipeline folder where all the tables are defined")]):
     """ Update existing Makefile for a given table or build a new one """
 
     build_update_makefile(pipeline_folder_name, table_name)

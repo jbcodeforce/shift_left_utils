@@ -27,15 +27,19 @@ from shift_left.core.utils.file_search import (
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
-# Configure logging
+
+log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
+if not os.path.exists(log_path):
+    os.mkdir(log_path)
 
 logging.basicConfig(
-    filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'pipelines.log'),
+    filename=os.path.join(log_path, 'pipelines.log'),
     filemode='w',
     level=get_config()["app"]["logging"],
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
+
 
 # Constants
 PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
@@ -72,8 +76,8 @@ class ReportInfoNode(BaseModel):
     """Node containing reporting information for a table in the pipeline."""
     table_name: str
     base_path: str
-    type: str
-    ddl_path: str
+    type: Optional[str]
+    ddl_path: Optional[str]
     dml_path: str
     parents: Optional[Any]
     children: Optional[Any]
@@ -128,6 +132,13 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
         raise Exception("Error table not found in inventory")
     return _walk_the_hierarchy_for_report(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
+
+def report_running_dmls(table_name: str, inventory_path: str) -> ReportInfoNode:
+    if not inventory_path:
+        inventory_path = os.getenv("PIPELINES")
+    inventory = load_existing_inventory(inventory_path)
+    if table_name not in inventory:
+        return None
 
 
 # ---- Private APIs ---- 

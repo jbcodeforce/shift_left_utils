@@ -147,7 +147,7 @@ def from_absolute_to_pipeline(file_or_folder_name) -> str:
         str_file_path=str(file_or_folder_name.resolve())
     else:
         str_file_path = file_or_folder_name
-        
+
     if not str_file_path or str_file_path.startswith(PIPELINE_FOLDER_NAME):
         return str_file_path
         
@@ -210,6 +210,23 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     file_paths.update(_list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
+def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:  
+    if product_name:
+        prefix= prefix + "-" + product_name
+    ddl_n = prefix + "-ddl-" + table_name.replace("_","-"),
+    dml_n = prefix + "-dml-" + table_name.replace("_","-")
+    return ddl_n, dml_n
+
+def extract_product_name(existing_path: str) -> str:
+    """
+    Given an existing folder path, get the name of the folder below one of the structural folder as it is the name of the data product.
+    """
+    parent_folder=os.path.dirname(existing_path).split("/")[-1]
+    if parent_folder not in ["facts", "intermediates", "sources", "dimensions", "views"]:
+        return parent_folder
+    else:
+        return ""
+    
 def _list_src_sql_files(folder_path: str) -> Dict[str, str]:
     """
     Given the folder path, list the sql statements and use the name of the file as table name

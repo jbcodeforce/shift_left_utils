@@ -17,6 +17,8 @@ from shift_left.core.utils.file_search import (
     load_existing_inventory,
     SCRIPTS_DIR, 
     get_table_ref_from_inventory,
+    extract_product_name,
+    get_ddl_dml_names_from_table,
     build_inventory)
 from typing import Set, Dict
 
@@ -46,7 +48,7 @@ def build_folder_structure_for_table(table_name: str,
         internal_table_name = config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     else:
         internal_table_name=table_name
-    product_name = _extract_product_name(table_folder)
+    product_name = extract_product_name(table_folder)
     _create_makefile(internal_table_name, SCRIPTS_DIR, SCRIPTS_DIR, table_folder, config["kafka"]["cluster_type"], product_name)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
@@ -95,8 +97,7 @@ def build_update_makefile(pipeline_folder: str, table_name: str):
                     SCRIPTS_DIR, 
                     SCRIPTS_DIR, 
                     table_folder, 
-                    get_config()["kafka"]["cluster_type"],
-                    None)
+                    get_config()["kafka"]["cluster_type"], None)
 
 def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     """
@@ -124,22 +125,6 @@ def get_or_create_inventory(pipeline_folder: str):
     return build_inventory(pipeline_folder)
 
 # --------- Private APIs ---------------
-
-def _generate_tracking_output(file_name: str, dep_list) -> str:
-    the_path= Path(file_name)
-    table_name = the_path.stem
-    output=f"""## Tracking the pipeline implementation for table: {table_name}
-    
-    -- Processed file: {file_name}
-
-    --- Final result is a list of tables in the pipeline:
-    """
-    output+="\n"
-    output+="\n".join(f"NOT_TESTED || OK | Table: {str(d[0])},\tSrc dbt: {str(d[1])}" for d in dep_list)
-    output+="\n\n## Data\n"
-    output+="Created with tool and updated to make the final join working on the merge conditions:\n"
-    return output
-
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     tracking_tmpl = env.get_template(f"tracking_tmpl.jinja")
@@ -176,18 +161,6 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
     with open(out_dir + '/sql-scripts/dml.' + table_name + ".sql", 'w') as f:
         f.write(rendered_dml)
 
-
-
-
-def _extract_product_name(existing_path: str) -> str:
-    """
-    Given an existing folder path, get the name of the folder below one of the structural folder as it is the name of the data product.
-    """
-    parent_folder=os.path.dirname(existing_path).split("/")[-1]
-    if parent_folder not in ["facts", "intermediates", "sources", "dimensions"]:
-        return parent_folder
-    else:
-        return ""
     
 def _create_makefile(table_name: str, 
                      ddl_folder: str,
@@ -202,14 +175,12 @@ def _create_makefile(table_name: str,
     logging.debug(f"Create makefile for {table_name} in {out_dir}")
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     makefile_template = env.get_template(f"makefile_ddl_dml_tmpl.jinja")
-    if product_name:
-        prefix=cluster_type + "-" + product_name
-    else:
-        prefix=cluster_type
+
+    ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, cluster_type, product_name)
     context = {
         'table_name': table_name,
-        'ddl_statement_name': prefix+ "-ddl-" + table_name.replace("_","-"),
-        'dml_statement_name': prefix + "-dml-" + table_name.replace("_","-"),
+        'ddl_statement_name': ddl_name, 
+        'dml_statement_name': dml_name,
         'drop_statement_name': table_name.replace("_","-"),
         'ddl_folder': ddl_folder,
         'dml_folder': dml_folder

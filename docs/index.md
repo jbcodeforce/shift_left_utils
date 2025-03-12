@@ -41,8 +41,8 @@ At the system context level, for the tools of this repository, we can see the fo
 1. Pipeline dependencies is a tool to get understanding of the sink to source pipeline and from the source to sink too. There is another tool that help assess which tables use a given table.
 1. Finally pipeline deployment help to automate, and pace the deployment of a given pipeline.
 
-???+ warning
-    Not all those tools are implemented, see utils folder, and [tool references]()
+## Shift_left tooling
+
 
 The following diagram illustrates the development environment which, mainly, uses two docker container containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
 

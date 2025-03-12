@@ -6,6 +6,7 @@ from shift_left.core.pipeline_mgr import (
     build_pipeline_definition_from_table, 
     walk_the_hierarchy_for_report_from_table, 
     build_all_pipeline_definitions,
+    report_running_dmls,
     delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table
@@ -64,7 +65,7 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
     
 
 @app.command()
-def report(table_name: Annotated[str, typer.Argument(help="The table name (folder name) containing pipeline_definition.json")],
+def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.")],
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format")):
@@ -74,7 +75,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        pipeline_def=walk_the_hierarchy_for_report_from_table(table_name,inventory_path )
+        pipeline_def=walk_the_hierarchy_for_report_from_table(table_name, inventory_path)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -126,7 +127,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name (folde
     console.print(tree)
 
 @app.command()
-def deploy(table_name:  Annotated[str, typer.Argument()],
+def deploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
         compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID")]):
     """
@@ -141,3 +142,21 @@ def deploy(table_name:  Annotated[str, typer.Argument()],
         raise typer.Exit(1)
 
     print(f"Pipeline deployed from {table_name}")
+
+
+#@app.command()
+# Not yet implemented
+def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")]):
+    """
+    Assess for a given table, what are the running dmls from its children, using recursively. 
+    """
+    print(f"Assess runnning Flink DML part of the pipeline from given table name")
+    try:
+        report=report_running_dmls(table_name, inventory_path)
+        print(report)
+    except Exception as e:
+        print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    print(f"Running DML deployed from {table_name}")

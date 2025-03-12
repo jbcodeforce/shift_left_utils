@@ -2,11 +2,22 @@ import logging
 import subprocess
 import requests
 import json
-import os
+import os, time
 from base64 import b64encode
 from typing import List, Dict
-
 from shift_left.core.utils.app_config import get_config
+
+log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
+if not os.path.exists(log_path):
+    os.mkdir(log_path)
+
+logging.basicConfig(
+    filename=os.path.join(log_path, 'ccloud-client.log'),
+    filemode='w',
+    level=get_config()["app"]["logging"],
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
@@ -114,13 +125,13 @@ class ConfluentCloudClient:
     def get_flink_statement_list(self): 
         url = self._build_flink_url_and_auth_header()
         try:
-            result = self.make_request("GET", url+"/statements")
+            result = self.make_request("GET", url+"/statements?page_size=100")
             logging.debug("Statement execution result:", result)
             return result
         except requests.exceptions.RequestException as e:
             logging.info(f"Error executing rest call: {e}")
 
-    def _wait_response(statement_name: str):
+    def _wait_response(self, statement_name: str):
         try:
             while True:
                 status = self.get_statement_status("/statements", statement_name)
@@ -158,7 +169,7 @@ class ConfluentCloudClient:
             logging.error(f"Error executing rest call: {e}")
 
     def delete_flink_statement(self, statement_name):
-        url = _build_flink_url_and_auth_header(config)
+        url = self._build_flink_url_and_auth_header(self.config)
         try:
             status=self.make_request("DELETE",f"{url}/statements/{statement_name}")
             logging.info(f" delete_flink_statement: {status}")

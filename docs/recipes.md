@@ -1,6 +1,14 @@
 # Recipes Summary
 
-This section provides a brief overview of the migration tools and their application to specific use cases. Ensure the following environment variables are set: in a `.env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
+This section provides a brief overview of the migration and pipeline management tools and their application to specific use cases. 
+
+
+[Refer to the high-level component](./index.md#context) view for project organization details:
+
+![](./images/components.drawio.png)
+
+
+Ensure the following environment variables are set: in a `.env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
 
 ```sh
 export SRC_FOLDER=../../your-src-dbt-folder/models
@@ -9,9 +17,6 @@ export PIPELINES=../../flink-project/pipelines
 export CONFIG_FILE=../../flink-project/config.yaml
 ```
 
-Refer to the high-level component view for project organization details:
-
-![](./images/components.drawio.png)
 
 ## Project related tasks
 
