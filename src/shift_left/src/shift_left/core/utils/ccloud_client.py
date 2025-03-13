@@ -176,6 +176,16 @@ class ConfluentCloudClient:
             return self._wait_response(statement_name)
         except requests.exceptions.RequestException as e:
             logging.info(f"Error executing rest call: {e}")
+    
+    def update_flink_statement(self, statement_name: str, stop: bool):
+        url = self._build_flink_url_and_auth_header(self.config)
+        try:
+            status=self.make_request("PUT",f"{url}/statements/{statement_name}")
+            logging.info(f" update_flink_statement: {status}")
+            return self._wait_response(statement_name)
+        except requests.exceptions.RequestException as e:
+            logging.info(f"Error executing rest call: {e}")
+     
 
 # --- Public APIs ---
 

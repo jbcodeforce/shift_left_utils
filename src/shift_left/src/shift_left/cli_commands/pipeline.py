@@ -57,9 +57,9 @@ def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument()]
 @app.command()
 def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
-    Go to the hierarchy of folders for dimensions and facts and build the pipeline definitions for each table found using recurring walk through
+    Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recurring walk through
     """
-    print("Build all pipeline definitions for dimension and fact tables")
+    print(f"Build all pipeline definitions for dimension, fact tables in {pipeline_path}")
     build_all_pipeline_definitions(pipeline_path)
     print("Done")
     

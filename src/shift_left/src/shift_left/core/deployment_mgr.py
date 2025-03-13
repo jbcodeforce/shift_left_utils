@@ -38,7 +38,7 @@ def search_existing_flink_statement(statement_name: str):
         if statement_name in statement["name"]:
             statements.append(statement)
     logging.info(f"Found those statements {statements}")
-    if len(statements > 1):
+    if len(statements) > 1:
         print(f"ERROR, stopping: found more than one statement for the expected statement {statement_name}")
         print(f"Found those statements {statements}")
         exit(1)
@@ -64,7 +64,7 @@ def deploy_pipeline_from_table(table_name: str, inventory_path: str, compute_poo
     ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], product_name)
     statement = search_existing_flink_statement(dml_name)
     print(f"* Delete the current table DML statement to stop processing")
-    _stop_dml_statement(table_name, statement)
+    _delete_dml_statement(table_name, statement)
     print(f"* Stop children dml statements - reccursively")
     _stop_child_dmls(pipeline_def, inventory_path)
     print(f"* Recreate the new DML for this table")
@@ -82,15 +82,20 @@ def _deploy_table_statements(dml_path: str):
     # TODO: implement
 
 
-def _stop_dml_statement(table_name: str, statement):
+def _delete_dml_statement(table_name: str, statement):
     print(f"Stopping DML statements for {table_name} with {statement}")
     client = ConfluentCloudClient(get_config())
     client.delete_flink_statement(statement)
-    pass
+    
+def _stop_dml_statement(table_name: str, statement):
+    print(f"Stopping DML statements for {table_name} with {statement}")
+    client = ConfluentCloudClient(get_config())
+    rep = client.update_flink_statement(statement, True)
+    print(rep)
 
 def _resume_dml_statements(table_name: str):
     print(f"Resume DML statements for {table_name}")
-    pass
+    
 
 def _stop_child_dmls(pipeline_def, inventory_path: str):
     if not pipeline_def.children or len(pipeline_def.children) == 0:
@@ -98,7 +103,7 @@ def _stop_child_dmls(pipeline_def, inventory_path: str):
     for node in pipeline_def.children:
         print(node)
         node_ref=walk_the_hierarchy_for_report_from_table(node['table_name'], inventory_path )
-        _stop_dml_statements(node['table_name']) # stop or delete and recreate
+        _stop_dml_statement(node['table_name']) # stop or delete and recreate
         _stop_child_dmls(node_ref)
 
 def _start_child_dmls(pipeline_def):

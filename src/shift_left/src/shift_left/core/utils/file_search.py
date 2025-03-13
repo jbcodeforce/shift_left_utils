@@ -127,6 +127,10 @@ def get_table_type_from_file_path(file_name: str) -> str:
         return "stage"
     elif "mv" in file_name:
         return "view"
+    elif "seed" in file_name:
+        return "seed"
+    elif "dead_letter" in file_name:
+        return "dead_letter"
     else:
         return "intermediate"
 

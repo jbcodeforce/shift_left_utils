@@ -9,6 +9,7 @@ This module provides functionality to:
 from collections import deque
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 from typing import Dict, Optional, Final, Any, Set, List, Tuple
@@ -28,17 +29,22 @@ from shift_left.core.utils.file_search import (
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 
-log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
-if not os.path.exists(log_path):
-    os.mkdir(log_path)
-
-logging.basicConfig(
-    filename=os.path.join(log_path, 'pipelines.log'),
-    filemode='w',
-    level=get_config()["app"]["logging"],
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+log_dir = os.path.join(os.getcwd(), 'logs')
+logger = logging.getLogger("shift_left")
+os.makedirs(log_dir, exist_ok=True)
+logger.setLevel(get_config()["app"]["logging"])
+log_file_path = os.path.join(log_dir, "shift_left.log")
+file_handler = RotatingFileHandler(
+    log_file_path, 
+    maxBytes=1024*1024,  # 1MB
+    backupCount=3        # Keep up to 3 backup files
 )
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+logger.addHandler(console_handler)
 
 
 # Constants
@@ -111,6 +117,10 @@ def build_all_pipeline_definitions(pipeline_path: str):
     _process_one_sink_folder(dimensions_path, pipeline_path)
     facts_path = Path(pipeline_path) / "facts"
     _process_one_sink_folder(facts_path, pipeline_path)
+    views_path = Path(pipeline_path) / "views"
+    _process_one_sink_folder(views_path, pipeline_path)
+    
+    logger.info("")
     
 
 def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: str) -> ReportInfoNode:
@@ -119,7 +129,7 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
     The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
     The parents are a list of dictionnary with the same structure, and so on.
     """
-    logging.info(f"walk_the_hierarchy_for_report_from_table({table_name}, {inventory_path})")
+    logger.info(f"walk_the_hierarchy_for_report_from_table({table_name}, {inventory_path})")
     if not inventory_path:
         inventory_path = os.getenv("PIPELINES")
     inventory = load_existing_inventory(inventory_path)
@@ -147,7 +157,7 @@ def delete_metada_files(root_folder: str):
     Delete all the files with the given name in the given root folder tree
     """
     file_to_delete = PIPELINE_JSON_FILE_NAME
-    logging.info(f"Delete {file_to_delete} from folder: {root_folder}")
+    logger.info(f"Delete {file_to_delete} from folder: {root_folder}")
     for root, dirs, files in os.walk(root_folder):
         for file in files:
             if file_to_delete == file:
@@ -182,7 +192,7 @@ def _get_table_ddl_dml_from_inventory(table_name: str, inventory: dict) -> Tuple
     if table_name.endswith(".sql"):
         table_name=table_name.split(".sql")[0]    # legacy table name
     table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
-    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
+    logger.debug(f"Search {table_name} in inventory of files got {table_ref}")
     if table_ref and table_ref.dml_ref:
         return table_ref.ddl_ref, table_ref.dml_ref
     return "", ""
@@ -216,7 +226,7 @@ def _get_parent_table_references_from_sql_content(
     try:
         if sql_file_name.startswith(PIPELINE_FOLDER_NAME):
             sql_file_name = os.path.join(os.getenv("PIPELINES"), "..", sql_file_name)
-            
+        logger.debug(f" Derived name: {sql_file_name}")
         with open(sql_file_name) as f:
             sql_content = f.read()
             parser = SQLparser()
@@ -228,7 +238,7 @@ def _get_parent_table_references_from_sql_content(
                 for dependency in dependency_names:
                     if not dependency in all_files:
                         continue
-                    logging.info(f"{table_name} - depends on: {dependency}")
+                    logger.info(f"{table_name} - depends on: {dependency}")
                     ddl_file_name, dml_file_name = _get_table_ddl_dml_from_inventory(
                         dependency, all_files
                     )
@@ -243,8 +253,8 @@ def _get_parent_table_references_from_sql_content(
             return table_name, dependencies
             
     except Exception as e:
-        logging.error(e)
-        return "", set()
+        logger.error(f"Error while processing {sql_file_name} with messasge: {e} \n process continue...")
+        return "error_table", set()
 
 
 def _assess_pipeline_definition_exists(file_name: str) -> str:
@@ -264,7 +274,7 @@ def _assess_pipeline_definition_exists(file_name: str) -> str:
                     json.load(f)
                 return pname
             except json.JSONDecodeError:
-                logging.error("ERROR {pname} not a json file")
+                logger.error("ERROR {pname} not a json file")
                 return None
         else:
             return None
@@ -317,13 +327,12 @@ def _create_table_hierarchy_node(
     Returns:
         FlinkStatementHierarchy node
     """
-    logging.info(f"_create_table_hierarchy_node( {dml_file_name}, {table_name},  {parent_names}, {children})")
+    logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parent_names}, children: {children})")
    
     table_type = get_table_type_from_file_path(dml_file_name)
     directory = os.path.dirname(dml_file_name)
     base_path = os.path.dirname(directory)
-    
-    return FlinkStatementHierarchy.model_validate({
+    f = FlinkStatementHierarchy.model_validate({
         "table_name": table_name,
         "type": table_type,
         "path": base_path,
@@ -332,6 +341,8 @@ def _create_table_hierarchy_node(
         "parents": parent_names,
         "children": children
     })
+    logger.debug(f" FlinkStatementHierarchy created: {f}")
+    return f
 
 
 def _build_table_reference(
@@ -371,7 +382,7 @@ def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        print(f"\n\n\t... processing the node {current_node}")
+        logger.info(f"\n\n\t... processing the node {current_node}")
         _create_or_merge(current_node)
         nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         processed_nodes[current_node.table_name]=current_node
