@@ -1,6 +1,6 @@
 
 import logging
-import os
+import os, re
 from pathlib import Path
 from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
@@ -124,6 +124,19 @@ def get_or_create_inventory(pipeline_folder: str):
     """
     return build_inventory(pipeline_folder)
 
+
+
+def validate_table_cross_products(rootdir: str):
+    config=get_config()
+    for product in config["app"]["products"]:
+        sqls=  _get_sql_paths_files(rootdir,product)
+        invalid_names= _validate_table_names(sqls)
+        print('-'*40 + product.upper() + '-'*40)
+        if invalid_names:
+            for sql_file, violations in invalid_names.items():
+                for violation in violations:
+                    print("{:50s} {:s}".format(sql_file, violation))
+
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
@@ -189,6 +202,75 @@ def _create_makefile(table_name: str,
     # Write the rendered Makefile to a file
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
+
+
+def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
+    sql_files_paths = {}
+    for root, dirs, files in os.walk(folder_path):
+        if product in root and "tests" not in root:
+            for file in files:
+                if file.startswith(('ddl','dml')) and file.endswith('.sql'):
+                    sql_files_paths[file]=root
+    return sql_files_paths
+
+def _validate_table_names(sqls: dict) -> dict[str, any]:
+    invalids={}
+    file_pattern=r"(ddl|dml)\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*\.sql$"
+    for name, path in sqls.items():
+        violations=[]
+        #--- Check sql file naming standards
+        if not re.match( file_pattern, name):
+            violations.append('WRONG FILE Name')
+
+        #--- Check sql files are in right dir
+        if not 'sql-scripts' in path:
+            violations.append('WRONG Directory ')
+        sql_file_name=path+'/'+name
+
+        ct_violation = True
+        #--- Check CREATE TABLE statement in DDL files
+        if name.startswith('ddl'):
+            with open(sql_file_name, "r") as f:
+                for line in f:
+                    #removes multiple spaces & backticks
+                    normalized_text = ' '.join(line.split()).replace("`", "") 
+                    if 'CREATE TABLE IF NOT EXISTS' in normalized_text:
+                        ct_violation=False
+                        table_name=normalized_text.split()[5]
+                        break
+
+            if ct_violation:
+                violations.append('CREATE TABLE statement')
+
+            substring='pipelines'
+            index = path.find(substring)
+            if index == -1:
+                break
+            before, after = path[:index], path[index + len(substring):]
+            result = after.split("/")
+            type=result[1]
+            product=result[2]
+            match type:
+                case 'sources':
+                    if not table_name.startswith('src_'+product):
+                        violations.append('WRONG TABLE NAME:' + table_name)
+                case 'intermediates':
+                    if not table_name.startswith('int_'+product) or table_name.endswith('_deduped'):
+                        violations.append('WRONG TABLE NAME:' + table_name)
+                case 'facts':
+                    if not table_name.startswith(product+'_fct'):
+                        violations.append('WRONG TABLE NAME:' + table_name)
+                case 'dimensions':
+                    if not table_name.startswith(product+'_dim'):
+                        violations.append('WRONG TABLE NAME:' + table_name)
+                case 'views':
+                    if not table_name.startswith(product+'_mv'):
+                        violations.append('WRONG TABLE NAME:' + table_name)
+
+        if violations:
+            invalids[name]=violations
+
+    return invalids
 
 def get_column_definitions(table_name: str, config) -> tuple[str,str]:
     return "-- put here column definitions", "-- put here column definitions"

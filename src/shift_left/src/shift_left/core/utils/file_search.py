@@ -19,7 +19,7 @@ PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 class FlinkTableReference(BaseModel):
     """Reference to a Flink table including its metadata and location information."""
     table_name: Final[str]
-    type: Final[str]
+    type: Optional[str]
     dml_ref: Optional[str]
     ddl_ref: Optional[str]
     table_folder_name: str
@@ -125,6 +125,8 @@ def get_table_type_from_file_path(file_name: str) -> str:
         return "source"
     elif "stage" in file_name:
         return "stage"
+    elif "mv" in file_name:
+        return "view"
     else:
         return "intermediate"
 
@@ -210,7 +212,8 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     file_paths.update(_list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
-def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:  
+def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:
+    print(f"Get dml name from table {table_name} and {product_name}")  
     if product_name:
         prefix= prefix + "-" + product_name
     ddl_n = prefix + "-ddl-" + table_name.replace("_","-"),

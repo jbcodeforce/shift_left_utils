@@ -133,7 +133,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     """
     Deploy a pipeline from a given folder
     """
-    print(f"Deploy pipeline from folder")
+    print(f"## Deploy pipeline from table {table_name}")
     try:
         deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id)
 

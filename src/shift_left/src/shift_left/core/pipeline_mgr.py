@@ -57,7 +57,7 @@ class FlinkStatementHierarchy(BaseModel):
     For sink tables, children will be empty.
     """
     table_name: str
-    type: str
+    type: Optional[str]
     path: str
     ddl_ref: str
     dml_ref: str
@@ -96,7 +96,7 @@ def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str)
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     all_files = load_existing_inventory(pipeline_path)
     
-    table_name, parent_references = get_parent_table_references_from_sql_content(
+    table_name, parent_references = _get_parent_table_references_from_sql_content(
         dml_file_name, all_files
     )
     
@@ -141,60 +141,6 @@ def report_running_dmls(table_name: str, inventory_path: str) -> ReportInfoNode:
         return None
 
 
-# ---- Private APIs ---- 
-
-def _process_one_sink_folder(sink_folder_path, pipeline_path):
-    for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
-        if sql_scripts_path.is_dir():
-            for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
-                if file_path.is_file() and file_path.name.startswith("dml"):
-                    print(f"Process the dml {file_path}")
-                    build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
-    
-
-def _walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> ReportInfoNode:
-    """
-    Walk the hierarchy of tables given the pipeline definition file name.
-    This function is used to generate a report on the pipeline hierarchy for a given table.
-    The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
-    The parents are a list of dictionnary with the same structure, and so on.
-    """
-    current_hierarchy: FlinkStatementHierarchy= read_pipeline_metadata(pipeline_definition_fname)
-    parents = _visit_parents(current_hierarchy)["parents"]
-    children = _visit_children(current_hierarchy)["children"]
-    return ReportInfoNode.model_validate({"table_name" : current_hierarchy.table_name, 
-            "base_path": current_hierarchy.path,
-            "type": current_hierarchy.type,
-            "ddl_path": current_hierarchy.ddl_ref,
-            "dml_path": current_hierarchy.dml_ref,
-            "parents": parents, 
-            "children": children})
-
-def get_table_ddl_dml_from_inventory(table_name: str, inventory: dict) -> Tuple[str,str]:
-    """
-    Given the table name, search the matching information from the inventory.
-    returns ddl and dml file name, relative to pipelines folder
-    """
-    if table_name.endswith(".sql"):
-        table_name=table_name.split(".sql")[0]    # legacy table name
-    table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
-    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
-    if table_ref and table_ref.dml_ref:
-        return table_ref.ddl_ref, table_ref.dml_ref
-    return "", ""
-
-def get_ddl_file_name(folder_path: str) -> str:
-    """
-    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
-    or includes a CREATE TABLE statement
-    """
-    folder_path = from_pipeline_to_absolute(folder_path)
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.startswith('ddl'):
-                return from_absolute_to_pipeline(os.path.join(root, file))
-    return ""
-
 
 def delete_metada_files(root_folder: str):
     """
@@ -210,7 +156,51 @@ def delete_metada_files(root_folder: str):
                 print(f"File '{file_path}' deleted successfully.")
 
 
-def get_parent_table_references_from_sql_content(
+
+def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
+    """Read pipeline metadata from file.
+    
+    Args:
+        file_name: Path to pipeline metadata file
+        
+    Returns:
+        FlinkStatementHierarchy object
+    """
+    file_name = from_pipeline_to_absolute(file_name)
+    with open(file_name, "r") as f:
+        content = FlinkStatementHierarchy.model_validate_json(f.read())
+        return content
+
+
+# ---- Private APIs ---- 
+
+def _get_table_ddl_dml_from_inventory(table_name: str, inventory: dict) -> Tuple[str,str]:
+    """
+    Given the table name, search the matching information from the inventory.
+    returns ddl and dml file name, relative to pipelines folder
+    """
+    if table_name.endswith(".sql"):
+        table_name=table_name.split(".sql")[0]    # legacy table name
+    table_ref: FlinkTableReference= FlinkTableReference.model_validate(inventory[table_name])
+    logging.debug(f"Search {table_name} in inventory of files got {table_ref}")
+    if table_ref and table_ref.dml_ref:
+        return table_ref.ddl_ref, table_ref.dml_ref
+    return "", ""
+
+def _get_ddl_file_name(folder_path: str) -> str:
+    """
+    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
+    or includes a CREATE TABLE statement
+    """
+    folder_path = from_pipeline_to_absolute(folder_path)
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.startswith('ddl'):
+                return from_absolute_to_pipeline(os.path.join(root, file))
+    return ""
+
+
+def _get_parent_table_references_from_sql_content(
     sql_file_name: str,
     all_files: Dict
 ) -> Tuple[str, Set[FlinkTableReference]]:
@@ -239,7 +229,7 @@ def get_parent_table_references_from_sql_content(
                     if not dependency in all_files:
                         continue
                     logging.info(f"{table_name} - depends on: {dependency}")
-                    ddl_file_name, dml_file_name = get_table_ddl_dml_from_inventory(
+                    ddl_file_name, dml_file_name = _get_table_ddl_dml_from_inventory(
                         dependency, all_files
                     )
                     table_type = get_table_type_from_file_path(ddl_file_name)
@@ -256,6 +246,59 @@ def get_parent_table_references_from_sql_content(
         logging.error(e)
         return "", set()
 
+
+def _assess_pipeline_definition_exists(file_name: str) -> str:
+    """Assess if pipeline definition exists.
+    
+    Args:
+        file_name: Path to pipeline definition file
+        
+    Returns:
+        Path to pipeline definition file if it exists, otherwise None
+    """
+    try:
+        pname = _get_path_to_pipeline_file(file_name)
+        if os.path.exists(pname):
+            try:
+                with open(pname, 'r') as f:
+                    json.load(f)
+                return pname
+            except json.JSONDecodeError:
+                logging.error("ERROR {pname} not a json file")
+                return None
+        else:
+            return None
+    except Exception as e:
+        return None
+    
+def _process_one_sink_folder(sink_folder_path, pipeline_path):
+    for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
+        if sql_scripts_path.is_dir():
+            for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
+                if file_path.is_file() and file_path.name.startswith("dml"):
+                    print(f"Process the dml {file_path}")
+                    build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
+    
+
+def _walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> ReportInfoNode:
+    """
+    Walk the hierarchy of tables given the pipeline definition file name.
+    This function is used to generate a report on the pipeline hierarchy for a given table.
+    The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
+    The parents are a list of dictionnary with the same structure, and so on.
+    """
+    current_hierarchy: FlinkStatementHierarchy= read_pipeline_metadata(pipeline_definition_fname)
+    parents = _visit_parents(current_hierarchy)["parents"]
+    children = _visit_children(current_hierarchy)["children"]
+    return ReportInfoNode.model_validate({"table_name" : current_hierarchy.table_name, 
+            "base_path": current_hierarchy.path,
+            "type": current_hierarchy.type,
+            "ddl_path": current_hierarchy.ddl_ref,
+            "dml_path": current_hierarchy.dml_ref,
+            "parents": parents, 
+            "children": children})
+    
+# --- private APIs
 
 def _create_table_hierarchy_node(
     dml_file_name: str,
@@ -284,7 +327,7 @@ def _create_table_hierarchy_node(
         "table_name": table_name,
         "type": table_type,
         "path": base_path,
-        "ddl_ref": get_ddl_file_name(directory),
+        "ddl_ref": _get_ddl_file_name(directory),
         "dml_ref": base_path + "/" + SCRIPTS_DIR + "/" + dml_file_name.split("/")[-1],
         "parents": parent_names,
         "children": children
@@ -322,7 +365,6 @@ def _build_table_reference(
     })
 
     
-
 def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     """
     Process the next node from the queue, to walk up the hierarchy
@@ -363,43 +405,7 @@ def _create_or_merge(current: FlinkStatementHierarchy):
         with open(pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
 
-def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
-    """Read pipeline metadata from file.
-    
-    Args:
-        file_name: Path to pipeline metadata file
-        
-    Returns:
-        FlinkStatementHierarchy object
-    """
-    file_name = from_pipeline_to_absolute(file_name)
-    with open(file_name, "r") as f:
-        content = FlinkStatementHierarchy.model_validate_json(f.read())
-        return content
 
-def assess_pipeline_definition_exists(file_name: str) -> str:
-    """Assess if pipeline definition exists.
-    
-    Args:
-        file_name: Path to pipeline definition file
-        
-    Returns:
-        Path to pipeline definition file if it exists, otherwise None
-    """
-    try:
-        pname = _get_path_to_pipeline_file(file_name)
-        if os.path.exists(pname):
-            try:
-                with open(pname, 'r') as f:
-                    json.load(f)
-                return pname
-            except json.JSONDecodeError:
-                logging.error("ERROR {pname} not a json file")
-                return None
-        else:
-            return None
-    except Exception as e:
-        return None
 
 def _modify_children(current: FlinkStatementHierarchy, parent_ref: FlinkTableReference):
     """
@@ -438,7 +444,7 @@ def _add_parents_for_future_process(current_node: FlinkStatementHierarchy,
     """
     for parent_table_ref in current_node.parents:
         if not parent_table_ref.table_name in processed_nodes:
-            table_name, parent_references = get_parent_table_references_from_sql_content(parent_table_ref.dml_ref, all_files)
+            table_name, parent_references = _get_parent_table_references_from_sql_content(parent_table_ref.dml_ref, all_files)
             if not table_name  in processed_nodes:
                 child = _build_table_reference(current_node.table_name, 
                                               current_node.type,

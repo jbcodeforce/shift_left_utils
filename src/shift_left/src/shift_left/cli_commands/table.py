@@ -6,6 +6,7 @@ from shift_left.core.table_mgr import (
     build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
     extract_table_name, build_update_makefile, 
+    validate_table_cross_products,
     search_users_of_table,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
@@ -89,3 +90,8 @@ def find_table_users(table_name: Annotated[str, typer.Argument()],
     print("#" * 30 + f" find_table_users for  {table_name}")
     out=search_users_of_table(table_name, pipeline_path)
     print(out)
+
+@app.command()
+def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(help= "Pipeline folder where all the tables are defined")]):
+    print("#" * 30 + f" validate_table_names in {pipeline_folder_name}")
+    validate_table_cross_products(pipeline_folder_name)
