@@ -10,5 +10,7 @@ WITH (
   'kafka.retention.time' = '0',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
-  'value.fields-include' = 'all'
+  'value.fields-include' = 'all',
+  'key.avro-registry.schema-context' = 'dev-',
+  'value.avro-registry.schema-context' = 'dev-'
 );

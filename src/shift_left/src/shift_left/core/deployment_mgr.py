@@ -38,8 +38,13 @@ def search_existing_flink_statement(statement_name: str):
         if statement_name in statement["name"]:
             statements.append(statement)
     logging.info(f"Found those statements {statements}")
-    print(f"Found those statements {statements}")
-    return statements
+    if len(statements > 1):
+        print(f"ERROR, stopping: found more than one statement for the expected statement {statement_name}")
+        print(f"Found those statements {statements}")
+        exit(1)
+    if len(statements) == 1:
+        return statements[0]
+    return None
     
 
 def deploy_pipeline_from_table(table_name: str, inventory_path: str, compute_pool_id: str) -> None:
@@ -57,13 +62,13 @@ def deploy_pipeline_from_table(table_name: str, inventory_path: str, compute_poo
         pass
     product_name = extract_product_name(pipeline_def.base_path)
     ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], product_name)
-    statements = search_existing_flink_statement(dml_name)
+    statement = search_existing_flink_statement(dml_name)
     print(f"* Delete the current table DML statement to stop processing")
-    _stop_dml_statements(table_name, statements)
-    print(f"* Stop children dml statements - recursively")
+    _stop_dml_statement(table_name, statement)
+    print(f"* Stop children dml statements - reccursively")
     _stop_child_dmls(pipeline_def, inventory_path)
     print(f"* Recreate the new DML for this table")
-    _deploy_table_statements(pipeline_def.dml_path)
+    _deploy_table_statements(pipeline_def.dml_path, statement)
     print(f"* Re-start the child DMLs")
     _start_child_dmls(pipeline_def, inventory_path)
 
@@ -77,8 +82,10 @@ def _deploy_table_statements(dml_path: str):
     # TODO: implement
 
 
-def _stop_dml_statements(table_name: str, statements):
-    print(f"Stopping DML statements for {table_name}")
+def _stop_dml_statement(table_name: str, statement):
+    print(f"Stopping DML statements for {table_name} with {statement}")
+    client = ConfluentCloudClient(get_config())
+    client.delete_flink_statement(statement)
     pass
 
 def _resume_dml_statements(table_name: str):

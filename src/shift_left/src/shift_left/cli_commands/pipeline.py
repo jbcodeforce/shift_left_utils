@@ -28,8 +28,8 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def build_metadata(dml_file_name:  Annotated[str, typer.Argument()], 
-             pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The path to the DML file. e.g. $PIPELINES/table-name/sql-scripts/dml.table-name.sql")], 
+             pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
     Build a pipeline from a sink table: add or update {} each table in the pipeline
     """
@@ -48,14 +48,14 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument()],
 @app.command()
 def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument()]):
     """
-    Delete a pipeline definitions from a given folder
+    Delete a pipeline definitions from a given folder path
     """
     print(f"Delete pipeline definition from {path_from_where_to_delete}")
     delete_metada_files(path_from_where_to_delete)
 
 
 @app.command()
-def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
     Go to the hierarchy of folders for dimensions and facts and build the pipeline definitions for each table found using recurring walk through
     """
@@ -66,7 +66,7 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
 
 @app.command()
 def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.")],
-          inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
+          inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format")):
     """
@@ -129,7 +129,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 @app.command()
 def deploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
-        compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID")]):
+        compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will create a pool.")]):
     """
     Deploy a pipeline from a given folder
     """
