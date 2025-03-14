@@ -49,7 +49,7 @@ logger.addHandler(console_handler)
 
 # Constants
 PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
-
+ERROR_TABLE_NAME = "error_table"
 # Global queues for processing
 files_to_process: deque = deque()  # Files to process when parsing SQL dependencies
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
@@ -90,7 +90,8 @@ class ReportInfoNode(BaseModel):
 
 
 def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkStatementHierarchy:
-    """Build pipeline definition hierarchy starting from given dml file.
+    """Build pipeline definition hierarchy starting from given dml file. This is the exposed API
+    so entry point of the processing.
     
     Args:
         dml_file_name: Path to DML file for root table
@@ -119,8 +120,7 @@ def build_all_pipeline_definitions(pipeline_path: str):
     _process_one_sink_folder(facts_path, pipeline_path)
     views_path = Path(pipeline_path) / "views"
     _process_one_sink_folder(views_path, pipeline_path)
-    
-    logger.info("")
+
     
 
 def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: str) -> ReportInfoNode:
@@ -253,33 +253,9 @@ def _get_parent_table_references_from_sql_content(
             return table_name, dependencies
             
     except Exception as e:
-        logger.error(f"Error while processing {sql_file_name} with messasge: {e} \n process continue...")
-        return "error_table", set()
+        logger.error(f"Error while processing {sql_file_name} with message: {e} \n process continue...")
+        return ERROR_TABLE_NAME, set()
 
-
-def _assess_pipeline_definition_exists(file_name: str) -> str:
-    """Assess if pipeline definition exists.
-    
-    Args:
-        file_name: Path to pipeline definition file
-        
-    Returns:
-        Path to pipeline definition file if it exists, otherwise None
-    """
-    try:
-        pname = _get_path_to_pipeline_file(file_name)
-        if os.path.exists(pname):
-            try:
-                with open(pname, 'r') as f:
-                    json.load(f)
-                return pname
-            except json.JSONDecodeError:
-                logger.error("ERROR {pname} not a json file")
-                return None
-        else:
-            return None
-    except Exception as e:
-        return None
     
 def _process_one_sink_folder(sink_folder_path, pipeline_path):
     for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
@@ -308,12 +284,11 @@ def _walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> ReportInfo
             "parents": parents, 
             "children": children})
     
-# --- private APIs
 
 def _create_table_hierarchy_node(
     dml_file_name: str,
     table_name: str, 
-    parent_names: Set[FlinkTableReference],
+    parent_references: Set[FlinkTableReference],
     children: Set[FlinkTableReference]
 ) -> FlinkStatementHierarchy:
     """Create hierarchy node with table information.
@@ -327,7 +302,7 @@ def _create_table_hierarchy_node(
     Returns:
         FlinkStatementHierarchy node
     """
-    logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parent_names}, children: {children})")
+    logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parent_references}, children: {children})")
    
     table_type = get_table_type_from_file_path(dml_file_name)
     directory = os.path.dirname(dml_file_name)
@@ -337,8 +312,9 @@ def _create_table_hierarchy_node(
         "type": table_type,
         "path": base_path,
         "ddl_ref": _get_ddl_file_name(directory),
-        "dml_ref": base_path + "/" + SCRIPTS_DIR + "/" + dml_file_name.split("/")[-1],
-        "parents": parent_names,
+        #"dml_ref": base_path + "/" + SCRIPTS_DIR + "/" + dml_file_name.split("/")[-1],
+        "dml_ref" : dml_file_name,
+        "parents": parent_references,
         "children": children
     })
     logger.debug(f" FlinkStatementHierarchy created: {f}")
@@ -382,7 +358,7 @@ def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logger.info(f"\n\n\t... processing the node {current_node}")
+        logger.info(f"\n\n... processing the node {current_node}")
         _create_or_merge(current_node)
         nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         processed_nodes[current_node.table_name]=current_node
@@ -403,11 +379,13 @@ def _create_or_merge(current: FlinkStatementHierarchy):
             combined_parents = old_definition.parents
             for child in current.children:
                 if child in old_definition.children:
+                    #old_definition.children.update(child)
                     continue
                 else:
                     combined_children.add(child)
             for parent in current.parents:
                 if parent in old_definition.parents:
+                    #old_definition.parents.update(parent)
                     continue
                 else:
                     combined_parents.add(parent)
@@ -455,20 +433,22 @@ def _add_parents_for_future_process(current_node: FlinkStatementHierarchy,
     """
     for parent_table_ref in current_node.parents:
         if not parent_table_ref.table_name in processed_nodes:
+            # walk to take parents of parent
             table_name, parent_references = _get_parent_table_references_from_sql_content(parent_table_ref.dml_ref, all_files)
-            if not table_name  in processed_nodes:
-                child = _build_table_reference(current_node.table_name, 
-                                              current_node.type,
-                                              current_node.dml_ref, 
-                                              current_node.ddl_ref, 
-                                              current_node.path)
-                parent_node=_create_table_hierarchy_node(parent_table_ref.dml_ref, 
-                                         table_name, 
-                                         parent_references, 
-                                         [child])
-                _add_node_to_process_if_not_present(parent_node, nodes_to_process)
-            else:
-                _modify_children(current_node, parent_table_ref)
+            if not table_name == ERROR_TABLE_NAME:
+                if not table_name  in processed_nodes:
+                    child = _build_table_reference(current_node.table_name, 
+                                                current_node.type,
+                                                current_node.dml_ref, 
+                                                current_node.ddl_ref, 
+                                                current_node.path)
+                    parent_node=_create_table_hierarchy_node(parent_table_ref.dml_ref, 
+                                            table_name, 
+                                            parent_references, 
+                                            [child])
+                    _add_node_to_process_if_not_present(parent_node, nodes_to_process)
+                else:
+                    _modify_children(current_node, parent_table_ref)
         else:
             _modify_children(current_node, parent_table_ref)
     return nodes_to_process

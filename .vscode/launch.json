@@ -4,23 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "Python Debugger: Worker with Arguments",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${fileDirname}",
-            "env": {
-                "CONFIG_FILE": "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml",
-                "PIPELINES": "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-              },
-              "args": [
-                "-i", "${fileDirname}/../../data-platform-flink/pipelines",
-                "-f", "${fileDirname}/../../data-platform-flink/pipelines/dimensions/aqem/dim_tag/sql-scripts/dml.aqem_dim_tag.sql",
-                "--build"
-            ],
-        },
+
         {
             "name": "Python Debugger: current file",
             "type": "debugpy",

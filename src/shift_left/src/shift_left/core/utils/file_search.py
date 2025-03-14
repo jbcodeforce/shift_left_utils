@@ -117,14 +117,16 @@ def get_table_type_from_file_path(file_name: str) -> str:
     """
     Determine the type of table one of fact, intermediate, source, stage or dimension
     """
-    if "fact" in file_name:
-        return "fact"
-    elif "dimension" in file_name:
-        return "dimension"
-    elif "source" in file_name:
+    if "source" in file_name:
         return "source"
+    elif "intermediates" in file_name:
+        return "intermediate"
+    if "facts" in file_name:
+        return "fact"
+    elif "dimensions" in file_name:
+        return "dimension"
     elif "stage" in file_name:
-        return "stage"
+        return "intermediate"
     elif "mv" in file_name:
         return "view"
     elif "seed" in file_name:
@@ -132,7 +134,7 @@ def get_table_type_from_file_path(file_name: str) -> str:
     elif "dead_letter" in file_name:
         return "dead_letter"
     else:
-        return "intermediate"
+        return "unknow-type"
 
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):

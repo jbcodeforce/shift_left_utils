@@ -12,7 +12,7 @@ logger.setLevel(get_config()["app"]["logging"])
 log_file_path = os.path.join(log_dir, "shift_left.log")
 file_handler = RotatingFileHandler(
     log_file_path, 
-    maxBytes=1024*1024,  # 1MB
+    maxBytes=1024*1024*4,  # 4MB
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(get_config()["app"]["logging"])

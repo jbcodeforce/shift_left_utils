@@ -15,6 +15,8 @@ import yaml
 import os
 import sys
 import logging
+import networkx as nx
+import matplotlib.pyplot as plt
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 """
@@ -68,7 +70,8 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
 def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.")],
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
-          to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format")):
+          to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
+        to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree")):
     """
     Generate a report showing the pipeline hierarchy for a given table using its pipeline_definition.json
     """
@@ -89,7 +92,9 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     if to_json:
         print("[bold]JSON:[/bold]")
         print(pipeline_def.model_dump_json(indent=3))
-
+    if to_graph:
+        print("[bold]Graph:[/bold]")
+        
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
     
@@ -160,3 +165,29 @@ def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The tab
         raise typer.Exit(1)
 
     print(f"Running DML deployed from {table_name}")
+
+
+def _display_directed_graph(nodes, edges):
+    """
+    Displays a directed graph using networkx and matplotlib.
+
+    Args:
+        nodes: A list of node identifiers.
+        edges: A list of tuples, where each tuple represents a directed edge
+               (source_node, target_node).
+    """
+
+    G = nx.DiGraph()  # Create a directed graph object
+
+    # Add nodes
+    G.add_nodes_from(nodes)
+
+    # Add edges
+    G.add_edges_from(edges)
+
+    # Draw the graph
+    pos = nx.spring_layout(G)  # Layout algorithm
+    nx.draw(G, pos, with_labels=True, node_size=700, node_color="lightgreen", font_size=15, font_weight="bold", arrowsize=20)
+
+    # Show the graph
+    plt.show()

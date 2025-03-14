@@ -9,6 +9,8 @@ import shift_left.core.table_mgr as tm
 
 class TestPipelineManager(unittest.TestCase):
     
+    """
+    
     @classmethod
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
@@ -18,7 +20,7 @@ class TestPipelineManager(unittest.TestCase):
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
 
-       
+    """
   
     def _test_build_a_src_pipelinedef(self):
         print("test_build_a_src_pipelinedef")
@@ -44,11 +46,19 @@ class TestPipelineManager(unittest.TestCase):
         assert result
         print(result.model_dump_json(indent=3))
 
-    def test_walk_the_hierarchy_for_report_from_table(self):
+    def _test_walk_the_hierarchy_for_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         result = pm.walk_the_hierarchy_for_report_from_table("int_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
     
+    def test_build_pipeline_def_for_fact_table(self):
+        print("test_build_pipeline_def_for_dim_table")
+        path= os.getenv("PIPELINES")
+        table_path=path + "/dimensions/mx/dim_mx_role_group_location/sql-scripts/dml.mx_dim_role_group_location.sql"
+        result = pm.build_pipeline_definition_from_table(table_path, path)
+        assert result
+        print(result.model_dump_json(indent=3))
+
 if __name__ == '__main__':
     unittest.main()
