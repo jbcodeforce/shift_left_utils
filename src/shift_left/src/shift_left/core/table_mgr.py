@@ -131,11 +131,11 @@ def validate_table_cross_products(rootdir: str):
     for product in config["app"]["products"]:
         sqls=  _get_sql_paths_files(rootdir,product)
         invalid_names= _validate_table_names(sqls)
-        print('-'*40 + product.upper() + '-'*40)
+        print('-'*50 + product.upper() + '-'*50)
         if invalid_names:
             for sql_file, violations in invalid_names.items():
                 for violation in violations:
-                    print("{:50s} {:s}".format(sql_file, violation))
+                    print("{:65s} {:s}".format(sql_file, violation))
 
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
@@ -214,7 +214,7 @@ def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
     return sql_files_paths
 
 def _validate_table_names(sqls: dict) -> dict[str, any]:
-    invalids={}
+        invalids={}
     file_pattern=r"(ddl|dml)\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*\.sql$"
     for name, path in sqls.items():
         violations=[]
@@ -231,14 +231,22 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
         #--- Check CREATE TABLE statement in DDL files
         if name.startswith('ddl'):
             with open(sql_file_name, "r") as f:
+                changelog_mode = 'append'
+                cleanup_policy = 'delete'
+                sql_ltz = ''
                 for line in f:
                     #removes multiple spaces & backticks
-                    normalized_text = ' '.join(line.split()).replace("`", "") 
-                    if 'CREATE TABLE IF NOT EXISTS' in normalized_text:
+                    normalized_line = ' '.join(line.split()).replace("`", "").replace("'", "").replace(",", "")
+                    if 'CREATE TABLE IF NOT EXISTS' in normalized_line:
                         ct_violation=False
-                        table_name=normalized_text.split()[5]
-                        break
-
+                        table_name=normalized_line.split()[5]
+                    elif 'changelog.mode' in normalized_line:
+                        changelog_mode=normalized_line.split("=")[1].strip()
+                    elif 'kafka.cleanup-policy' in normalized_line:
+                        cleanup_policy=normalized_line.split("=")[1].strip()
+                    elif 'sql.local-time-zone' in normalized_line:
+                        sql_ltz=normalized_line.split("=")[1].strip()
+            #print ('table(' + table_name + ')changelog(' + changelog_mode + ')cleanup(' + cleanup_policy + ')')
             if ct_violation:
                 violations.append('CREATE TABLE statement')
 
@@ -253,19 +261,48 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
             match type:
                 case 'sources':
                     if not table_name.startswith('src_'+product):
-                        violations.append('WRONG TABLE NAME:' + table_name)
+                        violations.append('WRONG TABLE NAME : ' + table_name)
+                    if not changelog_mode.startswith('upsert'):
+                        violations.append('WRONG changelog.mode : ' + changelog_mode)
+                    if not cleanup_policy.startswith('delete'):
+                        violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
                 case 'intermediates':
                     if not table_name.startswith('int_'+product) or table_name.endswith('_deduped'):
-                        violations.append('WRONG TABLE NAME:' + table_name)
+                        violations.append('WRONG TABLE NAME : ' + table_name)
+                    if not changelog_mode.startswith('upsert'):
+                        violations.append('WRONG changelog.mode : ' + changelog_mode)
+                    if not cleanup_policy.startswith('delete'):
+                        violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
                 case 'facts':
                     if not table_name.startswith(product+'_fct'):
-                        violations.append('WRONG TABLE NAME:' + table_name)
+                        violations.append('WRONG TABLE NAME : ' + table_name)
+                    if not changelog_mode.startswith('retract'):
+                        violations.append('WRONG changelog.mode : ' + changelog_mode)
+                    if not cleanup_policy.startswith('compact'):
+                        violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
+                    #--enable this later
+                    #if not sql_ltz.startswith('UTC'):
+                    #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
                 case 'dimensions':
                     if not table_name.startswith(product+'_dim'):
-                        violations.append('WRONG TABLE NAME:' + table_name)
+                        violations.append('WRONG TABLE NAME : ' + table_name)
+                    if not changelog_mode.startswith('retract'):
+                        violations.append('WRONG changelog.mode : ' + changelog_mode)
+                    if not cleanup_policy.startswith('compact'):
+                        violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
+                    #--enable this later
+                    #if not sql_ltz.startswith('UTC'):
+                    #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
                 case 'views':
                     if not table_name.startswith(product+'_mv'):
-                        violations.append('WRONG TABLE NAME:' + table_name)
+                        violations.append('WRONG TABLE NAME : ' + table_name)
+                    if not changelog_mode.startswith('retract'):
+                        violations.append('WRONG changelog.mode : ' + changelog_mode)
+                    if not cleanup_policy.startswith('compact'):
+                        violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
+                    #--enable this later
+                    #if not sql_ltz.startswith('UTC'):
+                    #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
 
         if violations:
             invalids[name]=violations
