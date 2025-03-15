@@ -10,6 +10,7 @@ from shift_left.core.table_mgr import (
     search_users_of_table,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
+from shift_left.core.utils.file_search import list_src_sql_files
 
 """
 Manage the table entities.
@@ -30,7 +31,7 @@ def init(table_name: Annotated[str, typer.Argument()],
     print(f"Created folder {table_folder} for the table {table_name}")
 
 @app.command()
-def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """
     Build the table inventory from the PIPELINES path.
     """
@@ -76,7 +77,7 @@ def migrate(
 @app.command()
 def update_makefile(
         table_name: Annotated[str, typer.Argument(help= "Name of the table to process and update the Makefile from.")],
-        pipeline_folder_name: Annotated[str, typer.Argument(help= "Pipeline folder where all the tables are defined")]):
+        pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """ Update existing Makefile for a given table or build a new one """
 
     build_update_makefile(pipeline_folder_name, table_name)
@@ -85,13 +86,38 @@ def update_makefile(
 
 @app.command()
 def find_table_users(table_name: Annotated[str, typer.Argument()],
-                     pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"])]):
+                     pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """ Find the Flink Statements user of a given table """
     print("#" * 30 + f" find_table_users for  {table_name}")
     out=search_users_of_table(table_name, pipeline_path)
     print(out)
 
 @app.command()
-def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(help= "Pipeline folder where all the tables are defined")]):
+def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"],help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
+    """
+    Go over the pipeline folder to assess table name and naming convention are respected.
+    """
     print("#" * 30 + f" validate_table_names in {pipeline_folder_name}")
     validate_table_cross_products(pipeline_folder_name)
+
+@app.command()
+def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folder from where to do the table update. It could be the all pipelines or subfolders.")],
+                  ddl: bool = typer.Option(False, "--ddl", help="Focus on DDL processing. Default is only DML"),
+                  class_to_use = Annotated[str, typer.Argument(help= "The class to use to do the Statement processing", default="shift_left.core.utils.table_worker.ChangeLocalTimeZone")]):
+    """
+    Update the tables with SQL code changes defined in external python callback. It will read dml or ddl and apply the updates.
+    """
+    files = list_src_sql_files(folder_to_work_from)
+    files_to_process =[]
+    if ddl:
+        for file in files:
+            if file.startswith("ddl"):
+                files_to_process.append(files[file])
+    else:
+        for file in files:
+            if file.startswith("dml"):
+                files_to_process.append(files[file])
+    for file in files_to_process:
+        print(file)
+
+    pass

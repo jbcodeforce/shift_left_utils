@@ -209,13 +209,13 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
 
 @lru_cache
 def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
-    file_paths=_list_src_sql_files(f"{src_path}/intermediates")
-    file_paths.update(_list_src_sql_files(f"{src_path}/dimensions"))
-    file_paths.update(_list_src_sql_files(f"{src_path}/stage"))
-    file_paths.update(_list_src_sql_files(f"{src_path}/facts"))
-    file_paths.update(_list_src_sql_files(f"{src_path}/sources"))
-    file_paths.update(_list_src_sql_files(f"{src_path}/intermediates/dedups"))
-    file_paths.update(_list_src_sql_files(f"{src_path}/stage"))
+    file_paths=list_src_sql_files(f"{src_path}/intermediates")
+    file_paths.update(list_src_sql_files(f"{src_path}/dimensions"))
+    file_paths.update(list_src_sql_files(f"{src_path}/stage"))
+    file_paths.update(list_src_sql_files(f"{src_path}/facts"))
+    file_paths.update(list_src_sql_files(f"{src_path}/sources"))
+    file_paths.update(list_src_sql_files(f"{src_path}/intermediates/dedups"))
+    file_paths.update(list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
 def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:
@@ -236,7 +236,7 @@ def extract_product_name(existing_path: str) -> str:
     else:
         return ""
     
-def _list_src_sql_files(folder_path: str) -> Dict[str, str]:
+def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     """
     Given the folder path, list the sql statements and use the name of the file as table name
     return the list of files and table name

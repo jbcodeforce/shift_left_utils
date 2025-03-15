@@ -6,7 +6,7 @@ git_context.sh
 set_env
 site/
 .aider*
-**/logs/*.log
+**/logs/*.log*
 **/tmp
 **/.venv
 **/.env

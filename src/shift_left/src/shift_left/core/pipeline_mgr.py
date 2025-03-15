@@ -82,11 +82,11 @@ class ReportInfoNode(BaseModel):
     """Node containing reporting information for a table in the pipeline."""
     table_name: str
     base_path: str
-    type: Optional[str]
+    type: Optional[str] = ''
     ddl_path: Optional[str]
     dml_path: str
-    parents: Optional[Any]
-    children: Optional[Any]
+    parents: Optional[Any] = []
+    children: Optional[Any] = []
 
 
 def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkStatementHierarchy:
@@ -149,7 +149,7 @@ def report_running_dmls(table_name: str, inventory_path: str) -> ReportInfoNode:
     inventory = load_existing_inventory(inventory_path)
     if table_name not in inventory:
         return None
-
+    # TO COMPLETE
 
 
 def delete_metada_files(root_folder: str):
@@ -177,9 +177,13 @@ def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
         FlinkStatementHierarchy object
     """
     file_name = from_pipeline_to_absolute(file_name)
-    with open(file_name, "r") as f:
-        content = FlinkStatementHierarchy.model_validate_json(f.read())
-        return content
+    try:
+        with open(file_name, "r") as f:
+            content = FlinkStatementHierarchy.model_validate_json(f.read())
+            return content
+    except Exception as e:
+        logger.error(f"processing {file_name} got {e}, ... try to continue")
+        return None
 
 
 # ---- Private APIs ---- 
@@ -242,7 +246,7 @@ def _get_parent_table_references_from_sql_content(
                     ddl_file_name, dml_file_name = _get_table_ddl_dml_from_inventory(
                         dependency, all_files
                     )
-                    table_type = get_table_type_from_file_path(ddl_file_name)
+                    table_type = get_table_type_from_file_path(dml_file_name)
                     dependencies.add(_build_table_reference(
                         dependency, 
                         table_type,

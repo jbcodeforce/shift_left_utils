@@ -98,11 +98,12 @@ Finish the statement with the following declaration:
    PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
 ) WITH ( 'changelog.mode' = 'retract',
    'value.format' = 'avro-registry',
-      'kafka.cleanup-policy'= 'compact',
+    'kafka.cleanup-policy'= 'compact',
    'kafka.retention.time' = '0',
    'key.format' = 'avro-registry',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
+   'sql.local-time-zone' = 'UTC',
    'value.fields-include' = 'all'
 )
 

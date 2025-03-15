@@ -1,4 +1,5 @@
 import pytest
+import unittest
 from typer.testing import CliRunner
 from shift_left.cli_commands.pipeline import app
 from shift_left.core.pipeline_mgr import walk_the_hierarchy_for_report_from_table
@@ -48,11 +49,11 @@ class TestPipelineCLI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        data_dir = Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
+        os.environ["CONFIG_FILE"] =  str(Path(__file__).parent /  "config.yaml")
 
     def test_report_command_success(self, mock_pipeline_data):
         """Test successful execution of the report command"""

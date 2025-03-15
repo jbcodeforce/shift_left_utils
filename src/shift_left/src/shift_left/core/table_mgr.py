@@ -2,14 +2,15 @@
 import logging
 import os, re
 from pathlib import Path
+from jinja2 import Environment, PackageLoader
+
 from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
     read_pipeline_metadata, 
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME)
-
 from shift_left.core.utils.app_config import get_config
-from jinja2 import Environment, PackageLoader
+from shift_left.core.utils.table_worker import TableWorker
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
@@ -20,11 +21,11 @@ from shift_left.core.utils.file_search import (
     extract_product_name,
     get_ddl_dml_names_from_table,
     build_inventory)
-from typing import Set, Dict
+
 
 
 """
-Table management is for managing table folder content
+Table management is for managing table folder, and table content.
 """
 
 # --------- Public APIs ---------------
@@ -137,6 +138,17 @@ def validate_table_cross_products(rootdir: str):
                 for violation in violations:
                     print("{:65s} {:s}".format(sql_file, violation))
 
+def update_sql_content(sql_content: str, processor: TableWorker):
+    """
+    """
+    return processor.update_sql_content(sql_content)
+
+
+
+def load_sql_content(sql_file_name):
+    with open(sql_file_name, "r") as f:
+        return f.read()
+
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
@@ -205,6 +217,9 @@ def _create_makefile(table_name: str,
 
 
 def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
+    """
+    Buuild a dict of filename with matching path to access the keyed file
+    """
     sql_files_paths = {}
     for root, dirs, files in os.walk(folder_path):
         if product in root and "tests" not in root:
@@ -214,7 +229,7 @@ def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
     return sql_files_paths
 
 def _validate_table_names(sqls: dict) -> dict[str, any]:
-        invalids={}
+    invalids={}
     file_pattern=r"(ddl|dml)\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*\.sql$"
     for name, path in sqls.items():
         violations=[]

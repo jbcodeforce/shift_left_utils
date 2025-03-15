@@ -7,6 +7,7 @@ from shift_left.core.pipeline_mgr import (
     walk_the_hierarchy_for_report_from_table, 
     build_all_pipeline_definitions,
     report_running_dmls,
+    ReportInfoNode,
     delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table
@@ -94,6 +95,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
         print(pipeline_def.model_dump_json(indent=3))
     if to_graph:
         print("[bold]Graph:[/bold]")
+        _process_hierarchy_to_node(pipeline_def)
         
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
@@ -133,7 +135,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 
 @app.command()
 def deploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")],
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will create a pool.")]):
     """
     Deploy a pipeline from a given folder
@@ -152,7 +154,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
 #@app.command()
 # Not yet implemented
 def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder")]):
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
     """
     Assess for a given table, what are the running dmls from its children, using recursively. 
     """
@@ -191,3 +193,17 @@ def _display_directed_graph(nodes, edges):
 
     # Show the graph
     plt.show()
+
+def _process_children(nodes_directed, edges_directed, current_node):
+    if current_node.children:
+        for child in current_node.children:
+            child_ref = ReportInfoNode.model_validate(child)
+            nodes_directed.append(child_ref.table_name)
+            edges_directed.append((current_node.table_name, child_ref.table_name))
+            _process_children(nodes_directed, edges_directed, child_ref)
+
+def _process_hierarchy_to_node(pipeline_def):
+    nodes_directed = [pipeline_def.table_name]
+    edges_directed = []
+    _process_children(nodes_directed, edges_directed, pipeline_def)
+    _display_directed_graph(nodes_directed, edges_directed)

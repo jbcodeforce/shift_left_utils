@@ -7,6 +7,7 @@
    "parents": [
       {
          "table_name": "src_table_2",
+         "type": "source",
          "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_table_2.sql",
          "ddl_ref": null,
          "table_folder_name": "pipelines/sources/p1/src_table_2"
@@ -15,6 +16,7 @@
    "children": [
       {
          "table_name": "fct_order",
+         "type": "fact",
          "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
          "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
          "table_folder_name": "pipelines/facts/p1/fct_order"
