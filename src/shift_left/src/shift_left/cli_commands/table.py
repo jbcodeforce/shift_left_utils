@@ -109,7 +109,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
     """
     files = list_src_sql_files(folder_to_work_from)
     files_to_process =[]
-    if ddl:
+    if ddl: # focus on DDLs update
         for file in files:
             if file.startswith("ddl"):
                 files_to_process.append(files[file])
