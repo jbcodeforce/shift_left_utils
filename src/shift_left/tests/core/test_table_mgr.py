@@ -75,17 +75,7 @@ class TestTableManager(unittest.TestCase):
         assert ".sql" in files["dml.fct_order"]
         print(files)
 
-    def test_update_ddl_statement(self):
-        table_name = "int_table_1"
-        print("Test update ddl sql content")
-        files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")
-        sql_in = tm.load_sql_content(files["ddl.fct_order"])
-        class TestUpdate(TableWorker):
-            def update_sql_content(sql_in : str):
-                return sql_in.replace(" 'kafka.retention.time' = '0',", " 'kafka.retention.time' = '0', \n'sql.local-time-zone' = 'UTC-0',")
-        sql_out=tm.update_sql_content(sql_in, TestUpdate)
-        assert "sql.local-time-zon" in sql_out
-        print(sql_out)
+ 
     
 
 

@@ -16,7 +16,7 @@ class ChangeLocalTimeZone(TableWorker):
      """
      def update_sql_content(sql_content: str) -> str:
         sql_out=sql_content.replace("WITH (", "WITH (\n\t'sql.local-time-zone' = 'UTC-0',")
-        logging.debug(f"SWL transformed to {sql_out}")
+        logging.debug(f"SQL transformed to {sql_out}")
         return sql_out
      
 class ChangeChangeModeToUpsert(TableWorker):
@@ -24,7 +24,16 @@ class ChangeChangeModeToUpsert(TableWorker):
      Predefined class to change the DDL setting for a change log
      """
      def update_sql_content(sql_content: str) -> str:
-        if 'changelog.mode' in sql_content:
-            sql_out=sql_content.replace("WITH (", "  'changelog.mode' = 'upsert',")
-        logging.debug(f"SWL transformed to {sql_out}")
+        sql_out: str = ""
+        if not 'changelog.mode' in sql_content:
+            sql_out=sql_content.replace("WITH (", "WITH (\n   'changelog.mode' = 'upsert',")
+        else:
+
+            for line in sql_content.split('\n'):
+                print(line)
+                if 'changelog.mode' in line:
+                    sql_out+="   'changelog.mode' = 'upsert',"
+                else:
+                    sql_out+=line
+        logging.debug(f"SQL transformed to {sql_out}")
         return sql_out

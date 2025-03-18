@@ -1,7 +1,6 @@
 import unittest
-import os
 import json
-import pathlib
+
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 

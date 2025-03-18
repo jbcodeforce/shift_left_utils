@@ -1,13 +1,16 @@
 import typer
 import os
+from importlib import import_module
 from rich import print
 from typing_extensions import Annotated
 from shift_left.core.table_mgr import (
     build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
-    extract_table_name, build_update_makefile, 
+    extract_table_name, 
+    build_update_makefile, 
     validate_table_cross_products,
     search_users_of_table,
+    update_sql_content,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
@@ -97,7 +100,7 @@ def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(env
     """
     Go over the pipeline folder to assess table name and naming convention are respected.
     """
-    print("#" * 30 + f" validate_table_names in {pipeline_folder_name}")
+    print("#" * 30 + f"\nValidate_table_names in {pipeline_folder_name}")
     validate_table_cross_products(pipeline_folder_name)
 
 @app.command()
@@ -107,6 +110,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
     """
     Update the tables with SQL code changes defined in external python callback. It will read dml or ddl and apply the updates.
     """
+    print("#" * 30 + f"\nUpdate_tables from {folder_to_work_from} using the processor: {class_to_use}")
     files = list_src_sql_files(folder_to_work_from)
     files_to_process =[]
     if ddl: # focus on DDLs update
@@ -117,7 +121,10 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         for file in files:
             if file.startswith("dml"):
                 files_to_process.append(files[file])
-    for file in files_to_process:
-        print(file)
-
-    pass
+    if class_to_use:
+        module_path, class_name = class_to_use.rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        for file in files_to_process:    
+            update_sql_content(file, runner_class)
+    print("Done !")
