@@ -18,16 +18,17 @@ from shift_left.core.utils.file_search import list_src_sql_files
 """
 Manage the table entities.
 - build an inventory of all the tables in the project with the basic metadata per table
-
+- deploy a table taking care of the children Flink statements to stop and start
+- 
 """
 app = typer.Typer()
 
 @app.command()
-def init(table_name: Annotated[str, typer.Argument()],
-         table_path: Annotated[str, typer.Argument()]):
+def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],
+         table_path: Annotated[str, typer.Argument(help="Path in which the table folder stucture will be created under.")]):
     """
-    Build a new table structure under the specified path. For example to add a source table structure
-    use table init src_table_1 $PIPELINES/sources/p1
+    Build a new table structure under the specified path. For example to add a source table structure use for example the command:
+    `shift_left table init src_table_1 $PIPELINES/sources/p1`
     """
     print("#" * 30 + f" Build Table in {table_path}")
     table_folder, table_name= build_folder_structure_for_table(table_name, table_path)
