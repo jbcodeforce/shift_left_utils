@@ -1,4 +1,4 @@
-# Shift Left CLI
+# CLI
 
 **Usage**:
 
@@ -101,6 +101,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `find-table-users`: Find the Flink Statements user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess...
 * `update-tables`: Update the tables with SQL code changes...
+* `unit-test`: Run all the unit tests or a specified test...
 
 ### `table init`
 
@@ -211,7 +212,7 @@ $ table find-table-users [OPTIONS] TABLE_NAME PIPELINE_PATH
 
 **Arguments**:
 
-* `TABLE_NAME`: [required]
+* `TABLE_NAME`: The name of the table to search   [required]
 * `PIPELINE_PATH`: Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
 
 **Options**:
@@ -253,7 +254,26 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 **Options**:
 
 * `--ddl`: Focus on DDL processing. Default is only DML
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107cd9e80&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1197de2d0&gt;]]
+* `--help`: Show this message and exit.
+
+### `table unit-test`
+
+Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+
+**Usage**:
+
+```console
+$ table unit-test [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--test-case-name TEXT`: Name of the individual unit test to run.   [required]
 * `--help`: Show this message and exit.
 
 ## `pipeline`

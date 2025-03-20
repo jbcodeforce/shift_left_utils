@@ -64,7 +64,20 @@ python src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_ord
 
 ## Debug core functions
 
-```sh
+Use the following settings for vscode based IDE
+
+```json
+    {
+        "name": "Python Debugger: current file",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${file}",
+        "console": "integratedTerminal",
+        "cwd": "${fileDirname}",
+        "env": {
+            "CONFIG_FILE": "${fileWorkspaceFolder}/config.yaml"
+            },
+    },
 ```
 
 
@@ -80,4 +93,10 @@ uv tool install . -e
 
 ```sh
 uv build
+```
+
+## Build Command documentation
+
+```sh
+ typer src/shift_left/src/shift_left/cli.py utils docs --output docs/command.md
 ```

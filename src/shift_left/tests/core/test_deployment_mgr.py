@@ -24,10 +24,9 @@ class TestDeploymentManager(unittest.TestCase):
        
   
     def test_search_statement(self):
-        statement_dict = dm.search_existing_flink_statement("workspace-2025-02-19-035912-12318e87-8cff-4a80-91e5-5a42b46c909d")
-        assert statement_dict
-        obj= Statement(**statement_dict)
-        print(obj.spec.statement)
+        statement = dm.search_existing_flink_statement("workspace-2025-02-19-035912-12318e87-8cff-4a80-91e5-5a42b46c909d")
+        assert statement
+        print(statement.spec.statement)
 
     def test_search_non_existant_statement(self):
         statement_dict = dm.search_existing_flink_statement("dummy")
@@ -49,6 +48,6 @@ class TestDeploymentManager(unittest.TestCase):
     def test_delete_a_statement(self):
         statement = dm._delete_flink_statement('dev-p1-ddl-fct-order')
         assert statement
-        
+
 if __name__ == '__main__':
     unittest.main()

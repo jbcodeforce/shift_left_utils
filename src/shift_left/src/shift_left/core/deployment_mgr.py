@@ -1,5 +1,6 @@
 import subprocess
 import logging, os
+from pydantic import BaseModel
 from shift_left.core.pipeline_mgr import (
     ReportInfoNode,
     walk_the_hierarchy_for_report_from_table)  
@@ -29,11 +30,19 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+
+class DeploymentReport(BaseModel):
+    table_name: str
+    compute_pool_id: str
+    statement_name: str
+    flink_statement_deployed: str
+
+
 def get_pool_usage(compute_pool_id: str) -> json:
     result=subprocess.run(["confluent", "flink", "compute-pool", "describe", compute_pool_id, "-o", "json"],capture_output=True, text=True)
     return json.loads(result.stdout)
 
-def search_existing_flink_statement(statement_name: str):
+def search_existing_flink_statement(statement_name: str) -> None | Statement:
     """
     Given a table name the Flink SQL statement for dml includes the name of the table changing '_' to '-'
     """
@@ -50,7 +59,7 @@ def search_existing_flink_statement(statement_name: str):
         print(f"Found those statements {statements}")
         exit(1)
     if len(statements) == 1:
-        return statements[0]
+        return Statement(**statements[0])
     return None
     
 
