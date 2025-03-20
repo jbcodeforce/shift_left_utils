@@ -14,6 +14,7 @@ This repository includes a set of tools to help refactoring SQL batch processing
 * [x] Generate sink folder structure with makefile
 * [x] Capability of re-generating Makefile. 
 * [x] Makefile supporting drop table and dev specific dml
-* [ ] Improve different prompts with one shot prompting
+* [x] Improve different prompts with one shot prompting: -> one or two shots prompting gave worse results.
 * [ ] Verify concat(...) generated statement becomes md5(concat(...))
-* [ ] Test Harness framework
+* [ ] Test Harness framework: - define sql for insert test data to all tables used for a given flink statement, define the sql to validate the outcome. 
+* [ ] Deployment of a flink statement with control of children deployment based on the semantic of the flink statement.

@@ -140,7 +140,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     """
     Deploy a pipeline from a given folder
     """
-    print(f"## Deploy pipeline from table {table_name}")
+    print(f"#### Deploy pipeline from table {table_name} in {compute_pool_id}")
     try:
         deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id)
 
@@ -148,7 +148,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
 
-    print(f"Pipeline deployed from {table_name}")
+    print(f"#### Pipeline deployed from {table_name}")
 
 
 #@app.command()

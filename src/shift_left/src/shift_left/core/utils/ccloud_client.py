@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler
 import subprocess
 import requests
 import json
@@ -7,17 +8,23 @@ from base64 import b64encode
 from typing import List, Dict
 from shift_left.core.utils.app_config import get_config
 
-log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
-if not os.path.exists(log_path):
-    os.mkdir(log_path)
 
-logging.basicConfig(
-    filename=os.path.join(log_path, 'ccloud-client.log'),
-    filemode='w',
-    level=get_config()["app"]["logging"],
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+log_dir = os.path.join(os.getcwd(), '..', 'logs')
+logger = logging.getLogger("shift_left")
+os.makedirs(log_dir, exist_ok=True)
+logger.setLevel(get_config()["app"]["logging"])
+log_file_path = os.path.join(log_dir, "cc-client.log")
+file_handler = RotatingFileHandler(
+    log_file_path, 
+    maxBytes=1024*1024,  # 1MB
+    backupCount=3        # Keep up to 3 backup files
 )
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
@@ -44,21 +51,25 @@ class ConfluentCloudClient:
             "Authorization": self.auth_header,
             "Content-Type": "application/json"
         }
-        print(url)
         response = requests.request(
             method=method,
             url=url,
             headers=headers,
             json=data
         )
-        print(response.request.body)
+        print(response)
+        #response.raise_for_status()
         if response.status_code in [200,202]:
             logging.debug(response.request.body)
             logging.debug("Response headers:", response.headers)
+        elif response.status_code in [400,401, 403, 422]:
+            logging.error("Request failed:", response.json())
+            print("Request failed:", response.json())
         else:
-            logging.error("Request failed:", response.status_code)
-            logging.debug(response.request.body)
-        response.raise_for_status()
+            logging.error("Request failed:", response.json())
+            print(response)
+            print(url)
+        
         return response.json()
     
     def get_statement_status(self, endpoint, statement_id):
@@ -68,7 +79,7 @@ class ConfluentCloudClient:
 
     def get_environment_list(self):
         """Get the list of environments"""
-        url = f"https://{self.cloud_api_endpoint}/environments"
+        url = f"https://{self.cloud_api_endpoint}/environments?page_size=50"
         try:
             result = self.make_request("GET", url)
             logging.info("Statement execution result: %s", json.dumps(result, indent=2))
@@ -94,19 +105,26 @@ class ConfluentCloudClient:
         return self.make_request("GET", url)
     
     def list_topics(self):
-        """List the topics in the environment"""
+        """List the topics in the environment 
+        example of url https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics \
+ 
+        """
         region=self.config["confluent_cloud"]["region"]
         cloud_provider=self.config["confluent_cloud"]["provider"]
         pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
         cluster_id=self.config["kafka"]["cluster_id"]
+        self.api_key = self.config["kafka"]["api_key"]
+        self.api_secret = self.config["kafka"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
         url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
-        
-        print(url)
+        logging.info(f"List topic from {url}")
         try:
             result= self.make_request("GET", url)
+            print(result)
             return result
         except requests.exceptions.RequestException as e:
-            logging.error(e)
+            print(e)
+            return None
 
     def _build_flink_url_and_auth_header(self):
         region=self.config["confluent_cloud"]["region"]
@@ -130,6 +148,7 @@ class ConfluentCloudClient:
             return result
         except requests.exceptions.RequestException as e:
             logging.info(f"Error executing rest call: {e}")
+            print(f"Error executing rest call: {e}")
 
     def _wait_response(self, statement_name: str):
         try:
@@ -144,7 +163,7 @@ class ConfluentCloudClient:
             logging.error(f"Error waiting for response {e}")
             return ""
 
-    def post_flink_statement(self, compute_pool_id: str,  statement_name: str, sql_statement: str, stopped: False): 
+    def post_flink_statement(self, compute_pool_id: str,  statement_name: str, sql_statement: str, properties: str, stopped: bool = False): 
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -155,21 +174,23 @@ class ConfluentCloudClient:
                 "environment_id": self.config["confluent_cloud"]["environment_id"],
                 "spec": {
                     "statement": sql_statement,
+                    "properties": properties,
                     "compute_pool_id":  compute_pool_id,
                     "stopped": stopped
                 }
             }
         try:
             logging.info(f"Send POST request to Flink statement api with {statement_data}")
+            print(statement_data)
             response = self.make_request("POST", url + "/statements", statement_data)
-            statement_id = response["metadata"]["uid"]
-            logging.debug(f"Statement id for post request: {statement_id}")
+            #statement_id = response["metadata"]["uid"]
+            #logging.debug(f"Statement id for post request: {statement_id}")
             return self._wait_response(statement_name)
         except requests.exceptions.RequestException as e:
             logging.error(f"Error executing rest call: {e}")
 
     def delete_flink_statement(self, statement_name):
-        url = self._build_flink_url_and_auth_header(self.config)
+        url = self._build_flink_url_and_auth_header()
         try:
             status=self.make_request("DELETE",f"{url}/statements/{statement_name}")
             logging.info(f" delete_flink_statement: {status}")
@@ -178,7 +199,7 @@ class ConfluentCloudClient:
             logging.info(f"Error executing rest call: {e}")
     
     def update_flink_statement(self, statement_name: str, stop: bool):
-        url = self._build_flink_url_and_auth_header(self.config)
+        url = self._build_flink_url_and_auth_header()
         try:
             status=self.make_request("PUT",f"{url}/statements/{statement_name}")
             logging.info(f" update_flink_statement: {status}")

@@ -5,6 +5,6 @@ with cte_table as (
     FROM int_table_1
 )
 SELECT  
-    a,b,c 
-from cte_table
-left join int_table_2;
+    cte.a,cte.b,cte.d  
+from cte_table ct
+left join int_table_2 i2 on ;

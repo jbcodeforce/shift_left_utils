@@ -1,0 +1,29 @@
+{'api_version': 'sql/v1', 
+'environment_id': 'env-nknqp3', 
+'kind': 'Statement', 
+'metadata': 
+{'created_at': '2025-02-28T02: 31: 00.76805Z', 
+'labels': {}, 
+'resource_version': '98', 
+'self': 'https: //flink.us-west-2.aws.confluent.cloud/sql/v1/organizations/49cee212-6346-438a-a1fa-d1b1cbd90d44/environments/env-nknqp3/statements/workspace-2025-02-19-035912-12318e87-8cff-4a80-91e5-5a42b46c909d', 
+'uid': 'b0aed98e-a974-4b92-8927-00ae78576100', 'updated_at': '2025-02-28T02:36:56.251874Z'}, 'name': 'workspace-2025-02-19-035912-12318e87-8cff-4a80-91e5-5a42b46c909d', 'organization_id': '49cee212-6346-438a-a1fa-d1b1cbd90d44', 
+'spec': {'compute_pool_id': 'lfcp-xvrvmz', 'principal': 'u-xg2ndz', 'properties': {'sql.current-catalog': 'j9r-env', 'sql.current-database': 'j9r-kafka', 'sql.local-time-zone': 'GMT-08:00'}, 
+    'statement': 'select * from `examples`.`marketplace`.`clicks`limit 10; ', 'stopped': True}, 
+'status': {'detail': 'This statement was automatically stopped since no client has consumed the results for 5 minutes or more.', 
+'network_kind': 'PUBLIC', 
+'phase': 'STOPPED', 
+'scaling_status': {'last_updated': '2025-02-28T02:31:14Z', 'scaling_state': 'OK'}, 
+'traits': {'is_append_only': True, 
+        'is_bounded': False, 
+        'schema': 
+            {'columns': 
+                [
+                    {'name': 'click_id', 'type': {'length': 2147483647, 'nullable': False, 'type': 'VARCHAR'}}, 
+                    {'name': 'user_id', 'type': {'nullable': False, 'type': 'INTEGER'}}, 
+                    {'name': 'url', 'type': {'length': 2147483647, 'nullable': False, 'type': 'VARCHAR'}}, 
+                    {'name': 'user_agent', 'type': {'length': 2147483647, 'nullable': False, 'type': 'VARCHAR'}}, 
+                    {'name': 'view_time', 'type': {'nullable': False, 'type': 'INTEGER'}}
+                ]
+        }, 
+'sql_kind': 'SELECT', 
+'upsert_columns': 'None'}}}

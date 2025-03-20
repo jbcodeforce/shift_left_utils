@@ -1,2 +1,2 @@
 INSERT INTO src_table_2
-vALUES ()
+select * from `src_order_raw`;

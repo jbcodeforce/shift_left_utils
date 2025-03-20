@@ -42,6 +42,11 @@ Keep all the select statements defined with the WITH keyword.
 Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 
 Do not use VARCHAR prefer STRING. 
+When the source SQL or DBT code has the following constructs:
+
+* 
+* epoch_to_ts
+
 
 Start the generated code with:
 

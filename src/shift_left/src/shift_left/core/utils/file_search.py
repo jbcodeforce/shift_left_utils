@@ -222,8 +222,12 @@ def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str
     print(f"Get dml name from table {table_name} and {product_name}")  
     if product_name:
         prefix= prefix + "-" + product_name
-    ddl_n = prefix + "-ddl-" + table_name.replace("_","-"),
-    dml_n = prefix + "-dml-" + table_name.replace("_","-")
+    if prefix:
+        ddl_n = prefix + "-ddl-" + table_name.replace("_","-")
+        dml_n = prefix + "-dml-" + table_name.replace("_","-")
+    else:
+        ddl_n = "ddl-" + table_name.replace("_","-")
+        dml_n = "dml-" + table_name.replace("_","-")
     return ddl_n, dml_n
 
 def extract_product_name(existing_path: str) -> str:

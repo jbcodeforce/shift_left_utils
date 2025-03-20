@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
      "rich>=13.9.4",
     "typer>=0.15.2",
+    "confluent_flink_table_api_python_plugin=1.20.48"
 ]
 
 

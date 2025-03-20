@@ -137,10 +137,11 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
         return None
     try:
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
+
     except Exception as e:
         print(f"Error table not found in inventory: {e}")
         raise Exception("Error table not found in inventory")
-    return _walk_the_hierarchy_for_report(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    return _walk_the_hierarchy_recursive(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 
 def report_running_dmls(table_name: str, inventory_path: str) -> ReportInfoNode:
@@ -270,7 +271,7 @@ def _process_one_sink_folder(sink_folder_path, pipeline_path):
                     build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
     
 
-def _walk_the_hierarchy_for_report(pipeline_definition_fname: str) -> ReportInfoNode:
+def _walk_the_hierarchy_recursive(pipeline_definition_fname: str) -> ReportInfoNode:
     """
     Walk the hierarchy of tables given the pipeline definition file name.
     This function is used to generate a report on the pipeline hierarchy for a given table.

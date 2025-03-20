@@ -89,7 +89,7 @@ def update_makefile(
 
 
 @app.command()
-def find_table_users(table_name: Annotated[str, typer.Argument()],
+def find_table_users(table_name: Annotated[str, typer.Argument(help="The name of the table to search ")],
                      pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """ Find the Flink Statements user of a given table """
     print("#" * 30 + f" find_table_users for  {table_name}")
@@ -129,3 +129,12 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         for file in files_to_process:    
             update_sql_content(file, runner_class)
     print("Done !")
+
+
+@app.command()
+def unit_test(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+                test_case_name:  Annotated[str, typer.Option(help= "Name of the individual unit test to run. ")]):
+    """
+    Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+    """
+    
