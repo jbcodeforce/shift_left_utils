@@ -7,7 +7,7 @@ from shift_left.core.pipeline_mgr import (
     walk_the_hierarchy_for_report_from_table, 
     build_all_pipeline_definitions,
     report_running_dmls,
-    ReportInfoNode,
+    FlinkStatementHierarchy,
     delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport
@@ -200,7 +200,7 @@ def _display_directed_graph(nodes, edges):
 def _process_children(nodes_directed, edges_directed, current_node):
     if current_node.children:
         for child in current_node.children:
-            child_ref = ReportInfoNode.model_validate(child)
+            child_ref = FlinkStatementHierarchy.model_validate(child)
             nodes_directed.append(child_ref.table_name)
             edges_directed.append((current_node.table_name, child_ref.table_name))
             _process_children(nodes_directed, edges_directed, child_ref)

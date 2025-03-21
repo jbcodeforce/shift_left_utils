@@ -68,8 +68,8 @@ class FlinkStatementHierarchy(BaseModel):
     ddl_ref: str
     dml_ref: str
     compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
-    parents: Optional[Set[FlinkTableReference]]
-    children: Optional[Set[FlinkTableReference]]
+    parents: Optional[Set[FlinkTableReference]] = []
+    children: Optional[Set[FlinkTableReference]] = []
 
     def __hash__(self) -> int:
         return hash(self.table_name)
@@ -125,7 +125,7 @@ def build_all_pipeline_definitions(pipeline_path: str):
 
     
 
-def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: str) -> ReportInfoNode:
+def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: str) -> FlinkStatementHierarchy:
     """
     Walk the hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
     The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
@@ -146,7 +146,7 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
     return _walk_the_hierarchy_recursive(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 
-def report_running_dmls(table_name: str, inventory_path: str) -> ReportInfoNode:
+def report_running_dmls(table_name: str, inventory_path: str) -> FlinkStatementHierarchy:
     if not inventory_path:
         inventory_path = os.getenv("PIPELINES")
     inventory = load_existing_inventory(inventory_path)
@@ -188,6 +188,9 @@ def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
         return None
 
+def update_pipeline_metadata(file_name: str, data: FlinkStatementHierarchy):
+    with open(file_name, "w") as f:
+        f.write(data.model_dump_json(indent=3))
 
 # ---- Private APIs ---- 
 
@@ -366,12 +369,12 @@ def _process_next_node(nodes_to_process, processed_nodes,  all_files):
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
         logger.info(f"\n\n... processing the node {current_node}")
-        _create_or_merge(current_node)
+        _create_or_merge_pipeline_definition(current_node)
         nodes_to_process = _add_parents_for_future_process(current_node, nodes_to_process, processed_nodes, all_files)
         processed_nodes[current_node.table_name]=current_node
         _process_next_node(nodes_to_process, processed_nodes, all_files)
 
-def _create_or_merge(current: FlinkStatementHierarchy):
+def _create_or_merge_pipeline_definition(current: FlinkStatementHierarchy):
     """
     If the pipeline definition exists we may need to merge the parents and children
     """
@@ -418,7 +421,7 @@ def _modify_children(current: FlinkStatementHierarchy, parent_ref: FlinkTableRef
     pipe_definition_fn = parent_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
     parent = read_pipeline_metadata(pipe_definition_fn)
     parent.children.add(child)
-    _create_or_merge(parent)
+    _create_or_merge_pipeline_definition(parent)
 
 
 def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):

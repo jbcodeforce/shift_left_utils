@@ -86,7 +86,7 @@ def deploy_pipeline_from_table(table_name: str,
         flink_statement_deployed=[pipeline_def.dml]
         result = DeploymentReport(table_name, compute_pool_id, statement_name,flink_statement_deployed)
     else:
-        _deploy_ddl_statements(pipeline_def, compute_pool_id)
+        _deploy_ddl_statements(pipeline_def, compute_pool_id, force)
         statement_name= _deploy_dml_statements(pipeline_def, compute_pool_id, force)
         flink_statement_deployed=[pipeline_def.ddl_path, pipeline_def.dml]
         result = DeploymentReport(table_name, compute_pool_id, statement_name,flink_statement_deployed)
@@ -119,7 +119,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: ReportInfoNode
 # ---- private API
 
 def _garbage():
-    product_name = extract_product_name(pipeline_def.base_path)
+   
     
     statement = search_existing_flink_statement(pipeline_def.dml_path)
     logger.info(f"* Delete the current table DML statement to stop processing")
@@ -135,23 +135,33 @@ def _garbage():
     _start_child_dmls(pipeline_def, inventory_path)
 
 
-def _deploy_ddl_statements(pipeline_def: ReportInfoNode, statement_name:str, compute_pool_id: str, force: bool = False) -> Statement:
-    logger.info(f"Deploying DDL statements from {ddl_path} named {statement_name}")
+def _deploy_ddl_statements(pipeline_def: ReportInfoNode, 
+                           compute_pool_id: str, 
+                           force: bool = False) -> Statement:
     config = get_config()
-    with open(ddl_path, "r") as f:
-        sql_content = f.read()
-        client = ConfluentCloudClient(config)
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-        return client.post_flink_statement(compute_pool_id, statement_name, sql_content,  properties )
-
+    product_name = extract_product_name(pipeline_def.base_path)
+    ddl_statement_name, _ = get_ddl_dml_names_from_table(pipeline_def.table_name, 
+                                                      config['kafka']['cluster_type'], 
+                                                      product_name)
+    logger.info(f"Deploying DDL statements from {pipeline_def.ddl_path} named {ddl_statement_name}")
+    statement = search_existing_flink_statement(ddl_statement_name)
+    if statement:
+        _delete_flink_statement(ddl_statement_name)
+    _deploy_flink_statement(pipeline_def.ddl_path, compute_pool_id, ddl_statement_name, config)
 
 def _deploy_dml_statements(dml_path: str):
     logger.info(f"Deploying DML statements from {dml_path}")
     # TODO: implement
 
+def _deploy_flink_statement(content_path: str, compute_pool_id: str, statement_name: str, config: dict):
+    with open(content_path, "r") as f:
+        sql_content = f.read()
+        client = ConfluentCloudClient(config)
+        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+        return client.post_flink_statement(compute_pool_id, statement_name, sql_content,  properties )
 
 def _delete_flink_statement(statement_name: str) -> str:
-    logger.info(f"Stopping Flink statement: {statement_name}")
+    logger.info(f"Deleting Flink statement: {statement_name}")
     client = ConfluentCloudClient(get_config())
     result = client.delete_flink_statement(statement_name).json()
     logger.info(result)
@@ -189,6 +199,8 @@ def _start_child_dmls(pipeline_def):
         _resume_dml_statements(node['table_name']) # stop or delete and recreate
         _pipeline_def = ReportInfoNode.model_validate(node)
         _start_child_dmls(_pipeline_def)
+
+# ---- compute pool related functions
 
 def _create_compute_pool(table_name: str) -> str:
     config = get_config()

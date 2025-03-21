@@ -12,14 +12,14 @@ list_record_data_from_topic:
 
 # --- DDL 
 create_flink_ddl: 
-	$(call create_flink_statement, ('dev-ddl-int-table-1',), ./sql-scripts/ddl.int_table_1.sql) 
-	$(call delete_flink_statement, ('dev-ddl-int-table-1',) )
+	$(call create_flink_statement, dev-ddl-int-table-1, ./sql-scripts/ddl.int_table_1.sql) 
+	$(call delete_flink_statement, dev-ddl-int-table-1 )
 
 describe_flink_ddl:
-	$(call describe_flink_statement,  ('dev-ddl-int-table-1',))
+	$(call describe_flink_statement,  dev-ddl-int-table-1)
 
 delete_flink_ddl:
-	$(call delete_flink_statement, ('dev-ddl-int-table-1',))
+	$(call delete_flink_statement, dev-ddl-int-table-1)
 
 drop_table_int_table_1: 
 	$(call drop_table, drop-int-table-1, int_table_1)

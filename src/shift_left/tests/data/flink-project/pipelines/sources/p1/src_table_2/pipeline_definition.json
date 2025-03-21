@@ -12,7 +12,8 @@
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
          "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_table_2.sql",
-         "table_folder_name": "pipelines/intermediates/p1/int_table_2"
+         "table_folder_name": "pipelines/intermediates/p1/int_table_2",
+         "compute_pool_id": ""
       }
    ]
 }

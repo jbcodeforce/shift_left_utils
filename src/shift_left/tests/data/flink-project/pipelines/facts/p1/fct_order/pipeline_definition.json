@@ -4,21 +4,23 @@
    "path": "pipelines/facts/p1/fct_order",
    "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
    "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
-   "compute_pool_id": "lfcp-d3n9zz",
+   "compute_pool_id": "",
    "parents": [
       {
          "table_name": "int_table_1",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
          "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_table_1.sql",
-         "table_folder_name": "pipelines/intermediates/p1/int_table_1"
+         "table_folder_name": "pipelines/intermediates/p1/int_table_1",
+         "compute_pool_id": ""
       },
       {
          "table_name": "int_table_2",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
          "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_table_2.sql",
-         "table_folder_name": "pipelines/intermediates/p1/int_table_2"
+         "table_folder_name": "pipelines/intermediates/p1/int_table_2",
+         "compute_pool_id": ""
       }
    ],
    "children": []
