@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Dict, Optional, Final, Any, Set, List, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import (
@@ -67,6 +67,7 @@ class FlinkStatementHierarchy(BaseModel):
     path: str
     ddl_ref: str
     dml_ref: str
+    compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
     parents: Optional[Set[FlinkTableReference]]
     children: Optional[Set[FlinkTableReference]]
 
@@ -85,6 +86,7 @@ class ReportInfoNode(BaseModel):
     type: Optional[str] = ''
     ddl_path: Optional[str]
     dml_path: str
+    compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
     parents: Optional[Any] = []
     children: Optional[Any] = []
 

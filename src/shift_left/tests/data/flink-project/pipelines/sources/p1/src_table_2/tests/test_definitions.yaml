@@ -1,14 +1,16 @@
 test_suite:
-  - test_case_1:
-    name: test_case_1
-    inputs:
-    - table_name: src_table_2
-      sql_file_name: tests/insert_src_table_2_1.sql
-    outputs:
-      sql_file_name: tests/validate_table_2_1.sql
-  - test_case_2:
-    name: test_case_2
-    inputs:
-    - table_name: src_table_2
-    outputs:
+- name: test_case_1
+  inputs:
+  - table_name: src_order_raw
+    sql_file_name: tests/ctas_src_order_raw_1.sql
+  outputs:
+  - table_name: src_table_2
+    sql_file_name: tests/validate_table_2_1.sql
+- name: test_case_2
+  inputs:
+  - table_name: src_order_raw
+    sql_file_name: tests/insert_src_order_raw_2.sql
+  outputs:
+  - table_name: src_table_2
+    sql_file_name: tests/validate_table_2_2.sql
       

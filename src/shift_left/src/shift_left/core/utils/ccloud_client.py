@@ -9,8 +9,8 @@ from typing import List, Dict
 from shift_left.core.utils.app_config import get_config
 
 
-log_dir = os.path.join(os.getcwd(), '..', 'logs')
-logger = logging.getLogger("shift_left")
+log_dir = os.path.join(os.getcwd(), 'logs')
+logger = logging.getLogger("ccloud_client")
 os.makedirs(log_dir, exist_ok=True)
 logger.setLevel(get_config()["app"]["logging"])
 log_file_path = os.path.join(log_dir, "cc-client.log")
@@ -19,7 +19,7 @@ file_handler = RotatingFileHandler(
     maxBytes=1024*1024,  # 1MB
     backupCount=3        # Keep up to 3 backup files
 )
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
@@ -57,19 +57,15 @@ class ConfluentCloudClient:
             headers=headers,
             json=data
         )
-        print(response)
         #response.raise_for_status()
         if response.status_code in [200,202]:
-            logging.debug(response.request.body)
-            logging.debug("Response headers:", response.headers)
-        elif response.status_code in [400,401, 403, 422]:
-            logging.error("Request failed:", response.json())
-            print("Request failed:", response.json())
+            logger.debug(response.request.body)
+            logger.debug("Response headers:", response.headers)
+        elif response.status_code in [400, 401, 403, 422]:
+            logger.error("Request failed:", response.json())
         else:
-            logging.error("Request failed:", response.json())
-            print(response)
-            print(url)
-        
+            logger.error("Request may have failed:", response.json())
+            return response
         return response.json()
     
     def get_statement_status(self, endpoint, statement_id):
@@ -82,10 +78,10 @@ class ConfluentCloudClient:
         url = f"https://{self.cloud_api_endpoint}/environments?page_size=50"
         try:
             result = self.make_request("GET", url)
-            logging.info("Statement execution result: %s", json.dumps(result, indent=2))
+            logger.info("Statement execution result: %s", json.dumps(result, indent=2))
             return result
         except requests.exceptions.RequestException as e:
-            logging.info(f"Error executing rest call: {e}")
+            logger.info(f"Error executing rest call: {e}")
             return None
     
     def get_compute_pool_list(self):
@@ -104,6 +100,15 @@ class ConfluentCloudClient:
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
     
+    def create_compute_pool(self, spec: dict):
+        self.api_key = self.config["confluent_cloud"]["api_key"]
+        self.api_secret = self.config["confluent_cloud"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
+        data={'spec': spec}
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools"
+        return self.make_request("POST", url, data)
+        
+
     def list_topics(self):
         """List the topics in the environment 
         example of url https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics \
@@ -117,13 +122,13 @@ class ConfluentCloudClient:
         self.api_secret = self.config["kafka"]["api_secret"]
         self.auth_header = self._generate_auth_header()
         url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
-        logging.info(f"List topic from {url}")
+        logger.info(f"List topic from {url}")
         try:
             result= self.make_request("GET", url)
-            print(result)
+            logger.info(result)
             return result
         except requests.exceptions.RequestException as e:
-            print(e)
+            logger.error(e)
             return None
 
     def _build_flink_url_and_auth_header(self):
@@ -144,23 +149,22 @@ class ConfluentCloudClient:
         url = self._build_flink_url_and_auth_header()
         try:
             result = self.make_request("GET", url+"/statements?page_size=100")
-            logging.debug("Statement execution result:", result)
+            logger.debug("Statement execution result:", result)
             return result
         except requests.exceptions.RequestException as e:
-            logging.info(f"Error executing rest call: {e}")
-            print(f"Error executing rest call: {e}")
+            logger.info(f"Error executing rest call: {e}")
 
-    def _wait_response(self, statement_name: str):
+    def _wait_response(self, url: str, statement_name: str):
         try:
             while True:
                 status = self.get_statement_status("/statements", statement_name)
                 if status["phase"] in ["COMPLETED"]:
                     results=self.make_request("GET",f"/statements/{statement_name}/results")
-                    logging.debug(f"Response to the get statement results: {results}")
+                    logger.debug(f"Response to the get statement results: {results}")
                     return results
                 time.sleep(5)
         except Exception as e:
-            logging.error(f"Error waiting for response {e}")
+            logger.error(f"Error waiting for response {e}")
             return ""
 
     def post_flink_statement(self, compute_pool_id: str,  statement_name: str, sql_statement: str, properties: str, stopped: bool = False): 
@@ -180,32 +184,32 @@ class ConfluentCloudClient:
                 }
             }
         try:
-            logging.info(f"Send POST request to Flink statement api with {statement_data}")
-            print(statement_data)
+            logger.info(f"Send POST request to Flink statement api with {statement_data}")
             response = self.make_request("POST", url + "/statements", statement_data)
+            logger.info(response)
             #statement_id = response["metadata"]["uid"]
-            #logging.debug(f"Statement id for post request: {statement_id}")
-            return self._wait_response(statement_name)
+            #logger.debug(f"Statement id for post request: {statement_id}")
+            return self._wait_response(url, statement_name)
         except requests.exceptions.RequestException as e:
-            logging.error(f"Error executing rest call: {e}")
+            logger.error(f"Error executing rest call: {e}")
 
     def delete_flink_statement(self, statement_name):
         url = self._build_flink_url_and_auth_header()
         try:
             status=self.make_request("DELETE",f"{url}/statements/{statement_name}")
-            logging.info(f" delete_flink_statement: {status}")
-            return self._wait_response(statement_name)
+            logger.info(f" delete_flink_statement: {status}")
+            return status
         except requests.exceptions.RequestException as e:
-            logging.info(f"Error executing rest call: {e}")
+            logger.info(f"Error executing rest call: {e}")
     
     def update_flink_statement(self, statement_name: str, stop: bool):
         url = self._build_flink_url_and_auth_header()
         try:
             status=self.make_request("PUT",f"{url}/statements/{statement_name}")
-            logging.info(f" update_flink_statement: {status}")
-            return self._wait_response(statement_name)
+            logger.info(f" update_flink_statement: {status}")
+            return self._wait_response(url, statement_name)
         except requests.exceptions.RequestException as e:
-            logging.info(f"Error executing rest call: {e}")
+            logger.info(f"Error executing rest call: {e}")
      
 
 # --- Public APIs ---
@@ -216,7 +220,7 @@ def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
     return the topic name if found otherwise return the table name
     """
     potential_matches=[]
-    logging.debug(f"Search {table_name} in the list of topics, avoiding the ones starting by {rejected_prefixes}")
+    logger.debug(f"Search {table_name} in the list of topics, avoiding the ones starting by {rejected_prefixes}")
     with open(TOPIC_LIST_FILE,"r") as f:
         for line in f:
             line=line.strip()
@@ -234,7 +238,7 @@ def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
     if len(potential_matches) == 1:
         return potential_matches[0]
     else:
-        logging.warning(f"Found multiple potential matching topics: {potential_matches}, removing the ones that may be not start with {rejected_prefixes}")
+        logger.warning(f"Found multiple potential matching topics: {potential_matches}, removing the ones that may be not start with {rejected_prefixes}")
         narrow_list=[]
         for topic in potential_matches:
             found = False
@@ -244,24 +248,14 @@ def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
             if not found:
                 narrow_list.append(topic)
         if len(narrow_list) > 1:
-            logging.error(f"Still found more topic than expected {narrow_list}\n\t--> Need to abort")
+            logger.error(f"Still found more topic than expected {narrow_list}\n\t--> Need to abort")
             exit()
         elif len(narrow_list) == 0:
-            logging.warning(f"Found no more topic {narrow_list}")
+            logger.warning(f"Found no more topic {narrow_list}")
             return ""
-        logging.debug(f"Take the following topic: {narrow_list[0]}")
+        logger.debug(f"Take the following topic: {narrow_list[0]}")
         return narrow_list[0]
 
-def verify_compute_pool_exists(compute_pool_id: str) -> dict:
-    """
-    Verify the existence of the compute pool
-    """
-    client=ConfluentCloudClient(get_config())
-    result=client.get_compute_pool_info(compute_pool_id)
-    if result.status_code != 200:
-        logging.error(f"Error getting compute pool {compute_pool_id}: {result.text}")
-        exit()
-    return result.json()
 
 def _find_sub_string(table_name, topic_name) -> bool:
     """

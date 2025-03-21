@@ -4,6 +4,7 @@
    "path": "pipelines/sources/p1/src_table_2",
    "ddl_ref": "pipelines/sources/p1/src_table_2/sql-scripts/ddl.src_table_2.sql",
    "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_table_2.sql",
+   "compute_pool_id": "",
    "parents": [],
    "children": [
       {

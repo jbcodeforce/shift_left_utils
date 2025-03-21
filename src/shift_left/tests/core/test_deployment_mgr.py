@@ -8,9 +8,14 @@ os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import get_ddl_dml_names_from_table
+from shift_left.core.utils.file_search import (get_ddl_dml_names_from_table,
+            get_table_ref_from_inventory,
+            load_existing_inventory,
+            FlinkTableReference
+        )
 from  shift_left.core.flink_statement_model import *
 import shift_left.core.deployment_mgr as dm
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 class TestDeploymentManager(unittest.TestCase):
     
@@ -46,8 +51,35 @@ class TestDeploymentManager(unittest.TestCase):
         assert statement.status.phase == 'COMPLETED'
     
     def test_delete_a_statement(self):
-        statement = dm._delete_flink_statement('dev-p1-ddl-fct-order')
-        assert statement
+        response = dm._delete_flink_statement('dev-p1-ddl-fct-order')
+        assert response
+        print(response)
+        response = dm.search_existing_flink_statement('dev-p1-ddl-fct-order')
+        assert response == None
+
+    def test_build_pool_spec(self):
+        config = get_config()
+        result = dm._build_compute_pool_spec("fct-order", config)
+        assert result
+        assert result['display_name'] == "cp-fct-order"
+        print(result)
+
+    def test_create_compute_pool(self):
+        result = dm._create_compute_pool("fct-order")
+        assert result
+        print(result)
+
+    def test_verify_pool_state(self):
+        client = ConfluentCloudClient(get_config())
+        result = dm._verify_compute_pool_provisioned(client, "lfcp-d3n9zz")
+        assert result
+        print(result)
+
+    def test_validate_a_pool(self):
+        result = dm._validate_a_pool("lfcp-d3n9zz")
+        assert result
+
+
 
 if __name__ == '__main__':
     unittest.main()

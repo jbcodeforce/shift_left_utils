@@ -254,7 +254,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 **Options**:
 
 * `--ddl`: Focus on DDL processing. Default is only DML
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1197de2d0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x106b963f0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`
@@ -273,7 +273,8 @@ $ table unit-test [OPTIONS] TABLE_NAME
 
 **Options**:
 
-* `--test-case-name TEXT`: Name of the individual unit test to run.   [required]
+* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests  [required]
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [env var: CPOOL_ID; required]
 * `--help`: Show this message and exit.
 
 ## `pipeline`
@@ -294,7 +295,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `delete-metadata`: Delete a pipeline definitions from a given...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the pipeline...
-* `deploy`: Deploy a pipeline from a given folder
+* `deploy`: Deploy a pipeline from a given table.
 
 ### `pipeline build-metadata`
 
@@ -375,7 +376,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 ### `pipeline deploy`
 
-Deploy a pipeline from a given folder
+Deploy a pipeline from a given table. Th
 
 **Usage**:
 
@@ -390,5 +391,7 @@ $ pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 **Options**:
 
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [env var: CPOOL_ID; required]
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [required]
+* `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
+* `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
 * `--help`: Show this message and exit.

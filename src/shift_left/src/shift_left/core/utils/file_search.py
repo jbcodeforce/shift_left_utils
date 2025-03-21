@@ -4,7 +4,7 @@ from typing import Final, Dict, Set, Optional, Any, Tuple
 import json
 import logging
 from functools import lru_cache
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 
 """
@@ -23,6 +23,7 @@ class FlinkTableReference(BaseModel):
     dml_ref: Optional[str]
     ddl_ref: Optional[str]
     table_folder_name: str
+    compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
 
     def __hash__(self) -> int:
         return hash(self.table_name)

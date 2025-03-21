@@ -13,14 +13,22 @@ class SLTestData(BaseModel):
 class SLTestCase(BaseModel):
     name: str
     inputs: List[SLTestData]
+    outputs: List[SLTestData]
 
 class SLTestSuite(BaseModel):
-     testcases: List[SLTestCase]
+     test_suite: List[SLTestCase]
 
 # --- public api
-def excute_one_test(table_name: str, test_case_name: str):
+def excute_one_test(table_name: str, test_case_name: str, compute_pool_id :str):
     """
     From the definition of all tests, select the test to run
+    """
+
+    pass
+
+def excute_all_tests(table_name: str, test_case_name: str, compute_pool_id :str):
+    """
+    From the definition of all tests, run all of them
     """
 
     pass

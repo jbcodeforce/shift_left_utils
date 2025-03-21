@@ -10,7 +10,7 @@ from shift_left.core.pipeline_mgr import (
     ReportInfoNode,
     delete_metada_files)
 from typing_extensions import Annotated
-from shift_left.core.deployment_mgr import deploy_pipeline_from_table
+from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport
 
 import yaml
 import os
@@ -136,19 +136,22 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 @app.command()
 def deploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
-        compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will create a pool.")]):
+        compute_pool_id: Annotated[str, typer.Option(help="Flink compute pool ID. If not provided, it will create a pool.")],
+        dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
+        force: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
+        ):
     """
-    Deploy a pipeline from a given folder
+    Deploy a pipeline from a given table. Th 
     """
     print(f"#### Deploy pipeline from table {table_name} in {compute_pool_id}")
     try:
-        deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id)
+        result: DeploymentReport = deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, force)
 
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
 
-    print(f"#### Pipeline deployed from {table_name}")
+    print(f"#### Pipeline deployed from {result}")
 
 
 #@app.command()

@@ -4,6 +4,7 @@
    "path": "pipelines/facts/p1/fct_order",
    "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
    "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+   "compute_pool_id": "lfcp-d3n9zz",
    "parents": [
       {
          "table_name": "int_table_1",
