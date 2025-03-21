@@ -1,5 +1,11 @@
 # Migration process
 
+???- info "Version"
+    Created February 2025 - 
+
+???- warning "Deprecated - need to be updated"
+    This chapter uses the version 0 of the toolings, now that those tools are refactored in a cli the commands are not more valid.
+
 This chapter covers a straightforward migration process to FLINK SQL pipelines, from ETL jobs that batch process a fact tables up to source tables. Ensure you have completed the project setup using one of the two options explained [in this note](./setup.md).
 
 All the dbt to SQL source tables are defined in the $SRC_FOLDER folder. 

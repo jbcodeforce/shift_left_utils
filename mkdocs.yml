@@ -7,7 +7,8 @@ nav:
   - Setup: setup.md
   - Recipes: recipes.md
   - Migration Process: migration.md 
-  - Cli commands: command.md
+  - CLI commands: command.md
+  - Test Harness: test_harness.md
   - Contributing: contributing.md
 theme: 
   name: material
