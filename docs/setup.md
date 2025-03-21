@@ -1,12 +1,17 @@
 # Environment Setup
 
-This chapter discusses the essential tools required and the project setup. There are two options for running the tools: one involves using a Python virtual environment, while the other utilizes Docker along with a predefined Python environment image that includes all the necessary modules and code.
+???- info "Version"
+    Created January 2025 - Updated 03/21/25: setup guide separation between user of the CLI and developer of this project.
 
-Additionally, running the Ollama Qwen model with 32 billion parameters requires 64 GB of memory and a GPU with 32 GB of VRAM. Therefore, it may be more practical to create an EC2 instance with the appropriate resources to handle the migration of each fact and dimension table, generate the staged migrated SQL, and then terminate the instance. Currently, tuning the pipeline and finalizing each SQL version is done manually.
+This chapter discusses the CLI tool to manage Flink project, in a shift_left exercise or in close future in a data as a product project. To install the CLI, which is based on Python, use a virtual environment.
+
+Additionally, when using the tool to do migration of existing code to Apache Flink SQL, a LLM running within Ollama is used. The Qwen model with 32 billion parameters requires 64 GB of memory and a GPU with 32 GB of VRAM. Therefore, it may be more practical to create an EC2 instance with the appropriate resources to handle the migration of each fact and dimension tables, generate the stageg migrated SQLs, and then terminate the instance. Currently, tuning the pipeline and finalizing each automatically migrated SQL is done manually as some migrations are not perfect. There is work to be done in prompting and chaining AI agents.
 
 To create this EC2 machine, Terraform configurations are defined in [the IaC folder. See the readme.](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) With Terraform and setup.sh script the next sections are automated. The EC2 does not need to run docker.
 
-## Common Pre-requisites
+**Important** Ollama and LLM is used for migration, and to classify SQL statements.
+
+## Pre-requisites
 
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
@@ -18,7 +23,14 @@ To create this EC2 machine, Terraform configurations are defined in [the IaC fol
 * All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html)
 * All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
 
-* Create a virtual environment:
+* Clone this repository (this will not be necessary once the CLI will be available in pypi): 
+
+```sh
+git clone  https://github.com/jbcodeforce/shift_left_utils.git
+cd shift_left_utils
+```
+
+* Create a Python virtual environment:
 
 ```sh
 python -m venv .venv
@@ -30,16 +42,12 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-* Clone this repository: 
 
-```sh
-git clone  https://github.com/jbcodeforce/shift_left_utils.git
-```
 
 * Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): 
 
 ```sh
-pip install src/shift_left/dist/shift_left-0.1.0-py3-none-any.whl
+pip install src/shift_left/dist/shift_left-0.1.1-py3-none-any.whl
 ```
 
 * Validate the CLI is available via:
@@ -48,23 +56,19 @@ pip install src/shift_left/dist/shift_left-0.1.0-py3-none-any.whl
 shift_left --help
 ```
 
-???- info "Rebuild the CLI"
-      The way the CLI is built, is by using [uv](https://docs.astral.sh/uv) and the command:
-      `uv build` 
-
 ## Create a new Flink data project
 
-This is step is only valuable when starting a new project, or a new data product using Flink. 
+This is step is only valuable when starting a new Confluent Flink project, or a new data as a product using Flink and Confluent. 
 
 ```sh
 shift_left project init <project_name> <project_path> --project-type 
 # example for a default Kimball project
 shift_left project init flink-project ../
-# For a project more focused on developing data product
+# For a project more focused on developing data as a product
 shift_left project init flink-project ../ --project-type data-product
 ```
 
-At this stage, you should have three folders for the project: flink_project, the dbt_source, the shift_left_utils. For the flink_project a pipelines folder with the same structure as defined by the Kimball guidelines:
+At this stage, you should have three folders for the project: flink_project, the dbt_source, the shift_left_utils. For the Kimball based flink project there is a pipelines folder with the same structure as defined by the Kimball guidelines:
 
 ```sh
 ├── flink-project
@@ -128,6 +132,12 @@ STAGING=$FLINK_PROJECT/staging
 PIPELINES=$FLINK_PROJECT/pipelines
 ```
 
+* Define a config.yaml file to keep some important parameters of the CLI. 
+
+```sh
+cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
+```
+
 * Modify the `config.yaml` in the root of the Flink project, with the corresponding values. The Kafka section is to access the Kafka Cluster and topics:
 
 ```yaml
@@ -154,7 +164,6 @@ Those declarations are loaded by the Kafka Producer and Consumer and with tools 
 
 ???- warning "Security access"
   The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
-
 
 
 You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process) or use the [recipes](./recipes.md) to get how to do some common activities.

@@ -4,3 +4,5 @@ langgraph
 pyyaml
 requests
 pydantic
+networkx
+matplotlib

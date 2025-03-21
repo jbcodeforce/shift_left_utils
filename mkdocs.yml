@@ -8,6 +8,7 @@ nav:
   - Recipes: recipes.md
   - Migration Process: migration.md 
   - Cli commands: command.md
+  - Contributing: contributing.md
 theme: 
   name: material
   logo: assets/logo.drawio.png
