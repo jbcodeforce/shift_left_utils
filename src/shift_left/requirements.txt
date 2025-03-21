@@ -1,0 +1,6 @@
+jinja2
+langchain_ollama
+langgraph
+pyyaml
+requests
+pydantic

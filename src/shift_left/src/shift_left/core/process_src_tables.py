@@ -9,6 +9,7 @@ there is one pipeline per sink table.
 """
 import os
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 from shift_left.core.utils.flink_sql_code_agent_lg import translate_to_flink_sqls
@@ -19,10 +20,23 @@ from shift_left.core.utils.ccloud_client import search_matching_topic
 from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
 
 
-logging.basicConfig(
-    filename=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs', 'process_src_tables.log'),
-    level=get_config()["app"]["logging"], 
-    format='%(levelname)s: %(message)s')
+log_dir = os.path.join(os.getcwd(), 'logs')
+logger = logging.getLogger("deployment")
+os.makedirs(log_dir, exist_ok=True)
+logger.setLevel(get_config()["app"]["logging"])
+log_file_path = os.path.join(log_dir, "process-src-table.log")
+file_handler = RotatingFileHandler(
+    log_file_path, 
+    maxBytes=1024*1024,  # 1MB
+    backupCount=3        # Keep up to 3 backup files
+)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+logger.addHandler(console_handler)
+
 TMPL_FOLDER="templates"
 CREATE_TABLE_TMPL="create_table_skeleton.jinja"
 DML_DEDUP_TMPL="dedup_dml_skeleton.jinja"
@@ -36,7 +50,7 @@ def process_one_file(table_name: str,
                     src_folder_path: str,
                     process_parents: bool = False):
     """ Process one source sql file to extract code and migrate to Flink SQL """
-    logging.debug(f"Migration process_one_file: {sql_src_file} - {staging_target_folder} as {table_name}")
+    logger.debug(f"Migration process_one_file: {sql_src_file} - {staging_target_folder} as {table_name}")
     if sql_src_file.endswith(".sql"):
         create_folder_if_not_exist(staging_target_folder)
         if sql_src_file.find("source") > 0:
@@ -58,11 +72,11 @@ def process_from_table_name(table_name: str, staging_folder: str, src_folder_pat
     print(all_files)
     matching_sql_file=all_files[table_name]
     if matching_sql_file:
-        logging.info(f"\n\n------------------------------------------")
-        logging.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
+        logger.info(f"\n\n------------------------------------------")
+        logger.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
         process_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
     else:
-        logging.info("Matching sql file not found !")
+        logger.info("Matching sql file not found !")
 
 # --- utilities functions
 
@@ -80,14 +94,14 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
         pk_to_use="__pd"
     fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
     file_name=f"{target_folder}/ddl.{fname}.sql" 
-    logging.info(f"Create DDL Skeleton for {fname}")
+    logger.info(f"Create DDL Skeleton for {fname}")
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
     try:
-        logging.info("try to get the column definitions by calling Confluent Cloud REST API")
+        logger.info("try to get the column definitions by calling Confluent Cloud REST API")
         column_definitions, fields=get_column_definitions(table_name, config)
     except Exception as e:
-        logging.error(e)
+        logger.error(e)
         column_definitions = "-- add columns"
         fields=""
     context = {
@@ -96,7 +110,7 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
         'default_PK': pk_to_use
     }
     rendered_sql = sql_template.render(context)
-    logging.info(f"writing file {file_name}")
+    logger.info(f"writing file {file_name}")
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
     return fields
@@ -121,7 +135,7 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
         'fields': fields
     }
     rendered_sql = sql_template.render(context)
-    logging.info(f"writing file {file_name}")
+    logger.info(f"writing file {file_name}")
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
 
@@ -133,7 +147,7 @@ def _create_test_dedup(table_name: str, target_folder: str):
         'table_name': table_name,
     }
     rendered_sql = sql_template.render(context)
-    logging.info(f"writing file {file_name}")
+    logger.info(f"writing file {file_name}")
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
     
@@ -149,7 +163,7 @@ def _process_ddl_file(file_path: str, sql_file: str):
 
 
 def _save_one_file(fname: str, content: str):
-    logging.debug(f"Write: {fname}")
+    logger.debug(f"Write: {fname}")
     with open(fname,"w") as f:
         f.write(content)
 
@@ -174,7 +188,7 @@ def _remove_already_processed_table(parents: list[str]) -> list[str]:
         if not _search_table_in_processed_tables(table_name):
             newParents.append(parent)
         else:
-            logging.info(f"{table_name} already processed")
+            logger.info(f"{table_name} already processed")
     return newParents
 
 
@@ -223,7 +237,7 @@ def _process_non_source_sql_file(table_name: str,
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     """
-    logging.debug(f"process SQL file {sql_src_file_name}")
+    logger.debug(f"process SQL file {sql_src_file_name}")
     product_path = os.path.dirname(sql_src_file_name).replace(src_folder_path, "",1)[1:]
     where_to_write_path = os.path.join(target_path, product_path)
     table_folder, _ = build_folder_structure_for_table(table_name, where_to_write_path)
