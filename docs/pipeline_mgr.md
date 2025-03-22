@@ -60,11 +60,29 @@ While a source processing, that most of the time are doing deduplication, which 
 ## Requirements
 
 
-* [] The expect command should be simple like:
+* [x] The expected command to deploy should be simple like:
 
-    ```
-    ```
-    
+```sh
+shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
+
+   --compute-pool-id     TEXT  Flink compute pool ID. If not provided, it will create a pool. [default: None]   
+   --dml-only            By default the deployment will do DDL and DML, with this flag it will deploy only DML [default: no-dml-only]                
+   --force               The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml) [default: no-force]
+```
+
+* [ ] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
+
+* [ ] Support deploying only DML, or both DDL and DML (default)
+* [ ] Deploying a DDL, means dropping existing table if exists.
+* [ ] Deploying a non existant sink means deploying all its parents if not already deployed, up to the sources. This will be the way to deploy a pipeline. In this case deploy first the sources, ddl and dml, except if already running as it means this table was created by another pipeline.
+* [ ] Deploying an existant sink, means drop the table if the force flag is true, and deploy the DML. If forced flag is false, only deploy dml. When DML is stateful deploy DDL and DML (= forced) 
+
+### Questions
+
+The following may be considered:
+
+* does it make sense to have DDL only deployment from a source to sink pipeline?
+
 ## Developer's note
 
 The module to support the management of pipeline is `pipeline_mgr.py`

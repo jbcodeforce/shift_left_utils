@@ -58,9 +58,8 @@ class ConfluentCloudClient:
             json=data
         )
         #response.raise_for_status()
-        if response.status_code in [200,202]:
-            logger.debug(response.request.body)
-            logger.debug("Response headers:", response.headers)
+        if response.status_code in [200, 202]:
+            logger.debug(f"\nMake http request: {response} and headers: {response.headers} msg: {response.text}")
         elif response.status_code in [400, 401, 403, 422]:
             logger.error("Request failed:", response.json())
         else:
@@ -157,11 +156,13 @@ class ConfluentCloudClient:
     def _wait_response(self, url: str, statement_name: str):
         try:
             while True:
-                status = self.get_statement_status("/statements", statement_name)
+                status = self.get_statement_status(url + "/statements", statement_name)
                 if status["phase"] in ["COMPLETED"]:
-                    results=self.make_request("GET",f"/statements/{statement_name}/results")
+                    results=self.make_request("GET",f"{url}/statements/{statement_name}/results")
                     logger.debug(f"Response to the get statement results: {results}")
                     return results
+                if status["phase"] in ["FAILED"]:
+                    return status
                 time.sleep(5)
         except Exception as e:
             logger.error(f"Error waiting for response {e}")
@@ -186,7 +187,7 @@ class ConfluentCloudClient:
         try:
             logger.info(f"Send POST request to Flink statement api with {statement_data}")
             response = self.make_request("POST", url + "/statements", statement_data)
-            logger.info(response)
+            logger.info(f"POST response= {response}")
             #statement_id = response["metadata"]["uid"]
             #logger.debug(f"Statement id for post request: {statement_id}")
             return self._wait_response(url, statement_name)
@@ -197,10 +198,10 @@ class ConfluentCloudClient:
         url = self._build_flink_url_and_auth_header()
         try:
             status=self.make_request("DELETE",f"{url}/statements/{statement_name}")
-            logger.info(f" delete_flink_statement: {status}")
+            logger.info(f"CC client delete_flink_statement: {status}")
             return status
         except requests.exceptions.RequestException as e:
-            logger.info(f"Error executing rest call: {e}")
+            logger.info(f"Error executing delete statement call for {statement_name}: {e}")
     
     def update_flink_statement(self, statement_name: str, stop: bool):
         url = self._build_flink_url_and_auth_header()

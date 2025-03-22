@@ -1,5 +1,6 @@
 """
-Pipeline manager defines functions to build inventory, pipeline definitions, and navigate pipeline trees.
+Flink Statement pipeline manager defines functions to build inventory, create pipeline definition for table, 
+and navigate statement pipeline trees.
 
 This module provides functionality to:
 1. Build and manage pipeline definition inventories
@@ -246,7 +247,8 @@ def _get_parent_table_references_from_sql_content(
                         dependency, 
                         table_type,
                         dml_file_name,
-                        ddl_file_name
+                        ddl_file_name,
+                        ""
                     ))
                     
             return table_name, dependencies
@@ -275,6 +277,7 @@ def _walk_the_hierarchy_recursive(pipeline_definition_fname: str) -> FlinkStatem
     current_hierarchy: FlinkStatementHierarchy= read_pipeline_metadata(pipeline_definition_fname)
     current_hierarchy = _visit_parents(current_hierarchy)
     current_hierarchy = _visit_children(current_hierarchy)
+    logger.debug(f"Retrieved hierarchy is {current_hierarchy}")
     return current_hierarchy
     
 
@@ -319,7 +322,8 @@ def _build_table_reference(
     type: str,
     dml_file_name: str,
     ddl_file_name: str,
-    table_folder: Optional[str] = None
+    table_folder: Optional[str] = None,
+    compute_pool_id: Optional[str] = ""
 ) -> FlinkTableReference:
     """Build a FlinkTableReference object from table metadata.
     
@@ -342,7 +346,7 @@ def _build_table_reference(
         "dml_ref": dml_file_name,
         "ddl_ref": ddl_file_name,
         "table_folder_name": table_folder,
-        "compute_pool_id":  ""
+        "compute_pool_id":  compute_pool_id
     })
 
     
@@ -401,7 +405,8 @@ def _modify_children(current: FlinkStatementHierarchy, parent_ref: FlinkTableRef
                                 current.type,
                                 current.dml_ref, 
                                 current.ddl_ref,
-                                current.path)
+                                current.path,
+                                current.compute_pool_id)
     pipe_definition_fn = parent_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
     parent = read_pipeline_metadata(pipe_definition_fn)
     parent.children.add(child)
@@ -435,7 +440,8 @@ def _add_parents_for_future_process(current_node: FlinkStatementHierarchy,
                                                 current_node.type,
                                                 current_node.dml_ref, 
                                                 current_node.ddl_ref, 
-                                                current_node.path)
+                                                current_node.path,
+                                                current_node.compute_pool_id)
                     parent_node=_create_table_hierarchy_node(parent_table_ref.dml_ref, 
                                             table_name, 
                                             parent_references, 

@@ -28,34 +28,9 @@ class TestDeploymentManager(unittest.TestCase):
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
   
-    def test_search_statement(self):
-        statement = dm.search_existing_flink_statement("workspace-2025-02-19-035912-12318e87-8cff-4a80-91e5-5a42b46c909d")
-        assert statement
-        print(statement.spec.statement)
-
     def test_search_non_existant_statement(self):
         statement_dict = dm.search_existing_flink_statement("dummy")
         assert statement_dict == None
-
-    def test_deploy_sink_table(self):
-        config = get_config()
-        table_name="fct_order"
-        inventory_path= os.getenv("PIPELINES")
-        pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-       
-        assert pipeline_def.ddl_path
-        print(pipeline_def.ddl_path)
-        ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], "p1")
-        print(ddl_name)
-        statement= dm._deploy_ddl_statements(inventory_path + '/../' + pipeline_def.ddl_path, ddl_name, config["flink"]["compute_pool_id"])
-        assert statement.status.phase == 'COMPLETED'
-    
-    def test_delete_a_statement(self):
-        response = dm._delete_flink_statement('dev-p1-ddl-fct-order')
-        assert response
-        print(response)
-        response = dm.search_existing_flink_statement('dev-p1-ddl-fct-order')
-        assert response == None
 
     def test_build_pool_spec(self):
         config = get_config()
@@ -64,20 +39,51 @@ class TestDeploymentManager(unittest.TestCase):
         assert result['display_name'] == "cp-fct-order"
         print(result)
 
-    def test_create_compute_pool(self):
-        result = dm._create_compute_pool("fct-order")
-        assert result
-        print(result)
-
     def test_verify_pool_state(self):
-        client = ConfluentCloudClient(get_config())
-        result = dm._verify_compute_pool_provisioned(client, "lfcp-d3n9zz")
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        result = dm._verify_compute_pool_provisioned(client, config['flink']['compute_pool_id'])
         assert result
         print(result)
 
     def test_validate_a_pool(self):
-        result = dm._validate_a_pool("lfcp-d3n9zz")
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        result = dm._validate_a_pool(client, config['flink']['compute_pool_id'])
         assert result
+
+    def test_ddl_deployment(self):
+        table_name="int_table_1"
+        inventory_path= os.getenv("PIPELINES")
+        pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
+        dm.deploy_ddl_statements(pipeline_def)
+
+    def test_deploy_flink_statement(self):
+        config = get_config()
+        insert_data_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/tests/insert_int_table_1_1.sql"
+        dm.deploy_flink_statement(insert_data_path, None, None, config)
+
+    def test_deploy_sink_table(self):
+        config = get_config()
+        table_name="fct_order"
+        inventory_path= os.getenv("PIPELINES")
+        pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
+        assert pipeline_def.ddl_path
+        print(pipeline_def.ddl_path)
+        ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], "p1")
+        print(ddl_name)
+        statement= dm._deploy_ddl_statements(inventory_path + '/../' + pipeline_def.ddl_path, ddl_name, config["flink"]["compute_pool_id"])
+        assert statement.status.phase == 'COMPLETED'
+    
+    def _test_delete_a_statement(self):
+        response = dm._delete_flink_statement('dev-p1-ddl-fct-order')
+        assert response
+        print(response)
+        response = dm.search_existing_flink_statement('dev-p1-ddl-fct-order')
+        assert response == None
+
+
+
 
 
 
