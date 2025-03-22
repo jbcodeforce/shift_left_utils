@@ -25,7 +25,7 @@ class Schema(BaseModel):
 class Traits(BaseModel):
     is_append_only: bool
     is_bounded: bool
-    schema: Schema
+    flink_schema: Schema =  Field(alias="schema")
     sql_kind: str
     upsert_columns: Optional[List[str]] = Field(default=None, description="Upsert columns if applicable")
 

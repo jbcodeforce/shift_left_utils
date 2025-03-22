@@ -103,28 +103,28 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     def add_nodes_to_tree(node_data, tree_node):
         if node_data.parents:
             for parent in node_data.parents:
-                parent_node = tree_node.add(f"[green]{parent['table_name']}[/green]")
+                parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
                 # Add file references
-                if parent.get('dml_path'):
-                    parent_node.add(f"[dim]DML: {parent['dml_path']}[/dim]")
-                if parent.get('ddl_path'):
-                    parent_node.add(f"[dim]DDL: {parent['ddl_path']}[/dim]")
-                parent_node.add(f"[dim]Base: {parent['base_path']}[/dim]")
+                if parent.dml_ref:
+                    parent_node.add(f"[dim]DML: {parent.dml_ref}[/dim]")
+                if parent.ddl_ref:
+                    parent_node.add(f"[dim]DDL: {parent.ddl_ref}[/dim]")
+                parent_node.add(f"[dim]Path: {parent.path}[/dim]")
                 parent_node.add(f"[dim]Type: parent[/dim]")
         if node_data.children:
             for child in node_data.children:
-                child_node = tree_node.add(f"[green]{child['table_name']}[/green]")
+                child_node = tree_node.add(f"[green]{child.table_name}[/green]")
                 # Add file references
-                if child.get('dml_path'):
-                    child_node.add(f"[dim]DML: {child['dml_path']}[/dim]")
-                if child.get('ddl_path'):
-                    child_node.add(f"[dim]DDL: {child['ddl_path']}[/dim]")
-                child_node.add(f"[dim]Base: {child['base_path']}[/dim]")
+                if child.dml_ref:
+                    child_node.add(f"[dim]DML: {child.dml_ref}[/dim]")
+                if child.ddl_ref:
+                    child_node.add(f"[dim]DDL: {child.ddl_ref}[/dim]")
+                child_node.add(f"[dim]Base: {child.path}[/dim]")
                 child_node.add(f"[dim]Type: child[/dim]")
     
     # Add the root node details
-    tree.add(f"[dim]DML: {pipeline_def.dml_path}[/dim]")
-    tree.add(f"[dim]DDL: {pipeline_def.ddl_path}[/dim]")
+    tree.add(f"[dim]DML: {pipeline_def.dml_ref}[/dim]")
+    tree.add(f"[dim]DDL: {pipeline_def.ddl_ref}[/dim]")
     
     # Add parent nodes
     add_nodes_to_tree(pipeline_def, tree)
@@ -200,13 +200,23 @@ def _display_directed_graph(nodes, edges):
 def _process_children(nodes_directed, edges_directed, current_node):
     if current_node.children:
         for child in current_node.children:
-            child_ref = FlinkStatementHierarchy.model_validate(child)
-            nodes_directed.append(child_ref.table_name)
-            edges_directed.append((current_node.table_name, child_ref.table_name))
-            _process_children(nodes_directed, edges_directed, child_ref)
+            nodes_directed.append(child.table_name)
+            edges_directed.append((current_node.table_name, child.table_name))
+            _process_children(nodes_directed, edges_directed, child)
+
+def _process_parents(nodes_directed, edges_directed, current_node):
+    if current_node.parents:
+        for parent in current_node.parents:
+            nodes_directed.append(parent.table_name)
+            edges_directed.append((parent.table_name, current_node.table_name))
+            _process_parents(nodes_directed, edges_directed, parent)
+
 
 def _process_hierarchy_to_node(pipeline_def):
     nodes_directed = [pipeline_def.table_name]
     edges_directed = []
-    _process_children(nodes_directed, edges_directed, pipeline_def)
+    if len(pipeline_def.children) > 0:
+        _process_children(nodes_directed, edges_directed, pipeline_def)
+    if len(pipeline_def.parents) > 0:
+        _process_parents(nodes_directed, edges_directed, pipeline_def)
     _display_directed_graph(nodes_directed, edges_directed)

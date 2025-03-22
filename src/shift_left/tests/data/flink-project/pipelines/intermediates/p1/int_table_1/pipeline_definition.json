@@ -7,19 +7,19 @@
    "compute_pool_id": "",
    "parents": [
       {
-         "table_name": "src_table_1",
-         "type": "source",
-         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
-         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
-         "table_folder_name": "pipelines/sources/src_table_1",
-         "compute_pool_id": ""
-      },
-      {
          "table_name": "src_table_3",
          "type": "source",
          "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
          "ddl_ref": null,
          "table_folder_name": "pipelines/sources/p1/src_table_3",
+         "compute_pool_id": ""
+      },
+      {
+         "table_name": "src_table_1",
+         "type": "source",
+         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
+         "table_folder_name": "pipelines/sources/src_table_1",
          "compute_pool_id": ""
       }
    ],

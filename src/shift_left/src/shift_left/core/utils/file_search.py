@@ -220,7 +220,7 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     return file_paths
 
 def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:
-    print(f"Get dml name from table {table_name} and {product_name}")  
+    logging.info(f"Get dml name from table {table_name} and {product_name}")  
     if product_name:
         prefix= prefix + "-" + product_name
     if prefix:

@@ -58,6 +58,9 @@ class TestPipelineManager(unittest.TestCase):
 
     def test_walk_the_hierarchy_for_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
+        path= os.getenv("PIPELINES")
+        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        pm.build_pipeline_definition_from_table(table_path, path)
         result = pm.walk_the_hierarchy_for_report_from_table("int_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))

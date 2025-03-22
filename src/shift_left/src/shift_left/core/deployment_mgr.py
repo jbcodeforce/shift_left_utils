@@ -4,13 +4,14 @@ import time
 from logging.handlers import RotatingFileHandler
 from pydantic import BaseModel
 from shift_left.core.pipeline_mgr import (
-    ReportInfoNode,
     read_pipeline_metadata,
+    PIPELINE_JSON_FILE_NAME,
+    FlinkStatementHierarchy,
     walk_the_hierarchy_for_report_from_table)  
 
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.pipeline_mgr import ReportInfoNode, PIPELINE_JSON_FILE_NAME
+
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
     get_ddl_dml_names_from_table, 
@@ -76,7 +77,7 @@ def deploy_pipeline_from_table(table_name: str,
     If the compute pool id is present it will use it. If not it will 
     get the existing pool_id from the table already deployed.
     """    
-    pipeline_def: ReportInfoNode = walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
+    pipeline_def: FlinkStatementHierarchy = walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
     if pipeline_def is None:
         raise Exception(f"Table {table_name} not found in inventory")
     result: DeploymentReport = None
@@ -92,7 +93,7 @@ def deploy_pipeline_from_table(table_name: str,
         result = DeploymentReport(table_name, compute_pool_id, statement_name,flink_statement_deployed)
     return result
  
-def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: ReportInfoNode):
+def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkStatementHierarchy):
     """
     if the compute pool is given, use it, else assess if there is a statement
     for this table already running and reuse the compute pool, if not
@@ -135,7 +136,7 @@ def _garbage():
     _start_child_dmls(pipeline_def, inventory_path)
 
 
-def _deploy_ddl_statements(pipeline_def: ReportInfoNode, 
+def _deploy_ddl_statements(pipeline_def: FlinkStatementHierarchy, 
                            compute_pool_id: str, 
                            force: bool = False) -> Statement:
     config = get_config()
@@ -197,7 +198,7 @@ def _start_child_dmls(pipeline_def):
         return
     for node in pipeline_def.children:
         _resume_dml_statements(node['table_name']) # stop or delete and recreate
-        _pipeline_def = ReportInfoNode.model_validate(node)
+        _pipeline_def = FlinkStatementHierarchy.model_validate(node)
         _start_child_dmls(_pipeline_def)
 
 # ---- compute pool related functions

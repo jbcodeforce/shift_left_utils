@@ -1,3 +1,6 @@
+foundations:
+  - table_name: src_order_raw
+    ddl_for_test: tests/ddl_int_table_1.sql
 test_suite:
 - name: test_case_1
   inputs:

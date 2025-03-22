@@ -3,7 +3,7 @@
 ???- info "Version"
     Created Mars 21- 2025 
 
-The goals of this chapter is to present the requirements of this test tool, which in included as a command in the `shift-left` CLI.
+The goals of this chapter is to present the requirements and design of this test tool, which in included as a command in the `shift-left` CLI.
 
 ## Context
 
@@ -47,13 +47,13 @@ Options:
 * [ ] Be able to define test. The yaml is defined as
 
 ```yaml
-test_suite:
-- foundations:
-    inputs:
+
+foundations:
     - table_name: int_table_1
       ddl_for_test: tests/ddl_int_table_1.sql
     - table_name: int_table_2
       ddl_for_test: tests/ddl_int_table_2.sql
+test_suite:
 - name: test_case_1
     inputs:
     - table_name: int_table_1

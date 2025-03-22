@@ -1,3 +1,8 @@
+foundations:
+  - table_name: int_table_1
+    ddl_for_test: tests/ddl_int_table_1.sql
+  - table_name: int_table_2
+    ddl_for_test: tests/ddl_int_table_2.sql
 test_suite:
 - name: test_case_1
   inputs:

@@ -65,11 +65,11 @@ class FlinkStatementHierarchy(BaseModel):
     table_name: str
     type: Optional[str]
     path: str
-    ddl_ref: str
+    ddl_ref: Optional[str] = Field(default="", description="DDL path")
     dml_ref: str
     compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
-    parents: Optional[Set[FlinkTableReference]] = []
-    children: Optional[Set[FlinkTableReference]] = []
+    parents: Optional[Set[FlinkTableReference]] = Field(default=[], description="parents of this flink dml")
+    children: Optional[Set[FlinkTableReference]] = Field(default=[], description="users of the table created by this flink dml")
 
     def __hash__(self) -> int:
         return hash(self.table_name)
@@ -78,17 +78,6 @@ class FlinkStatementHierarchy(BaseModel):
         if not isinstance(other, FlinkStatementHierarchy):
             return NotImplemented
         return self.table_name == other.table_name
-
-class ReportInfoNode(BaseModel):
-    """Node containing reporting information for a table in the pipeline."""
-    table_name: str
-    base_path: str
-    type: Optional[str] = ''
-    ddl_path: Optional[str]
-    dml_path: str
-    compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
-    parents: Optional[Any] = []
-    children: Optional[Any] = []
 
 
 def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkStatementHierarchy:
@@ -141,7 +130,7 @@ def walk_the_hierarchy_for_report_from_table(table_name: str, inventory_path: st
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
 
     except Exception as e:
-        print(f"Error table not found in inventory: {e}")
+        logger.error(f"Error table not found in inventory: {e}")
         raise Exception("Error table not found in inventory")
     return _walk_the_hierarchy_recursive(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
@@ -166,7 +155,7 @@ def delete_metada_files(root_folder: str):
             if file_to_delete == file:
                 file_path=os.path.join(root, file)
                 os.remove(file_path)
-                print(f"File '{file_path}' deleted successfully.")
+                logger.info(f"File '{file_path}' deleted successfully.")
 
 
 
@@ -272,11 +261,11 @@ def _process_one_sink_folder(sink_folder_path, pipeline_path):
         if sql_scripts_path.is_dir():
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
                 if file_path.is_file() and file_path.name.startswith("dml"):
-                    print(f"Process the dml {file_path}")
+                    logger.info(f"Process the dml {file_path}")
                     build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
     
 
-def _walk_the_hierarchy_recursive(pipeline_definition_fname: str) -> ReportInfoNode:
+def _walk_the_hierarchy_recursive(pipeline_definition_fname: str) -> FlinkStatementHierarchy:
     """
     Walk the hierarchy of tables given the pipeline definition file name.
     This function is used to generate a report on the pipeline hierarchy for a given table.
@@ -284,15 +273,9 @@ def _walk_the_hierarchy_recursive(pipeline_definition_fname: str) -> ReportInfoN
     The parents are a list of dictionnary with the same structure, and so on.
     """
     current_hierarchy: FlinkStatementHierarchy= read_pipeline_metadata(pipeline_definition_fname)
-    parents = _visit_parents(current_hierarchy)["parents"]
-    children = _visit_children(current_hierarchy)["children"]
-    return ReportInfoNode.model_validate({"table_name" : current_hierarchy.table_name, 
-            "base_path": current_hierarchy.path,
-            "type": current_hierarchy.type,
-            "ddl_path": current_hierarchy.ddl_ref,
-            "dml_path": current_hierarchy.dml_ref,
-            "parents": parents, 
-            "children": children})
+    current_hierarchy = _visit_parents(current_hierarchy)
+    current_hierarchy = _visit_children(current_hierarchy)
+    return current_hierarchy
     
 
 def _create_table_hierarchy_node(
@@ -358,7 +341,8 @@ def _build_table_reference(
         "type": type,
         "dml_ref": dml_file_name,
         "ddl_ref": ddl_file_name,
-        "table_folder_name": table_folder
+        "table_folder_name": table_folder,
+        "compute_pool_id":  ""
     })
 
     
@@ -473,7 +457,7 @@ def _get_matching_node_pipeline_info(access_info: FlinkTableReference) -> FlinkS
     if access_info.table_folder_name:
         return read_pipeline_metadata(access_info.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME)
 
-def _visit_parents(current_node: FlinkStatementHierarchy) -> Dict:
+def _visit_parents(current_node: FlinkStatementHierarchy) -> FlinkStatementHierarchy:
     """Visit parents of current node.
     
     Args:
@@ -482,20 +466,16 @@ def _visit_parents(current_node: FlinkStatementHierarchy) -> Dict:
     Returns:
         Dictionary containing parent information
     """
-    parents = []
-    print(f"->> {current_node.table_name}")
+    parents = set()
+    logger.info(f"->> {current_node.table_name}")
     for parent in current_node.parents:
         parent_info = _get_matching_node_pipeline_info(parent)
         rep = _visit_parents(parent_info)
-        parents.append(rep)
-    return {"table_name": current_node.table_name, 
-            "type": current_node.type, 
-            "ddl_path": current_node.ddl_ref, 
-            "dml_path": current_node.dml_ref, 
-            "base_path": current_node.path, 
-            "parents": parents }
+        parents.add(rep)
+    current_node.parents = parents
+    return current_node
 
-def _visit_children(current_node: FlinkStatementHierarchy) -> Dict:
+def _visit_children(current_node: FlinkStatementHierarchy) -> FlinkStatementHierarchy:
     """Visit children of current node.
     
     Args:
@@ -504,10 +484,12 @@ def _visit_children(current_node: FlinkStatementHierarchy) -> Dict:
     Returns:
         Dictionary containing child information
     """
-    children = []
+    children = set()
     for child in current_node.children:
-        children.append(_visit_children(_get_matching_node_pipeline_info(child)))
-    return {"table_name": current_node.table_name, "ddl_path": current_node.ddl_ref, "dml_path": current_node.dml_ref, "base_path": current_node.path, "children": children }
+        children.add(_visit_children(_get_matching_node_pipeline_info(child)))
+    current_node.children = children
+    return current_node
+
 
 
 
