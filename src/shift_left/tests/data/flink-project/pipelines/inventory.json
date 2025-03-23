@@ -11,7 +11,7 @@
         "table_name": "src_table_3",
         "type": "source",
         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
-        "ddl_ref": null,
+        "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_table_3.sql",
         "table_folder_name": "pipelines/sources/p1/src_table_3",
         "compute_pool_id": ""
     },

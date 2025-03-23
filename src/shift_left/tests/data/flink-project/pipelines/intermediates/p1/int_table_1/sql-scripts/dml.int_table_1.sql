@@ -1,5 +1,5 @@
 INSERT INTO int_table_1
 SELECT 
-  id, user_name, account
-FROM src_table_1 a
-left join src_table_3 b on a.id = b.id;
+  u.user_id as id, u.user_name, b.account_id, b.account_name, b.balance
+FROM src_table_1 u
+left join src_table_3 b on a.user_id = b.user_id;

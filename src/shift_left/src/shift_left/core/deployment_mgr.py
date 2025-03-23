@@ -122,7 +122,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkStatement
 def deploy_flink_statement(flink_statement_file_path: str, 
                            compute_pool_id: str, 
                            statement_name: str, 
-                           config: dict):
+                           config: dict) -> Statement:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool.
@@ -136,7 +136,10 @@ def deploy_flink_statement(flink_statement_file_path: str,
         sql_content = f.read()
         client = ConfluentCloudClient(config)
         properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-        return client.post_flink_statement(compute_pool_id, statement_name, sql_content,  properties )
+        return client.post_flink_statement(compute_pool_id, 
+                                           statement_name, 
+                                           sql_content,  
+                                           properties )
 
 
 
@@ -150,11 +153,27 @@ def deploy_ddl_statements(pipeline_def: FlinkStatementHierarchy,
     ddl_statement_name, _ = get_ddl_dml_names_from_table(pipeline_def.table_name, 
                                                       config['kafka']['cluster_type'], 
                                                       product_name)
-    logger.info(f"Deploying DDL statements from {pipeline_def.ddl_ref} named {ddl_statement_name}")
+    logger.info(f"Deploying DDL statements named {ddl_statement_name} from {pipeline_def.ddl_ref} ")
     statement = search_existing_flink_statement(ddl_statement_name)
     if statement:
         _delete_flink_statement(ddl_statement_name)
-    deploy_flink_statement(pipeline_def.ddl_ref, compute_pool_id, ddl_statement_name, config)
+        drop_table(pipeline_def.table_name)
+    
+    statement=deploy_flink_statement(pipeline_def.ddl_ref, compute_pool_id, ddl_statement_name, config)
+    return statement
+
+def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id=config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    sql_content = f"drop table {table_name};"
+    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+    statement_name = "drop-" + table_name.replace('_','-')
+    statement = search_existing_flink_statement(statement_name)
+    if statement:
+        _delete_flink_statement(statement_name)
+    client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
 
 # ---- private API
 
@@ -176,14 +195,7 @@ def _deploy_dml_statements(pipeline_def: FlinkStatementHierarchy,  compute_pool_
 def _delete_flink_statement(statement_name: str) -> str:
     logger.info(f"Deleting Flink statement: {statement_name}")
     client = ConfluentCloudClient(get_config())
-    result = client.delete_flink_statement(statement_name)
-    logger.info(result)
-    if "404" in result['errors'][0]['status']:
-        return result['errors'][0]['detail']
-    elif "202" in result:
-        return "statement deleted"
-    else:
-        return result['errors'][0]
+    client.delete_flink_statement(statement_name)
 
     
 def _stop_dml_statement(table_name: str, statement):

@@ -16,7 +16,7 @@ The objectives of a test harness for developer and system integration is to vali
 1. be able to generate test data from schema registry or table definition - and with developer being able to tune test data for each test cases.
 1. produce test data to n source topics, consumes from the expected output topic and validates expected results. All this flow being one test case. This may be automated for non-regression testing to ensure continuous quality.
 1. support multiple testcase definitions as a test suite
-1. tear done topics and data.
+1. tear down topics and data.
 1. Do not impact other topics that may be use to do integration tests within the same Kafka Cluster.
 
 The following diagram illustrates the global infrastructure deployment context:
@@ -98,7 +98,7 @@ test_suite:
 * [ ] For each test cases defined do the following on a selected compute pool id
 
     * Execute the foundation sql statements to create the temporary tables for injecting test data (e.g. `tests/ddl_int_table_1.sql`, `tests/ddl_int_table_2.sql`). The name of the tables are changed to add `_ut` at the end to avoid colision with existing topics.
-    * Deploy the target flink deployment to test, by loading the sql content from the file (e.g. `sql-scripts/dml.fct_order.sql`) but modifying the table names dynamically (e.g.  `int_table_1` becomimg `int_table_1_ut`). 
+    * Deploy the target flink deployment to test, by loading the sql content from the file (e.g. `sql-scripts/dml.fct_order.sql`) but modifying the table names dynamically (e.g.  `int_table_1` becoming `int_table_1_ut`). 
     * Execute the inputs SQL statements to inject the data to the different source tables.
     * Execute the validation SQL statement to validate the expected results
 

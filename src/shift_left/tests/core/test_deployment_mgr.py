@@ -56,23 +56,30 @@ class TestDeploymentManager(unittest.TestCase):
         table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
         pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-        dm.deploy_ddl_statements(pipeline_def)
+        statement = dm.deploy_ddl_statements(pipeline_def)
+        assert statement
+        print(statement)
 
+    def test_drop_table(self):
+        dm.drop_table("int_table_1")
+        
     def test_deploy_flink_statement(self):
         config = get_config()
         insert_data_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/tests/insert_int_table_1_1.sql"
         dm.deploy_flink_statement(insert_data_path, None, None, config)
 
-    def test_deploy_sink_table(self):
+    def test_deploy_pipeline_from_sink_table(self):
         config = get_config()
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
+        dm.deploy_pipeline_from_table()
+
         pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
         assert pipeline_def.ddl_path
         print(pipeline_def.ddl_path)
         ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], "p1")
         print(ddl_name)
-        statement= dm._deploy_ddl_statements(inventory_path + '/../' + pipeline_def.ddl_path, ddl_name, config["flink"]["compute_pool_id"])
+        statement= dm.deploy_ddl_statements(inventory_path + '/../' + pipeline_def.ddl_path, ddl_name, config["flink"]["compute_pool_id"])
         assert statement.status.phase == 'COMPLETED'
     
     def _test_delete_a_statement(self):

@@ -7,6 +7,7 @@ import os, time
 from base64 import b64encode
 from typing import List, Dict
 from shift_left.core.utils.app_config import get_config
+from shift_left.core.flink_statement_model import *
 
 
 log_dir = os.path.join(os.getcwd(), 'logs')
@@ -168,7 +169,11 @@ class ConfluentCloudClient:
             logger.error(f"Error waiting for response {e}")
             return ""
 
-    def post_flink_statement(self, compute_pool_id: str,  statement_name: str, sql_statement: str, properties: str, stopped: bool = False): 
+    def post_flink_statement(self, compute_pool_id: str,  
+                             statement_name: str, 
+                             sql_statement: str, 
+                             properties: str, 
+                             stopped: bool = False) -> Statement: 
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -190,7 +195,8 @@ class ConfluentCloudClient:
             logger.info(f"POST response= {response}")
             #statement_id = response["metadata"]["uid"]
             #logger.debug(f"Statement id for post request: {statement_id}")
-            return self._wait_response(url, statement_name)
+            self._wait_response(url, statement_name)
+            return Statement.response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
 

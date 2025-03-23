@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS int_table_1 (
     id STRING NOT NULL,
     user_name STRING, 
-    account STRING,
+    account_id STRING,
+    account_name STRING,
+    balance int,
     PRIMARY KEY(id) NOT ENFORCED 
 ) DISTRIBUTED BY HASH(id) INTO 1 BUCKETS WITH (
    'kafka.retention.time' = '0',
