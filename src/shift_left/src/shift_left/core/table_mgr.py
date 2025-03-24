@@ -50,7 +50,7 @@ def build_folder_structure_for_table(table_name: str,
     else:
         internal_table_name=table_name
     product_name = extract_product_name(table_folder)
-    _create_makefile(internal_table_name, SCRIPTS_DIR, SCRIPTS_DIR, table_folder, config["kafka"]["cluster_type"], product_name)
+    _create_makefile(internal_table_name, table_folder, config["kafka"]["cluster_type"], product_name)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
@@ -95,8 +95,6 @@ def build_update_makefile(pipeline_folder: str, table_name: str):
     existing_path = inventory[table_name]["table_folder_name"]
     table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
     _create_makefile( table_name, 
-                    SCRIPTS_DIR, 
-                    SCRIPTS_DIR, 
                     table_folder, 
                     get_config()["kafka"]["cluster_type"], None)
 
@@ -188,8 +186,6 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
 
     
 def _create_makefile(table_name: str, 
-                     ddl_folder: str,
-                     dml_folder: str, 
                      out_dir: str, 
                      cluster_type: str, 
                      product_name: str):
@@ -201,14 +197,9 @@ def _create_makefile(table_name: str,
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     makefile_template = env.get_template(f"makefile_ddl_dml_tmpl.jinja")
 
-    ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, cluster_type, product_name)
     context = {
         'table_name': table_name,
-        'ddl_statement_name': ddl_name, 
-        'dml_statement_name': dml_name,
-        'drop_statement_name': table_name.replace("_","-"),
-        'ddl_folder': ddl_folder,
-        'dml_folder': dml_folder
+        'script_pre_kebab': cluster_type
     }
     rendered_makefile = makefile_template.render(context)
     # Write the rendered Makefile to a file

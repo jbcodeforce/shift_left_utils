@@ -44,7 +44,7 @@ Do not add suggestions or explanations in the response, just return the structur
 Do not use VARCHAR prefer STRING. 
 When the source SQL or DBT code has the following constructs:
 
-* 
+*  `surrogate_key` to a MD5(CONCAT())
 * epoch_to_ts
 
 
