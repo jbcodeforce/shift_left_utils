@@ -66,31 +66,35 @@ def search_existing_flink_statement(statement_name: str) -> None | Statement:
         return Statement(**statements[0])
     return None
     
+def get_statement(statement_name: str) -> None | Statement:
+    """
+    Get the statement given the statement name
+    """
+    client = ConfluentCloudClient(get_config())
+    return client.get_statement_info(statement_name)
 
+    
 def deploy_pipeline_from_table(table_name: str, 
                                inventory_path: str, 
                                compute_pool_id: str,
                                dml_only: bool = False,
-                               force: bool = False ) -> DeploymentReport:
+                               force_children: bool = False ) -> DeploymentReport:
     """
     Given the table name, executes the dml and ddl to deploy a pipeline.
     If the compute pool id is present it will use it. If not it will 
     get the existing pool_id from the table already deployed, if none
     is defined it will create a new pool and assign the pool_id.
     A deployment may impact children statement depending of the semantic of the current
-    DDL and the children's one.
+    DDL and the children's one. And will look at parents to be sure the deployment will work
+    to avoid table not found issues.
     """    
     pipeline_def: FlinkStatementHierarchy = walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
     result: DeploymentReport = None
     compute_pool_id= get_or_build_compute_pool(compute_pool_id, pipeline_def)
-    if dml_only:
-        statement_name = _deploy_dml_statements(pipeline_def, compute_pool_id, force)
-        flink_statement_deployed=[pipeline_def.dml]
-        result = DeploymentReport(table_name, compute_pool_id, statement_name,flink_statement_deployed)
-    else:
-        deploy_ddl_dml_statements(pipeline_def, compute_pool_id)
-        flink_statement_deployed=[pipeline_def.ddl_ref, pipeline_def.dml_ref]
-        result = DeploymentReport(table_name, compute_pool_id, statement_name,flink_statement_deployed)
+   
+    statement = deploy_ddl_dml_statements(pipeline_def, compute_pool_id, dml_only, force_children)
+    flink_statement_deployed=[pipeline_def.ddl_ref, pipeline_def.dml_ref]
+    result = DeploymentReport(table_name, compute_pool_id, statement.statement_name, flink_statement_deployed)
     return result
  
 def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkStatementHierarchy):
@@ -143,7 +147,9 @@ def deploy_flink_statement(flink_statement_file_path: str,
 
 
 def deploy_ddl_dml_statements(pipeline_def: FlinkStatementHierarchy, 
-                              compute_pool_id: Optional[str] = None) -> Statement:
+                              compute_pool_id: Optional[str] = None,
+                              dml_only: bool = False,
+                              force_children: bool = False) -> Statement:
     """
     For the given ddl if this is a sink (no children), we need to assess if parents are running up to
     the sources if not need to start them too. This is a way to start a full pipeline.
@@ -153,13 +159,22 @@ def deploy_ddl_dml_statements(pipeline_def: FlinkStatementHierarchy,
     ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
                                                       config['kafka']['cluster_type'], 
                                                       product_name)
-    logger.info(f"Deploying DDL statements named {ddl_statement_name} from {pipeline_def.ddl_ref} ")
-    statement = search_existing_flink_statement(ddl_statement_name)
+    
+    statement = get_statement(dml_statement_name)
     if statement:
-        _delete_flink_statement(ddl_statement_name)
-        drop_table(pipeline_def.table_name)
-    statement = _deploy_parents_if_needed([(pipeline_def, ddl_statement_name, dml_statement_name)], pipeline_def, compute_pool_id, config)
-
+        _delete_flink_statement(dml_statement_name)
+        if not dml_only:
+            drop_table(pipeline_def.table_name)
+            ddl_stmt =  get_statement(ddl_statement_name)
+            if ddl_stmt:
+                _delete_flink_statement(ddl_statement_name)
+    statement = _deploy_current_with_parents_when_needed([(pipeline_def, ddl_statement_name, 
+                                                           dml_statement_name)], 
+                                                           pipeline_def, 
+                                                           compute_pool_id, 
+                                                           dml_only,
+                                                           config)
+    _process_children(pipeline_def, compute_pool_id, force_children, config)
     return statement
 
 def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
@@ -172,25 +187,10 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     statement_name = "drop-" + table_name.replace('_','-')
     statement = search_existing_flink_statement(statement_name)
     if statement:
-        _delete_flink_statement(statement_name)
+        client.delete_flink_statement(statement_name)
     client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
 
 # ---- private API
-
-def _deploy_dml_statements(pipeline_def: FlinkStatementHierarchy,  compute_pool_id: str, force: bool= False):
-    logger.info(f"Deploying DML statements from {pipeline_def.dml_ref}")
-    # TODO: implement
-    logger.info(f"* Delete the current table DML statement to stop processing")
-
-    logger.info(f"* Stop children dml statements - recursively")
-    _stop_child_dmls(pipeline_def)
-    logger.info("recreate the table using the DDL")
-    
-    logger.info(f"* Recreate the new DML for this table")
-   
-    logger.info(f"* Re-start the child DMLs")
-    #_start_child_dmls(pipeline_def, inventory_path)
-
 
 def _delete_flink_statement(statement_name: str) -> str:
     logger.info(f"Deleting Flink statement: {statement_name}")
@@ -225,10 +225,30 @@ def _start_child_dmls(pipeline_def):
         _pipeline_def = FlinkStatementHierarchy.model_validate(node)
         _start_child_dmls(_pipeline_def)
 
-def _deploy_parents_if_needed(table_list_to_process: List[FlinkStatementHierarchy], 
+def _process_children(current_pipeline_def: FlinkStatementHierarchy, 
+                      compute_pool_id: str,
+                      config: dict):
+    pass
+
+def _deploy_dml_statements(pipeline_def: FlinkStatementHierarchy,  compute_pool_id: str, force: bool= False):
+    logger.info(f"Deploying DML statements from {pipeline_def.dml_ref}")
+    # TODO: implement
+    logger.info(f"* Delete the current table DML statement to stop processing")
+
+    logger.info(f"* Stop children dml statements - recursively")
+    _stop_child_dmls(pipeline_def)
+    logger.info("recreate the table using the DDL")
+    
+    logger.info(f"* Recreate the new DML for this table")
+   
+    logger.info(f"* Re-start the child DMLs")
+    #_start_child_dmls(pipeline_def, inventory_path)
+
+def _deploy_current_with_parents_when_needed(table_list_to_process: List[FlinkStatementHierarchy], 
                               current_pipeline_def: FlinkStatementHierarchy, 
                               compute_pool_id: str,
-                              config: dict):
+                              dml_only: bool = False, 
+                              config: dict = None):
     """
     The current table may have parents not yet deploy so we need to deploy them
     """
@@ -243,11 +263,13 @@ def _deploy_parents_if_needed(table_list_to_process: List[FlinkStatementHierarch
             ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_table(parent.table_name, 
                                                         config['kafka']['cluster_type'], 
                                                         product_name)
-            statement = search_existing_flink_statement(dml_statement_name)
+            statement = get_statement(dml_statement_name)
             if not statement:
-                logger.info(f"\nNeed to deploy {parent.table_name}")
-                table_list_to_process.append((parent, ddl_statement_name, dml_statement_name))
-                _deploy_parents_if_needed(table_list_to_process, parent, compute_pool_id, config)
+                statement =  get_statement(ddl_statement_name)
+                if not statement:  # yes this is ugly
+                    logger.info(f"\nNeed to deploy {parent.table_name}")
+                    table_list_to_process.append((parent, ddl_statement_name, dml_statement_name))
+                    _deploy_current_with_parents_when_needed(table_list_to_process, parent, compute_pool_id, config)
         to_process= table_list_to_process.pop()
         logger.info(f"\nDeploy ddl and dml for {to_process}")
         return _deploy_ddl_dml(to_process, compute_pool_id, config)

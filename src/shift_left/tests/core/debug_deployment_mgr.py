@@ -1,7 +1,6 @@
 
 import unittest
 import os
-import json 
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
     
@@ -41,7 +40,7 @@ class TestDeploymentManager(unittest.TestCase):
         ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
                                                         config['kafka']['cluster_type'], 
                                                         product_name)
-        statement = dm._deploy_parents_if_needed([(pipeline_def, ddl_statement_name, dml_statement_name)], pipeline_def, config['flink']['compute_pool_id'], config)
+        statement = dm._deploy_current_with_parents_when_needed([(pipeline_def, ddl_statement_name, dml_statement_name)], pipeline_def, config['flink']['compute_pool_id'], config)
         print(statement)
 
 if __name__ == '__main__':

@@ -30,9 +30,11 @@ app:
 def mock_pipeline_data():
     return {
         "table_name": "test_table",
+        "type": "fact",
         "base_path": "pipelines/test_table",
         "ddl_path": "pipelines/test_table/sql-scripts/ddl_test_table.sql",
         "dml_path": "pipelines/test_table/sql-scripts/dml_test_table.sql",
+        "compute_pool_id": "cnp",
         "parents": [
             {
                 "table_name": "parent_table1",
@@ -66,7 +68,7 @@ class TestPipelineCLI(unittest.TestCase):
             assert "parent_table1" in result.stdout
             mock_walk.assert_called_once_with('test_table')
 
-    def test_report_command_error(self):
+    def test_report_command_error(self, mock_pipeline_data):
         """Test error handling when pipeline data cannot be retrieved"""
         with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
             mock_walk.side_effect = Exception("Pipeline definition not found")

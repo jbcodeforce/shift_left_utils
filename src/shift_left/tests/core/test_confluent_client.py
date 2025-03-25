@@ -43,6 +43,24 @@ class TestConfluentClient(unittest.TestCase):
         print(f"{pool['status']['current_cfu']} over {pool['spec']['max_cfu']}")
 
 
+    def test_create_statement(self):
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        statement_name="test-statement"
+        sql_content = "select * from `examples`.`marketplace`.`clicks` limit 10;"
+        properties = {'sql.current-catalog' : 'examples' , 'sql.current-database' : 'marketplace'}
+       
+        statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
+        print(f"\n\n---- {statement}")
+        assert statement
+        statement = client.get_statement_info(statement_name)
+        assert statement.status.phase == "RUNNING"
+        resp = client.update_flink_statement(statement_name,  statement, True)
+        print(resp)
+        #assert statement['status']['phase'] == "STOPPED"
+        status=client.delete_flink_statement(statement_name)
+        print(status)
+        assert "deleted" == status
 
 if __name__ == '__main__':
     unittest.main()

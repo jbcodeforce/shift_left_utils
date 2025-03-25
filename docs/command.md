@@ -34,6 +34,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
+* `list-compute-pools`: Get the complete list and detail of the...
 
 ### `project init`
 
@@ -77,6 +78,22 @@ $ project list-topics [OPTIONS] PROJECT_PATH
 
 **Options**:
 
+* `--help`: Show this message and exit.
+
+### `project list-compute-pools`
+
+Get the complete list and detail of the compute pools of the given environment_id. If the environment_id is not specified, it will use the conflig.yaml
+with the [&#x27;confluent_cloud&#x27;][&#x27;environment_id&#x27;]
+
+**Usage**:
+
+```console
+$ project list-compute-pools [OPTIONS]
+```
+
+**Options**:
+
+* `--environment-id TEXT`: Environment_id to return all compute pool
 * `--help`: Show this message and exit.
 
 ## `table`
@@ -254,7 +271,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 **Options**:
 
 * `--ddl`: Focus on DDL processing. Default is only DML
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x106b963f0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107ca5df0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`
@@ -328,7 +345,7 @@ $ pipeline delete-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
 
 **Arguments**:
 
-* `PATH_FROM_WHERE_TO_DELETE`: [required]
+* `PATH_FROM_WHERE_TO_DELETE`: Delete metadata pipeline_definitions.json in the given folder  [required]
 
 **Options**:
 

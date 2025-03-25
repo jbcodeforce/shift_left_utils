@@ -1,6 +1,16 @@
+CREATE TABLE IF NOT EXISTS a_table (
 
-INSERT INTO a
-SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+  -- put here column definitions
+  PRIMARY KEY(default_key) NOT ENFORCED
+) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS
+WITH (
+  'changelog.mode' = 'append',
+  'key.format' = 'avro-registry',
+  'value.format' = 'avro-registry',
+  'kafka.retention.time' = '0',
+   'scan.bounded.mode' = 'unbounded',
+   'scan.startup.mode' = 'earliest-offset',
+  'value.fields-include' = 'all',
+  'key.avro-registry.schema-context' = 'dev-',
+  'value.avro-registry.schema-context' = 'dev-'
+);

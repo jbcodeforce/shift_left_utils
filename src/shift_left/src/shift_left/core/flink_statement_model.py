@@ -20,12 +20,12 @@ class Column(BaseModel):
     type: Optional[Type] = Field(None, description="type of the column if applicable")
 
 class Schema(BaseModel):
-    columns: List[Column]
+    columns: Optional[List[Column]] = Field(None, description="columns of the schema definition")
 
 class Traits(BaseModel):
     is_append_only: bool
     is_bounded: bool
-    flink_schema: Schema =  Field(alias="schema")
+    flink_schema: Optional[Schema] =  Field(alias="schema", default=None)
     sql_kind: str
     upsert_columns: Optional[List[str]] = Field(default=None, description="Upsert columns if applicable")
 
