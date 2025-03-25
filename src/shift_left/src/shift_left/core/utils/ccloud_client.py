@@ -108,14 +108,11 @@ class ConfluentCloudClient:
         results=[]
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
-        if self.config["confluent_cloud"]["url_scope"].lower() == "unknown":
-            url=f"https://api.private.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}?environment={env_id}"
-        else:
-            url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}&environment={env_id}"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}&environment={env_id}"
         while True:
             if next_page_token:
                 parsed_url = urlparse(next_page_token)
-                path = parsed_url.path + '?' + parsed_url.query if parsed_url.query else parsed_url.path
+                path = "https://api.confluent.cloud" + parsed_url.path + '?' + parsed_url.query if parsed_url.query else parsed_url.path
                 resp=self.make_request("GET", path + f"?page_size={page_size}")
             else:
                 resp=self.make_request("GET", url)
@@ -219,7 +216,7 @@ class ConfluentCloudClient:
                              statement_name: str, 
                              sql_statement: str, 
                              properties: str, 
-                             stopped: bool = 'False') -> Statement: 
+                             stopped: bool = False) -> Statement: 
         """
         POST to the statements API to execute a SQL statement.
         """

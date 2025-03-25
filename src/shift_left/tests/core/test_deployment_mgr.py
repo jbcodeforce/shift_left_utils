@@ -62,11 +62,14 @@ class TestDeploymentManager(unittest.TestCase):
 
     def test_drop_table(self):
         dm.drop_table("int_table_1")
-        
-    def test_deploy_flink_statement(self):
+    
+    def test_deploy_flink_statement_without_compute_pool(self):
         config = get_config()
-        insert_data_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/tests/insert_int_table_1_1.sql"
-        dm.deploy_flink_statement(insert_data_path, None, None, config)
+        insert_data_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-queries/ddl.fct_order.sql"
+        statement = dm.deploy_flink_statement(insert_data_path, None, None, config)
+        print (statement)
+        assert statement
+        dm.drop_table("fct_order")
 
     def test_deploy_pipeline_from_sink_table(self):
         config = get_config()

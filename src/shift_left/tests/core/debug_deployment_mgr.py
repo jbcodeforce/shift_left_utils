@@ -15,6 +15,7 @@ from shift_left.core.utils.file_search import (get_ddl_dml_names_from_table,
 from  shift_left.core.flink_statement_model import *
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
+import json
 
 class TestDeploymentManager(unittest.TestCase):
     
@@ -26,7 +27,7 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
-    def test_deploy_pipeline_from_sink_table(self):
+    def _test_deploy_pipeline_from_sink_table(self):
         """
         As a sink table, it needs to verify the parents are running. This is the first deployment
         so it will run ddl, then ddls of all parent recursively.
@@ -42,6 +43,14 @@ class TestDeploymentManager(unittest.TestCase):
                                                         product_name)
         statement = dm._deploy_current_with_parents_when_needed([(pipeline_def, ddl_statement_name, dml_statement_name)], pipeline_def, config['flink']['compute_pool_id'], config)
         print(statement)
+
+
+    def test_get_compute_pool_list(self):
+        client = ConfluentCloudClient(get_config())
+        config=get_config()
+        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
+        self.assertGreater(len(pools), 0)
+        print(json.dumps(pools, indent=2))
 
 if __name__ == '__main__':
     unittest.main()
