@@ -23,17 +23,21 @@ theme:
       - content.code.copy
       - content.tooltips
       - content.code.copy
+      - content.tabs.link
+      - search.suggest
       - search.highlight
       - navigation.instant
       - navigation.instant.progress
-      # - navigation.tabs
-      # - navigation.tabs.sticky
-      - navigation.instant
+      #- navigation.tabs
+      #- navigation.tabs.sticky
       - navigation.tracking
-      # - navigation.sections
-      #- navigation.expand
+      - navigation.sections
+      - navigation.expand
       - navigation.top
       - navigation.footer
+      - search.highlight
+      - navigation.instant
+      - navigation.instant.progress
 extra_css: ["extra.css"]
 plugins:
   - search:
@@ -50,14 +54,20 @@ markdown_extensions:
   - codehilite
   - footnotes
   - tables
+  #- pymdownx.blocks.caption
   - pymdownx.smartsymbols
   - toc:
       permalink: true
       toc_depth: 3
-  - pymdownx.tabbed
+  #- pymdownx.tabbed
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.tilde
   - pymdownx.details
   - pymdownx.tasklist:
       custom_checkbox: true

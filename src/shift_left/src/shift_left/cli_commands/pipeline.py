@@ -49,7 +49,7 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
     print(f"Pipeline built from {dml_file_name}")
 
 @app.command()
-def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument()]):
+def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument(help="Delete metadata pipeline_definitions.json in the given folder")]):
     """
     Delete a pipeline definitions from a given folder path
     """

@@ -56,7 +56,7 @@ class TestDeploymentManager(unittest.TestCase):
         table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
         pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-        statement = dm.deploy_ddl_statements(pipeline_def)
+        statement = dm.deploy_ddl_dml_statements(pipeline_def)
         assert statement
         print(statement)
 
@@ -72,15 +72,8 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
-        dm.deploy_pipeline_from_table()
+        statement = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], True, False)
 
-        pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-        assert pipeline_def.ddl_path
-        print(pipeline_def.ddl_path)
-        ddl_name, dml_name = get_ddl_dml_names_from_table(table_name, config["kafka"]["cluster_type"], "p1")
-        print(ddl_name)
-        statement= dm.deploy_ddl_statements(inventory_path + '/../' + pipeline_def.ddl_path, ddl_name, config["flink"]["compute_pool_id"])
-        assert statement.status.phase == 'COMPLETED'
     
     def _test_delete_a_statement(self):
         response = dm._delete_flink_statement('dev-p1-ddl-fct-order')

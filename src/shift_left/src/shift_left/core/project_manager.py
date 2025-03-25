@@ -3,7 +3,7 @@ import subprocess
 import logging
 import shutil
 import importlib.resources 
-from typing import Tuple
+from typing import Tuple, List
 from shift_left.core.utils.file_search import create_folder_if_not_exist
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
@@ -39,6 +39,10 @@ def get_topic_list(file_name: str):
             for topic in topics["data"]:
                 f.write(topic["topic_name"]+"\n")
     return topics["data"]
+
+def get_list_of_compute_pool(env_id: str) -> List[str]:
+    ccloud = ConfluentCloudClient(get_config())
+    return ccloud.get_compute_pool_list(env_id)
 
 # --- Private APIs ---
 

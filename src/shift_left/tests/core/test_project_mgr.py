@@ -25,5 +25,9 @@ class TestPojectManager(unittest.TestCase):
     def test_list_topic(self):
         pm.get_topic_list("./tmp/test_data_kimball_project/topics.txt")
 
+    def test_list_of_compute_pools(self):
+        env_id="env-nknqp3"
+        pm.get_list_of_compute_pool(env_id)
+        
 if __name__ == '__main__':
     unittest.main()

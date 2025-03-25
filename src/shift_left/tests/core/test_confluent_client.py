@@ -30,7 +30,8 @@ class TestConfluentClient(unittest.TestCase):
 
     def test_get_compute_pool_list(self):
         client = ConfluentCloudClient(get_config())
-        pools = client.get_compute_pool_list()
+        config=get_config()
+        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
         self.assertGreater(len(pools), 0)
         print(json.dumps(pools, indent=2))
 

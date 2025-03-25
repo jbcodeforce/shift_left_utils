@@ -1,8 +1,9 @@
 mkdocs-material
 mkdocs-minify-plugin
-mkdocs<3.4
-mkdocs-mermaid2-plugin
+mkdocs>=1.6.1
+#mkdocs-mermaid2-plugin
 #mkdocs-jupyter
 #matplotlib
 pytest
 mkdocstrings-python
+pymdown-extensions

@@ -1,9 +1,11 @@
 import typer
 from rich import print
+from shift_left.core.utils.app_config import get_config
 from shift_left.core.project_manager import (
         build_project_structure, 
         DATA_PRODUCT_PROJECT_TYPE, 
         KIMBALL_PROJECT_TYPE,
+        get_list_of_compute_pool,
         get_topic_list)
 from typing_extensions import Annotated
 """
@@ -43,3 +45,15 @@ def list_topics(project_path: Annotated[str, typer.Argument(help="Project path t
         print("#" * 30 + f" List topic {project_path}")
         list_of_topics = get_topic_list(project_path + "/topic_list.txt")
         print(list_of_topics)
+
+@app.command()
+def list_compute_pools(environment_id: Annotated[str , typer.Option(help="Environment_id to return all compute pool")] = None):
+        """
+        Get the complete list and detail of the compute pools of the given environment_id. If the environment_id is not specified, it will use the conflig.yaml
+        with the ['confluent_cloud']['environment_id']
+        """
+        if not environment_id:
+               environment_id = get_config().get('confluent_cloud').get('environment_id')
+        print("#" * 30 + f" List conpute pool {environment_id}")
+        list_of_pools = get_list_of_compute_pool(environment_id)
+        print(list_of_pools)

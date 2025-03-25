@@ -23,11 +23,12 @@ confluent_cloud:
   organization_id: <TO_FILL>
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
+  page_size: 100
+  url_scope: private
 flink:
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
   compute_pool_id: lfcp- <TO_FILL>
-  url_scope: private
   catalog_name:  <TO_FILL>
   database_name:  <TO_FILL>
   max_cfu: 10

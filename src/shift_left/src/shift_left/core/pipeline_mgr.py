@@ -160,7 +160,7 @@ def delete_metada_files(root_folder: str):
 
 
 
-def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
+def read_pipeline_metadata(relative_path_file_name: str) -> FlinkStatementHierarchy:
     """Read pipeline metadata from file.
     
     Args:
@@ -169,7 +169,7 @@ def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
     Returns:
         FlinkStatementHierarchy object
     """
-    file_name = from_pipeline_to_absolute(file_name)
+    file_name = from_pipeline_to_absolute(relative_path_file_name)
     try:
         with open(file_name, "r") as f:
             content = FlinkStatementHierarchy.model_validate_json(f.read())
@@ -178,7 +178,8 @@ def read_pipeline_metadata(file_name: str) -> FlinkStatementHierarchy:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
         return None
 
-def update_pipeline_metadata(file_name: str, data: FlinkStatementHierarchy):
+def update_pipeline_metadata(relative_path_file_name: str, data: FlinkStatementHierarchy):
+    file_name = from_pipeline_to_absolute(relative_path_file_name)
     with open(file_name, "w") as f:
         f.write(data.model_dump_json(indent=3))
 

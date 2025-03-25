@@ -52,6 +52,7 @@ class ConfluentCloudClient:
             "Authorization": self.auth_header,
             "Content-Type": "application/json"
         }
+        logger.debug(f"Make request {method} to {url}")
         response = requests.request(
             method=method,
             url=url,
@@ -62,7 +63,7 @@ class ConfluentCloudClient:
         if response.status_code in [200, 202]:
             logger.debug(f"\nMake http request: {response} and headers: {response.headers} msg: {response.text}")
         elif response.status_code in [400, 401, 403, 422]:
-            logger.error("Request failed:", response.json())
+            logger.error("Request failed:", str(response))
         else:
             logger.error("Request may have failed:", response.json())
             return response
@@ -84,12 +85,33 @@ class ConfluentCloudClient:
             logger.info(f"Error executing rest call: {e}")
             return None
     
-    def get_compute_pool_list(self):
+    def get_compute_pool_list(self, env_id: str) -> List[str]:
         """Get the list of compute pools"""
-        env_id=self.config["confluent_cloud"]["environment_id"]
+        if not env_id:
+            env_id=self.config["confluent_cloud"]["environment_id"]
         region=self.config["confluent_cloud"]["region"]
-        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}"
-        return self.make_request("GET", url)
+        results=[]
+        next_page_token = None
+        page_size = self.config["confluent_cloud"].get("page_size", 100)
+        if self.config["confluent_cloud"]["url_scope"].lower() == "unknown":
+            url=f"https://api.private.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}?environment={env_id}"
+        else:
+            url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}&environment={env_id}"
+        while True:
+            if next_page_token:
+                resp=self.make_request("GET", next_page_token)
+            else:
+                resp=self.make_request("GET", url)
+            if "data" in resp:
+                results.append(resp["data"])
+            if "metadata" in resp and "next" in resp["metadata"]:
+                next_page_token = resp["metadata"]["next"]
+                if not next_page_token:
+                    break
+            else:
+                break
+        return results
+        
 
     def get_compute_pool_info(self, compute_pool_id: str):
         """Get the info of a compute pool"""
@@ -97,9 +119,12 @@ class ConfluentCloudClient:
         self.api_secret = self.config["confluent_cloud"]["api_secret"]
         self.auth_header = self._generate_auth_header()
         env_id=self.config["confluent_cloud"]["environment_id"]
-        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
+        if self.config["confluent_cloud"]["url_scope"].lower() == "private":
+            url=f"https://api.private.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
+        else:
+            url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
-    
+
     def create_compute_pool(self, spec: dict):
         self.api_key = self.config["confluent_cloud"]["api_key"]
         self.api_secret = self.config["confluent_cloud"]["api_secret"]
@@ -139,7 +164,7 @@ class ConfluentCloudClient:
         self.api_key = self.config["flink"]["api_key"]
         self.api_secret = self.config["flink"]["api_secret"]
         self.auth_header = self._generate_auth_header()
-        if self.config["flink"]["url_scope"].lower() == "private":
+        if self.config["confluent_cloud"]["url_scope"].lower() == "private":
             url=f"https://flink.{region}.{cloud_provider}.private.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
         else:
             url=f"https://flink.{region}.{cloud_provider}.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"

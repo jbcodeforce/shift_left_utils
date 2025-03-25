@@ -3,7 +3,7 @@
 ???- info "Version"
     Created Mars 21- 2025 
 
-The goals of this chapter is to present the requirements and design of the pipeline management tools.
+The goals of this chapter is to present the requirements, design, and validation of the pipeline management tools.
 
 ## Context
 
@@ -18,30 +18,70 @@ Flink statements are inherently interdependent, consuming and joining tables pro
 
 ## Managing the pipeline
 
-The recipe chapter has how-to descriptions on some the specific commands to use for pipeline management. The following high level concepts are the foundations for this management:
+The [recipe chapter](./recipes.md) has how-to descriptions on some the specific commands to use for pipeline management. The following high level concepts are the foundations for this management:
 
 1. The git folder is the source of truth for pipeline definitions. 
-1. The table inventory must be run with the simple command:
+1. The table inventory, which lists all the Flink tables, must be run with a simple command like:
 
     ```
     shift_left table build-inventory $PIPELINES
     ```
 
-    and should be run as soon as there is a new commit. The `inventory.json` is persisted in the $PIPELINES folder and committed in git. It will be extensively use by any pipeline commands.
+    The `inventory.json` is persisted in the $PIPELINES folder and committed in git. It will be extensively used by any pipeline commands.
 
-1. Table pipeline definition json files, that include single level of information about the pipeline are built from the sink tables. One by one during development phase or by going into all facts, dimension and views folders.
+1. Table pipeline definition json file, includes a single level of information about the pipeline. Those files are built from the sink tables going up to the src. During the Flink development phase, developers can use this tool to build the metadata:
 
+    ```sh
+    shift_left pipeline build_metadata $PIPELINES/facts/p1/fct_order/sql_scripts/dml.dct_order.sql $PIPELINES
     ```
+
+    The created file looks like:
+
+    ```json
+    {
+    "table_name": "fct_order",
+    "type": "fact",
+    "path": "pipelines/facts/p1/fct_order",
+    "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
+    "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+    "compute_pool_id": "",
+    "parents": [
+        {
+            "table_name": "int_table_1",
+            "type": "intermediate",
+            "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
+            "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_table_1.sql",
+            "table_folder_name": "pipelines/intermediates/p1/int_table_1",
+            "compute_pool_id": ""
+        },
+        {
+            "table_name": "int_table_2",
+            "type": "intermediate",
+            "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
+            "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_table_2.sql",
+            "table_folder_name": "pipelines/intermediates/p1/int_table_2",
+            "compute_pool_id": ""
+        }
+    ],
+    "children": []
+    }
+    ```
+
+    Developers or SREs may use another command to go over all facts, dimension or views folders, which will be all those definitions:
+
+    ```sh
     shift_left pipeline build-all-metadata $PIPELINES
     ```
 
-1. Hierarchy view of a pipeline can be used for reporting, or by the developer to understand the complex tree, he/she is using when adding a new table:
+    Note that going to a second sink to the same intermediate or source table will modify existing definitions to add a children. The parents and children lists are in fact Set so no duplicate entries if a table is used by multiple pipelines.
 
-    ```
+1. A hierarchy view of a pipeline can be used for reporting, or by the developer to understand the complex tree, he/she is using when adding a new table:
+
+    ```sh
     shift_left pipeline report fct_order --json
     ```
 
-1. But it used to deploy a selected table and its children. Here is an example of tables that will be modified by a stateful statement deployment:
+1. Hierarchy view is used to deploy a selected table and its children. Here is an example of all the tables (fct_order) that will be modified by a stateful statement deployment (int_table_1):
 
 <figure markdown="span">
 ![](./images/flink_pipeline.drawio.png)
@@ -59,6 +99,7 @@ While a source processing, that most of the time are doing deduplication, which 
 
 ## Requirements
 
+The following list presents the requirements to implement:
 
 * [x] The expected command to deploy should be simple like:
 
@@ -70,7 +111,7 @@ shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
    --force               The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml) [default: no-force]
 ```
 
-* [ ] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
+* [ ] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not, it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
 
 * [ ] Support deploying only DML, or both DDL and DML (default)
 * [ ] Deploying a DDL, means dropping existing table if exists.
@@ -85,4 +126,6 @@ The following may be considered:
 
 ## Developer's note
 
-The module to support the management of pipeline is `pipeline_mgr.py`
+The module to support the management of pipeline is `pipeline_mgr.py` and `deployment_mgr.py`.
+
+* Testing a Flink deployment see []()

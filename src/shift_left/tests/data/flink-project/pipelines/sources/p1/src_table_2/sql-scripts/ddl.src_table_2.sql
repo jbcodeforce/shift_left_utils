@@ -2,7 +2,7 @@ create table if not exists src_table_2 (
     order_id STRING,
     product_id STRING,
     customer_id STRING,
-    amount int
+    amount int,
     PRIMARY KEY(order_id) NOT ENFORCED 
 ) DISTRIBUTED BY HASH(order_id) INTO 1 BUCKETS WITH (
    'kafka.retention.time' = '0',
