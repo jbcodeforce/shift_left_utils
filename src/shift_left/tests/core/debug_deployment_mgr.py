@@ -22,25 +22,20 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
-    def _test_deploy_pipeline_from_sink_table(self):
+    def test_deploy_pipeline_from_sink_table(self):
         """
         As a sink table, it needs to verify the parents are running. This is the first deployment
         so it will run ddl, then ddls of all parent recursively.
         As we deploy both DDL and DML, force does not need to be True
         """
         config = get_config()
-        #tm.get_or_create_inventory(os.getenv("PIPELINES"))
-        #pm.delete_metada_files(os.getenv("PIPELINES"))
-        path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
-        #result = pm.build_pipeline_definition_from_table(table_path, path)
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
         result = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], False, False)
         assert result
         print(result)
     
-    def test_create_statement(self):
+    def _test_create_statement(self):
         config = get_config()
         client = ConfluentCloudClient(config)
         statement_name="test-statement"
@@ -51,6 +46,8 @@ class TestDeploymentManager(unittest.TestCase):
         print(f"\n\n---- {statement}")
         status=client.delete_flink_statement(statement_name)
         print(f"\n--- {status}")
+
+
 
 if __name__ == '__main__':
     unittest.main()

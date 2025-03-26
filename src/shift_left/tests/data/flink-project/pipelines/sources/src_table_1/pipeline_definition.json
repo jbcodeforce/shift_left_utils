@@ -4,7 +4,7 @@
    "path": "pipelines/sources/src_table_1",
    "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
    "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
-   "compute_pool_id": "",
+   "compute_pool_id": "lfcp-xvrvmz",
    "state_form": "Stateful",
    "parents": [],
    "children": [

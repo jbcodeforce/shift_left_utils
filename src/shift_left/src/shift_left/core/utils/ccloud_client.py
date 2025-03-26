@@ -65,15 +65,18 @@ class ConfluentCloudClient:
             response.raise_for_status()
             try:
                     json_response = response.json()
-                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
+                    logger.debug(f"\n>>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
                     return json_response
             except ValueError:
-                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
+                    logger.debug(f"\n>>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
                     return response.text
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request to {url} failed: {e} with response = {response}")
+            logger.error(f"Request to {url} failed: {e}")
             if response is not None:
-                logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
+                if response.status_code == 404:
+                    logger.info(f">>>> Response text: {response.text["errors"]["detail"]}")
+                else:
+                    logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             raise 
     
     def get_statement_status(self, endpoint, statement_id) -> Statement:
@@ -255,15 +258,18 @@ class ConfluentCloudClient:
                 }
             }
         try:
-            logger.info(f"\nSend POST request to Flink statement api with {statement_data}")
+            logger.info(f"Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
             response = self.make_request("POST", url + "/statements", statement_data)
             logger.info(f"\n>>>> POST response= {response}")
             #statement_id = response["metadata"]["uid"]
             #logger.debug(f"Statement id for post request: {statement_id}")
-            statement_result = self._wait_response(url, statement_name, start_time)
-            statement_result.results.append(response)
-            return statement_result
+            if response["status"]["phase"] == "PENDING"
+                statement_result = self._wait_response(url, statement_name, start_time)
+                statement_result.results.append(response)
+                return statement_result
+            execution_time = time.perf_counter() - start_time
+            return  StatementResult.model_validate({"loop_counter": 0, "execution_time": execution_time, "results" : [statement]})
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
 

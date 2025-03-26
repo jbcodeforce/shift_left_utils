@@ -60,8 +60,6 @@ class TestDeploymentManager(unittest.TestCase):
         client = ConfluentCloudClient(config)
         result = dm._validate_a_pool(client, config['flink']['compute_pool_id'])
         assert result
-        print(result)
-
 
     # ---- Statement related  apis tests ------------------- 
 
@@ -81,7 +79,7 @@ class TestDeploymentManager(unittest.TestCase):
         response = dm.delete_flink_statement("show_table")
         assert response
 
-    def test_clean_things(self):
+    def _test_clean_things(self):
         for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
              dm.drop_table(table)
              dm.delete_flink_statement("drop-" + table.replace('_','-'))

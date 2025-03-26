@@ -1,6 +1,6 @@
 # Recipes Summary
 
-This section provides a brief overview of the migration and pipeline management tools and their application to specific use cases. 
+This chapter provides a brief overview of the migration and pipeline management tools and their application to specific use cases. 
 
 
 [Refer to the high-level component](./index.md#context) view for project organization details:
@@ -99,9 +99,9 @@ shift_left table migrate $SRC_FOLDER/facts/aqem/aqem.fct_event.sql $STAGING --re
 ```
 
 
-## Build an inventory of Flink SQL DDL and DML statements
+## Build an inventory of Flink SQL DDL and DML statements with table name as key
 
-The inventory is built by crowling the `pipelines` folder and looking at each dml to get the table name. The inventory is a hashmap with the key being the table name and the value is a TableReference defined as:
+The inventory is built by crowling the `pipelines` folder and by looking at each dml to get the table name. The inventory is a hashmap with the key being the table name and the value is a `FlinkTableReference` defined as:
 
 ```python
 class FlinkTableReference(BaseModel):
@@ -152,6 +152,10 @@ shift_left table build-inventory $PIPELINES
         }
         ```
 
+The `inventory.json` file is saved under the $PIPELINES folder and it is used intensively by the chift_left cli.
+
+???- warning "Update the inventory"
+    Each time a new table is added or renamed, it is recommended to run this command. It can even be integrated in a CI pipeline.
 
 ## Work with pipelines
 
@@ -198,21 +202,27 @@ shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml
 shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql $PIPELINES
 ```
 
-### Delete pipeline_defition.json file for a given folder
+### Delete pipeline_defition.json files for a given folder
 
-Delete all the `pipeline_definition.json` files from a given folder. It goes down recursively.
+Delete all the `pipeline_definition.json` files from a given folder. The command walk down the folder tree to find table folder.
 
 ```sh
 shift_left pipeline delete-metadata $PIPELINES
 ```
 
+Only the facts tables:
+
+```sh
+shift_left pipeline delete-metadata $PIPELINES/facts
+```
+
 ### Build pipeline reports 
 
-* Get a report from one sink to n sources:
+* Get a report from one sink table to n sources: 
 
 ```sh
 shift_left pipeline report fct_table
-# with the inventory.json folder
+# explicitly specifying the pipeline folder.
 shift_left pipeline report fct_table $PIPELINES
 ```
 
@@ -235,7 +245,7 @@ The deployment will take the full pipeline from the source to sink giving a sink
 
 #### Using Confluent CLI / makefile
 
-Each confluent cli are defined in a common makefile, and each sql to be deploy has also a make file with a set of targets:
+Each confluent cli commands are defined in a common makefile, and each sql to be deploy has also a makefile with a set of targets:
 
 * To create the Flink dynamic table using the target Flink compute pool do:
 
@@ -274,3 +284,14 @@ This action creates the Kafka topic with the name of the table and create the sc
   ```sh
   make delete_flink_statements
   ```
+
+#### Using the deploy pipeline command
+
+
+
+## Troubleshooting the CLI
+
+When starting the CLI, it creates a logs folder and different logs, per majoe components: 
+
+* Confluent cloud client traces: `logs/cc-client.log`
+* Deployment: `logs/deployment_mgr.log`

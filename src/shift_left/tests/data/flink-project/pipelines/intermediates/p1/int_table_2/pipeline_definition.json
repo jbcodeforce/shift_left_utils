@@ -4,15 +4,14 @@
    "path": "pipelines/intermediates/p1/int_table_2",
    "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_table_2.sql",
    "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
-   "compute_pool_id": "",
+   "compute_pool_id": "lfcp-xvrvmz",
    "state_form": "Stateful",
    "parents": [
       {
          "table_name": "src_table_2",
          "type": "source",
-         "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_table_2.sql",
          "ddl_ref": "pipelines/sources/p1/src_table_2/sql-scripts/ddl.src_table_2.sql",
-         "table_folder_name": "pipelines/sources/p1/src_table_2",
+         "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_table_2.sql",
          "compute_pool_id": ""
       }
    ],

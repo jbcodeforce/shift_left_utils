@@ -4,24 +4,22 @@
    "path": "pipelines/intermediates/p1/int_table_1",
    "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_table_1.sql",
    "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
-   "compute_pool_id": "",
+   "compute_pool_id": "lfcp-xvrvmz",
    "state_form": "Stateful",
    "parents": [
       {
-         "table_name": "src_table_3",
-         "type": "source",
-         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
-         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_table_3.sql",
-         "table_folder_name": "pipelines/sources/p1/src_table_3",
-         "compute_pool_id": ""
-      },
-      {
          "table_name": "src_table_1",
          "type": "source",
-         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
          "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
-         "table_folder_name": "pipelines/sources/src_table_1",
-         "compute_pool_id": ""
+         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "compute_pool_id": "lfcp-xvrvmz"
+      },
+      {
+         "table_name": "src_table_3",
+         "type": "source",
+         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_table_3.sql",
+         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
+         "compute_pool_id": "lfcp-xvrvmz"
       }
    ],
    "children": [

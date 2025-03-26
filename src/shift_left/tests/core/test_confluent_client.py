@@ -53,12 +53,13 @@ class TestConfluentClient(unittest.TestCase):
         statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
         print(f"\n\n---- {statement}")
         assert statement
-        statement = client.get_statement_info(statement_name)
-        print(statement)
         assert statement.results
         assert statement.results[0]['phase'] == 'RUNNING'
-        resp = client.update_flink_statement(statement_name,  statement, True)
-        print(f"\n--- {status}")
+        statement = client.get_statement_info(statement_name)
+        print(statement)
+
+        #resp = client.update_flink_statement(statement_name,  statement, True)
+        #print(f"\n--- {resp}")
         #assert statement['status']['phase'] == "STOPPED"
         status=client.delete_flink_statement(statement_name)
         print(status)

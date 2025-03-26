@@ -21,7 +21,7 @@ class TestProjectManager(unittest.TestCase):
         except Exception as e:
             self.fail()
        
-    def test_create_data_kimball_project(self):
+    def test_1_create_data_kimball_project(self):
         try:
             pm.build_project_structure("test_data_kimball_project",self.data_dir, pm.KIMBALL_PROJECT_TYPE)
             assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project"))
@@ -32,8 +32,14 @@ class TestProjectManager(unittest.TestCase):
             self.fail()
 
     def test_list_topic(self):
-        topics = pm.get_topic_list("./tmp/test_data_kimball_project/topics.txt")
+        topics = pm.get_topic_list("./topics.txt")
         assert topics
+        assert os.path.exists("./topics.txt")
+        with open("./topics.txt", "r") as f:
+            lines = f.readlines()
+            line_count = len(lines)
+            assert line_count > 0
+        os.remove("./topics.txt")
 
     def test_list_of_compute_pools(self):
         env_id=get_config()['confluent_cloud']['environment_id']
