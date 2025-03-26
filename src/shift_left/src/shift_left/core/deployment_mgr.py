@@ -1,4 +1,4 @@
-import subprocess
+
 import logging, os
 import time
 from logging.handlers import RotatingFileHandler
@@ -9,15 +9,14 @@ from shift_left.core.pipeline_mgr import (
     FlinkStatementHierarchy,
     update_pipeline_metadata,
     walk_the_hierarchy_for_report_from_table)  
+from typing import Tuple
 
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
-from shift_left.core.utils.file_search import (
-    FlinkTableReference, 
+from shift_left.core.utils.file_search import ( 
     get_ddl_dml_names_from_table, 
     extract_product_name,
-    load_existing_inventory,
     from_pipeline_to_absolute
 )
 from shift_left.core.flink_statement_model import *
@@ -36,7 +35,7 @@ file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 logger.addHandler(console_handler)
 
 
@@ -124,7 +123,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkStatement
 def deploy_flink_statement(flink_statement_file_path: str, 
                            compute_pool_id: str, 
                            statement_name: str, 
-                           config: dict) -> Statement:
+                           config: dict) -> StatementResult:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool.
@@ -162,19 +161,22 @@ def deploy_ddl_dml_statements(pipeline_def: FlinkStatementHierarchy,
     
     statement = get_statement(dml_statement_name)
     if statement:
-        _delete_flink_statement(dml_statement_name)
-        if not dml_only:
-            drop_table(pipeline_def.table_name)
-            ddl_stmt =  get_statement(ddl_statement_name)
-            if ddl_stmt:
-                _delete_flink_statement(ddl_statement_name)
-    statement = _deploy_current_with_parents_when_needed([(pipeline_def, ddl_statement_name, 
-                                                           dml_statement_name)], 
+        delete_flink_statement(dml_statement_name)
+    if not dml_only:
+        drop_table(pipeline_def.table_name)
+        ddl_stmt =  get_statement(ddl_statement_name)
+        if ddl_stmt:
+            delete_flink_statement(ddl_statement_name)
+        
+    # At this stage: there is no more ddl and dml ot if it needs to keep ddl, table still exists
+    to_process = [(pipeline_def, ddl_statement_name, dml_statement_name)]        
+    statement = _deploy_current_with_parents_when_needed(to_process, 
                                                            pipeline_def, 
                                                            compute_pool_id, 
                                                            dml_only,
                                                            config)
-    _process_children(pipeline_def, compute_pool_id, force_children, config)
+    if force_children:
+        _process_children(pipeline_def, compute_pool_id, force_children, config)
     return statement
 
 def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
@@ -188,16 +190,17 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     statement = search_existing_flink_statement(statement_name)
     if statement:
         client.delete_flink_statement(statement_name)
-    client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
+    result= client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
+    logger.debug(f"Run drop table in {result.execution_time} seconds")
+
+def delete_flink_statement(statement_name: str) -> str:
+    logger.info(f"Deleting Flink statement: {statement_name}")
+    client = ConfluentCloudClient(get_config())
+    return client.delete_flink_statement(statement_name)
+
 
 # ---- private API
 
-def _delete_flink_statement(statement_name: str) -> str:
-    logger.info(f"Deleting Flink statement: {statement_name}")
-    client = ConfluentCloudClient(get_config())
-    client.delete_flink_statement(statement_name)
-
-    
 def _stop_dml_statement(table_name: str, statement):
     logger.info(f"Stopping DML statements for {table_name} with {statement}")
     client = ConfluentCloudClient(get_config())
@@ -228,34 +231,36 @@ def _start_child_dmls(pipeline_def):
 def _process_children(current_pipeline_def: FlinkStatementHierarchy, 
                       compute_pool_id: str,
                       config: dict):
-    pass
+    if not current_pipeline_def.children or len(current_pipeline_def.children) == 0:
+        return
+    for child in current_pipeline_def.children:
+        if child.state_form == "Stateful":
+            logger.debug(f"Stop {child.dml_ref}")
+            logger.debug(f"Drop table {child.table_name}")
+            logger.debug(f"Create {child.ddl_ref}")
+            logger.debug(f"Start {child.dml_ref}")
+            logger.debug(f"Process childer of {child.table_name}")
+        else:
+            logger.debug(f"Stop {child.dml_ref}")
+            logger.debug(f"Update {child.dml_ref} with offser")
+            logger.debug(f"Resume {child.dml_ref}")
 
-def _deploy_dml_statements(pipeline_def: FlinkStatementHierarchy,  compute_pool_id: str, force: bool= False):
-    logger.info(f"Deploying DML statements from {pipeline_def.dml_ref}")
-    # TODO: implement
-    logger.info(f"* Delete the current table DML statement to stop processing")
 
-    logger.info(f"* Stop children dml statements - recursively")
-    _stop_child_dmls(pipeline_def)
-    logger.info("recreate the table using the DDL")
-    
-    logger.info(f"* Recreate the new DML for this table")
-   
-    logger.info(f"* Re-start the child DMLs")
-    #_start_child_dmls(pipeline_def, inventory_path)
 
-def _deploy_current_with_parents_when_needed(table_list_to_process: List[FlinkStatementHierarchy], 
+def _deploy_current_with_parents_when_needed(table_list_to_process: Tuple[FlinkStatementHierarchy, str, str], 
                               current_pipeline_def: FlinkStatementHierarchy, 
                               compute_pool_id: str,
                               dml_only: bool = False, 
                               config: dict = None):
     """
-    The current table may have parents not yet deploy so we need to deploy them
+    The current table may have parents not yet deployed so we need to deploy them
+    then deploy the dml and ddl when needed.
     """
     logger.info(f"\nProcess parents of {current_pipeline_def.table_name} if present")
     if current_pipeline_def.parents == None or len(current_pipeline_def.parents) == 0:
+        # At the source level, just deploy the ddl / dml statements
         to_process= table_list_to_process.pop()
-        _deploy_ddl_dml(to_process, compute_pool_id, config)
+        return _deploy_ddl_dml(to_process, compute_pool_id, dml_only, config)
     else:
         for parent in current_pipeline_def.parents:
             logger.info(f"\nVerify {parent.dml_ref} is running")
@@ -264,32 +269,36 @@ def _deploy_current_with_parents_when_needed(table_list_to_process: List[FlinkSt
                                                         config['kafka']['cluster_type'], 
                                                         product_name)
             statement = get_statement(dml_statement_name)
+            # if parent is running do not redeploy it.
             if not statement:
-                statement =  get_statement(ddl_statement_name)
-                if not statement:  # yes this is ugly
-                    logger.info(f"\nNeed to deploy {parent.table_name}")
-                    table_list_to_process.append((parent, ddl_statement_name, dml_statement_name))
-                    _deploy_current_with_parents_when_needed(table_list_to_process, parent, compute_pool_id, config)
+                table_list_to_process.append((parent, ddl_statement_name, dml_statement_name))
+                _deploy_current_with_parents_when_needed(table_list_to_process, parent, compute_pool_id, dml_only, config)
         to_process= table_list_to_process.pop()
         logger.info(f"\nDeploy ddl and dml for {to_process}")
-        return _deploy_ddl_dml(to_process, compute_pool_id, config)
+        return _deploy_ddl_dml(to_process, compute_pool_id, dml_only, config)
         
 
 
-def _deploy_ddl_dml(to_process: FlinkStatementHierarchy, compute_pool_id: str, config: dict):
-    logger.info(f"\nDeploy ddl and dml for {to_process[0].table_name}")
+def _deploy_ddl_dml(to_process: Tuple[FlinkStatementHierarchy, str, str], compute_pool_id: str, dml_only: bool, config: dict):
+    current_statement = to_process[0]
+    ddl_statement_name =  to_process[1]
+    dml_statement_name =  to_process[2]
+    logger.info(f"\nDeploy ddl and dml for {current_statement.table_name}")
     cpool_id = compute_pool_id
-    if to_process[0].compute_pool_id or len(to_process[0].compute_pool_id) > 0:
-        cpool_id = to_process[0].compute_pool_id
-    statement=deploy_flink_statement(to_process[0].ddl_ref, 
+    if current_statement.compute_pool_id or len(current_statement.compute_pool_id) > 0:
+        cpool_id = current_statement.compute_pool_id
+    if not dml_only:
+        statement=deploy_flink_statement(current_statement.ddl_ref, 
                                     cpool_id, 
-                                    to_process[1], 
+                                    ddl_statement_name, 
                                     config)
-    statement=deploy_flink_statement(to_process[0].dml_ref, 
+        delete_flink_statement(ddl_statement_name)
+    statement=deploy_flink_statement(current_statement.dml_ref, 
                                     cpool_id, 
-                                    to_process[2], 
+                                    dml_statement_name, 
                                     config)
-    _save_compute_pool_info(to_process, cpool_id)
+    # TO DO assess if we need to persist execution timing 
+    _save_compute_pool_info(current_statement, cpool_id)
     return statement   
 
 def _save_compute_pool_info(current_definition: FlinkStatementHierarchy, compute_pool_id: str):
@@ -318,7 +327,7 @@ def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
     return spec
 
-def _verify_compute_pool_provisioned(client, pool_id: str):
+def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
     """
     Wait for the compute pool is provisionned
     """
@@ -350,7 +359,7 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str):
     ratio = _get_pool_usage(pool_info) 
     if ratio >= 0.7:
         raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
-    return True
+    return pool_info['status']['phase'] == "PROVISIONED"
 
 
             

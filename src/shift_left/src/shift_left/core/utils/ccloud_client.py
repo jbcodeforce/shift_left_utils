@@ -1,6 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import subprocess
+import time
 import requests
 from urllib.parse import urlparse
 import json
@@ -25,7 +25,7 @@ file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 logger.addHandler(console_handler)
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
@@ -54,7 +54,7 @@ class ConfluentCloudClient:
             "Content-Type": "application/json"
         }
         response = None
-        logger.debug(f"\nMake request {method} to {url}")
+        logger.debug(f"\n> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -65,15 +65,15 @@ class ConfluentCloudClient:
             response.raise_for_status()
             try:
                     json_response = response.json()
-                    logger.debug(f"Successful {method} request to {url}. Response: {json_response}")
+                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
                     return json_response
             except ValueError:
-                    logger.debug(f"Successful {method} request to {url}. Response text: {response.text}")
+                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
                     return response.text
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request to {url} failed: {e}")
+            logger.error(f"Request to {url} failed: {e} with response = {response}")
             if response is not None:
-                logger.error(f"Response status code: {response.status_code}, Response text: {response.text}")
+                logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             raise 
     
     def get_statement_status(self, endpoint, statement_id) -> Statement:
@@ -112,12 +112,14 @@ class ConfluentCloudClient:
         while True:
             if next_page_token:
                 parsed_url = urlparse(next_page_token)
-                path = "https://api.confluent.cloud" + parsed_url.path + '?' + parsed_url.query if parsed_url.query else parsed_url.path
-                resp=self.make_request("GET", path + f"?page_size={page_size}")
+                #path = "https://api.confluent.cloud" + parsed_url.path + '?' + parsed_url.query if parsed_url.query else parsed_url.path
+                resp=self.make_request("GET", next_page_token + f"?page_size={page_size}")
+
             else:
                 resp=self.make_request("GET", url)
-            if "data" in resp:
-                results.append(resp["data"])
+            if "data" in resp and resp["data"]:
+                for info in resp["data"]:
+                    results.append({'id' : info["id"], 'name':  info["spec"]["display_name"]} )
             if "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]
                 if not next_page_token:
@@ -193,24 +195,42 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing rest call: {e}")
 
-    def _wait_response(self, url: str, statement_name: str):
+    def _wait_response(self, url: str, statement_name: str, start_time ) -> StatementResult:
+        """
+        wait to get a non pending state
+        """
+        timer= self.config['flink'].get("poll_timer", 10)
+        logger.debug(f"Start polling response for {statement_name}")
+        counter = 0
         try:
             while True:
                 status = self.get_statement_status(url + "/statements", statement_name)
                 if status["phase"] in ["COMPLETED"]:
-                    results=self.make_request("GET",f"{url}/statements/{statement_name}/results")
-                    logger.debug(f"_wait_response - Response to the get statement results: {results}")
-                    return results
+                    statement_result=self.make_request("GET",f"{url}/statements/{statement_name}/results")
+                    logger.debug(f">>>> wait_response() - Response to the get statement result: {statement_result}")
+                    execution_time = time.perf_counter() - start_time
+                    statement_result = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results": [status]})
+                    return statement_result
                 if status["phase"] in ["FAILED"]:
-                    logger.error(f"Wait response got failed {status["detail"]}")
-                    return status
+                    logger.error(f">>>> wait_response() failed {status["detail"]}")
+                    execution_time = time.perf_counter() - start_time
+                    statement_result = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results": [status]})
+                    return statement_result
                 if status["phase"] in ["RUNNING"]:
-                    logger.info(f"Statement {statement_name} is running")
-                    return status
-                time.sleep(10)
+                    logger.debug(f">>>> wait_response() {statement_name} is running")
+                    execution_time = time.perf_counter() - start_time
+                    statement_result = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results": [status]})
+                    return statement_result
+                time.sleep(timer)
+                counter+=1
+                if counter == 6:
+                    timer = 30 
         except Exception as e:
-            logger.error(f"Error waiting for response {e}")
-            return ""
+            logger.error(f">>>> wait_response() error waiting for response {e}")
+            execution_time = time.perf_counter() - start_time
+            statement_result = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results" : []})
+            return statement_result
+
 
     def post_flink_statement(self, compute_pool_id: str,  
                              statement_name: str, 
@@ -236,12 +256,14 @@ class ConfluentCloudClient:
             }
         try:
             logger.info(f"\nSend POST request to Flink statement api with {statement_data}")
+            start_time = time.perf_counter()
             response = self.make_request("POST", url + "/statements", statement_data)
-            logger.info(f"\nPOST response= {response}")
+            logger.info(f"\n>>>> POST response= {response}")
             #statement_id = response["metadata"]["uid"]
             #logger.debug(f"Statement id for post request: {statement_id}")
-            self._wait_response(url, statement_name)
-            return response
+            statement_result = self._wait_response(url, statement_name, start_time)
+            statement_result.results.append(response)
+            return statement_result
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
 
@@ -275,11 +297,12 @@ class ConfluentCloudClient:
                 "spec": statement.spec.model_dump()
             }
             logger.info(f" update_flink_statement payload: {statement_data}")
-            status=self.make_request("PUT",f"{url}/statements/{statement_name}", statement_data)
-            logger.info(f" update_flink_statement: {status}")
-            rep = self._wait_response(url, statement_name)
+            start_time = time.perf_counter()
+            statement=self.make_request("PUT",f"{url}/statements/{statement_name}", statement_data)
+            logger.info(f" update_flink_statement: {statement}")
+            rep = self._wait_response(url, statement_name, start_time)
             logger.info(f" update_flink_statement: {rep}")
-            return status
+            return statement
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing rest call: {e}")
      
@@ -288,8 +311,9 @@ class ConfluentCloudClient:
 
 def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
     """
-    Given the table name search in the list of topics the potential matching topic.
+    Given the table name search in the list of topics the potential matching topics.
     return the topic name if found otherwise return the table name
+    rejected_prefixes list the prefixes the topic name should not start with
     """
     potential_matches=[]
     logger.debug(f"Search {table_name} in the list of topics, avoiding the ones starting by {rejected_prefixes}")

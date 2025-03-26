@@ -69,6 +69,7 @@ class FlinkStatementHierarchy(BaseModel):
     ddl_ref: Optional[str] = Field(default="", description="DDL path")
     dml_ref: str
     compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
+    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement")
     parents: Optional[Set[FlinkTableReference]] = Field(default=[], description="parents of this flink dml")
     children: Optional[Set[FlinkTableReference]] = Field(default=[], description="users of the table created by this flink dml")
 
@@ -493,6 +494,7 @@ def _visit_children(current_node: FlinkStatementHierarchy) -> FlinkStatementHier
     """
     children = set()
     for child in current_node.children:
+
         children.add(_visit_children(_get_matching_node_pipeline_info(child)))
     current_node.children = children
     return current_node

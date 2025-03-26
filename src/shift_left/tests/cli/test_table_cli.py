@@ -13,7 +13,7 @@ class TestTableCLI(unittest.TestCase):
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
+        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
 

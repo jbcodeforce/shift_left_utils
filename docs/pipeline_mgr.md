@@ -111,12 +111,13 @@ shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
    --force               The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml) [default: no-force]
 ```
 
-* [ ] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not, it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
+* [x] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not, it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
 
-* [ ] Support deploying only DML, or both DDL and DML (default)
-* [ ] Deploying a DDL, means dropping existing table if exists.
-* [ ] Deploying a non existant sink means deploying all its parents if not already deployed, up to the sources. This will be the way to deploy a pipeline. In this case deploy first the sources, ddl and dml, except if already running as it means this table was created by another pipeline.
+* [x] Support deploying only DML, or both DDL and DML (default)
+* [x] Deploying a DDL, means dropping existing table if exists.
+* [x] Deploying a non existant sink means deploying all its parents if not already deployed, up to the sources. This will be the way to deploy a pipeline. In this case deploy first the sources, ddl and dml, except if already running as it means this table was created by another pipeline.
 * [ ] Deploying an existant sink, means drop the table if the force flag is true, and deploy the DML. If forced flag is false, only deploy dml. When DML is stateful deploy DDL and DML (= forced) 
+* [ ] For a given table with children, deploy the current table, and for each childrent redeploy the DML if the DML is stateful. When stateless, manage the offset and modify the DML to read from the retrieved offset.
 
 ### Questions
 

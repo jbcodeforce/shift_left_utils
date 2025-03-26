@@ -128,7 +128,7 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     file_name=f"{target_folder}/dml.{table_fname}.sql" 
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
-    topic_name=search_matching_topic(table_name)
+    topic_name=search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
     context = {
         'table_name': table_fname,
         'topic_name': f"`{topic_name}`",

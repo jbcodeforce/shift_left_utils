@@ -69,7 +69,7 @@ def _define_kimball_structure(pipeline_folder: str):
 
 def _add_important_files(project_folder: str):    
     logging.info(f"add_important_files({project_folder}")
-    for file in ["common.mk", "config.yaml"]:
+    for file in ["common.mk", "config_tmpl.yaml"]:
         template_path = importlib.resources.open_text("shift_left.core.templates", file)
         shutil.copyfile(str(template_path.name), os.path.join(project_folder, "pipelines", file))
     shutil.copyfile(str(importlib.resources.open_text("shift_left.core.templates", ".env_tmpl").name), os.path.join(project_folder, ".env"))

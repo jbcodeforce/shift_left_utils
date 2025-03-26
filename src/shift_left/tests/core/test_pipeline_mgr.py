@@ -16,7 +16,7 @@ class TestPipelineManager(unittest.TestCase):
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
+        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
         pm.delete_metada_files(os.getenv("PIPELINES"))

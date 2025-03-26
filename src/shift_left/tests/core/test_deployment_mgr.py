@@ -19,19 +19,18 @@ from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 class TestDeploymentManager(unittest.TestCase):
     
+    data_dir = None
     
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
+        cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
+        os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
-  
-    def test_search_non_existant_statement(self):
-        statement_dict = dm.search_existing_flink_statement("dummy")
-        assert statement_dict == None
 
+
+    # ---- Compute pool apis ------------------- 
     def test_build_pool_spec(self):
         config = get_config()
         result = dm._build_compute_pool_spec("fct-order", config)
@@ -40,19 +39,64 @@ class TestDeploymentManager(unittest.TestCase):
         print(result)
 
     def test_verify_pool_state(self):
+        """
+        Given the compute pool id in the test config filr, get information about the pool using cloud client
+        """
         config = get_config()
         client = ConfluentCloudClient(config)
         result = dm._verify_compute_pool_provisioned(client, config['flink']['compute_pool_id'])
-        assert result
-        print(result)
+        assert result == True
+
+    def test_get_compute_pool_list(self):
+        client = ConfluentCloudClient(get_config())
+        config=get_config()
+        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
+        self.assertGreater(len(pools), 0)
+        print(json.dumps(pools, indent=2))
+
 
     def test_validate_a_pool(self):
         config = get_config()
         client = ConfluentCloudClient(config)
         result = dm._validate_a_pool(client, config['flink']['compute_pool_id'])
         assert result
+        print(result)
 
-    def test_ddl_deployment(self):
+
+    # ---- Statement related  apis tests ------------------- 
+
+    def test_search_non_existant_statement(self):
+        statement_dict = dm.search_existing_flink_statement("dummy")
+        assert statement_dict == None
+
+    def test_execute_show_create_table_then_delete_statement(self):
+        config= get_config()
+        sql_path = os.getenv("PIPELINES") + "/intermediates/p1/int_table_1/tests/show_create_table.sql"
+        statement = dm.deploy_flink_statement(sql_path, None, "show-table", config)
+        assert statement
+        print(statement)
+        statement_dict = dm.search_existing_flink_statement("show-table")
+        assert statement_dict
+        print(f"\n -- {statement_dict}")
+        response = dm.delete_flink_statement("show_table")
+        assert response
+
+    def test_clean_things(self):
+        for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
+             dm.drop_table(table)
+             dm.delete_flink_statement("drop-" + table.replace('_','-'))
+
+    def test_src_table_deployment(src):
+        """
+        Given a source table with children, deploy the DDL and DML without the children.
+        """
+        config= get_config()
+        inventory_path = os.getenv("PIPELINES")
+        result = dm.deploy_pipeline_from_table("src_table_1", inventory_path, config['flink']['compute_pool_id'], False, False)
+        assert result
+        print(result)
+
+    def _test_ddl_deployment(self):
         table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
         pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
@@ -60,10 +104,10 @@ class TestDeploymentManager(unittest.TestCase):
         assert statement
         print(statement)
 
-    def test_drop_table(self):
+    def _test_drop_table(self):
         dm.drop_table("int_table_1")
     
-    def test_deploy_flink_statement_without_compute_pool(self):
+    def _test_deploy_flink_statement_without_compute_pool(self):
         config = get_config()
         insert_data_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-queries/ddl.fct_order.sql"
         statement = dm.deploy_flink_statement(insert_data_path, None, None, config)
@@ -75,15 +119,10 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
-        statement = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], True, False)
+        result = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], True, False)
+        assert result
+        print(result)
 
-    
-    def _test_delete_a_statement(self):
-        response = dm._delete_flink_statement('dev-p1-ddl-fct-order')
-        assert response
-        print(response)
-        response = dm.search_existing_flink_statement('dev-p1-ddl-fct-order')
-        assert response == None
 
 
 

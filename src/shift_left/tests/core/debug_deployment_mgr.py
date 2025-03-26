@@ -4,14 +4,9 @@ import os
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
     
-from shift_left.core.pipeline_mgr import (
-    FlinkStatementHierarchy
-)
+import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import (get_ddl_dml_names_from_table,
-            extract_product_name
-        )
 from  shift_left.core.flink_statement_model import *
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
@@ -24,7 +19,7 @@ class TestDeploymentManager(unittest.TestCase):
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "src-project")
+        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
     def _test_deploy_pipeline_from_sink_table(self):
@@ -34,23 +29,28 @@ class TestDeploymentManager(unittest.TestCase):
         As we deploy both DDL and DML, force does not need to be True
         """
         config = get_config()
+        #tm.get_or_create_inventory(os.getenv("PIPELINES"))
+        #pm.delete_metada_files(os.getenv("PIPELINES"))
+        path= os.getenv("PIPELINES")
+        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        #result = pm.build_pipeline_definition_from_table(table_path, path)
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
-        pipeline_def: FlinkStatementHierarchy = dm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-        product_name = extract_product_name(pipeline_def.path)
-        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                        config['kafka']['cluster_type'], 
-                                                        product_name)
-        statement = dm._deploy_current_with_parents_when_needed([(pipeline_def, ddl_statement_name, dml_statement_name)], pipeline_def, config['flink']['compute_pool_id'], config)
-        print(statement)
-
-
-    def test_get_compute_pool_list(self):
-        client = ConfluentCloudClient(get_config())
-        config=get_config()
-        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
-        self.assertGreater(len(pools), 0)
-        print(json.dumps(pools, indent=2))
+        result = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], False, False)
+        assert result
+        print(result)
+    
+    def test_create_statement(self):
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        statement_name="test-statement"
+        sql_content = "show create table `examples`.`marketplace`.`clicks`;"
+        properties = {'sql.current-catalog' : 'examples' , 'sql.current-database' : 'marketplace'}
+       
+        statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
+        print(f"\n\n---- {statement}")
+        status=client.delete_flink_statement(statement_name)
+        print(f"\n--- {status}")
 
 if __name__ == '__main__':
     unittest.main()

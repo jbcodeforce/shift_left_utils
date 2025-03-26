@@ -54,9 +54,11 @@ class TestConfluentClient(unittest.TestCase):
         print(f"\n\n---- {statement}")
         assert statement
         statement = client.get_statement_info(statement_name)
-        assert statement.status.phase == "RUNNING"
+        print(statement)
+        assert statement.results
+        assert statement.results[0]['phase'] == 'RUNNING'
         resp = client.update_flink_statement(statement_name,  statement, True)
-        print(resp)
+        print(f"\n--- {status}")
         #assert statement['status']['phase'] == "STOPPED"
         status=client.delete_flink_statement(statement_name)
         print(status)

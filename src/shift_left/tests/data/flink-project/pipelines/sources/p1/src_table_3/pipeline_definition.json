@@ -5,6 +5,7 @@
    "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_table_3.sql",
    "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_table_3.sql",
    "compute_pool_id": "",
+   "state_form": "Stateful",
    "parents": [],
    "children": [
       {
