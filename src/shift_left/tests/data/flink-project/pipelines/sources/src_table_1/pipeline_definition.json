@@ -1,10 +1,9 @@
 {
    "table_name": "src_table_1",
    "type": "source",
-   "path": "pipelines/sources/src_table_1",
-   "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
    "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
-   "compute_pool_id": "lfcp-xvrvmz",
+   "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
+   "path": "pipelines/sources/src_table_1",
    "state_form": "Stateful",
    "parents": [],
    "children": [
@@ -13,8 +12,10 @@
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
          "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_table_1.sql",
-         "table_folder_name": "pipelines/intermediates/p1/int_table_1",
-         "compute_pool_id": ""
+         "path": "pipelines/intermediates/p1/int_table_1",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": []
       }
    ]
 }

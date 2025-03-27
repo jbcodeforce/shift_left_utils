@@ -84,6 +84,12 @@ class TestDeploymentManager(unittest.TestCase):
              dm.drop_table(table)
              dm.delete_flink_statement("drop-" + table.replace('_','-'))
 
+    def test_table_structure(self):
+        result = dm.get_table_structure("int_table_2")
+        print(f"\n\n---- {result}")
+        assert result
+        assert "int_table_2" in result
+
     def test_src_table_deployment(src):
         """
         Given a source table with children, deploy the DDL and DML without the children.
@@ -97,8 +103,8 @@ class TestDeploymentManager(unittest.TestCase):
     def _test_ddl_deployment(self):
         table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
-        pipeline_def = pm.walk_the_hierarchy_for_report_from_table(table_name, inventory_path )
-        statement = dm.deploy_ddl_dml_statements(pipeline_def)
+        pipeline_def = pm.build_pipeline_report_from_table(table_name, inventory_path )
+        statement = dm.deploy_table(pipeline_def)
         assert statement
         print(statement)
 

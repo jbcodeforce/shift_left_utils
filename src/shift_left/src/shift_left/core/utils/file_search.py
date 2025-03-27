@@ -16,15 +16,16 @@ SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 # ------ Public APIs ------
 
-class FlinkTableReference(BaseModel):
-    """Reference to a Flink table including its metadata and location information."""
+class InfoNode(BaseModel):
     table_name: Final[str]
     type: Optional[str]
     dml_ref: Optional[str]
     ddl_ref: Optional[str]
-    table_folder_name: str
-    compute_pool_id: str = Field(default="", description="compute_pool_id when deployed")
 
+class FlinkTableReference(InfoNode):
+    """Reference to a Flink table including its metadata and location information."""
+    table_folder_name: Optional[str] = Field(default="", description="table_folder_name")
+    
     def __hash__(self) -> int:
         return hash(self.table_name)
 
@@ -188,7 +189,8 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
     Returns:
         FlinkTableReference for the table
     """
-    return FlinkTableReference.model_validate(inventory[table_name])
+    entry = inventory[table_name]
+    return FlinkTableReference.model_validate(entry)
     
 def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """
@@ -198,14 +200,16 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     dml_file_name = None
     base_scripts=os.path.join(root,dir)
     for file in os.listdir(base_scripts):
-        if file.startswith("ddl"):
+        if file.startswith("ddl."):
             ddl_file_name=os.path.join(base_scripts,file)
-        if file.startswith('dml'):
+        if file.startswith('dml.'):
             dml_file_name=os.path.join(base_scripts,file)
     if ddl_file_name is None:
         logging.error(f"No DDL file found in the directory: {base_scripts}")
+        raise Exception(f"No DDL file found in the directory: {base_scripts}")
     if dml_file_name is None:
         logging.error(f"No DML file found in the directory: {base_scripts}")
+        raise Exception(f"No DML file found in the directory: {base_scripts}")
     return ddl_file_name, dml_file_name
 
 @lru_cache

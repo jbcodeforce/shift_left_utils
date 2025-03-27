@@ -2,7 +2,7 @@ import pytest
 import unittest
 from typer.testing import CliRunner
 from shift_left.cli_commands.pipeline import app
-from shift_left.core.pipeline_mgr import walk_the_hierarchy_for_report_from_table
+from shift_left.core.pipeline_mgr import build_pipeline_report_from_table
 from unittest.mock import patch, MagicMock
 import logging
 import os

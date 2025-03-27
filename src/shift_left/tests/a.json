@@ -1,0 +1,10 @@
+"results": {
+    "data": [
+        {
+            "row": [
+                "CREATE TABLE `j9r-env`.`j9r-kafka`.`int_table_2` (\n  `order_id` VARCHAR(2147483647) NOT NULL,\n  `product_id` VARCHAR(2147483647),\n  `customer_id` VARCHAR(2147483647),\n  `amount` INT,\n  CONSTRAINT `PRIMARY` PRIMARY KEY (`order_id`) NOT ENFORCED\n)\nDISTRIBUTED BY HASH(`order_id`) INTO 1 BUCKETS\nWITH (\n  "changelog.mode" = "upsert",\n  "connector" = "confluent",\n  "kafka.cleanup-policy" = "compact",\n  "kafka.max-message-size" = "0 bytes",\n  "kafka.retention.time" = "0 ms",\n  "key.format" = "avro-registry",\n  "scan.bounded.mode" = "unbounded",\n  "scan.startup.mode" = "earliest-offset",\n  "value.fields-include" = "all",\n  "value.format" = "avro-registry"\n)\n"
+            ]
+        }
+    ]
+}
+}

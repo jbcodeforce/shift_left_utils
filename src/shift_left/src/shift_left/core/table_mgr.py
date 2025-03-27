@@ -6,7 +6,7 @@ from jinja2 import Environment, PackageLoader
 
 from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
-    read_pipeline_metadata, 
+    read_pipeline_definition_from_file, 
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME)
 from shift_left.core.utils.app_config import get_config
@@ -107,7 +107,7 @@ def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     if tab_ref is None:
         logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
     else:
-        results =  read_pipeline_metadata(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
+        results =  read_pipeline_definition_from_file(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
         output=f"## `{table_name}` is referenced in {len(results)} Flink SQL statements:\n"
         if len(results) == 0:
             output+="\n\t no table ... yet"

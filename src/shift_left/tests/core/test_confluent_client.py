@@ -49,7 +49,7 @@ class TestConfluentClient(unittest.TestCase):
         statement_name="test-statement"
         sql_content = "select * from `examples`.`marketplace`.`clicks` limit 10;"
         properties = {'sql.current-catalog' : 'examples' , 'sql.current-database' : 'marketplace'}
-       
+        client.delete_flink_statement(statement_name)
         statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
         print(f"\n\n---- {statement}")
         assert statement

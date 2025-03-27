@@ -4,10 +4,10 @@ from rich.tree import Tree
 from rich.console import Console
 from shift_left.core.pipeline_mgr import (
     build_pipeline_definition_from_table, 
-    walk_the_hierarchy_for_report_from_table, 
+    build_pipeline_report_from_table, 
     build_all_pipeline_definitions,
     report_running_dmls,
-    FlinkStatementHierarchy,
+    FlinkTablePipelineDefinition,
     delete_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport
@@ -79,7 +79,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        pipeline_def=walk_the_hierarchy_for_report_from_table(table_name, inventory_path)
+        pipeline_def=build_pipeline_report_from_table(table_name, inventory_path)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)

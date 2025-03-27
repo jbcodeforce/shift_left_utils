@@ -74,7 +74,8 @@ class ConfluentCloudClient:
             logger.error(f"Request to {url} failed: {e}")
             if response is not None:
                 if response.status_code == 404:
-                    logger.info(f">>>> Response text: {response.text["errors"]["detail"]}")
+                    result = json.loads(response.text)
+                    logger.info(f">>>> Response text: {result["errors"][0]["detail"]}")
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             raise 
@@ -212,8 +213,8 @@ class ConfluentCloudClient:
                     statement_result=self.make_request("GET",f"{url}/statements/{statement_name}/results")
                     logger.debug(f">>>> wait_response() - Response to the get statement result: {statement_result}")
                     execution_time = time.perf_counter() - start_time
-                    statement_result = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results": [status]})
-                    return statement_result
+                    s_r = StatementResult.model_validate({"loop_counter": counter, "execution_time": execution_time, "results": [statement_result]})
+                    return s_r
                 if status["phase"] in ["FAILED"]:
                     logger.error(f">>>> wait_response() failed {status["detail"]}")
                     execution_time = time.perf_counter() - start_time
@@ -261,12 +262,12 @@ class ConfluentCloudClient:
             logger.info(f"Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
             response = self.make_request("POST", url + "/statements", statement_data)
-            logger.info(f"\n>>>> POST response= {response}")
+            logger.info(f"\n>>>> POST response= {response}") 
             #statement_id = response["metadata"]["uid"]
             #logger.debug(f"Statement id for post request: {statement_id}")
-            if response["status"]["phase"] == "PENDING"
+            if response["status"]["phase"] == "PENDING":
                 statement_result = self._wait_response(url, statement_name, start_time)
-                statement_result.results.append(response)
+                #statement_result.results.append(response)
                 return statement_result
             execution_time = time.perf_counter() - start_time
             return  StatementResult.model_validate({"loop_counter": 0, "execution_time": execution_time, "results" : [statement]})
@@ -286,7 +287,7 @@ class ConfluentCloudClient:
     def delete_flink_statement(self, statement_name: str):
         url = self._build_flink_url_and_auth_header()
         try:
-            self.make_request("DELETE",f"{url}/statements/{statement_name}")
+            result = self.make_request("DELETE",f"{url}/statements/{statement_name}")
             return "deleted"
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing delete statement call for {statement_name}: {e}")

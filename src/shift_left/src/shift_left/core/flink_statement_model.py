@@ -2,6 +2,18 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
 
+class MetadataResult(BaseModel):
+    self_ref:  Optional[str] =  Field(alias="self", default=None)
+    next: Optional[str]
+    
+class StatementResult(BaseModel):
+    api_version:  Optional[str] =  Field(default=None,description="The api version")
+    kind: Optional[str] =  Field(default=None,description="The StatementResult or nothing")
+    metadata: Optional[MetadataResult] =  Field(default=None,description="Metadata for the StatementRsult when present")
+    results: List[Any]
+    execution_time: Optional[float]
+    loop_counter: Optional[int]
+
 class Metadata(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when the resource was created")
     labels: Dict[str, str] = Field(default_factory=dict, description="Labels associated with the resource")
@@ -51,19 +63,10 @@ class Statement(BaseModel):
     organization_id: str
     spec: Spec
     status: Status
+    result: Optional[StatementResult] = Field(default=None, description="Result of the statement execution, for example for a select from...")
 
 
-class MetadataResult(BaseModel):
-    self_ref:  Optional[str] =  Field(alias="self", default=None)
-    next: Optional[str]
-    
-class StatementResult(BaseModel):
-    api_version:  Optional[str] =  Field(default=None,description="The api version")
-    kind: Optional[str] =  Field(default=None,description="The StatementResult or nothing")
-    metadata: Optional[MetadataResult] =  Field(default=None,description="Metadata for the StatementRsult when present")
-    results: List[Any]
-    execution_time: float
-    loop_counter: int
+
 
 if __name__ == '__main__':
     statement = """
