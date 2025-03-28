@@ -29,11 +29,11 @@ create_flink_statement = \
 
 show_create_table = \
 	sql_statement="show create table $2";\
-	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)   --environment $$ENV_ID --context $(CC_CONTEXT) --wait 
+	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)   --environment $(ENV_ID) --context $(CC_CONTEXT) --wait 
 
 drop_table = \
 	sql_statement="drop table $2";\
-	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)   --environment $$ENV_ID --context $(CC_CONTEXT) --wait 
+	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)   --environment $(ENV_ID) --context $(CC_CONTEXT) --wait 
 
 describe_flink_statement = \
 	confluent flink statement describe $1 --cloud $(CLOUD) --region $(REGION) 
@@ -49,22 +49,22 @@ delete_flink_statement = \
 
 list_topic_content = \
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
-	confluent kafka topic consume $1 --cluster $$CLUSTER_ID --environment $$ENV_ID --from-beginning
+	confluent kafka topic consume $1 --cluster $$CLUSTER_ID --environment $(ENV_ID) --from-beginning
 
 # --- common
 list_topics:
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1);\
-	confluent kafka topic list --cluster  $$CLUSTER_ID --environment $$ENV_ID
+	confluent kafka topic list --cluster  $$CLUSTER_ID --environment $(ENV_ID)
 
 # -- some useful targets
 flink_list_statements:
 	confluent flink statement list --context $(CC_CONTEXT) --output human --cloud $(CLOUD) --region $(REGION)   --compute-pool $$CPOOL_ID
 
 start_flink_shell:
-	confluent flink shell --compute-pool $$CPOOL_ID  --context $(CC_CONTEXT) 
+	confluent flink shell --compute-pool $(CPOOL_ID)  --context $(CC_CONTEXT) 
 
 # -- init to get environments and compute pool
 init: 
-	export CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
-	echo $$ENV_ID $$CLUSTER_ID $$CPOOLID
+	export CLUSTER_ID=$$(confluent kafka cluster list --environment $(ENV_ID) | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
+	echo $(ENV_ID) $$CLUSTER_ID $(CPOOLID)
 

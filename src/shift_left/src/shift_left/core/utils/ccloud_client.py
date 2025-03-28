@@ -1,5 +1,4 @@
-import logging
-from logging.handlers import RotatingFileHandler
+
 import time
 import requests
 from urllib.parse import urlparse
@@ -7,26 +6,11 @@ import json
 import os, time
 from base64 import b64encode
 from typing import List, Dict
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.flink_statement_model import *
 
 
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("ccloud_client")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "cc-client.log")
-file_handler = RotatingFileHandler(
-    log_file_path, 
-    maxBytes=1024*1024,  # 1MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
+
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 

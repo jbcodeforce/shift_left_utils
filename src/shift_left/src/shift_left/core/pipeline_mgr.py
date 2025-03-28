@@ -8,16 +8,14 @@ This module provides functionality to:
 3. Navigate and analyze pipeline hierarchies
 """
 from collections import deque
-import json
-import logging
-from logging.handlers import RotatingFileHandler
+
 import os
 from pathlib import Path
 from typing import Dict, Optional, Final, Any, Set, List, Tuple, Union
 
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.file_search import (
     from_absolute_to_pipeline, 
     from_pipeline_to_absolute, 
@@ -30,23 +28,6 @@ from shift_left.core.utils.file_search import (
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
-
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("shift_left")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "shift_left.log")
-file_handler = RotatingFileHandler(
-    log_file_path, 
-    maxBytes=1024*1024,  # 1MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
 
 
 # Constants

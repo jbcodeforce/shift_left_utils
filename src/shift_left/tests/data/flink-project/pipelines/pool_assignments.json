@@ -6,5 +6,21 @@
     "dev-p1-dml-int-table-1": {
         "statement_name": "dev-p1-dml-int-table-1",
         "compute_pool_id": "lfcp-xvrvmz"
+    },
+    "dev-p1-dml-src-table-2": {
+        "statement_name": "dev-p1-dml-src-table-2",
+        "compute_pool_id": "lfcp-xvrvmz"
+    },
+    "dev-p1-dml-src-table-3": {
+        "statement_name": "dev-p1-dml-src-table-3",
+        "compute_pool_id": "lfcp-xvrvmz"
+    },
+    "dev-dml-src-table-1": {
+        "statement_name": "dev-dml-src-table-1",
+        "compute_pool_id": "lfcp-xvrvmz"
+    },
+    "dev-p1-dml-fct-order": {
+        "statement_name": "dev-p1-dml-fct-order",
+        "compute_pool_id": "lfcp-xvrvmz"
     }
 }

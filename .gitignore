@@ -11,4 +11,5 @@ site/
 **/.venv
 **/.env
 tmp/
+.DS_Store
 .webui_secret_key

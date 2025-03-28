@@ -1,8 +1,8 @@
 
-import logging, os
+import os
 import time
 import json
-from logging.handlers import RotatingFileHandler
+
 from pydantic import BaseModel
 from shift_left.core.pipeline_mgr import (
     read_pipeline_definition_from_file,
@@ -20,7 +20,7 @@ from shift_left.core.utils.file_search import (
 from typing import Tuple
 
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 
 from shift_left.core.utils.file_search import ( 
     get_ddl_dml_names_from_table, 
@@ -29,22 +29,6 @@ from shift_left.core.utils.file_search import (
 )
 from shift_left.core.flink_statement_model import *
 
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("deployment")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "deployment_mgr.log")
-file_handler = RotatingFileHandler(
-    log_file_path, 
-    maxBytes=1024*1024,  # 1MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
-logger.addHandler(file_handler)
-#console_handler = logging.StreamHandler()
-#console_handler.setLevel(logging.INFO)
-#logger.addHandler(console_handler)
 
 STATEMENT_COMPUTE_POOL_FILE=os.getenv("PIPELINES") + "/pool_assignments.json"
 
@@ -184,7 +168,7 @@ def deploy_flink_statement(flink_statement_file_path: str,
                            config: dict) -> StatementResult:
     """
     Read the SQL content for the flink_statement file name, and deploy to
-    the assigned compute pool.
+    the assigned compute pool. If the statement fails, propagate the exception to higher level.
     """
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
@@ -276,6 +260,8 @@ def _process_table_deployment(to_process,
                 parent_pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
                 to_process.add(parent_pipeline_def)
                 _process_table_deployment(to_process, already_process, compute_pool_id, dml_only, force_children)
+            else:
+                logger.debug(f"Parent {parent.table_name} is running, there is no need to change that!")
         if not get_table_structure(current_pipeline_def.table_name, compute_pool_id):
             statement=_deploy_ddl_dml(current_pipeline_def, compute_pool_id, False)
         elif dml_only:
@@ -305,27 +291,34 @@ def _process_children(current_pipeline_def: FlinkTablePipelineDefinition,
             logger.debug(f"Resume {child.dml_ref}")
 
 
-def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition, compute_pool_id: str, table_exist: bool = False):
+def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition, compute_pool_id: str, table_exists: bool = False):
+    """
+    Deploy the DDL 
+    """
     config = get_config()
-    dml_already_delete = False
+    dml_already_deleted = False
     ddl_statement_name, dml_statement_name = _return_ddl_dml_names(to_process, config)
     logger.info(f"_deploy_ddl_dml() - Deploy ddl: {ddl_statement_name} for {to_process.table_name}")
-    if table_exist:
+    if table_exists:
+        # need to delete the dml and the table
         _delete_statement_if_exist(dml_statement_name)
-        dml_already_delete= True
-        drop_table(to_process.table_name)
+        dml_already_deleted= True
+        rep= drop_table(to_process.table_name)
+        logger.debug(f"Drop table {to_process.table_name} status is : {rep}")
     else:
         _delete_statement_if_exist(ddl_statement_name)
         statement=deploy_flink_statement(to_process.ddl_ref, 
                                     compute_pool_id, 
                                     ddl_statement_name, 
                                     config)
+        logger.debug(f"Create table {to_process.table_name} status is : {statement}")
         delete_flink_statement(ddl_statement_name)
-    statement = _deploy_dml(to_process, compute_pool_id, dml_statement_name, dml_already_delete)
+    statement = _deploy_dml(to_process, compute_pool_id, dml_statement_name, dml_already_deleted)
     return statement   
 
 def _deploy_dml(to_process: FlinkTablePipelineDefinition, compute_pool_id: str, dml_statement_name: str= None, dml_already_delete: bool = True):
     config = get_config()
+    logger.info(f"_deploy_dml() - Deploy ddl: {dml_statement_name} for {to_process.table_name}")
     if not dml_statement_name:
         _, dml_statement_name = _return_ddl_dml_names(to_process, config)
     if not dml_already_delete:
