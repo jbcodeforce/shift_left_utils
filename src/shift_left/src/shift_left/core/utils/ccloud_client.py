@@ -22,7 +22,7 @@ file_handler = RotatingFileHandler(
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
@@ -54,7 +54,7 @@ class ConfluentCloudClient:
             "Content-Type": "application/json"
         }
         response = None
-        logger.debug(f"\n> Make request {method} to {url}")
+        logger.info(f"\n> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -71,9 +71,9 @@ class ConfluentCloudClient:
                     logger.debug(f"\n>>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
                     return response.text
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request to {url} failed: {e}")
             if response is not None:
                 if response.status_code == 404:
+                    logger.warning(f"Request to {url} has reported error: {e}")
                     result = json.loads(response.text)
                     logger.info(f">>>> Response text: {result["errors"][0]["detail"]}")
                 else:
@@ -237,10 +237,10 @@ class ConfluentCloudClient:
                 }
             }
         try:
-            logger.info(f">>>> Send POST request to Flink statement api with {statement_data}")
+            logger.debug(f">>>> Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
             response = self.make_request("POST", url + "/statements", statement_data)
-            logger.info(f"\n>>>> POST response= {response}") 
+            logger.debug(f"\n>>>> POST response= {response}") 
             if response["status"]["phase"] == "PENDING":
                 return self._wait_response(url, statement_name, start_time)
             execution_time = time.perf_counter() - start_time
@@ -263,6 +263,8 @@ class ConfluentCloudClient:
         try:
             resp=self.make_request("GET",f"{url}/statements/{statement_name}/results")
             logger.debug(resp)
+            if resp['results'] and resp['results']['data']:
+                return StatementResult(**resp)
             if resp["metadata"]["next"]:
                 resp=self.make_request("GET", resp["metadata"]["next"])
                 logger.debug(f"After next called: {resp}")

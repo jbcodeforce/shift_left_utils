@@ -31,7 +31,7 @@ file_handler = RotatingFileHandler(
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)

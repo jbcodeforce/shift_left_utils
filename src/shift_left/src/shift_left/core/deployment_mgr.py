@@ -40,11 +40,11 @@ file_handler = RotatingFileHandler(
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
+#console_handler = logging.StreamHandler()
+#console_handler.setLevel(logging.INFO)
+#logger.addHandler(console_handler)
 
 STATEMENT_COMPUTE_POOL_FILE=os.getenv("PIPELINES") + "/pool_assignments.json"
 
@@ -54,7 +54,7 @@ class DeploymentReport(BaseModel):
     statement_name: str
     flink_statement_deployed: List[str]
 
-
+@DeprecationWarning
 def search_existing_flink_statement(statement_name: str) -> None | Statement:
     """
     Given a table name the Flink SQL statement for dml includes the name of the table changing '_' to '-'
@@ -201,7 +201,7 @@ def deploy_flink_statement(flink_statement_file_path: str,
                                            properties )
     
 
-def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str:
+def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
@@ -212,7 +212,7 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
     client.delete_flink_statement(statement_name)
     try:
         statement = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
-        if statement.status.phase in ("RUNNING", "COMPLETED"):
+        if statement and statement.status.phase in ("RUNNING", "COMPLETED"):
             statement_result = client.get_statement_results(statement_name)
             if len(statement_result.results.data) > 0:
                 result_str = str(statement_result.results.data)
@@ -220,7 +220,7 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
                 return result_str
         return None
     except Exception as e:
-        logger.error(e)
+        logger.error(f"get_table_structure {e}")
         client.delete_flink_statement(statement_name)
         return None
 
@@ -268,10 +268,13 @@ def _process_table_deployment(to_process,
     """
     if len(to_process) > 0:
         current_pipeline_def: FlinkTablePipelineDefinition  = to_process.pop()
+        logger.info(f"Start processing {current_pipeline_def.table_name}")
+        logger.debug(f"--- {current_pipeline_def}")
         for parent in current_pipeline_def.parents:
             if not get_table_structure(parent.table_name, compute_pool_id):
-                logger.info(f"Table: {parent.table_name} not present add it for processing.")
-                to_process.add(parent)
+                logger.info(f"Table: {parent.table_name} not present, add it for processing.")
+                parent_pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
+                to_process.add(parent_pipeline_def)
                 _process_table_deployment(to_process, already_process, compute_pool_id, dml_only, force_children)
         if not get_table_structure(current_pipeline_def.table_name, compute_pool_id):
             statement=_deploy_ddl_dml(current_pipeline_def, compute_pool_id, False)
@@ -391,7 +394,7 @@ def _save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
         with open(STATEMENT_COMPUTE_POOL_FILE, "r")  as f:
             data=json.load(f) 
     data[statement_name] = {"statement_name": statement_name, "compute_pool_id": compute_pool_id}
-    with open(STATEMENT_COMPUTE_POOL_FILE, "a") as f:
+    with open(STATEMENT_COMPUTE_POOL_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
 

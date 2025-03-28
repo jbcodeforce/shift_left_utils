@@ -6,7 +6,7 @@ nav:
   - Introduction: index.md
   - Setup: setup.md
   - Recipes: recipes.md
-  - Migration Process: migration.md 
+  #- Migration Process: migration.md 
   - CLI commands: command.md
   - Test Harness: test_harness.md
   - Pipeline management: pipeline_mgr.md

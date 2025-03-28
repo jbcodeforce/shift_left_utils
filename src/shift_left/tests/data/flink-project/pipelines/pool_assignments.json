@@ -1,0 +1,10 @@
+{
+    "dev-p1-dml-int-table-2": {
+        "statement_name": "dev-p1-dml-int-table-2",
+        "compute_pool_id": "lfcp-xvrvmz"
+    },
+    "dev-p1-dml-int-table-1": {
+        "statement_name": "dev-p1-dml-int-table-1",
+        "compute_pool_id": "lfcp-xvrvmz"
+    }
+}
