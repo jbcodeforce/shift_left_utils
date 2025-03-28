@@ -63,6 +63,13 @@ class TestDeploymentManager(unittest.TestCase):
 
     # ---- Statement related  apis tests ------------------- 
 
+    def test_dml_ddl_names(self):
+        pipe_def = pm.read_pipeline_definition_from_file( os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
+        config = get_config()
+        ddl, dml = dm._return_ddl_dml_names(pipe_def, config)
+        assert ddl == "dev-p1-ddl-fct-order"
+        assert dml == "dev-p1-dml-fct-order"
+        
     def test_search_non_existant_statement(self):
         statement_dict = dm.search_existing_flink_statement("dummy")
         assert statement_dict == None
@@ -104,7 +111,7 @@ class TestDeploymentManager(unittest.TestCase):
         table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
         pipeline_def = pm.build_pipeline_report_from_table(table_name, inventory_path )
-        statement = dm.deploy_table(pipeline_def)
+        statement = dm._process_table_deployment(pipeline_def)
         assert statement
         print(statement)
 

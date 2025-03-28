@@ -9,7 +9,7 @@ with cte_table as (
 )
 SELECT  
     c.id,
-    c.customer_name,
+    c.user_name,
     c.account_name,
     c.balance - ct.amount as balance 
 from cte_table ct

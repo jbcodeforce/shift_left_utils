@@ -5,14 +5,20 @@ from typing import Dict, List, Optional, Any
 class MetadataResult(BaseModel):
     self_ref:  Optional[str] =  Field(alias="self", default=None)
     next: Optional[str]
-    
+
+class OpRow(BaseModel):
+    op: Optional[int] =  Field(default=None, description="the row number")
+    row: List[Any]
+
+class Data(BaseModel):
+    data: Optional[List[OpRow]] = []
+
 class StatementResult(BaseModel):
     api_version:  Optional[str] =  Field(default=None,description="The api version")
     kind: Optional[str] =  Field(default=None,description="The StatementResult or nothing")
     metadata: Optional[MetadataResult] =  Field(default=None,description="Metadata for the StatementRsult when present")
-    results: List[Any]
-    execution_time: Optional[float]
-    loop_counter: Optional[int]
+    results: Optional[Data]=  Field(default=None, description=" results with data as array of content")
+
 
 class Metadata(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when the resource was created")
@@ -39,7 +45,7 @@ class Traits(BaseModel):
     is_bounded: bool
     flink_schema: Optional[Schema] =  Field(alias="schema", default=None)
     sql_kind: str
-    upsert_columns: Optional[List[str]] = Field(default=None, description="Upsert columns if applicable")
+    upsert_columns: Optional[List[Any]] = Field(default=None, description="Upsert columns if applicable")
 
 class Status(BaseModel):
     detail: str
@@ -64,7 +70,8 @@ class Statement(BaseModel):
     spec: Spec
     status: Status
     result: Optional[StatementResult] = Field(default=None, description="Result of the statement execution, for example for a select from...")
-
+    execution_time: Optional[float] = 0
+    loop_counter: Optional[int] = 0
 
 
 

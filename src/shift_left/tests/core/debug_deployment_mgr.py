@@ -7,7 +7,8 @@ os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
     FlinkTableReference,
-    PipelineReport
+    PipelineReport,
+    PIPELINE_JSON_FILE_NAME
 )
 from shift_left.core.utils.file_search import (
         get_table_ref_from_inventory,
@@ -49,31 +50,11 @@ class TestDeploymentManager(unittest.TestCase):
                                                False)
         assert result
         print(result)
-    
-    def test_create_statement(self):
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        statement_name="test-statement"
-        sql_content = "show create table `examples`.`marketplace`.`clicks`;"
-        properties = {'sql.current-catalog' : 'examples' , 'sql.current-database' : 'marketplace'}
-        rep= client.delete_flink_statement(statement_name)
-        statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
-        print(f"\n\n---- {statement}")
-        statement = client.get_statement_info(statement_name)
-        print(statement)
-        status=client.delete_flink_statement(statement_name)
-        print(f"\n--- {status}")
-
-    def _test_create_report(self):
-        table_name="fct_order"
-        inventory_path= os.getenv("PIPELINES")
-        root_ref= pm.build_pipeline_report_from_table(table_name, inventory_path)
-        assert root_ref
-        print(root_ref.model_dump_json(indent=3))
-
- 
 
 
+    def test_full_delete_pipeline(self):
+        trace = dm.full_delete_pipeline_from_table("fct_order", os.getenv("PIPELINES"))
+        print(trace)
 
 
 if __name__ == '__main__':

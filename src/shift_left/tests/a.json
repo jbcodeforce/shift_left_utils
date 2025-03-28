@@ -1,10 +1,18 @@
-"results": {
-    "data": [
-        {
-            "row": [
-                "CREATE TABLE `j9r-env`.`j9r-kafka`.`int_table_2` (\n  `order_id` VARCHAR(2147483647) NOT NULL,\n  `product_id` VARCHAR(2147483647),\n  `customer_id` VARCHAR(2147483647),\n  `amount` INT,\n  CONSTRAINT `PRIMARY` PRIMARY KEY (`order_id`) NOT ENFORCED\n)\nDISTRIBUTED BY HASH(`order_id`) INTO 1 BUCKETS\nWITH (\n  "changelog.mode" = "upsert",\n  "connector" = "confluent",\n  "kafka.cleanup-policy" = "compact",\n  "kafka.max-message-size" = "0 bytes",\n  "kafka.retention.time" = "0 ms",\n  "key.format" = "avro-registry",\n  "scan.bounded.mode" = "unbounded",\n  "scan.startup.mode" = "earliest-offset",\n  "value.fields-include" = "all",\n  "value.format" = "avro-registry"\n)\n"
-            ]
-        }
-    ]
-}
+{
+    "api_version": "sql/v1",
+    "kind": "StatementResult",
+    "metadata": {
+        "created_at": "2025-03-28T01:34:49.288959Z",
+        "next": "",
+        "self": "https://flink.us-west-2.aws.confluent.cloud/sql/v1/organizations/49cee212-6346-438a-a1fa-d1b1cbd90d44/environments/env-nknqp3/statements/show-int-table-2/results"
+    },
+    "results": {
+        "data": [
+            {
+                "row": [
+                    "CREATE TABLE `j9r-env`.`j9r-kafka`.`int_table_2` (\n  `order_id` VARCHAR(2147483647) NOT NULL,\n  `product_id` VARCHAR(2147483647),\n  `customer_id` VARCHAR(2147483647),\n  `amount` INT,\n  CONSTRAINT `PRIMARY` PRIMARY KEY (`order_id`) NOT ENFORCED\n)\nDISTRIBUTED BY HASH(`order_id`) INTO 1 BUCKETS\nWITH (\n  "changelog.mode" = "upsert",\n  "connector" = "confluent",\n  "kafka.cleanup-policy" = "compact",\n  "kafka.max-message-size" = "2097164 bytes",\n  "kafka.retention.size" = "0 bytes",\n  "kafka.retention.time" = "0 ms",\n  "key.format" = "avro-registry",\n  "scan.bounded.mode" = "unbounded",\n  "scan.startup.mode" = "earliest-offset",\n  "value.fields-include" = "all",\n  "value.format" = "avro-registry"\n)\n"
+                ]
+            }
+        ]
+    }
 }
