@@ -86,12 +86,12 @@ class ConfluentCloudClient:
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}&environment={env_id}"
         while True:
             if next_page_token:
-                parsed_url = urlparse(next_page_token)
+                #parsed_url = urlparse(next_page_token)
                 #path = "https://api.confluent.cloud" + parsed_url.path + '?' + parsed_url.query if parsed_url.query else parsed_url.path
                 resp=self.make_request("GET", next_page_token + f"?page_size={page_size}")
-
             else:
                 resp=self.make_request("GET", url)
+            logger.debug(f"compute pool response= {resp}")
             if "data" in resp and resp["data"]:
                 for info in resp["data"]:
                     results.append({'id' : info["id"], 'name':  info["spec"]["display_name"]} )

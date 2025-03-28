@@ -6,7 +6,7 @@ Dedicated class to parse a SQL statement and extract elements like table name
 
 class SQLparser:
     def __init__(self):
-        self.table_pattern = r'\b(\s*FROM|JOIN)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
+        self.table_pattern = r'\b(\s*FROM|JOIN)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS\s*\('
         self.not_wanted_words= r'\b(\s*CROSS JOIN UNNEST)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
@@ -59,8 +59,9 @@ class SQLparser:
             not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
             matches=set()
             for table in tables:
-                if not table[1] in ctes1 and not table[1] in ctes2 and not table[1] in not_wanted:
-                    table_name=self.remove_junk_words(table[1])
+                retrieved_table=table[1].replace('`','')
+                if not retrieved_table in ctes1 and not retrieved_table in ctes2 and not retrieved_table in not_wanted:
+                    table_name=self.remove_junk_words(retrieved_table)
                     if table_name is not None:
                         matches.add(table_name)
             return matches
@@ -90,63 +91,3 @@ class SQLparser:
         except Exception as e:
             raise Exception(f"Error reading SQL file: {str(e)}")
         
-if __name__ == "__main__":
-    parser = SQLparser()
-
-    test_queries = [
-        """
-        SELECT * FROM table1
-        """,
-        """
-        SELECT a.*, b.name 
-        FROM schema1.table1 a 
-        JOIN table2 b ON a.id = b.id
-        """,
-        """
-        SELECT * 
-        FROM table1 t1
-        LEFT JOIN schema2.table2 AS t2 ON t1.id = t2.id
-        INNER JOIN table3 t3 ON t2.id = t3.id
-        """,
-        """
-        SELECT * 
-        FROM table1
-        RIGHT OUTER JOIN table2 ON table1.id = table2.id
-        FULL JOIN table3 ON table2.id = table3.id
-        """,
-        """
-        WITH cte1 AS (
-           SELECT a,b,c
-           FROM table1
-        ),
-        cte2 AS (
-            SELECT d,b,e
-           FROM table2
-        )
-        SELECT * 
-        FROM cte1
-        RIGHT OUTER JOIN cte2 ON table1.id = table2.id
-        FULL JOIN table3 ON table2.id = table3.id
-        CROSS JOIN unnest(split(trim(BOTH '[]' FROM y.target_value),','))  as user_id
-        """
-    ]
-    for i, query in enumerate(test_queries, 1):
-        print(f"\nTest Case {i}:")
-        print("SQL:", query.strip())
-        print("Tables found:", parser.extract_table_references(query))
-        
-
-    sql_content2 = """
-    -- a comment
-with exam_def as (select * from {{ ref('int_exam_def_deduped') }} )
-,exam_data as (select * from {{ ref('int_exam_data_deduped') }} )
-,exam_performance as (select * from {{ ref('int_exam_performance_deduped') }} )
-,training_data as (select * from {{ ref('int_training_data_deduped') }} )
-"""
-    print(parser.extract_table_references(sql_content2))
-    print(parser.extract_table_name_from_insert_into_statement(" INSERT INTO mytablename\nSELECT a,b,c\nFROM src_table"))
-    sql_content_3 = """
-     
-
-"""
-    print(parser.extract_table_references(sql_content_3))

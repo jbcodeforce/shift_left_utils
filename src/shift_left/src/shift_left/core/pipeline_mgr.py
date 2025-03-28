@@ -236,7 +236,8 @@ def _build_pipeline_definitions_from_sql_content(
                         set(),
                         set()
                     ))
-                    
+            else:
+                logger.info(f"No referenced table found in {sql_file_name}")
             return current_table_name, dependencies
             
     except Exception as e:
@@ -276,7 +277,7 @@ def _build_pipeline_definition(
     Returns:
         FlinkTablePipelineDefinition node
     """
-    logger.debug(f"parame:ters dml: {dml_file_name}, table_name: {table_name},  parents: {parents}, children: {children})")
+    logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parents}, children: {children})")
     if not table_type:
         table_type = get_table_type_from_file_path(dml_file_name)
     directory = os.path.dirname(dml_file_name)

@@ -34,7 +34,7 @@ app = typer.Typer(no_args_is_help=True)
 def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The path to the DML file. e.g. $PIPELINES/table-name/sql-scripts/dml.table-name.sql")], 
              pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
-    Build a pipeline from a sink table: add or update {} each table in the pipeline
+    Build a pipeline by reading the Flink dml SQL content: add or update each table in the pipeline.
     """
     if not dml_file_name.endswith(".sql"):
         print(f"[red]Error: the first parameter needs to be a dml sql file[/red]")

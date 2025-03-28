@@ -48,7 +48,7 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
 def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argument()],
                                 src_project_folder: Annotated[str, typer.Argument(envvar=["SRC_FOLDER"])]):
     """
-    Search the parent for a given table from the source project.
+    Search the parent for a given table from the source project (dbt, sql or ksql folders).
     """
     if not table_sql_file_name.endswith(".sql"):
         exit(1)
@@ -91,7 +91,7 @@ def update_makefile(
 @app.command()
 def find_table_users(table_name: Annotated[str, typer.Argument(help="The name of the table to search ")],
                      pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
-    """ Find the Flink Statements user of a given table """
+    """ Find the Flink Statements, user of a given table """
     print("#" * 30 + f" find_table_users for  {table_name}")
     out=search_users_of_table(table_name, pipeline_path)
     print(out)
@@ -138,4 +138,5 @@ def unit_test(  table_name: Annotated[str, typer.Argument(help= "Name of the tab
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
+    print("NOT YET IMPLEMENTED")
     pass

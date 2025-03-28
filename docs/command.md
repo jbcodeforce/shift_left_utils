@@ -115,7 +115,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `search-source-dependencies`: Search the parent for a given table from...
 * `migrate`: Migrate a source SQL Table defined in a...
 * `update-makefile`: Update existing Makefile for a given table...
-* `find-table-users`: Find the Flink Statements user of a given...
+* `find-table-users`: Find the Flink Statements, user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess...
 * `update-tables`: Update the tables with SQL code changes...
 * `unit-test`: Run all the unit tests or a specified test...
@@ -160,7 +160,7 @@ $ table build-inventory [OPTIONS] PIPELINE_PATH
 
 ### `table search-source-dependencies`
 
-Search the parent for a given table from the source project.
+Search the parent for a given table from the source project (dbt, sql or ksql folders).
 
 **Usage**:
 
@@ -219,7 +219,7 @@ $ table update-makefile [OPTIONS] TABLE_NAME PIPELINE_FOLDER_NAME
 
 ### `table find-table-users`
 
-Find the Flink Statements user of a given table
+Find the Flink Statements, user of a given table
 
 **Usage**:
 
@@ -271,7 +271,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 **Options**:
 
 * `--ddl`: Focus on DDL processing. Default is only DML
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107ca5df0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10666a630&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`
@@ -312,7 +312,8 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `delete-metadata`: Delete a pipeline definitions from a given...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the pipeline...
-* `deploy`: Deploy a pipeline from a given table.
+* `deploy`: Deploy a pipeline from a given table name,...
+* `full-delete`: From a given table, when it is a sink it...
 
 ### `pipeline build-metadata`
 
@@ -393,7 +394,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 ### `pipeline deploy`
 
-Deploy a pipeline from a given table. Th
+Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
 
 **Usage**:
 
@@ -408,7 +409,26 @@ $ pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 **Options**:
 
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [required]
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
+* `--help`: Show this message and exit.
+
+### `pipeline full-delete`
+
+From a given table, when it is a sink it goes all the way to the full pipeline and delete tables and Flink statements not shared
+
+**Usage**:
+
+```console
+$ pipeline full-delete [OPTIONS] TABLE_NAME INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: The table name containing pipeline_definition.json.  [required]
+* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
 * `--help`: Show this message and exit.
