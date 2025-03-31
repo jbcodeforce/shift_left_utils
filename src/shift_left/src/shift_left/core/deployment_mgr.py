@@ -105,7 +105,7 @@ def deploy_pipeline_from_table(table_name: str,
     return result
 
 
-def full_delete_pipeline_from_table(table_name: str, 
+def full_pipeline_undeploy_from_table(table_name: str, 
                                inventory_path: str ) -> str:
     """
     Stop DML statement and drop table

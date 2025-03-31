@@ -8,9 +8,9 @@ from shift_left.core.pipeline_mgr import (
     build_all_pipeline_definitions,
     report_running_dmls,
     FlinkTablePipelineDefinition,
-    delete_metada_files)
+    delete_all_metada_files)
 from typing_extensions import Annotated
-from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_delete_pipeline_from_table
+from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_pipeline_undeploy_from_table
 
 import yaml
 import os
@@ -49,12 +49,12 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
     print(f"Pipeline built from {dml_file_name}")
 
 @app.command()
-def delete_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument(help="Delete metadata pipeline_definitions.json in the given folder")]):
+def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argument(help="Delete metadata pipeline_definitions.json in the given folder")]):
     """
-    Delete a pipeline definitions from a given folder path
+    Delete all pipeline definition json files from a given folder path
     """
     print(f"Delete pipeline definition from {path_from_where_to_delete}")
-    delete_metada_files(path_from_where_to_delete)
+    delete_all_metada_files(path_from_where_to_delete)
 
 
 @app.command()
@@ -172,13 +172,13 @@ def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The tab
     print(f"Running DMLs done")
 
 @app.command()
-def full_delete(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
+def undeploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
     """
     From a given table, when it is a sink it goes all the way to the full pipeline and delete tables and Flink statements not shared
     """
     print(f"#### Full Delete of a pipeline from table {table_name} for not shareable tables")
-    result = full_delete_pipeline_from_table(table_name, inventory_path)
+    result = full_pipeline_undeploy_from_table(table_name, inventory_path)
     print(result)
 
 def _display_directed_graph(nodes, edges):

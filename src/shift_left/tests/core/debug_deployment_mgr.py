@@ -52,9 +52,11 @@ class TestDeploymentManager(unittest.TestCase):
         print(result)
 
 
-    def test_full_delete_pipeline(self):
-        trace = dm.full_delete_pipeline_from_table("fct_order", os.getenv("PIPELINES"))
-        print(trace)
+    def test_one_table(self):
+        os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
+        print(os.getenv("PIPELINES"))
+        report = pm.build_pipeline_definition_from_table(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
+        print(report)
 
 
 if __name__ == '__main__':

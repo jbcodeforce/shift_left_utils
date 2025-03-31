@@ -83,7 +83,7 @@ def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str)
     table_inventory = load_existing_inventory(pipeline_path)
     
     table_name, parent_references = _build_pipeline_definitions_from_sql_content(dml_file_name, table_inventory)
-    
+    logger.debug(f"Build pipeline for table: {table_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name,
                                               None, 
                                               None,
@@ -143,7 +143,7 @@ def report_running_dmls(table_name: str, inventory_path: str) -> FlinkTablePipel
     # TO COMPLETE
 
 
-def delete_metada_files(root_folder: str):
+def delete_all_metada_files(root_folder: str):
     """
     Delete all the files with the given name in the given root folder tree
     """

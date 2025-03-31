@@ -43,7 +43,8 @@ class SQLparser:
 
     def extract_table_references(self, sql_content) -> Set[str]:
         """
-        Extract the table reference from the sql_content
+        Extract the table reference from the sql_content, using different reg expressions to
+        do not consider CTE name and kafka topic name. To extract kafka topic name, it remove name with mulitple '.' in it.
         """
         sql_content=self._normalize_sql(sql_content)
         #regex = r'{{\s*ref\([\'"]([^\']+)[\'"]\)\s*}}'
@@ -60,6 +61,8 @@ class SQLparser:
             matches=set()
             for table in tables:
                 retrieved_table=table[1].replace('`','')
+                if retrieved_table.count('.') > 0:
+                    continue
                 if not retrieved_table in ctes1 and not retrieved_table in ctes2 and not retrieved_table in not_wanted:
                     table_name=self.remove_junk_words(retrieved_table)
                     if table_name is not None:
@@ -69,7 +72,7 @@ class SQLparser:
 
     def extract_table_name_from_insert_into_statement(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_`]*)'
+        regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
         if len(tbname) > 0:
             tb=tbname[0][1].replace("`","")

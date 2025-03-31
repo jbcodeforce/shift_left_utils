@@ -23,12 +23,12 @@ class TestPipelineManager(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
-        pm.delete_metada_files(os.getenv("PIPELINES"))
+        pm.delete_all_metada_files(os.getenv("PIPELINES"))
 
   
     def test_build_a_src_pipeline_def(self):
         print("test_build_a_src_pipelinedef")
-        pm.delete_metada_files(path)
+        pm.delete_all_metada_files(path)
         path= os.getenv("PIPELINES")
         src_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
         result = pm.build_pipeline_definition_from_table(src_table_path, path)
@@ -40,7 +40,7 @@ class TestPipelineManager(unittest.TestCase):
         print(result.model_dump_json(indent=3))
 
     def test_all_pipeline_def(self):
-        pm.delete_metada_files(os.getenv("PIPELINES"))
+        pm.delete_all_metada_files(os.getenv("PIPELINES"))
         pm.build_all_pipeline_definitions( os.getenv("PIPELINES"))
         assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + pm.PIPELINE_JSON_FILE_NAME)
 

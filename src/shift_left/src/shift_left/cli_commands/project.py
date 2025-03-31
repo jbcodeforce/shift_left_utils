@@ -1,6 +1,6 @@
 import typer
 from rich import print
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, log_file_path
 from shift_left.core.project_manager import (
         build_project_structure, 
         DATA_PRODUCT_PROJECT_TYPE, 
@@ -57,3 +57,12 @@ def list_compute_pools(environment_id: Annotated[str , typer.Option(help="Enviro
         print("#" * 30 + f" List conpute pool {environment_id}")
         list_of_pools = get_list_of_compute_pool(environment_id)
         print(list_of_pools)
+
+@app.command()
+def clear_logs():
+       """
+       Clear the CLI logs to start from a white page.
+       """
+       import os
+       os.remove(log_file_path)
+       print(f"{log_file_path} removed !")
