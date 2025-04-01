@@ -220,17 +220,26 @@ def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
 
 def _validate_table_names(sqls: dict) -> dict[str, any]:
     invalids={}
-    file_pattern=r"(ddl|dml)\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*\.sql$"
+    #file_pattern=r"(ddl|dml)\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*\.sql$"
     for name, path in sqls.items():
         violations=[]
         #--- Check sql file naming standards
-        if not re.match( file_pattern, name):
-            violations.append('WRONG FILE Name')
+        #if not re.match( file_pattern, name):
+        #    violations.append('WRONG FILE Name')
 
         #--- Check sql files are in right dir
         if not 'sql-scripts' in path:
             violations.append('WRONG Directory ')
         sql_file_name=path+'/'+name
+
+        substring='pipelines'
+        index = path.find(substring)
+        if index == -1:
+            break
+        before, after = path[:index], path[index + len(substring):]
+        result = after.split("/")
+        type=result[1]
+        product=result[2]
 
         ct_violation = True
         #--- Check CREATE TABLE statement in DDL files
@@ -255,16 +264,12 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
             if ct_violation:
                 violations.append('CREATE TABLE statement')
 
-            substring='pipelines'
-            index = path.find(substring)
-            if index == -1:
-                break
-            before, after = path[:index], path[index + len(substring):]
-            result = after.split("/")
-            type=result[1]
-            product=result[2]
             match type:
                 case 'sources':
+                    file_pattern=r"^(ddl|dml)\.src_" + re.escape(product) + r"(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        #print ('name :' + name + 'product :' + product)
+                        violations.append('WRONG FILE NAME ')
                     if not table_name.startswith('src_'+product):
                         violations.append('WRONG TABLE NAME : ' + table_name)
                     if not changelog_mode.startswith('upsert'):
@@ -272,6 +277,9 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                     if not cleanup_policy.startswith('delete'):
                         violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
                 case 'intermediates':
+                    file_pattern=r"^(ddl|dml)\.int_" + re.escape(product) + r"(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
                     if not table_name.startswith('int_'+product) or table_name.endswith('_deduped'):
                         violations.append('WRONG TABLE NAME : ' + table_name)
                     if not changelog_mode.startswith('upsert'):
@@ -279,6 +287,9 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                     if not cleanup_policy.startswith('delete'):
                         violations.append('WRONG kafka.cleanup-policy : ' + cleanup_policy)
                 case 'facts':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_fct(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
                     if not table_name.startswith(product+'_fct'):
                         violations.append('WRONG TABLE NAME : ' + table_name)
                     if not changelog_mode.startswith('retract'):
@@ -289,6 +300,9 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                     #if not sql_ltz.startswith('UTC'):
                     #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
                 case 'dimensions':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_dim(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
                     if not table_name.startswith(product+'_dim'):
                         violations.append('WRONG TABLE NAME : ' + table_name)
                     if not changelog_mode.startswith('retract'):
@@ -299,6 +313,9 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                     #if not sql_ltz.startswith('UTC'):
                     #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
                 case 'views':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_mv(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
                     if not table_name.startswith(product+'_mv'):
                         violations.append('WRONG TABLE NAME : ' + table_name)
                     if not changelog_mode.startswith('retract'):
@@ -308,9 +325,65 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                     #--enable this later
                     #if not sql_ltz.startswith('UTC'):
                     #    violations.append('SINK tables sql.local-time-zone should be UTC : ' + sql_ltz)
+        elif name.startswith('dml'):
+            match type:
+                case 'sources':
+                    file_pattern=r"^(ddl|dml)\.src_" + re.escape(product) + r"(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
+                case 'intermediates':
+                    file_pattern=r"^(ddl|dml)\.int_" + re.escape(product) + r"(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
+                case 'facts':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_fct(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
+                case 'dimensions':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_dim(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
+                case 'views':
+                    file_pattern=r"^(ddl|dml)\." + re.escape(product) + r"_mv(_[a-zA-Z0-9]+)*\.sql$"
+                    if not re.match( file_pattern, name):
+                        violations.append('WRONG FILE NAME ')
 
         if violations:
             invalids[name]=violations
+
+    return invalids
+
+def _validate_pipelines(sqls: dict, rootdir: str) -> dict[str, any]:
+    invalids={}
+    pipeline_path=os.path.dirname(rootdir)
+    for name, path in sqls.items():
+        if name.startswith('dml'):
+            violations=[]
+            pipeline_file=os.path.dirname(path)+'/pipeline_definition.json'
+            if not os.path.exists(pipeline_file):
+                violations.append('MISSING pipeline definition')
+            else:
+                try:
+                    with open(pipeline_file, 'r') as file:
+                        pipeline_definition=json.load(file)
+                    if pipeline_definition:
+                        table_name=pipeline_definition["table_name"]
+                        if table_name == "No-Table":
+                            violations.append('INVALID pipeline table_name : ' + table_name)
+                        ddl_ref=pipeline_path+'/'+pipeline_definition["ddl_ref"]
+                        if not os.path.exists(ddl_ref):
+                            violations.append('INVALID pipeline ddl_ref ')
+                        dml_ref=pipeline_path+'/'+pipeline_definition["dml_ref"]
+                        if not os.path.exists(dml_ref):
+                            violations.append('INVALID pipeline dml_ref ')
+                        parents=pipeline_definition["parents"]
+                        childrens=pipeline_definition["children"]
+
+                except json.JSONDecodeError:
+                    violations.append('INVALID pipeline json')
+
+            if violations:
+                invalids[name]=violations
 
     return invalids
 
