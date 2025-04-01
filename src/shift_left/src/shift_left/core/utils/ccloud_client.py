@@ -158,13 +158,27 @@ class ConfluentCloudClient:
         return url
 
     def get_flink_statement_list(self): 
+        page_size = self.config["confluent_cloud"].get("page_size", 100)
         url = self._build_flink_url_and_auth_header()
-        try:
-            result = self.make_request("GET", url+"/statements?page_size=100")
-            logger.debug("Statement execution result:", result)
-            return result
-        except requests.exceptions.RequestException as e:
-            logger.info(f"Error executing rest call: {e}")
+        results=[]
+        next_page_token = None
+        url+=f"/statements?page_size={page_size}"
+        while True:
+            if next_page_token:
+                resp=self.make_request("GET", next_page_token + f"?page_size={page_size}")
+            else:
+                resp=self.make_request("GET", url)
+            logger.debug("Statement execution result:", resp)
+            if "data" in resp and resp["data"]:
+                for info in resp["data"]:
+                    results.append({'name' : info["name"], 'status':  info["status"]} )
+            if "metadata" in resp and "next" in resp["metadata"]:
+                next_page_token = resp["metadata"]["next"]
+                if not next_page_token:
+                    break
+            else:
+                break
+        return results
 
     def _wait_response(self, url: str, statement_name: str, start_time ) -> StatementResult:
         """
@@ -243,13 +257,14 @@ class ConfluentCloudClient:
         try:
             resp=self.make_request("GET",f"{url}/statements/{statement_name}/results")
             logger.debug(resp)
-            if resp['results'] and resp['results']['data']:
-                return StatementResult(**resp)
+
             if resp["metadata"]["next"]:
                 resp=self.make_request("GET", resp["metadata"]["next"])
                 logger.debug(f"After next called: {resp}")
                 return StatementResult(**resp)
-            return StatementResult(**resp)
+            elif resp['results'] and resp['results']['data']:
+                return StatementResult(**resp)
+
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing GET statement call for {statement_name}: {e}")
             return None

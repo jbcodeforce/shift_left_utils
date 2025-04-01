@@ -8,6 +8,7 @@ class TestConfluentClient(unittest.TestCase):
 
 
     def test_get_environment_list(self):
+        print("#"*30 + "\ntest_get_environment_list\n")
         # need another api key
         client = ConfluentCloudClient(get_config())
         environments = client.get_environment_list()
@@ -17,6 +18,7 @@ class TestConfluentClient(unittest.TestCase):
             print(e['display_name'])
 
     def test_get_compute_pool_list(self):
+        print("#"*30 + "\ntest_get_compute_pool_list\n")
         client = ConfluentCloudClient(get_config())
         config=get_config()
         pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
@@ -43,6 +45,7 @@ class TestConfluentClient(unittest.TestCase):
         assert pool
                                             
     def test_get_topic_list(self):
+        print("#"*30 + "\ntest_get_topic_list\n")
         client = ConfluentCloudClient(get_config())
         resp = client.list_topics()
         assert resp
@@ -50,6 +53,7 @@ class TestConfluentClient(unittest.TestCase):
         print(resp['data'])
 
     def test_get_flink_statements_list(self):
+        print("#"*30 + "\ntest_get_flink_statements_list\n")
         client = ConfluentCloudClient(get_config())
         statements = client.get_flink_statement_list()
         assert statements
@@ -78,6 +82,7 @@ class TestConfluentClient(unittest.TestCase):
         print(f"\n--- {status}")
 
     def test_select_statement_with_getting_result(self):
+        print("#"*30 + "\n test_select_statement_with_getting_result\n")
         config = get_config()
         client = ConfluentCloudClient(config)
         statement_name="test-statement"
@@ -86,16 +91,16 @@ class TestConfluentClient(unittest.TestCase):
         rep= client.delete_flink_statement(statement_name)
         try:
             statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
-            print(f"\n\n---- {statement}")
+            print(f"\n\n---- Statement: {statement}")
             assert statement
             statement = client.get_statement_results(statement_name)
-            print(f"--- with result: {statement}\n\n")
+            print(f"--- with result: {statement.model_dump_json(indent=3)}\n\n")
             for op_row in statement.results.data:
                 print(op_row)
         except Exception as e:
             print(e)
         status=client.delete_flink_statement(statement_name)
-        print(f"\n--- {status}")
+        print(f"\n--- {statement_name} {status}")
 
     def _test_update_statement(self):
         print("Not clear yet how it works")
