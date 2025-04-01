@@ -130,9 +130,14 @@ def validate_table_cross_products(rootdir: str):
     for product in config["app"]["products"]:
         sqls=  _get_sql_paths_files(rootdir,product)
         invalid_names= _validate_table_names(sqls)
+        invalid_pipelines= _validate_pipelines(sqls, rootdir)
         print('-'*50 + product.upper() + '-'*50)
         if invalid_names:
             for sql_file, violations in invalid_names.items():
+                for violation in violations:
+                    print("{:65s} {:s}".format(sql_file, violation))
+        if invalid_pipelines:
+            for sql_file, violations in invalid_pipelines.items():
                 for violation in violations:
                     print("{:65s} {:s}".format(sql_file, violation))
 
