@@ -1,18 +1,22 @@
 foundations:
-  - table_name: src_order_raw
-    ddl_for_test: tests/ddl_int_table_1.sql
+  - table_name: src_order
+    ddl_for_test: ddl.src_table_2.sql
+  - table_name: tgt_order
+    ddl_for_test: ddl.tgt_table_2.sql
 test_suite:
 - name: test_case_1
   inputs:
-  - table_name: src_order_raw
-    sql_file_name: tests/ctas_src_order_raw_1.sql
+  - table_name: src_order
+    sql_file_name: dml.src_table_2.sql
+  - table_name: tgt_order
+    sql_file_name: dml.sql
   outputs:
-  - table_name: src_table_2
-    sql_file_name: tests/validate_table_2_1.sql
+  - table_name: src_order
+    sql_file_name: validate_table_2_1.sql
 - name: test_case_2
   inputs:
-  - table_name: src_order_raw
-    sql_file_name: tests/insert_src_order_raw_2.sql
+  - table_name: src_order
+    sql_file_name: tests/test2_src_table_2.sql
   outputs:
   - table_name: src_table_2
     sql_file_name: tests/validate_table_2_2.sql
