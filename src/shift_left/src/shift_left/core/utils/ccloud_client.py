@@ -165,8 +165,10 @@ class ConfluentCloudClient:
         url+=f"/statements?page_size={page_size}"
         while True:
             if next_page_token:
-                resp=self.make_request("GET", next_page_token + f"?page_size={page_size}")
+                print(next_page_token)
+                resp=self.make_request("GET", next_page_token)
             else:
+                print(url)
                 resp=self.make_request("GET", url)
             logger.debug("Statement execution result:", resp)
             if "data" in resp and resp["data"]:

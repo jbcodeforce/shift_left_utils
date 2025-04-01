@@ -58,6 +58,13 @@ class TestDeploymentManager(unittest.TestCase):
         report = pm.build_pipeline_definition_from_table(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
         print(report)
 
+    def test_get_flink_statements_list(self):
+        print("#"*30 + "\ntest_get_flink_statements_list\n")
+        client = ConfluentCloudClient(get_config())
+        statements = client.get_flink_statement_list()
+        assert statements
+        self.assertGreater(len(statements), 0)
+        print(json.dumps(statements, indent=2))
 
 if __name__ == '__main__':
     unittest.main()
