@@ -28,8 +28,8 @@ class TestPipelineManager(unittest.TestCase):
   
     def test_build_a_src_pipeline_def(self):
         print("test_build_a_src_pipelinedef")
-        pm.delete_all_metada_files(path)
         path= os.getenv("PIPELINES")
+        pm.delete_all_metada_files(path)
         src_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
         result = pm.build_pipeline_definition_from_table(src_table_path, path)
         assert result
@@ -46,7 +46,7 @@ class TestPipelineManager(unittest.TestCase):
 
     def test_1_build_pipeline_def_for_fact_table(self):
         """ Need to run this one first"""
-        print("test_build_pipeline_def_for_fact_table")
+        print("test_1_build_pipeline_def_for_fact_table")
         path= os.getenv("PIPELINES")
         table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
         result = pm.build_pipeline_definition_from_table(table_path, path)
@@ -55,11 +55,11 @@ class TestPipelineManager(unittest.TestCase):
         assert len(result.parents) == 2
         print(result.model_dump_json(indent=3))
         print("Verify intermediate tables updated")
-        pipe_def: FlinkTablePipelineDefinition  =pm.read_pipeline_definition_from_file(path + "/intermediates/p1/int_table_1/" + PIPELINE_JSON_FILE_NAME)
+        pipe_def: FlinkTablePipelineDefinition = pm.read_pipeline_definition_from_file(path + "/intermediates/p1/int_table_1/" + PIPELINE_JSON_FILE_NAME)
         assert pipe_def
         assert len(pipe_def.children) == 1
-        assert len(pipe_def.parents) == 1
-        pipe_def: FlinkTablePipelineDefinition  =pm.read_pipeline_definition_from_file(path + "/intermediates/p1/int_table_2/" + PIPELINE_JSON_FILE_NAME)
+        assert len(pipe_def.parents) == 2
+        pipe_def: FlinkTablePipelineDefinition = pm.read_pipeline_definition_from_file(path + "/intermediates/p1/int_table_2/" + PIPELINE_JSON_FILE_NAME)
         assert pipe_def
         assert len(pipe_def.children) == 1
         assert len(pipe_def.parents) == 1

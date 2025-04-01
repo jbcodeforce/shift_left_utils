@@ -8,39 +8,22 @@ there is one pipeline per sink table.
 
 """
 import os
-import logging
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 from shift_left.core.utils.flink_sql_code_agent_lg import translate_to_flink_sqls
 from shift_left.core.utils.file_search import create_folder_if_not_exist, SCRIPTS_DIR, get_or_build_source_file_inventory
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.ccloud_client import search_matching_topic
 from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
+from typing import List
 
-
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("deployment")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "process-src-table.log")
-file_handler = RotatingFileHandler(
-    log_file_path, 
-    maxBytes=1024*1024,  # 1MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-logger.addHandler(console_handler)
 
 TMPL_FOLDER="templates"
 CREATE_TABLE_TMPL="create_table_skeleton.jinja"
 DML_DEDUP_TMPL="dedup_dml_skeleton.jinja"
 TEST_DEDUL_TMPL="test_dedup_statement.jinja"
+
+TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
 # ---- PUBLIC APIs ----
 
@@ -128,7 +111,7 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     file_name=f"{target_folder}/dml.{table_fname}.sql" 
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
-    topic_name=search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
+    topic_name=_search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
     context = {
         'table_name': table_fname,
         'topic_name': f"`{topic_name}`",
@@ -254,3 +237,61 @@ def _process_non_source_sql_file(table_name: str,
             process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
 
 
+def _search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
+    """
+    Given the table name search in the list of topics the potential matching topics.
+    return the topic name if found otherwise return the table name
+    rejected_prefixes list the prefixes the topic name should not start with
+    """
+    potential_matches=[]
+    logger.debug(f"Search {table_name} in the list of topics, avoiding the ones starting by {rejected_prefixes}")
+    with open(TOPIC_LIST_FILE,"r") as f:
+        for line in f:
+            line=line.strip()
+            if ',' in line:
+                keyname=line.split(',')[0]
+                line=line.split(',')[1].strip()
+            else:
+                keyname=line
+            if table_name == keyname:
+                potential_matches.append(line)
+            elif table_name in keyname:
+                potential_matches.append(line)
+            elif _find_sub_string(table_name, keyname):
+                potential_matches.append(line)
+    if len(potential_matches) == 1:
+        return potential_matches[0]
+    else:
+        logger.warning(f"Found multiple potential matching topics: {potential_matches}, removing the ones that may be not start with {rejected_prefixes}")
+        narrow_list=[]
+        for topic in potential_matches:
+            found = False
+            for prefix in rejected_prefixes:
+                if topic.startswith(prefix):
+                    found = True
+            if not found:
+                narrow_list.append(topic)
+        if len(narrow_list) > 1:
+            logger.error(f"Still found more topic than expected {narrow_list}\n\t--> Need to abort")
+            exit()
+        elif len(narrow_list) == 0:
+            logger.warning(f"Found no more topic {narrow_list}")
+            return ""
+        logger.debug(f"Take the following topic: {narrow_list[0]}")
+        return narrow_list[0]
+
+
+def _find_sub_string(table_name, topic_name) -> bool:
+    """
+    Topic name may includes words separated by ., and table may have words
+    separated by _, so try to find all the words defining the name of the table
+    to be in the topic name
+    """
+    words=table_name.split("_")
+    subparts=topic_name.split(".")
+    all_present = True
+    for w in words:
+        if w not in subparts:
+            all_present=False
+            break
+    return all_present

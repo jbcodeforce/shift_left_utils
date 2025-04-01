@@ -116,7 +116,7 @@ def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> Pi
         inventory_path = os.getenv("PIPELINES")
     inventory = load_existing_inventory(inventory_path)
     if table_name not in inventory:
-        return None
+        raise Exception("Table not found in inventory")
     try:
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
         current_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
@@ -134,12 +134,11 @@ def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> Pi
         logger.error(f"Error in processing pipeline report {e}")
         raise Exception(f"Error in processing pipeline report for {table_name}")
 
-def report_running_dmls(table_name: str, inventory_path: str) -> FlinkTablePipelineDefinition:
-    if not inventory_path:
-        inventory_path = os.getenv("PIPELINES")
-    inventory = load_existing_inventory(inventory_path)
-    if table_name not in inventory:
-        return None
+def report_running_flink_statements(table_name: str, inventory_path: str) -> PipelineReport:
+    report = build_pipeline_report_from_table(table_name, inventory_path)
+    for node in report.children:
+        print(node)
+    
     # TO COMPLETE
 
 

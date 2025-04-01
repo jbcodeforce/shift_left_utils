@@ -7,10 +7,10 @@ SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
 DROP_DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-drop-$(SCRIPT_POST_KEBAB)
-DDL_SCRIPT=./sql-scripts/ddl_$(TABLE_NAME).sql
+DDL_SCRIPT=./sql-scripts/ddl.$(TABLE_NAME).sql
 DML_STATEMENT=$(SCRIPT_PRE_KEBAB)-dml-$(SCRIPT_POST_KEBAB)
-DML_SCRIPT=./sql-scripts/dml_$(TABLE_NAME).sql
-DML_TESTS_SCRIPT=./tests/dml_$(TABLE_NAME).sql
+DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
+DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
 create_src_s1: create_flink_ddl  create_flink_dml
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_src_production_record_status: 
+drop_table_src_s1: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 

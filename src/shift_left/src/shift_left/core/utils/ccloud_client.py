@@ -5,14 +5,10 @@ from urllib.parse import urlparse
 import json
 import os, time
 from base64 import b64encode
-from typing import List, Dict
-from shift_left.core.utils.app_config import get_config, logger
+from typing import List
+from shift_left.core.utils.app_config import logger
 from shift_left.core.flink_statement_model import *
 
-
-
-
-TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
 class ConfluentCloudClient:
     """
@@ -289,63 +285,3 @@ class ConfluentCloudClient:
             logger.info(f"Error executing rest call: {e}")
      
 
-# --- Public APIs ---
-
-def search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
-    """
-    Given the table name search in the list of topics the potential matching topics.
-    return the topic name if found otherwise return the table name
-    rejected_prefixes list the prefixes the topic name should not start with
-    """
-    potential_matches=[]
-    logger.debug(f"Search {table_name} in the list of topics, avoiding the ones starting by {rejected_prefixes}")
-    with open(TOPIC_LIST_FILE,"r") as f:
-        for line in f:
-            line=line.strip()
-            if ',' in line:
-                keyname=line.split(',')[0]
-                line=line.split(',')[1].strip()
-            else:
-                keyname=line
-            if table_name == keyname:
-                potential_matches.append(line)
-            elif table_name in keyname:
-                potential_matches.append(line)
-            elif _find_sub_string(table_name, keyname):
-                potential_matches.append(line)
-    if len(potential_matches) == 1:
-        return potential_matches[0]
-    else:
-        logger.warning(f"Found multiple potential matching topics: {potential_matches}, removing the ones that may be not start with {rejected_prefixes}")
-        narrow_list=[]
-        for topic in potential_matches:
-            found = False
-            for prefix in rejected_prefixes:
-                if topic.startswith(prefix):
-                    found = True
-            if not found:
-                narrow_list.append(topic)
-        if len(narrow_list) > 1:
-            logger.error(f"Still found more topic than expected {narrow_list}\n\t--> Need to abort")
-            exit()
-        elif len(narrow_list) == 0:
-            logger.warning(f"Found no more topic {narrow_list}")
-            return ""
-        logger.debug(f"Take the following topic: {narrow_list[0]}")
-        return narrow_list[0]
-
-
-def _find_sub_string(table_name, topic_name) -> bool:
-    """
-    Topic name may includes words separated by ., and table may have words
-    separated by _, so try to find all the words defining the name of the table
-    to be in the topic name
-    """
-    words=table_name.split("_")
-    subparts=topic_name.split(".")
-    all_present = True
-    for w in words:
-        if w not in subparts:
-            all_present=False
-            break
-    return all_present
