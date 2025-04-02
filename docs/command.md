@@ -35,6 +35,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
+* `clear-logs`: Clear the CLI logs to start from a white...
 
 ### `project init`
 
@@ -94,6 +95,20 @@ $ project list-compute-pools [OPTIONS]
 **Options**:
 
 * `--environment-id TEXT`: Environment_id to return all compute pool
+* `--help`: Show this message and exit.
+
+### `project clear-logs`
+
+Clear the CLI logs to start from a white page.
+
+**Usage**:
+
+```console
+$ project clear-logs [OPTIONS]
+```
+
+**Options**:
+
 * `--help`: Show this message and exit.
 
 ## `table`
@@ -161,6 +176,7 @@ $ table build-inventory [OPTIONS] PIPELINE_PATH
 ### `table search-source-dependencies`
 
 Search the parent for a given table from the source project (dbt, sql or ksql folders).
+Example: shift_left table search-source-dependencies $SRC_FOLDER/
 
 **Usage**:
 
@@ -170,8 +186,8 @@ $ table search-source-dependencies [OPTIONS] TABLE_SQL_FILE_NAME SRC_PROJECT_FOL
 
 **Arguments**:
 
-* `TABLE_SQL_FILE_NAME`: [required]
-* `SRC_PROJECT_FOLDER`: [env var: SRC_FOLDER; required]
+* `TABLE_SQL_FILE_NAME`: Full path to the file name of the dbt sql file  [required]
+* `SRC_PROJECT_FOLDER`: Folder name for all the dbt sources (e.g. models)  [env var: SRC_FOLDER; required]
 
 **Options**:
 
@@ -271,7 +287,8 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 **Options**:
 
 * `--ddl`: Focus on DDL processing. Default is only DML
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10666a630&gt;]]
+* `--both-ddl-dml`: Run both DDL and DML sql files
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x124ab65a0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`
@@ -308,16 +325,17 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `build-metadata`: Build a pipeline from a sink table: add or...
-* `delete-metadata`: Delete a pipeline definitions from a given...
+* `build-metadata`: Build a pipeline by reading the Flink dml...
+* `delete-all-metadata`: Delete all pipeline definition json files...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the pipeline...
 * `deploy`: Deploy a pipeline from a given table name,...
-* `full-delete`: From a given table, when it is a sink it...
+* `report-running-dmls`: Assess for a given table, what are the...
+* `undeploy`: From a given table, when it is a sink it...
 
 ### `pipeline build-metadata`
 
-Build a pipeline from a sink table: add or update {} each table in the pipeline
+Build a pipeline by reading the Flink dml SQL content: add or update each table in the pipeline.
 
 **Usage**:
 
@@ -334,14 +352,14 @@ $ pipeline build-metadata [OPTIONS] DML_FILE_NAME PIPELINE_PATH
 
 * `--help`: Show this message and exit.
 
-### `pipeline delete-metadata`
+### `pipeline delete-all-metadata`
 
-Delete a pipeline definitions from a given folder path
+Delete all pipeline definition json files from a given folder path
 
 **Usage**:
 
 ```console
-$ pipeline delete-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
+$ pipeline delete-all-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
 ```
 
 **Arguments**:
@@ -414,14 +432,33 @@ $ pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
 * `--help`: Show this message and exit.
 
-### `pipeline full-delete`
+### `pipeline report-running-dmls`
+
+Assess for a given table, what are the running dmls from its children, using recursively.
+
+**Usage**:
+
+```console
+$ pipeline report-running-dmls [OPTIONS] TABLE_NAME INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: The table name containing pipeline_definition.json to get child list  [required]
+* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `pipeline undeploy`
 
 From a given table, when it is a sink it goes all the way to the full pipeline and delete tables and Flink statements not shared
 
 **Usage**:
 
 ```console
-$ pipeline full-delete [OPTIONS] TABLE_NAME INVENTORY_PATH
+$ pipeline undeploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 ```
 
 **Arguments**:

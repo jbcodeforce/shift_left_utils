@@ -113,7 +113,7 @@ def full_pipeline_undeploy_from_table(table_name: str,
                                inventory_path: str ) -> str:
     """
     Stop DML statement and drop table
-    Navigate to the parent and continue if there is no children 
+    Navigate to the parent(s) and continue if there is no children 
     """
     logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
     table_inventory = load_existing_inventory(inventory_path)
@@ -256,13 +256,17 @@ def report_running_flink_statements(table_name: str, inventory_path: str):
 def delete_statement_if_exists(statement_name):
     statement_list = _get_or_load_statement_list()
     if statement_name in statement_list:
-        delete_statement_if_exists(statement_name)
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        client.delete_flink_statement(statement_name)
         statement_list.pop(statement_name)
         return 
     else: # do remote API call
         statement = get_statement(statement_name)
         if statement:
-            delete_statement_if_exists(statement_name)
+            config = get_config()
+            client = ConfluentCloudClient(config)
+            client.delete_flink_statement(statement_name)
 
 # ---- private API
 

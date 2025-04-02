@@ -170,12 +170,12 @@ def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The tab
     print(f"Running DMLs done")
 
 @app.command()
-def undeploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
+def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table name containing pipeline_definition.json, from where the undeploy will run.")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
     """
-    From a given table, when it is a sink it goes all the way to the full pipeline and delete tables and Flink statements not shared
+    From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
-    print(f"#### Full Delete of a pipeline from table {table_name} for not shareable tables")
+    print(f"#### Full Delete of a pipeline from the table {table_name} for not shareable tables")
     result = full_pipeline_undeploy_from_table(table_name, inventory_path)
     print(result)
 
