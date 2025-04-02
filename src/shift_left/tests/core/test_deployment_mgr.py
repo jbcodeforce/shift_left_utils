@@ -83,13 +83,13 @@ class TestDeploymentManager(unittest.TestCase):
         statement_dict = dm.search_existing_flink_statement("show-table")
         assert statement_dict
         print(f"\n -- {statement_dict}")
-        response = dm.delete_flink_statement("show_table")
+        response = dm.delete_statement_if_exists("show_table")
         assert response
 
     def _test_clean_things(self):
         for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
              dm.drop_table(table)
-             dm.delete_flink_statement("drop-" + table.replace('_','-'))
+             dm.delete_statement_if_exists("drop-" + table.replace('_','-'))
 
     def test_table_structure(self):
         result = dm.get_table_structure("int_table_2")

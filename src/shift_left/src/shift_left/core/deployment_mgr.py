@@ -126,8 +126,8 @@ def full_pipeline_undeploy_from_table(table_name: str,
         return f"ERROR: Could not perform a full delete from a non sink table like {table_name}"
     else:
         ddl_statement_name, dml_statement_name = _return_ddl_dml_names(pipeline_def, config)
-        _delete_statement_if_exist(ddl_statement_name)
-        _delete_statement_if_exist(dml_statement_name)
+        delete_statement_if_exists(ddl_statement_name)
+        delete_statement_if_exists(dml_statement_name)
         drop_table(table_name, config['flink']['compute_pool_id'])
         trace = f"{table_name} deleted\n"
         return _delete_parent_not_shared(pipeline_def, trace, config)
@@ -208,7 +208,7 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
     client = ConfluentCloudClient(config)
     sql_content = f"show create table {table_name};"
     properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    _delete_statement_if_exist(statement_name)
+    delete_statement_if_exists(statement_name)
     try:
         statement = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
         if statement and statement.status.phase in ("RUNNING", "COMPLETED"):
@@ -232,19 +232,13 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     sql_content = f"drop table {table_name};"
     properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     statement_name = "drop-" + table_name.replace('_','-')
-    _delete_statement_if_exist(statement_name)
+    delete_statement_if_exists(statement_name)
     try:
         result= client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
         logger.debug(f"Run drop table {result}")
     except Exception as e:
         logger.error(e)
-    _delete_statement_if_exist(statement_name)
-
-
-def delete_flink_statement(statement_name: str) -> str:
-    logger.info(f"Deleting Flink statement: {statement_name}")
-    client = ConfluentCloudClient(get_config())
-    return client.delete_flink_statement(statement_name)
+    delete_statement_if_exists(statement_name)
 
 
 def report_running_flink_statements(table_name: str, inventory_path: str):
@@ -259,6 +253,16 @@ def report_running_flink_statements(table_name: str, inventory_path: str):
     return results
 
 
+def delete_statement_if_exists(statement_name):
+    statement_list = _get_or_load_statement_list()
+    if statement_name in statement_list:
+        delete_statement_if_exists(statement_name)
+        statement_list.pop(statement_name)
+        return 
+    else: # do remote API call
+        statement = get_statement(statement_name)
+        if statement:
+            delete_statement_if_exists(statement_name)
 
 # ---- private API
 
@@ -313,7 +317,7 @@ def _table_exists(table_name, statement_name, compute_pool_id) -> bool:
         if statement_list[statement_name] == "RUNNING":
             return True
         elif  statement_list[statement_name] in ("FAILED", "STOPPED"):
-            delete_flink_statement(statement_name)
+            delete_statement_if_exists(statement_name)
             return False
         
         return get_table_structure(table_name, compute_pool_id) != None
@@ -360,17 +364,17 @@ def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition, compute_pool_id: s
     logger.info(f"- Deploy ddl: {ddl_statement_name} for {to_process.table_name}")
     if table_exists:
         # need to delete the dml and the table
-        _delete_statement_if_exist(dml_statement_name)
+        delete_statement_if_exists(dml_statement_name)
         dml_already_deleted= True
         rep= drop_table(to_process.table_name)
         logger.debug(f"Dropped table {to_process.table_name} status is : {rep}")
-    _delete_statement_if_exist(ddl_statement_name)
+    delete_statement_if_exists(ddl_statement_name)
     statement=deploy_flink_statement(to_process.ddl_ref, 
                                 compute_pool_id, 
                                 ddl_statement_name, 
                                 config)
     logger.debug(f"Create table {to_process.table_name} status is : {statement}")
-    _delete_statement_if_exist(ddl_statement_name)
+    delete_statement_if_exists(ddl_statement_name)
     statement = _deploy_dml(to_process, compute_pool_id, dml_statement_name, dml_already_deleted)
     return statement   
 
@@ -384,7 +388,7 @@ def _deploy_dml(to_process: FlinkTablePipelineDefinition,
     if not dml_statement_name:
         _, dml_statement_name = _return_ddl_dml_names(to_process, config)
     if not dml_already_delete:
-        _delete_statement_if_exist(dml_statement_name)
+        delete_statement_if_exists(dml_statement_name)
     statement=deploy_flink_statement(to_process.dml_ref, 
                                     compute_pool_id, 
                                     dml_statement_name, 
@@ -399,16 +403,6 @@ def _return_ddl_dml_names(to_process: FlinkTablePipelineDefinition, config: dict
                                         config['kafka']['cluster_type'], 
                                         product_name)
 
-def _delete_statement_if_exist(statement_name):
-    statement_list = _get_or_load_statement_list()
-    if statement_name in statement_list:
-        delete_flink_statement(statement_name)
-        statement_list.pop(statement_name)
-        return 
-    else: # do remote API call
-        statement = get_statement(statement_name)
-        if statement:
-            delete_flink_statement(statement_name)
 
 
 def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:str, config ) -> str:
@@ -416,8 +410,8 @@ def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:s
         if len(parent.children) == 1:
             # as the parent is not shared it can be deleted
             ddl_statement_name, dml_statement_name = _return_ddl_dml_names(parent, config)
-            _delete_statement_if_exist(ddl_statement_name)
-            _delete_statement_if_exist(dml_statement_name)
+            delete_statement_if_exists(ddl_statement_name)
+            delete_statement_if_exists(dml_statement_name)
             drop_table(parent.table_name, config['flink']['compute_pool_id'])
             trace+= f"{parent.table_name} deleted\n"
             pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
@@ -426,8 +420,8 @@ def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:s
             trace+=f"{parent.table_name} has more than {current_ref.table_name} as child, so no delete"
     if len(current_ref.children) == 1:
         ddl_statement_name, dml_statement_name = _return_ddl_dml_names(current_ref, config)
-        _delete_statement_if_exist(ddl_statement_name)
-        _delete_statement_if_exist(dml_statement_name)
+        delete_statement_if_exists(ddl_statement_name)
+        delete_statement_if_exists(dml_statement_name)
         drop_table(current_ref.table_name, config['flink']['compute_pool_id'])
         trace+= f"{current_ref.table_name} deleted\n"
     return trace

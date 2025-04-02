@@ -210,7 +210,7 @@ def _build_pipeline_definitions_from_sql_content(
         with open(sql_file_name) as f:
             sql_content = f.read()
             parser = SQLparser()
-            current_table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
+            current_table_names = parser.extract_table_names_from_insert_into_statement(sql_content)
             dependencies = set()
             
             referenced_table_names = parser.extract_table_references(sql_content)
@@ -219,7 +219,7 @@ def _build_pipeline_definitions_from_sql_content(
                     table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[table_name])
                     if not table_ref:
                         continue
-                    logger.info(f"{current_table_name} - depends on: {table_name}") 
+                    logger.info(f"{current_table_names} - depends on: {table_name}") 
                     dependencies.add(_build_pipeline_definition(
                         table_name, 
                         table_ref.type,
@@ -231,7 +231,7 @@ def _build_pipeline_definitions_from_sql_content(
                     ))
             else:
                 logger.info(f"No referenced table found in {sql_file_name}")
-            return current_table_name, dependencies
+            return current_table_names, dependencies
             
     except Exception as e:
         logger.error(f"Error while processing {sql_file_name} with message: {e} but process continues...")

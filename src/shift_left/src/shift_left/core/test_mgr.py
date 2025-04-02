@@ -67,12 +67,9 @@ def drop_validation_tables(table_folder):
             print(f"{table_name} table dropped")
 
 def drop_validation_statements(statement_names):
-    for stmt_name in statement_names:
-        if get_statement(stmt_name):
-            delete_flink_statement(stmt_name)
-            print(f"Deleted Flink statement: {stmt_name}")
-        else:
-            print(f"Statement already deleted or does not exist: {stmt_name}")
+    for stmt_name in statement_names:       
+        delete_statement_if_exists(stmt_name)
+
 
 def execute_one_test(table_folder: str, test_case_name: str):
     definition = load_test_definition(table_folder)

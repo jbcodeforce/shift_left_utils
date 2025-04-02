@@ -82,7 +82,7 @@ def get_or_build_inventory(
                 # extract table name from dml filefrom sql script   
                 with open(dml_file_name, "r") as f:
                     sql_content = f.read()
-                    table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
+                    table_name = parser.extract_table_names_from_insert_into_statement(sql_content)
                     directory = os.path.dirname(dml_file_name)
                     table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
                     table_type = get_table_type_from_file_path(dml_file_name)
