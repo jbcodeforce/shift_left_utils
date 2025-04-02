@@ -1,4 +1,5 @@
 import typer
+import json
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
@@ -6,11 +7,9 @@ from shift_left.core.pipeline_mgr import (
     build_pipeline_definition_from_table, 
     build_pipeline_report_from_table, 
     build_all_pipeline_definitions,
-    report_running_flink_statements,
-    FlinkTablePipelineDefinition,
     delete_all_metada_files)
 from typing_extensions import Annotated
-from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_pipeline_undeploy_from_table
+from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_pipeline_undeploy_from_table, report_running_flink_statements
 
 import yaml
 import os
@@ -154,7 +153,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     print(f"#### Pipeline deployed from {result}")
 
 
-#@app.command()
+@app.command()
 def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json to get child list")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
     """
@@ -163,7 +162,7 @@ def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The tab
     print(f"Assess runnning Flink DML part of the pipeline from given table name")
     try:
         report=report_running_flink_statements(table_name, inventory_path)
-        print(report)
+        print(json.dumps(report, indent=3))
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)

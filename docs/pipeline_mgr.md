@@ -118,13 +118,24 @@ The [recipe chapter](./recipes.md) has how-to descriptions for the specific comm
 
 #### Deploying a fact table
 
-During development, Flink SQL developers  the makefile: see [recipe](). But it may be relevant to deploy a full pipeline from a sink table. For example we support, SREs want to deply `fct_order`. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, so before deploying the `fct_order dml`, the tool needs to deploy `int_table_1`, which means first running DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC). 
+During development, Flink SQL developers use the makefile: see [recipe]() to deploy statement. While preparing for staging or integration tests, it may be relevant to deploy a full pipeline from a sink table. For example SREs want to deploy the sink `fct_order` table. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, tables and topics have messages. Before deploying the `fct_order dml`, the tool needs to assess what are the current parents table running. If there are missing tables, the tool needs to deploy those, taking into consideration parents of parents. For example, for the `int_table_1` which is not created, the tool needs first to run the DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC), thne run the `int_table_1` DDL and DML, to finally deploy the `fct_order` DDL and DML. 
 
 <figure markdown="span">
 ![](./images/flink_pipeline_1.drawio.png)
  <figcaption>Sink table deployment - with parent deployment</figcaption>
 </figure>
 
+The red color highlights what is the goal of the deployment. The white represents what is stable, while the orange elements are impacted by the deployment.  
+
+???- info "Step to demonstrate a sink deployment"
+    * remove any older logs with `rm ~/.shift_left/logs/*.log*`
+    * be sure config.yaml has the good parameters in particular the flink and confluent cloud access keys,secrets, a default compute_pool_id and the logging level.
+    * defines the PIPELINES and CONFIG_FILE environement variables
+    * Ensure an inventory is up to date, if not run `shift_left table build-inventory $PIPELINES`
+    * If for any reason the pipeline definitions for the given pipeline needs to be recreated: `shift_left pipeline build-metadata fct_order $PIPELINES`
+    * verify a report works on the fact table: `shift_left pipeline report fct_order $PIPELINES`.  
+    * deploy the fact table: `shift_left deploy fct_order`
+    * Verify in the Confluent Cloud console the Flink statements running and the topics created.
 
 #### Deploying an intermediate table
 

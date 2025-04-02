@@ -84,7 +84,8 @@ class TestPipelineManager(unittest.TestCase):
         assert result
         print(result.model_dump_json(indent=3))
     
-   
+
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -8,9 +8,10 @@ with cte_table as (
     FROM int_table_2
 )
 SELECT  
-    c.id,
+    coalesce(c.id,'N/A') as id,
     c.user_name,
     c.account_name,
-    c.balance - ct.amount as balance 
+    c.balance - ct.amount as balance,
+    c.new_att
 from cte_table ct
 left join int_table_1 c on ct.customer_id = c.id;

@@ -45,10 +45,11 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
 @app.command()
-def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argument()],
-                                src_project_folder: Annotated[str, typer.Argument(envvar=["SRC_FOLDER"])]):
+def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argument(help="Full path to the file name of the dbt sql file")],
+                                src_project_folder: Annotated[str, typer.Argument(envvar=["SRC_FOLDER"], help="Folder name for all the dbt sources (e.g. models)")]):
     """
     Search the parent for a given table from the source project (dbt, sql or ksql folders).
+    Example: shift_left table search-source-dependencies $SRC_FOLDER/ 
     """
     if not table_sql_file_name.endswith(".sql"):
         exit(1)

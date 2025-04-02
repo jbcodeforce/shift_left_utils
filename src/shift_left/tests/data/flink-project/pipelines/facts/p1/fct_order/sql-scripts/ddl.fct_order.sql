@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS  fct_order(
-    id STRING,
+    id STRING NOT NULL,
     customer_name STRING,
     account_name STRING,
     balance int,
+    new_att int,
     PRIMARY KEY(id) NOT ENFORCED
 ) 
 DISTRIBUTED BY HASH(id) INTO 1 BUCKETS

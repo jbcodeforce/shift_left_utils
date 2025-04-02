@@ -34,7 +34,7 @@ class ConfluentCloudClient:
             "Content-Type": "application/json"
         }
         response = None
-        logger.info(f"\n> Make request {method} to {url}")
+        logger.debug(f"\n> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -45,17 +45,17 @@ class ConfluentCloudClient:
             response.raise_for_status()
             try:
                     json_response = response.json()
-                    logger.debug(f"\n>>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
+                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
                     return json_response
             except ValueError:
-                    logger.debug(f"\n>>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
+                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse text: {response.text}")
                     return response.text
         except requests.exceptions.RequestException as e:
             if response is not None:
                 if response.status_code == 404:
                     logger.warning(f"Request to {url} has reported error: {e}")
                     result = json.loads(response.text)
-                    logger.info(f">>>> Response text: {result["errors"][0]["detail"]}")
+                    logger.info(f">>>> Response text: {result['errors'][0]['detail']}")
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             raise 
@@ -160,20 +160,18 @@ class ConfluentCloudClient:
     def get_flink_statement_list(self): 
         page_size = self.config["confluent_cloud"].get("page_size", 100)
         url = self._build_flink_url_and_auth_header()
-        results=[]
+        results={}
         next_page_token = None
         url+=f"/statements?page_size={page_size}"
         while True:
             if next_page_token:
-                print(next_page_token)
                 resp=self.make_request("GET", next_page_token)
             else:
-                print(url)
                 resp=self.make_request("GET", url)
-            logger.debug("Statement execution result:", resp)
+            #logger.debug("Statement execution result:", resp)
             if "data" in resp and resp["data"]:
                 for info in resp["data"]:
-                    results.append({'name' : info["name"], 'status':  info["status"]} )
+                    results[info["name"]] =  info["status"]
             if "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]
                 if not next_page_token:
@@ -193,6 +191,7 @@ class ConfluentCloudClient:
             while True:
                 statement = self.get_statement_info(statement_name)
                 if statement.status.phase in ["PENDING"]:
+                    logger.debug(f"{statement_name} still pending.... sleep and poll again")
                     time.sleep(timer)
                     counter+=1
                     if counter == 6:

@@ -134,6 +134,15 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result)
 
+    def test_running_dmls(self):
+        """
+        """
+        table_name="fct_order"
+        inventory_path= os.getenv("PIPELINES")
+        result = dm.report_running_flink_statements(table_name, inventory_path)
+        assert result
+        print(result)
+
 
 
 

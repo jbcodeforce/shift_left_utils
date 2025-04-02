@@ -134,12 +134,6 @@ def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> Pi
         logger.error(f"Error in processing pipeline report {e}")
         raise Exception(f"Error in processing pipeline report for {table_name}")
 
-def report_running_flink_statements(table_name: str, inventory_path: str) -> PipelineReport:
-    report = build_pipeline_report_from_table(table_name, inventory_path)
-    for node in report.children:
-        print(node)
-    
-    # TO COMPLETE
 
 
 def delete_all_metada_files(root_folder: str):
