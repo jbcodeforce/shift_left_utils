@@ -1,5 +1,6 @@
 import re
 from typing import Set
+from shift_left.core.utils.app_config import logger
 """
 Dedicated class to parse a SQL statement and extract elements like table name
 """
@@ -60,6 +61,9 @@ class SQLparser:
             not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
             matches=set()
             for table in tables:
+                #logger.debug(table)
+                if 'REPLACE' in table[1].upper():
+                    continue
                 retrieved_table=table[1].replace('`','')
                 if retrieved_table.count('.') > 0:
                     continue
@@ -75,7 +79,11 @@ class SQLparser:
         regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
         if len(tbname) > 0:
-            tb=tbname[0][1].replace("`","")
+            #logger.debug(tbname[0][1])
+            if tbname[0][1] and '`' in tbname[0][1]:   
+                tb=tbname[0][1].replace("`","")
+            else:
+                tb=tbname[0][1]
             return tb
         return "No-Table"
     

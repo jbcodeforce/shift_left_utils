@@ -234,7 +234,7 @@ def _build_pipeline_definitions_from_sql_content(
             return current_table_name, dependencies
             
     except Exception as e:
-        logger.error(f"Error while processing {sql_file_name} with message: {e} \n process continue...")
+        logger.error(f"Error while processing {sql_file_name} with message: {e} but process continues...")
         return ERROR_TABLE_NAME, set()
 
     
