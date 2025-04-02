@@ -23,7 +23,7 @@ class ChangeLocalTimeZone(TableWorker):
             logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
-class ChangeChangeModeToUpsert(TableWorker):
+class ChangeChangeModeToUpsert(TableWorker):              
      """
      Predefined class to change the DDL setting for a change log
      """
