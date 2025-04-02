@@ -23,7 +23,7 @@ class TestTableWorker(unittest.TestCase):
         class TestUpdate(TableWorker):
             def update_sql_content(sql_in : str):
                 return sql_in.replace(" 'kafka.retention.time' = '0',", " 'kafka.retention.time' = '0', \n'sql.local-time-zone' = 'UTC-0',")
-        sql_out=tm.update_sql_content(sql_in, TestUpdate)
+        sql_out=tm.update_sql_content_for_file(sql_in, TestUpdate)
         assert "sql.local-time-zone" in sql_out
         print(sql_out)
     
@@ -41,7 +41,7 @@ class TestTableWorker(unittest.TestCase):
         module_path, class_name = "shift_left.core.utils.table_worker.ChangeChangeModeToUpsert".rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        sql_out = tm.update_sql_content(sql_in,runner_class)
+        sql_out = tm.update_sql_content_for_file(sql_in,runner_class)
         assert sql_out
         assert "'changelog.mode' = 'upsert'" in sql_out
         print(sql_out)
@@ -59,7 +59,7 @@ class TestTableWorker(unittest.TestCase):
         module_path, class_name = "shift_left.core.utils.table_worker.ChangeChangeModeToUpsert".rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        sql_out = tm.update_sql_content(sql_in,runner_class)
+        sql_out = tm.update_sql_content_for_file(sql_in,runner_class)
         assert sql_out
         assert "'changelog.mode' = 'upsert'" in sql_out
         print(sql_out)

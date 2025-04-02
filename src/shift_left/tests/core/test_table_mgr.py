@@ -64,7 +64,7 @@ class TestTableManager(unittest.TestCase):
         class TestUpdate(TableWorker):
             def update_sql_content(sql_in : str):
                 return sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
-        sql_out=tm.update_sql_content(sql_in, TestUpdate)
+        sql_out=tm.update_sql_content_for_file(sql_in, TestUpdate)
         assert "from t2 join t3 on t3.id" in sql_out
         print(sql_out)
     

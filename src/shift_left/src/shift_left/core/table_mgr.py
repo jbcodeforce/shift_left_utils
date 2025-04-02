@@ -141,10 +141,16 @@ def validate_table_cross_products(rootdir: str):
                 for violation in violations:
                     print("{:65s} {:s}".format(sql_file, violation))
 
-def update_sql_content(sql_content: str, processor: TableWorker):
+
+def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> bool:
     """
     """
-    return processor.update_sql_content(sql_content)
+    sql_content= load_sql_content(sql_file_name)
+    updated, new_content= processor.update_sql_content(sql_content)
+    if updated:
+        with open(sql_file_name, "w") as f:
+            f.write(new_content)
+    return updated
 
 
 def load_sql_content(sql_file_name):

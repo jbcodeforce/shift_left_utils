@@ -10,7 +10,7 @@ from shift_left.core.table_mgr import (
     build_update_makefile, 
     validate_table_cross_products,
     search_users_of_table,
-    update_sql_content,
+    update_sql_content_for_file,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
@@ -108,6 +108,8 @@ def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(env
 @app.command()
 def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folder from where to do the table update. It could be the all pipelines or subfolders.")],
                   ddl: bool = typer.Option(False, "--ddl", help="Focus on DDL processing. Default is only DML"),
+                  both_ddl_dml: bool = typer.Option(False, "--both-ddl-dml", help="Run both DDL and DML sql files"),
+                  
                   class_to_use = Annotated[str, typer.Argument(help= "The class to use to do the Statement processing", default="shift_left.core.utils.table_worker.ChangeLocalTimeZone")]):
     """
     Update the tables with SQL code changes defined in external python callback. It will read dml or ddl and apply the updates.
@@ -115,11 +117,11 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
     print("#" * 30 + f"\nUpdate_tables from {folder_to_work_from} using the processor: {class_to_use}")
     files = list_src_sql_files(folder_to_work_from)
     files_to_process =[]
-    if ddl: # focus on DDLs update
+    if both_ddl_dml or ddl: # focus on DDLs update
         for file in files:
             if file.startswith("ddl"):
                 files_to_process.append(files[file])
-    else:
+    if not ddl:
         for file in files:
             if file.startswith("dml"):
                 files_to_process.append(files[file])
@@ -127,8 +129,11 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         module_path, class_name = class_to_use.rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        for file in files_to_process:    
-            update_sql_content(file, runner_class)
+        for file in files_to_process:
+            print(f"Assessing file {file}")    
+            updated=update_sql_content_for_file(file, runner_class)
+            if updated:
+                print(f"-> {file} processed ")
     print("Done !")
 
 
