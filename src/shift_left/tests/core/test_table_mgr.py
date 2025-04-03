@@ -82,7 +82,7 @@ class TestTableManager(unittest.TestCase):
         assert ".sql" in files["dml.fct_order"]
         print(files)
 
- 
+    
     
 
 

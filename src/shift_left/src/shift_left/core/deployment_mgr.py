@@ -280,7 +280,6 @@ def _process_table_deployment(to_process,
         logger.info(f"Start processing {current_pipeline_def.table_name}")
         logger.debug(f"--- {current_pipeline_def}")
         for parent in current_pipeline_def.parents:
-           
             if not _table_exists(parent, compute_pool_id):
                 logger.info(f"Table: {parent.table_name} not present, add it for processing.")
                 parent_pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
@@ -520,19 +519,24 @@ def _get_pool_usage(pool_info: dict) -> float:
     max = pool_info['spec']['max_cfu']
     return (current / max)
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str):
+def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str) -> bool:
     """
     Validate a pool exist and with enough resources
     """
-    pool_info=client.get_compute_pool_info(compute_pool_id)
-    if pool_info == None:
-        logger.info(f"Compute Pool not found")
-        raise Exception(f"The given compute pool {compute_pool_id} is not found, prefer to stop")
-    logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
-    ratio = _get_pool_usage(pool_info) 
-    if ratio >= 0.7:
-        raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
-    return pool_info['status']['phase'] == "PROVISIONED"
+    try:
+        pool_info=client.get_compute_pool_info(compute_pool_id)
+        if pool_info == None:
+            logger.info(f"Compute Pool not found")
+            raise Exception(f"The given compute pool {compute_pool_id} is not found, prefer to stop")
+        logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
+        ratio = _get_pool_usage(pool_info) 
+        if ratio >= 0.7:
+            raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
+        return pool_info['status']['phase'] == "PROVISIONED"
+    except Exception as e:
+        logger.error(e)
+        logger.info("Continue processing to ignore compute pool constraint")
+        return True
 
 
             

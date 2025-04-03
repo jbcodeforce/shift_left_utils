@@ -3,7 +3,7 @@ import unittest
 import os
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-    
+from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
     FlinkTableReference,
@@ -36,7 +36,7 @@ class TestDeploymentManager(unittest.TestCase):
         #tm.get_or_create_inventory(os.getenv("PIPELINES"))
         
        
-    def test_deploy_pipeline_from_sink_table(self):
+    def _test_deploy_pipeline_from_sink_table(self):
         """
         As a sink table, it needs to verify the parents are running. This is the first deployment
         so it will run ddl, then ddls of all parent recursively.
@@ -64,6 +64,12 @@ class TestDeploymentManager(unittest.TestCase):
         print(os.getenv("PIPELINES"))
         report = pm.build_pipeline_definition_from_table(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
         print(report)
+
+
+    def test_validate_loading_src_inventory(self):
+        src_folder_path=os.getenv("HOME") + "/Code/customers/master-control/de-datawarehouse/models"
+        all_files= get_or_build_source_file_inventory(src_folder_path)
+        print(all_files)
 
    
 

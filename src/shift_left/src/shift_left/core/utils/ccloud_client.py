@@ -58,7 +58,8 @@ class ConfluentCloudClient:
                     return None
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
-            raise 
+            else:
+                raise 
     
     def get_environment_list(self):
         """Get the list of environments"""

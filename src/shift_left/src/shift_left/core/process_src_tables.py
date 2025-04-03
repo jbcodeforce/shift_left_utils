@@ -28,16 +28,16 @@ TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 # ---- PUBLIC APIs ----
 
 def process_one_file(table_name: str,
-                     sql_src_file: str, 
+                    sql_src_file: str, 
                     staging_target_folder: str, 
                     src_folder_path: str,
                     process_parents: bool = False):
     """ Process one source sql file to extract code and migrate to Flink SQL """
-    logger.debug(f"Migration process_one_file: {sql_src_file} - {staging_target_folder} as {table_name}")
+    logger.debug(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     if sql_src_file.endswith(".sql"):
         create_folder_if_not_exist(staging_target_folder)
         if sql_src_file.find("source") > 0:
-            _process_source_sql_file(table_name,sql_src_file, staging_target_folder)
+            _process_source_sql_file(table_name, sql_src_file, staging_target_folder)
         else:
             _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
     else:
@@ -52,14 +52,12 @@ def process_from_table_name(table_name: str, staging_folder: str, src_folder_pat
     :param: the table name
     """
     all_files= get_or_build_source_file_inventory(src_folder_path)
-    print(all_files)
-    matching_sql_file=all_files[table_name]
-    if matching_sql_file:
-        logger.info(f"\n\n------------------------------------------")
+    if table_name in all_files:
+        matching_sql_file=all_files[table_name]
         logger.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
         process_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
     else:
-        logger.info("Matching sql file not found !")
+        logger.error(f"Matching sql file {table_name} not found in {all_files}!")
 
 # --- utilities functions
 
@@ -217,6 +215,7 @@ def _process_non_source_sql_file(table_name: str,
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
 
     :param src_file_name: the file name of the dbt or SQL source file
+    :param target_path 
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     """

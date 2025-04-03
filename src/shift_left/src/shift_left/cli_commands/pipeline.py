@@ -145,7 +145,6 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     print(f"#### Deploy pipeline from table {table_name} in {compute_pool_id}")
     try:
         result: DeploymentReport = deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, force)
-
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)

@@ -32,29 +32,6 @@ model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
 llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
-translator_template_old = """
-you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
-You need to translate the dbt sql statement given as sql input and transform it into a
-Flink SQL statement with the same semantic.
-
-Keep all the select statements defined with the WITH keyword.
-
-Do not add suggestions or explanations in the response, just return the structured Flink sql output.
-
-Do not use VARCHAR prefer STRING. 
-When the source SQL or DBT code has the following constructs:
-
-*  `surrogate_key` to a MD5(CONCAT())
-* epoch_to_ts
-
-
-Start the generated code with:
-
-INSERT INTO {table_name}
-
-Question: {sql_input}
-
-"""
 
 translator_template = """
 you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
@@ -65,7 +42,11 @@ Maintain the original logic and functionality.
 * Keep all the select statements defined with the WITH keyword.
 * Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 * Do not use VARCHAR prefer STRING. 
-* Transform the dbt function `surrogate_key` to a MD5(CONCAT()) equivalent.
+* Transform the dbt function `surrogate_key` to a MD5(CONCAT_WS()) equivalent.  Start the contact argument with the char ' as a first field to concat with.
+* end each line with , for the select part of the query. Do not start a row content with ','
+* any _pk_fk substring needs to be changed to _sid 
+* remove  the string ```sql line
+* remove line with only ```  string
 
 Start the generated code with:
 
@@ -78,7 +59,12 @@ flink_sql_syntaxic_template="""
 you are qwen-coder, an agent expert in Apache Flink SQL syntax. Your goal is to generate a cleaner Apache Flink SQL
 statement from the following  statement: {flink_sql}.
 
-Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
+Use back quote character like ` around column name when column name match any SQL keyword. As an example a column named value should be `value` 
+while a column named tenant_id should be tenant_id. 
+
+* remove  the string ```sql line
+* remove line with only ```  string
+
 
 Do not generate explanations for the fixes you did.
 """
@@ -92,6 +78,7 @@ statement from the current flink sql insert into statement like:
 The resulting ddl for the table {table_name} should include STRING for any _id column.
 
 Do not use VARCHAR prefer STRING. 
+a CONCAT needs to be translated to CONCAT_WS.
 
 Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE
 
@@ -111,6 +98,9 @@ Finish the statement with the following declaration:
    'sql.local-time-zone' = 'UTC',
    'value.fields-include' = 'all'
 )
+
+* remove  the string ```sql line
+* remove line with only ```  string
 
 Do not generate explanations for the generated text you did.
 """
