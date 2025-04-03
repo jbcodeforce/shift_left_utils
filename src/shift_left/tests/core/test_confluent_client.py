@@ -52,16 +52,9 @@ class TestConfluentClient(unittest.TestCase):
         self.assertGreater(len(resp), 0)
         print(resp['data'])
 
-    def test_get_flink_statements_list(self):
-        print("#"*30 + "\ntest_get_flink_statements_list\n")
-        client = ConfluentCloudClient(get_config())
-        statements = client.get_flink_statement_list()
-        assert statements
-        self.assertGreater(len(statements), 0)
-        print(json.dumps(statements, indent=2))
-
 
     def test_show_create_table_statement(self):
+        print("\n"+"#"*30+ "\n test_show_create_table_statement\n")
         config = get_config()
         client = ConfluentCloudClient(config)
         statement_name="test-statement"
@@ -76,6 +69,10 @@ class TestConfluentClient(unittest.TestCase):
             statement = client.get_statement_info(statement_name)
             assert statement
             print(f"--- {statement}")
+            print("#"*30 + "\n Verify get flink statement list\n")
+            statements = client.get_flink_statement_list()
+            self.assertGreater(len(statements), 0)
+            print(json.dumps(statements, indent=2))
         except Exception as e:
             print(e)
         status=client.delete_flink_statement(statement_name)
@@ -86,7 +83,7 @@ class TestConfluentClient(unittest.TestCase):
         config = get_config()
         client = ConfluentCloudClient(config)
         statement_name="test-statement"
-        sql_content = "select * from src_table_1;"
+        sql_content = "select * from `examples`.`marketplace`.`customers` LIMIT 10;"
         properties = {'sql.current-catalog' : 'j9r-env' , 'sql.current-database' : 'j9r-kafka'}
         rep= client.delete_flink_statement(statement_name)
         try:

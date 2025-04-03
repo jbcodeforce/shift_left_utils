@@ -1,5 +1,6 @@
 import unittest
 import pathlib
+from typing import Tuple
 import os
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
       
@@ -60,13 +61,19 @@ class TestTableManager(unittest.TestCase):
     def test_update_dml_statement(self):
         table_name = "int_table_1"
         print("Test update dml sql content")
-        sql_in="""insert into t3 select id,b,c from t2;"""
+        with open("test_file", "w") as f:
+            f.write("insert into t3 select id,b,c from t2;")
+
         class TestUpdate(TableWorker):
-            def update_sql_content(sql_in : str):
-                return sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
-        sql_out=tm.update_sql_content_for_file(sql_in, TestUpdate)
-        assert "from t2 join t3 on t3.id" in sql_out
-        print(sql_out)
+            def update_sql_content(sql_in : str) -> Tuple[bool, str]:
+                return True, sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
+        
+        updated = tm.update_sql_content_for_file("test_file", TestUpdate)
+        assert updated
+        with open("test_file", "r") as f:
+            assert f.read() == "insert into t3 select id,b,c from t2 join t3 on t3.id = t2.id;"
+
+        os.remove("test_file")
     
     def test_get_ddl_dml_references(self):
         files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")

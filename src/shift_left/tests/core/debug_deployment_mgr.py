@@ -43,15 +43,18 @@ class TestDeploymentManager(unittest.TestCase):
         As we deploy both DDL and DML, force does not need to be True
         """
         config = get_config()
-        #table_name="fct_order"
-        table_name="int_table_1"
+        table_name="fct_order"
+        #table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
         import shift_left.core.deployment_mgr as dm
+        """
         result = dm.deploy_pipeline_from_table(table_name, 
                                                inventory_path, 
                                                config["flink"]["compute_pool_id"], 
                                                False, 
                                                False)
+        """
+        result = dm.full_pipeline_undeploy_from_table(table_name,inventory_path)
         assert result
         print(result)
 
@@ -62,6 +65,7 @@ class TestDeploymentManager(unittest.TestCase):
         report = pm.build_pipeline_definition_from_table(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
         print(report)
 
+   
 
  
 

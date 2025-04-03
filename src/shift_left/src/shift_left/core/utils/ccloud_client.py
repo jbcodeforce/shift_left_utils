@@ -3,7 +3,6 @@ import time
 import requests
 from urllib.parse import urlparse
 import json
-import os, time
 from base64 import b64encode
 from typing import List
 from shift_left.core.utils.app_config import logger
@@ -53,9 +52,10 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             if response is not None:
                 if response.status_code == 404:
-                    logger.warning(f"Request to {url} has reported error: {e}")
+                    logger.warning(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
                     logger.info(f">>>> Response text: {result['errors'][0]['detail']}")
+                    return None
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             raise 
@@ -171,7 +171,7 @@ class ConfluentCloudClient:
             #logger.debug("Statement execution result:", resp)
             if "data" in resp and resp["data"]:
                 for info in resp["data"]:
-                    results[info["name"]] =  info["status"]
+                    results[info["name"]] =  info["status"]["phase"]
             if "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]
                 if not next_page_token:
@@ -200,7 +200,7 @@ class ConfluentCloudClient:
                     execution_time = time.perf_counter() - start_time
                     statement.loop_counter= counter
                     statement.execution_time= execution_time
-                    logger.info(f"Done waiting with response= {statement}") 
+                    logger.info(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
                     return statement    
         except Exception as e:
             logger.error(f">>>> wait_response() error waiting for response {e}")
@@ -247,8 +247,9 @@ class ConfluentCloudClient:
         url = self._build_flink_url_and_auth_header()
         try:
             resp=self.make_request("GET",f"{url}/statements/{statement_name}")
-            logger.debug(resp)
-            return Statement(**resp)
+            if resp:
+                return Statement(**resp)
+            return None
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing GET statement call for {statement_name}: {e}")
             return None
