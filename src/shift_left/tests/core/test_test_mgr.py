@@ -36,7 +36,7 @@ class TestTestManager(unittest.TestCase):
  #       print(test_definitions)
 
     def test_execute_one_test(self):
-        table_folder = str(pathlib.Path(__file__).parent /"../data/flink-project/pipelines/sources/p1/src_table_2")
+        table_folder = str(pathlib.Path(__file__).parent /"../data/flink-project/pipelines/facts/p1/fct_order")
         compute_pool_id = "compute_pool_id"
         test_case_name = "test_case_1"
 

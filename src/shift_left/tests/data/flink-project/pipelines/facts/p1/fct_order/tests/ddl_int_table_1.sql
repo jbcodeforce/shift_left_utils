@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS int_table_1_ut (
+CREATE TABLE IF NOT EXISTS int_table_1 (
     id STRING NOT NULL,
     user_name STRING, 
     account_id STRING,

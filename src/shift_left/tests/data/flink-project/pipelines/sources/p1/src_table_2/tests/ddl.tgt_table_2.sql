@@ -1,4 +1,4 @@
-create table if not exists tgt_table_2 (
+CREATE TABLE IF NOT EXISTS tgt_table_2 (
     order_id STRING,
     product_id STRING,
     customer_id STRING,
