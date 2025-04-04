@@ -250,7 +250,7 @@ def delete_statement_if_exists(statement_name):
         client.delete_flink_statement(statement_name)
         statement_list.pop(statement_name)
         return 
-    else: # do remote API call
+    else: # not found in cache, do remote API call
         statement = get_statement(statement_name)
         if statement:
             config = get_config()
@@ -341,6 +341,7 @@ def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition,
                                 ddl_statement_name, 
                                 config)
     logger.debug(f"Create table {to_process.table_name} status is : {statement.status}")
+    _get_or_load_statement_list()[ddl_statement_name]=statement.status.phase   # import to avoid doing an api call
     delete_statement_if_exists(ddl_statement_name)
     statement = _deploy_dml(to_process, compute_pool_id, dml_statement_name, dml_already_deleted, force_children, come_from_leaf)
     return statement   
@@ -356,7 +357,8 @@ def _get_or_load_statement_list() -> dict:
         config = get_config()
         client = ConfluentCloudClient(config)
         statement_list = client.get_flink_statement_list()
-        logger.debug(statement_list)
+        if not statement_list:
+            logger.debug(f"statement list seems empty.")
     return statement_list
 
 def _process_children(current_pipeline_def: FlinkTablePipelineDefinition, 

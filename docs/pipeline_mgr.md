@@ -24,7 +24,7 @@ Flink statements are inherently interdependent, consuming and joining tables pro
 The [recipe chapter](./recipes.md) has how-to descriptions for the specific commands to use during development and during the pipeline management by system reliability engineers. The following high level concepts are the foundations for this management:
 
 1. The git folder is the source of truth for pipeline definitions. 
-1. The table inventory, which lists all the Flink tables of a project, is used as the foundation to find basic metadata about Flink statemetns. It must be created with a simple command like:
+1. The table inventory, which lists all the Flink tables of a project, is used as the foundation to find basic metadata about Flink statements. It must be created with a simple command like:
 
     ```
     shift_left table build-inventory $PIPELINES
@@ -113,6 +113,14 @@ The [recipe chapter](./recipes.md) has how-to descriptions for the specific comm
     The optins are `--json`, `--simple`,  `--yaml` or `--graph` can be used. 
 
 1. Hierarchy view is used to deploy a selected table, its parents and eventually its children. 
+1. For deployment they are some heuristic to follow:
+
+    1. when deploying a Flink statement, any parent (tables used for select or joins) not running, need to start them
+    1. When the current intermediate table, one with children and parents, is stateful and needs to be dropped then children will be impacted. 
+    1. For a current intermediate table, if a child is stateful, then need to restart this child once the current topic / table is created. If the child is stateless then offset management needs to be done. 
+    1. The deployment follows a LIFO queue
+    1. A table is running if a topic exist. Do we need to consider the DML writing to this table to also be running. It may not be a strong argument.
+
 
 ### Different constraints for pipeline deployment
 

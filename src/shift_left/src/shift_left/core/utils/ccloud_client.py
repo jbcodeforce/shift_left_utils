@@ -107,10 +107,7 @@ class ConfluentCloudClient:
         self.api_secret = self.config["confluent_cloud"]["api_secret"]
         self.auth_header = self._generate_auth_header()
         env_id=self.config["confluent_cloud"]["environment_id"]
-        if self.config["confluent_cloud"]["url_scope"].lower() == "private":
-            url=f"https://api.private.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
-        else:
-            url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
 
     def create_compute_pool(self, spec: dict):
