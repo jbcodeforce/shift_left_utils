@@ -2,11 +2,10 @@ import os
 from pathlib import  PosixPath
 from typing import Final, Dict, Optional, Any, Tuple
 import json
-import logging
 from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
-
+from shift_left.core.utils.app_config import logger 
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -78,7 +77,7 @@ def get_or_build_inventory(
                 if not dml_file_name:
                     continue
                     
-                logging.debug(f"Processing file {dml_file_name}")
+                logger.debug(f"Processing file {dml_file_name}")
                 # extract table name from dml filefrom sql script   
                 with open(dml_file_name, "r") as f:
                     sql_content = f.read()
@@ -94,12 +93,12 @@ def get_or_build_inventory(
                         "table_folder_name": table_folder
                     })
                     
-                    logging.debug(ref)
+                    logger.debug(ref)
                     inventory[ref.table_name] = ref.model_dump()
                     
     with open(inventory_path, "w") as f:
         json.dump(inventory, f, indent=4)
-    logging.info(f"Created inventory file {inventory_path}")
+    logger.info(f"Created inventory file {inventory_path}")
     return inventory
 
 def load_existing_inventory(target_path: str) -> Dict:
@@ -111,6 +110,7 @@ def load_existing_inventory(target_path: str) -> Dict:
     Returns:
         Dictionary containing inventory data
     """
+    logger.info(f"load existing inventory from {target_path}")
     inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
     with open(inventory_path, "r") as f:
         return json.load(f)
@@ -141,7 +141,7 @@ def get_table_type_from_file_path(file_name: str) -> str:
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):
         os.makedirs(new_path)
-        logging.debug(f"{new_path} folder created")
+        logger.debug(f"{new_path} folder created")
     return new_path
 
 def from_absolute_to_pipeline(file_or_folder_name) -> str:
@@ -189,6 +189,8 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
     Returns:
         FlinkTableReference for the table
     """
+    if table_name not in inventory:
+        raise Exception(f"Table {table_name} not in inventory")
     entry = inventory[table_name]
     return FlinkTableReference.model_validate(entry)
     
@@ -205,10 +207,10 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
         if file.startswith('dml.'):
             dml_file_name=os.path.join(base_scripts,file)
     if ddl_file_name is None:
-        logging.error(f"No DDL file found in the directory: {base_scripts}")
+        logger.error(f"No DDL file found in the directory: {base_scripts}")
         raise Exception(f"No DDL file found in the directory: {base_scripts}")
     if dml_file_name is None:
-        logging.error(f"No DML file found in the directory: {base_scripts}")
+        logger.error(f"No DML file found in the directory: {base_scripts}")
         raise Exception(f"No DML file found in the directory: {base_scripts}")
     return ddl_file_name, dml_file_name
 
@@ -233,7 +235,7 @@ def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str
     else:
         ddl_n = "ddl-" + table_name.replace("_","-")
         dml_n = "dml-" + table_name.replace("_","-")
-    logging.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
+    logger.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
     return ddl_n, dml_n
 
 def extract_product_name(existing_path: str) -> str:

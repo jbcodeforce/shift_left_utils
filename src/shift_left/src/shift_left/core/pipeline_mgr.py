@@ -44,7 +44,11 @@ class FlinkTablePipelineDefinition(InfoNode):
     For sink tables, children will be empty.
     """
     path: str
-    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement")
+    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    dml_statement_name:  Optional[str] =  Field(default=None, description="Name of the dml statement name")
+    dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
+    update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
+    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
     parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
     children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
 

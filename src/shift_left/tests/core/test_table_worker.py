@@ -64,6 +64,24 @@ class TestTableWorker(unittest.TestCase):
         assert "'changelog.mode' = 'upsert'" in sql_out
         print(sql_out)
 
+    def test_pf_dk_update(self):
+        sql_in="""
+        create table T (
+           id string,
+           a_pk_fk string,
+           primary key (id) not enforced
+        ) with (
+           'changelog.mode' = 'append'
+        )
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.ChangePK_FK_to_SID".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        sql_out = tm.update_sql_content_for_file(sql_in,runner_class)
+        assert sql_out
+        assert "'a_sid" in sql_out
+        print(sql_out)
+
 
 if __name__ == '__main__':
     unittest.main()

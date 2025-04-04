@@ -43,12 +43,4 @@ class TestTestManager(unittest.TestCase):
         result = execute_one_test(table_folder, test_case_name)
         assert result, f"Test case '{test_case_name}' executed successfully"
 
-
-    def test(self):
-        with open(sql_file_name) as f:
-            sql_content = f.read()
-            parser = SQLparser()
-            current_table_names = parser.extract_table_names_from_insert_into_statement(sql_content)
-            for table in current_table_names:
-                sql_content= sql_content.replace(table, table+"_ut")
         
