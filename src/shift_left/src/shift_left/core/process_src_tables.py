@@ -1,4 +1,5 @@
 """
+Copyright 2024-2025 Confluent, Inc.
 
 The processing of dbt sql statements for defining sources adopt a different approach than sink tables.
 

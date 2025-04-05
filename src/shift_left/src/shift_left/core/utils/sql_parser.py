@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import re
 from typing import Set
 from shift_left.core.utils.app_config import logger
@@ -7,7 +10,7 @@ Dedicated class to parse a SQL statement and extract elements like table name
 
 class SQLparser:
     def __init__(self):
-        self.table_pattern = r'\b(\s*FROM|JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS\s*\('
         self.not_wanted_words= r'\b(\s*CROSS JOIN UNNEST)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
@@ -61,11 +64,11 @@ class SQLparser:
             not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
             matches=set()
             for table in tables:
-                #logger.debug(table)
+                logger.info(table)
                 if 'REPLACE' in table[1].upper():
                     continue
                 retrieved_table=table[1].replace('`','')
-                if retrieved_table.count('.') > 0:
+                if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
                 if not retrieved_table in ctes1 and not retrieved_table in ctes2 and not retrieved_table in not_wanted:
                     table_name=self.remove_junk_words(retrieved_table)

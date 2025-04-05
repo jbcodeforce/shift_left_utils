@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import typer
 from rich import print
 from shift_left.core.utils.app_config import get_config, log_file_path

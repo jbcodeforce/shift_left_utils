@@ -1,4 +1,6 @@
-
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import logging
 import os, re, json
 from pathlib import Path

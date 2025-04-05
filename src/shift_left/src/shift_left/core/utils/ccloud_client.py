@@ -1,4 +1,6 @@
-
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import time
 import requests
 from urllib.parse import urlparse
@@ -33,7 +35,7 @@ class ConfluentCloudClient:
             "Content-Type": "application/json"
         }
         response = None
-        logger.debug(f"\n> Make request {method} to {url}")
+        logger.info(f">>> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -80,7 +82,8 @@ class ConfluentCloudClient:
         results=[]
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
-        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?page_size={page_size}&environment={env_id}"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}&page_size={page_size}"
+        
         while True:
             if next_page_token:
                 #parsed_url = urlparse(next_page_token)
@@ -89,10 +92,10 @@ class ConfluentCloudClient:
             else:
                 resp=self.make_request("GET", url)
             logger.debug(f"compute pool response= {resp}")
-            if "data" in resp and resp["data"]:
+            if resp and "data" in resp and resp["data"]:
                 for info in resp["data"]:
                     results.append({'id' : info["id"], 'name':  info["spec"]["display_name"]} )
-            if "metadata" in resp and "next" in resp["metadata"]:
+            if resp and "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]
                 if not next_page_token:
                     break
@@ -103,8 +106,8 @@ class ConfluentCloudClient:
 
     def get_compute_pool_info(self, compute_pool_id: str):
         """Get the info of a compute pool"""
-        self.api_key = self.config["confluent_cloud"]["api_key"]
-        self.api_secret = self.config["confluent_cloud"]["api_secret"]
+        self.api_key = self.config["flink"]["api_key"]
+        self.api_secret = self.config["flink"]["api_secret"]
         self.auth_header = self._generate_auth_header()
         env_id=self.config["confluent_cloud"]["environment_id"]
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
@@ -230,10 +233,10 @@ class ConfluentCloudClient:
                 }
             }
         try:
-            logger.debug(f">>>> Send POST request to Flink statement api with {statement_data}")
+            logger.debug(f"> Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
             response = self.make_request("POST", url + "/statements", statement_data)
-            logger.debug(f"\n>>>> POST response= {response}") 
+            logger.debug(f"> POST response= {response}") 
             if response["status"]["phase"] == "PENDING":
                 return self._wait_response(url, statement_name, start_time)
             execution_time = time.perf_counter() - start_time
@@ -271,9 +274,22 @@ class ConfluentCloudClient:
 
     def delete_flink_statement(self, statement_name: str):
         url = self._build_flink_url_and_auth_header()
+        timer= self.config['flink'].get("poll_timer", 10)
         try:
             resp = self.make_request("DELETE",f"{url}/statements/{statement_name}")
-            logger.debug(resp)
+            logger.info(resp)
+            counter=0
+            while True:
+                statement = self.get_statement_info(statement_name)
+                if statement and statement.status and statement.status.phase == "DELETED":
+                    break
+                else:
+                    counter+=1
+                    if counter == 6:
+                        timer = 30
+                    if counter == 10:
+                        return "failed to delete"
+                time.sleep(timer)
             return "deleted"
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing delete statement call for {statement_name}: {e}")

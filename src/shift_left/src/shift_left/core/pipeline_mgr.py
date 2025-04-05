@@ -1,4 +1,6 @@
 """
+Copyright 2024-2025 Confluent, Inc.
+
 Flink Statement pipeline manager defines functions to build inventory, create pipeline definition for table, 
 and navigate statement pipeline trees.
 
@@ -46,6 +48,7 @@ class FlinkTablePipelineDefinition(InfoNode):
     path: str
     state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
     dml_statement_name:  Optional[str] =  Field(default=None, description="Name of the dml statement name")
+    statement_status:  Optional[str] =  Field(default=None, description="Flink statement status")
     dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
     update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
     compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")

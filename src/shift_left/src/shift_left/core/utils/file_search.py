@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import os
 from pathlib import  PosixPath
 from typing import Final, Dict, Optional, Any, Tuple

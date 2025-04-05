@@ -1,6 +1,8 @@
-import operator
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import os, argparse
-from typing import Annotated, TypedDict, Tuple
+from typing import TypedDict, Tuple
 
 from pathlib import Path
 from langgraph.graph import END, StateGraph

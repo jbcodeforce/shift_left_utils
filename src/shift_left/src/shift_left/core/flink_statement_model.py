@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
@@ -16,7 +19,7 @@ class Data(BaseModel):
 class StatementResult(BaseModel):
     api_version:  Optional[str] =  Field(default=None,description="The api version")
     kind: Optional[str] =  Field(default=None,description="The StatementResult or nothing")
-    metadata: Optional[MetadataResult] =  Field(default=None,description="Metadata for the StatementRsult when present")
+    metadata: Optional[MetadataResult] =  Field(default=None,description="Metadata for the StatementResult when present")
     results: Optional[Data]=  Field(default=None, description=" results with data as array of content")
 
 

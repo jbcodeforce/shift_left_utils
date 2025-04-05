@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import typer
 import os
 from shift_left.cli_commands import project, table, pipeline

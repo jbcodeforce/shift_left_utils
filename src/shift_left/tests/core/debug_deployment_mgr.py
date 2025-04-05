@@ -2,12 +2,15 @@
 import unittest
 import os
 import pathlib
+from collections import deque
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
     FlinkTableReference,
     PipelineReport,
+    FlinkTablePipelineDefinition,
     PIPELINE_JSON_FILE_NAME
 )
 from shift_left.core.utils.file_search import (
@@ -32,7 +35,8 @@ class TestDeploymentManager(unittest.TestCase):
         data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
-        os.environ["CONFIG_FILE"] = str(data_dir / "../config.yaml")
+        #os.environ["CONFIG_FILE"] = str(data_dir / "../config.yaml")
+        
         #tm.get_or_create_inventory(os.getenv("PIPELINES"))
         
        
@@ -42,7 +46,6 @@ class TestDeploymentManager(unittest.TestCase):
         so it will run ddl, then ddls of all parent recursively.
         As we deploy both DDL and DML, force does not need to be True
         """
-        config = get_config()
         table_name="fct_order"
         #table_name="int_table_1"
         inventory_path= os.getenv("PIPELINES")
@@ -56,7 +59,7 @@ class TestDeploymentManager(unittest.TestCase):
         """
         result = dm.full_pipeline_undeploy_from_table(table_name,inventory_path)
         assert result
-        print(result)
+        print(result.model_dump_json())
 
 
     def _test_one_table(self):
@@ -66,14 +69,44 @@ class TestDeploymentManager(unittest.TestCase):
         print(report)
 
 
-    def test_validate_loading_src_inventory(self):
+    def _test_validate_loading_src_inventory(self):
         src_folder_path=os.getenv("HOME") + "/Code/customers/master-control/de-datawarehouse/models"
         all_files= get_or_build_source_file_inventory(src_folder_path)
         print(all_files)
 
-   
+    def _test_list_of_compute_pools(self):
+        import shift_left.core.project_manager as pmm
+        config = get_config()
+        env_id=config['confluent_cloud']['environment_id']
+        results = pmm.get_list_of_compute_pool(env_id)
+        assert results
+        assert len(results) > 0
 
- 
+    def test_deploy_pipeline_from_src_table(self):
+        #table_name="src_aqem_tag_tag"
+        table_name="int_aqem_tag_tag_dummy"
+        inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        os.environ["PIPELINES"]=inventory_path
+        pool_id= get_config()["flink"]["compute_pool_id"]
+        pool_id="lfcp-g78q9r"
+        import shift_left.core.deployment_mgr as dm
+        """
+        result = dm.deploy_pipeline_from_table(table_name, 
+                                               inventory_path, 
+                                               pool_id,  
+                                               True, 
+                                               True)
+        """
+        #result = dm.full_pipeline_undeploy_from_table(table_name,inventory_path)
+        table_inventory = load_existing_inventory(inventory_path)
+        table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+        pipeline_def: FlinkTablePipelineDefinition= pm.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+        pipeline_def = dm._complement_pipeline_definition(pipeline_def,pool_id)
+        queue=deque()
+        result = dm._process_table_deployment(pipeline_def,queue)
+        assert result
+        print(result.model_dump_json(indent=3))
+
 
 if __name__ == '__main__':
     unittest.main()

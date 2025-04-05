@@ -1,4 +1,6 @@
 """
+Copyright 2024-2025 Confluent, Inc.
+
 Interface definition to support modifying SQL code to multiple sql statements.
 """
 import logging

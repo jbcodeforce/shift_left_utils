@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import typer
 import json
 from rich import print
@@ -11,12 +14,12 @@ from shift_left.core.pipeline_mgr import (
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_pipeline_undeploy_from_table, report_running_flink_statements
 
-import yaml
 import os
 import sys
 import logging
 import networkx as nx
 import matplotlib.pyplot as plt
+from pydantic_yaml import to_yaml_str
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 """
@@ -71,7 +74,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
-        to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree")):
+        to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree"),
+        output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
     """
     Generate a report showing the pipeline hierarchy for a given table using its pipeline_definition.json
     """
@@ -88,10 +92,17 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 
     if to_yaml:
         print("[bold]YAML:[/bold]")
-        print(yaml.dump(pipeline_def.model_dump()))
-    if to_json:
+        result=to_yaml_str(pipeline_def)
+        print(result)
+    elif to_json:
         print("[bold]JSON:[/bold]")
-        print(pipeline_def.model_dump_json(indent=3))
+        result=pipeline_def.model_dump_json(indent=3)
+        print(result)
+    else:
+        result=pipeline_def
+    if output_file_name:
+        with open(output_file_name,"w") as f:
+            f.write(result)
     if to_graph:
         print("[bold]Graph:[/bold]")
         _process_hierarchy_to_node(pipeline_def)
@@ -109,7 +120,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 if parent.ddl_ref:
                     parent_node.add(f"[dim]DDL: {parent.ddl_ref}[/dim]")
                 parent_node.add(f"[dim]Path: {parent.path}[/dim]")
-                parent_node.add(f"[dim]Type: parent[/dim]")
+                parent_node.add(f"[dim]Type: {parent.type}[/dim]")
         if node_data.children:
             for child in node_data.children:
                 child_node = tree_node.add(f"[green]{child.table_name}[/green]")
@@ -119,7 +130,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 if child.ddl_ref:
                     child_node.add(f"[dim]DDL: {child.ddl_ref}[/dim]")
                 child_node.add(f"[dim]Base: {child.path}[/dim]")
-                child_node.add(f"[dim]Type: child[/dim]")
+                child_node.add(f"[dim]Type: {child.type}[/dim]")
     
     # Add the root node details
     tree.add(f"[dim]DML: {pipeline_def.dml_ref}[/dim]")
@@ -187,20 +198,16 @@ def _display_directed_graph(nodes, edges):
         edges: A list of tuples, where each tuple represents a directed edge
                (source_node, target_node).
     """
-
     G = nx.DiGraph()  # Create a directed graph object
-
-    # Add nodes
     G.add_nodes_from(nodes)
-
-    # Add edges
     G.add_edges_from(edges)
 
     # Draw the graph
     pos = nx.spring_layout(G)  # Layout algorithm
-    nx.draw(G, pos, with_labels=True, node_size=700, node_color="lightgreen", font_size=15, font_weight="bold", arrowsize=20)
-
-    # Show the graph
+    nx.draw(G, pos, with_labels=True,
+            node_size=600, node_color="lightblue", font_size=10, 
+            font_weight="bold", 
+            arrowsize=20)
     plt.show()
 
 def _process_children(nodes_directed, edges_directed, current_node):
