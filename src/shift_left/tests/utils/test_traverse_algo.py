@@ -169,29 +169,29 @@ def execute_plan(plan):
     """Executes the generated execution plan."""
     print("\n--- Execution Plan ---")
     for node in plan:
-        print(f"node: '{node.name}'")
+        print(f"node: '{node.table_name}'")
         if node.is_running:
             execute_node(node)
         else:
-            print(f"Restarting node: '{node.name}' (program: '{node.flink_statement}')")
+            print(f"Restarting node: '{node.table_name}' (program: '{node.flink_statement}')")
 
 
 class TestExecutionPlanBuilder(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.src_a = FlinkStatementNode(name= "Src_A", path= "initial_setup_a.sh")
-        cls.node_a = FlinkStatementNode(name= "A", path= "process_a.py")
-        cls.src_b = FlinkStatementNode(name= "Src_B", path= "initial_setup_b.sh")
-        cls.src_c = FlinkStatementNode(name= "Src_C", path= "initial_setup_c.sh")
-        cls.node_x = FlinkStatementNode(name= "X", path= "process_x.py")
-        cls.node_y = FlinkStatementNode(name= "Y", path= "process_y.py")
-        cls.node_z = FlinkStatementNode(name= "Z", path= "combine_results.py")
-        cls.node_p = FlinkStatementNode(name= "P", path= "final_report.py")
-        cls.node_c = FlinkStatementNode(name= "C", path= "process_c")
-        cls.node_d = FlinkStatementNode(name= "D", path= "process_d")
-        cls.node_e = FlinkStatementNode(name= "E", path= "process_e")
-        cls.node_f = FlinkStatementNode(name= "F", path= "process_f")
+        cls.src_a = FlinkStatementNode(table_name= "Src_A", path= "initial_setup_a.sh")
+        cls.node_a = FlinkStatementNode(table_name= "A", path= "process_a.py")
+        cls.src_b = FlinkStatementNode(table_name= "Src_B", path= "initial_setup_b.sh")
+        cls.src_c = FlinkStatementNode(table_name= "Src_C", path= "initial_setup_c.sh")
+        cls.node_x = FlinkStatementNode(table_name= "X", path= "process_x.py")
+        cls.node_y = FlinkStatementNode(table_name= "Y", path= "process_y.py")
+        cls.node_z = FlinkStatementNode(table_name= "Z", path= "combine_results.py")
+        cls.node_p = FlinkStatementNode(table_name= "P", path= "final_report.py")
+        cls.node_c = FlinkStatementNode(table_name= "C", path= "process_c")
+        cls.node_d = FlinkStatementNode(table_name= "D", path= "process_d")
+        cls.node_e = FlinkStatementNode(table_name= "E", path= "process_e")
+        cls.node_f = FlinkStatementNode(table_name= "F", path= "process_f")
 
         cls.src_a.add_child(cls.node_x)
         cls.src_a.add_child(cls.node_a)
@@ -244,9 +244,9 @@ class TestExecutionPlanBuilder(unittest.TestCase):
         assert graph
         print(graph)
         for node in graph:
-            print(f"{node.name} -> {node.dml_statement}")
+            print(f"{node.table_name} -> {node.dml_statement}")
             for p in node.children:
-                print(f"\t{p.name} -> {p.dml_statement}")
+                print(f"\t{p.table_name} -> {p.dml_statement}")
 
     def test_deploy_int_table(self):
         import shift_left.core.deployment_mgr as dm

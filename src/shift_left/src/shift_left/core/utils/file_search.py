@@ -43,10 +43,12 @@ class FlinkStatementNode(BaseModel):
     To build an execution plan we need one node for each popential Flink Statement to run.
     A node has 0 to many parents and 0 to many children
     """
-    name: str
+    table_name: str
     path:  Optional[str] =  Field(default=None, description="Name of path")
     statement_status:  Optional[str] =  Field(default=None, description="Flink statement status")
+    dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
     dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
+    ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
     ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
     dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
     update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
@@ -54,6 +56,7 @@ class FlinkStatementNode(BaseModel):
     parents: Set =  Field(default=set(), description="List of parent")
     children: Set = Field(default=set(), description="Child list")
     to_run: bool = Field(default=False, description="statement must be executed")
+    to_restart: bool = Field(default=False, description="statement will be restarted, this is to differentiate child treatment from parent")
 
     def add_child(self, child):
         self.children.add(child)
@@ -69,10 +72,10 @@ class FlinkStatementNode(BaseModel):
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FlinkStatementNode):
             return NotImplemented
-        return self.name == other.name
+        return self.table_name == other.table_name
     
     def __hash__(self) -> int:
-        return hash(self.name)
+        return hash(self.table_name)
     
 
 class FlinkTablePipelineDefinition(InfoNode):
@@ -97,10 +100,13 @@ class FlinkTablePipelineDefinition(InfoNode):
     def to_node(self) -> FlinkStatementNode:
         ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(self, get_config()['kafka']['cluster_type'])
        
-        r = FlinkStatementNode(name= self.table_name,
+        r = FlinkStatementNode(table_name= self.table_name,
                                path= self.path,
                                dml_statement=dml_statement_name,
-                               ddl_statement=ddl_statement_name)
+                               dml_ref=self.dml_ref,
+                               ddl_statement=ddl_statement_name,
+                               ddl_ref=self.ddl_ref
+                               )
         
         for p in self.parents:
             node_p:FlinkStatementNode = p.to_node()
@@ -325,7 +331,7 @@ def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str
     else:
         ddl_n = "ddl-" + table_name.replace("_","-")
         dml_n = "dml-" + table_name.replace("_","-")
-    logger.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
+    #logger.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
     return ddl_n, dml_n
 
 
