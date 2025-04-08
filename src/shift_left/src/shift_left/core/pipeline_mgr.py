@@ -17,51 +17,31 @@ from typing import Dict, Optional, Final, Any, Set, List, Tuple, Union
 
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import logger
 from shift_left.core.utils.file_search import (
+    PIPELINE_JSON_FILE_NAME,
+    PIPELINE_FOLDER_NAME,
     from_absolute_to_pipeline, 
     from_pipeline_to_absolute, 
     FlinkTableReference, 
+    FlinkTablePipelineDefinition,
+    get_ddl_file_name,
     get_table_ref_from_inventory,
-    load_existing_inventory,
+    get_or_build_inventory,
     get_table_type_from_file_path,
-    InfoNode
-)
+    read_pipeline_definition_from_file
 
-SCRIPTS_DIR: Final[str] = "sql-scripts"
-PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
+)
 
 
 # Constants
-PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
+
 ERROR_TABLE_NAME = "error_table"
 # Global queues for processing
 files_to_process: deque = deque()  # Files to process when parsing SQL dependencies
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
 
-class FlinkTablePipelineDefinition(InfoNode):
-    """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
-    
-    For source tables, parents will be empty.
-    For sink tables, children will be empty.
-    """
-    path: str
-    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
-    dml_statement_name:  Optional[str] =  Field(default=None, description="Name of the dml statement name")
-    statement_status:  Optional[str] =  Field(default=None, description="Flink statement status")
-    dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
-    update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
-    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
-    parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
-    children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
 
-    def __hash__(self) -> int:
-        return hash(self.table_name)
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FlinkTablePipelineDefinition):
-            return NotImplemented
-        return self.table_name == other.table_name
  
 class PipelineReport(BaseModel):
     """
@@ -87,7 +67,7 @@ def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str)
         FlinkTablePipelineDefinition for the table and its dependencies
     """
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
-    table_inventory = load_existing_inventory(pipeline_path)
+    table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
     
     table_name, parent_references = _build_pipeline_definitions_from_sql_content(dml_file_name, table_inventory)
     logger.debug(f"Build pipeline for table: {table_name} with parents: {parent_references}")
@@ -111,7 +91,6 @@ def build_all_pipeline_definitions(pipeline_path: str):
     _process_one_sink_folder(views_path, pipeline_path)
 
     
-
 def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> PipelineReport:
     """
     Walk the hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
@@ -121,7 +100,7 @@ def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> Pi
     logger.info(f"walk_the_hierarchy_for_report_from_table({table_name}, {inventory_path})")
     if not inventory_path:
         inventory_path = os.getenv("PIPELINES")
-    inventory = load_existing_inventory(inventory_path)
+    inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     if table_name not in inventory:
         raise Exception("Table not found in inventory")
     try:
@@ -158,43 +137,8 @@ def delete_all_metada_files(root_folder: str):
 
 
 
-def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTablePipelineDefinition:
-    """Read pipeline metadata from file.
-    
-    Args:
-        file_name: Path to pipeline metadata file
-        
-    Returns:
-        FlinkTablePipelineDefinition object
-    """
-    file_name = from_pipeline_to_absolute(relative_path_file_name)
-    try:
-        with open(file_name, "r") as f:
-            content = FlinkTablePipelineDefinition.model_validate_json(f.read())
-            return content
-    except Exception as e:
-        logger.error(f"processing {file_name} got {e}, ... try to continue")
-        return None
-
-def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):
-    file_name = from_pipeline_to_absolute(relative_path_file_name)
-    with open(file_name, "w") as f:
-        f.write(data.model_dump_json(indent=3))
 
 # ---- Private APIs ---- 
-
-
-def _get_ddl_file_name(folder_path: str) -> str:
-    """
-    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
-    or includes a CREATE TABLE statement
-    """
-    folder_path = from_pipeline_to_absolute(folder_path)
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.startswith('ddl'):
-                return from_absolute_to_pipeline(os.path.join(root, file))
-    return ""
 
 
 def _build_pipeline_definitions_from_sql_content(
@@ -217,16 +161,18 @@ def _build_pipeline_definitions_from_sql_content(
         with open(sql_file_name) as f:
             sql_content = f.read()
             parser = SQLparser()
-            current_table_names = parser.extract_table_names_from_insert_into_statement(sql_content)
+            current_table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
             dependencies = set()
             
             referenced_table_names = parser.extract_table_references(sql_content)
             if referenced_table_names:
+                if current_table_name in referenced_table_names:
+                    referenced_table_names.remove(current_table_name)
                 for table_name in referenced_table_names:
                     table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[table_name])
                     if not table_ref:
                         continue
-                    logger.info(f"{current_table_names} - depends on: {table_name}") 
+                    logger.info(f"{current_table_name} - depends on: {table_name}") 
                     dependencies.add(_build_pipeline_definition(
                         table_name, 
                         table_ref.type,
@@ -238,7 +184,7 @@ def _build_pipeline_definitions_from_sql_content(
                     ))
             else:
                 logger.info(f"No referenced table found in {sql_file_name}")
-            return current_table_names, dependencies
+            return current_table_name, dependencies
             
     except Exception as e:
         logger.error(f"Error while processing {sql_file_name} with message: {e} but process continues...")
@@ -252,9 +198,6 @@ def _process_one_sink_folder(sink_folder_path, pipeline_path):
                 if file_path.is_file() and file_path.name.startswith("dml"):
                     logger.info(f"Process the dml {file_path}")
                     build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
-    
-
-
     
 
 def _build_pipeline_definition(
@@ -284,7 +227,7 @@ def _build_pipeline_definition(
     if not path:
         path = os.path.dirname(directory)
     if not ddl_file_name:
-        ddl_file_name = _get_ddl_file_name(directory)
+        ddl_file_name = get_ddl_file_name(directory)
     
     f = FlinkTablePipelineDefinition.model_validate({
         "table_name": table_name,
@@ -298,37 +241,6 @@ def _build_pipeline_definition(
     })
     logger.debug(f" FlinkTablePipelineDefinition created: {f}")
     return f
-
-
-def _build_table_reference(
-    table_name: str,
-    type: str,
-    dml_file_name: str,
-    ddl_file_name: str,
-    table_folder: Optional[str] = None,
-) -> FlinkTableReference:
-    """Build a FlinkTableReference object from table metadata.
-    
-    Args:
-        table_name: Name of the table
-        dml_file_name: Path to DML file
-        ddl_file_name: Path to DDL file
-        table_folder: Optional folder containing the table files
-    
-    Returns:
-        FlinkTableReference object
-    """
-    if not table_folder:
-        directory = os.path.dirname(dml_file_name)
-        table_folder = os.path.dirname(directory)
-    
-    return FlinkTableReference.model_validate({
-        "table_name": table_name,
-        "type": type,
-        "dml_ref": dml_file_name,
-        "ddl_ref": ddl_file_name,
-        "table_folder_name": table_folder
-    })
 
     
 def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inventory):
@@ -385,25 +297,6 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
         current.parents = combined_parents
         with open(pipe_definition_fn, "w") as f:
             f.write(current.model_dump_json(indent=3))
-
-
-
-def _modify_children(current: FlinkTablePipelineDefinition, parent_ref: FlinkTableReference):
-    """
-    Verify the current is in the children of the parent.
-    It may happend that parent was already processed, but the current is referencing it another time,
-    in this case we need to add to the children of the parent
-    """
-    # TODO
-    child = _build_table_reference(current.table_name, 
-                                current.type,
-                                current.dml_ref, 
-                                current.ddl_ref,
-                                current.path)
-    pipe_definition_fn = parent_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
-    parent = read_pipeline_definition_from_file(pipe_definition_fn)
-    parent.children.add(child)
-    _create_or_merge_pipeline_definition(parent)
 
 
 def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):

@@ -12,7 +12,12 @@ from shift_left.core.pipeline_mgr import (
     build_all_pipeline_definitions,
     delete_all_metada_files)
 from typing_extensions import Annotated
-from shift_left.core.deployment_mgr import deploy_pipeline_from_table, DeploymentReport, full_pipeline_undeploy_from_table, report_running_flink_statements
+from shift_left.core.deployment_mgr import (
+    deploy_pipeline_from_table, 
+    DeploymentReport,
+    full_pipeline_undeploy_from_table
+)
+from shift_left.core.statement_mgr import report_running_flink_statements
 
 import os
 import sys

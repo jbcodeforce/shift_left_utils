@@ -17,7 +17,7 @@ from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
     get_or_build_source_file_inventory, 
-    load_existing_inventory,
+    get_or_build_inventory,
     SCRIPTS_DIR, 
     get_table_ref_from_inventory,
     extract_product_name,
@@ -67,8 +67,11 @@ def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_fol
     with open(sql_file_name, "r") as f:
         sql_content = f.read()
         parser = SQLparser()
+        table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
         table_names = parser.extract_table_references(sql_content)
         if table_names:
+            if table_name and table_name in table_names:
+                table_names.remove(table_name)  # do not want to have self in dependencies
             all_src_files = get_or_build_source_file_inventory(src_project_folder)
             dependencies = []
             for table in table_names:
@@ -90,7 +93,7 @@ def extract_table_name(src_file_name: str) -> str:
     return table_name
 
 def build_update_makefile(pipeline_folder: str, table_name: str):
-    inventory = load_existing_inventory(pipeline_folder)
+    inventory = get_or_build_inventory(pipeline_folder, pipeline_folder, False)
     if table_name not in inventory:
         logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
         return
@@ -104,7 +107,7 @@ def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     """
     When pipeline definitions is present for this table, return the list of children
     """
-    inventory = load_existing_inventory(pipeline_folder)
+    inventory = get_or_build_inventory(pipeline_folder, pipeline_folder, False)
     tab_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
     if tab_ref is None:
         logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")

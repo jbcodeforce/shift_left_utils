@@ -3,36 +3,35 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 import time
-import json
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from shift_left.core.pipeline_mgr import (
-    read_pipeline_definition_from_file,
-    PIPELINE_JSON_FILE_NAME,
-    FlinkTablePipelineDefinition,
-    update_pipeline_definition_file,
-    load_existing_inventory,
-    get_table_ref_from_inventory,
-    build_pipeline_report_from_table)  
-from shift_left.core.utils.file_search import (
-    FlinkTableReference
-)
+    build_pipeline_report_from_table
+)  
+
+from shift_left.core.compute_pool_mgr import get_or_build_compute_pool, save_compute_pool_info_in_metadata
+
 from collections import deque
-from typing import Tuple
+from typing import Optional, List
 
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger
 
 from shift_left.core.utils.file_search import ( 
-    get_ddl_dml_names_from_table, 
-    extract_product_name,
+    PIPELINE_JSON_FILE_NAME,
+    FlinkTableReference,
+    FlinkStatementNode,
+    get_or_build_inventory,
+    get_table_ref_from_inventory,
+    FlinkTablePipelineDefinition,
+    get_ddl_dml_names_from_pipe_def,
+    read_pipeline_definition_from_file,
     from_pipeline_to_absolute
 )
-from shift_left.core.flink_statement_model import *
+from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
+from shift_left.core.flink_statement_model import StatementResult, Statement
 
 
-STATEMENT_COMPUTE_POOL_FILE=os.getenv("PIPELINES") + "/pool_assignments.json"
-statement_list = None  # cache the statment loaded to limit the number of call to CC API
 
 class DeploymentReport(BaseModel):
     table_name: str
@@ -41,21 +40,6 @@ class DeploymentReport(BaseModel):
     ddl_dml:  Optional[str] =  Field(default="Both",description="The type of deployment: DML only, or both")
     update_children: bool
     flink_statements_deployed: List[str]
-
-
-    
-def get_statement(statement_name: str) -> None | Statement:
-    """
-    Get the statement given the statement name
-    """
-    logger.info(f"Verify {statement_name} statement's status")
-    client = ConfluentCloudClient(get_config())
-    statement = client.get_statement_info(statement_name)
-    if statement:
-        logger.info(f"Retrieved statement is {statement.model_dump_json(indent=3)}")
-        if statement.status and statement.status.phase:
-            statement_list[statement_name] = statement.status.phase
-    return statement
 
     
 def deploy_pipeline_from_table(table_name: str, 
@@ -75,21 +59,26 @@ def deploy_pipeline_from_table(table_name: str,
         add current_table to node to process
         for each node to process
             if there is a parent not yet deployed add parent to node to process. recursive call to do a BFS
-            if current table already exist
+            if current table Flinkalready exist
                 if only dml, redeploy dml taking into accound children
                 else deploy ddl and dml
             else deploy ddl and dml
     """    
     logger.info("#"*20 + f"\n# Start deploying pipeline from table {table_name}\n" + "#"*20)
     start_time = time.perf_counter()
-    table_inventory = load_existing_inventory(inventory_path)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-    pipeline_def.dml_only=dml_only
-    pipeline_def.compute_pool_id=get_or_build_compute_pool(compute_pool_id, pipeline_def)
-    pipeline_def.update_children=force_children
-    queue_to_process = set()
-    statement = _process_table_deployment(pipeline_def, queue_to_process, set())
+    if not table_ref:
+        raise Exception(f"Table {table_name} not found. Stop processing")
+    
+    pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    current_node= pipeline_def.to_node()
+    current_node.dml_only = dml_only
+    current_node.compute_pool_id = get_or_build_compute_pool(compute_pool_id, pipeline_def)
+    current_node.update_children = force_children
+    graph = _build_table_graph(current_node)
+    execution_plan = _build_execution_plan(graph, current_node)
+    statement = _execute_plan(execution_plan)
     logger.info(statement)
     flink_statement_deployed=[pipeline_def.dml_statement_name]
     result = DeploymentReport(table_name=table_name, 
@@ -113,7 +102,7 @@ def full_pipeline_undeploy_from_table(table_name: str,
     """
     logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
     start_time = time.perf_counter()
-    table_inventory = load_existing_inventory(inventory_path)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     if not table_ref:
         return f"ERROR: Table {table_name} not found in table inventory"
@@ -122,7 +111,7 @@ def full_pipeline_undeploy_from_table(table_name: str,
     if pipeline_def.children:
         return f"ERROR: Could not perform a full delete from a non sink table like {table_name}"
     else:
-        ddl_statement_name, dml_statement_name = _return_ddl_dml_names(pipeline_def, config)
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def, config['kafka']['cluster_type'])
         delete_statement_if_exists(ddl_statement_name)
         delete_statement_if_exists(dml_statement_name)
         drop_table(table_name, config['flink']['compute_pool_id'])
@@ -133,65 +122,7 @@ def full_pipeline_undeploy_from_table(table_name: str,
         return r
 
 
-def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition):
-    """
-    if the compute pool is given, use it, else assess if there is a statement
-    for this table already running and reuse the compute pool, if not
-    reuse the compute pool persisted in the table's pipeline definition.
-    else create a new pool.
-    """
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id = config['flink']['compute_pool_id']
-    logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
 
-    client = ConfluentCloudClient(config)
-    if compute_pool_id and _validate_a_pool(client, compute_pool_id):
-        return compute_pool_id
-    else:
-        logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
-        product_name = extract_product_name(pipeline_def.path)
-        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                    config['kafka']['cluster_type'], 
-                                                    product_name)
-        statement = get_statement(dml_statement_name)
-        pool_id= statement.spec.compute_pool_id
-        if pool_id:
-            return pool_id
-        else:
-            logger.info(f"Build a new compute pool")
-            pool_spec = _build_compute_pool_spec(pipeline_def.table_name)
-            return _create_compute_pool(pool_spec)
-        
-            
-
-
-def deploy_flink_statement(flink_statement_file_path: str, 
-                           compute_pool_id: str, 
-                           statement_name: str, 
-                           config: dict) -> StatementResult:
-    """
-    Read the SQL content for the flink_statement file name, and deploy to
-    the assigned compute pool. If the statement fails, propagate the exception to higher level.
-    """
-    logger.debug(f"{statement_name} with content: {flink_statement_file_path} deploy to {compute_pool_id}")
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
-    if not statement_name:
-        statement_name = os.path.basename(flink_statement_file_path).replace('.sql','').replace('_','-')
-    full_file_path = from_pipeline_to_absolute(flink_statement_file_path)
-    with open(full_file_path, "r") as f:
-        sql_content = f.read()
-        client = ConfluentCloudClient(config)
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-        statement= client.post_flink_statement(compute_pool_id, 
-                                           statement_name, 
-                                           sql_content,  
-                                           properties )
-        if statement and "king" in statement and statement["king"] == "Statement":
-            return StatementResult(results={"data" : statement})
-        else:
-            return statement
     
 
 def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
@@ -240,64 +171,75 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     delete_statement_if_exists(statement_name)
 
 
-def report_running_flink_statements(table_name: str, inventory_path: str):
-    table_inventory = load_existing_inventory(inventory_path)
-    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-    config = get_config()
-    client = ConfluentCloudClient(config)
-    statement_list = client.get_flink_statement_list()
-    results = {}
-    results = _update_results_from_node(pipeline_def, statement_list,  results, table_inventory, config)
-    return results
-
-
-def delete_statement_if_exists(statement_name):
-    logger.info(f"{statement_name}")
-    statement_list = _get_or_load_statement_list()
-    if statement_name in statement_list:
-        logger.info(f"{statement_name} in the cached statement list")
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        client.delete_flink_statement(statement_name)
-        statement_list.pop(statement_name)
-        return 
-    else: # not found in cache, do remote API call
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        client.delete_flink_statement(statement_name)
-
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
 
-class ExecutionNode:
-    def __init__(self, name, path_to_flink_table):
-        self.name = name
-        self.path_to_parameter = path_to_flink_table
-        self.parents = []
-        self.children = []
-        self.is_running = False
+def _get_statement_status(statement_name: str) -> str:
+    #statement_list = get_statement_list()
+    statement_list = None
+    if statement_list and statement_name in statement_list:
+        return statement_list[statement_name]
+    return "UNKNOWN"
 
-    def add_child(self, child):
-        self.children.append(child)
-        child.parent = self
-    
-    def add_parent(self, parent):
-        self.parents.append(parent)
-        parent.children.append(self)
+def _search_parents_to_run(nodes_to_run, node, visited_nodes):
+    if not node in visited_nodes:
+        nodes_to_run.append(node)
+        visited_nodes.add(node)
+        for p in node.parents:
+            p.statement_status = _get_statement_status(p.dml_statement)
+            if not p.is_running() and not p.to_run:
+                _search_parents_to_run(nodes_to_run, p, visited_nodes)
 
-def _build_execution_plan():
-    pass
+def _add_non_running_parents(node, execution_plan):
+    for p in node.parents:
+        p.statement_status = _get_statement_status(p.dml_statement)
+        if not p.is_running() and not p.to_run and p not in execution_plan:
+            # position the parent before the node to be sure it is started before it
+            idx=execution_plan.index(node)
+            execution_plan.insert(idx,p)
+            p.to_run = True
 
-def _process_table_deployment(current_table_info,
-                              queue_to_process):
-    
-    _build_parent_queue(current_table_info, queue_to_process)
-    if current_table_info not in queue_to_process:
-        queue_to_process.append(current_table_info)
-        _build_child_queue(current_table_info, queue_to_process)
-    _process_queue_element(current_table_info, queue_to_process)
+def _build_execution_plan(graph: FlinkStatementNode, start_node: FlinkStatementNode):
+    """
+    Build an execution plan from the static relationship between Flink Statements
+
+    """
+    execution_plan = []
+    nodes_to_run = []
+    visited_nodes = set()
+    for node in graph:
+        if node.name == start_node.name:
+            node.dml_only=start_node.dml_only
+            node.update_children= start_node.update_children
+            node.compute_pool_id = start_node.compute_pool_id
+            start_node = node
+            break
+    _search_parents_to_run(nodes_to_run, start_node, visited_nodes)
+    start_node.to_run = True
+     # All the parents - grandparents... reacheable by DFS from the start_node are in nodes_to_run
+    # 2. Add the non-running ancestors to the execution plan 
+    for node in reversed(nodes_to_run):
+        execution_plan.append(node)
+        # to be starteable each parent needs to be part of the running ancestors
+        _add_non_running_parents(node, execution_plan)
+        node.to_run = True  
+    # 3. Restart all children of each node in the execution plan if they are not yet there
+    for node in execution_plan:
+        for c in node.children:
+            if not c.is_running() and not c.to_run and c not in execution_plan:
+                _search_parents_to_run(execution_plan, c, visited_nodes)
+                c.to_restart = True
+    return execution_plan
+
+def _execute_plan(plan) -> Statement:
+    print("\n--- Execution Plan ---")
+    for node in plan:
+        print(f"node: '{node.name}' {node.statement_status}")
+        if node.to_run:
+            print(f"Execute this {node}")
+        else:
+            print(f"Restarting node: '{node.name}' (program: '{node.flink_statement}')")
 
 
 def _process_table_deployment_2(current_pipeline_def,
@@ -325,7 +267,7 @@ def _process_table_deployment_2(current_pipeline_def,
                 parent_pipeline_def.update_children=False
                 parent_pipeline_def.dml_only=False
                 queue_to_process.add(parent_pipeline_def)
-                _process_table_deployment(queue_to_process, already_processed_list)
+                _build_execution_plan(queue_to_process, already_processed_list)
             else:
                 logger.debug(f"Parent {parent.table_name} is running, there is no need to change that!")
         # process current node to run dml with ddl: will be in the order of higher in the hierarchy to the lower 
@@ -346,9 +288,9 @@ def _table_exists_1(table_ref: FlinkTablePipelineDefinition) -> bool:
     """
     global statement_list
     config = get_config()
-    ddl_statement_name, dml_statement_name = _return_ddl_dml_names(table_ref, config)
+    ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(table_ref, config['kafka']['cluster_type'])
     table_ref.dml_statement_name=dml_statement_name
-    statement_list=_get_or_load_statement_list()
+    statement_list=get_statement_list()
     if statement_list and dml_statement_name in statement_list:
         if statement_list[dml_statement_name] == "RUNNING":
             return True
@@ -366,7 +308,7 @@ def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition, dml_already_delete
     """
     config = get_config()
     if not to_process.dml_statement_name:
-        ddl_statement_name, dml_statement_name = _return_ddl_dml_names(to_process, config)
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(to_process, config['kafka']['cluster_type'])
         to_process.dml_statement_name=dml_statement_name
     logger.debug(f"{to_process.table_name} to {to_process.compute_pool_id}")
     if not to_process.dml_only:
@@ -383,25 +325,11 @@ def _deploy_ddl_dml(to_process: FlinkTablePipelineDefinition, dml_already_delete
                                 ddl_statement_name, 
                                 config)
     logger.info(f"Create table {to_process.table_name} status is : {statement.status}")
-    _get_or_load_statement_list()[ddl_statement_name]=statement.status.phase   # important to avoid doing an api call
+    get_statement_list()[ddl_statement_name]=statement.status.phase   # important to avoid doing an api call
     delete_statement_if_exists(ddl_statement_name)
     statement = _deploy_dml(to_process, to_process.dml_statement_name, dml_already_deleted)
     return statement   
     
-
-def _get_or_load_statement_list() -> dict:
-    """
-    Caching the current statement list to avoid too many API requests
-    """
-    global statement_list
-    if statement_list == None:
-        logger.info("Load the current list of Flink statements from REST API")
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        statement_list = client.get_flink_statement_list()
-        if not statement_list:
-            logger.debug(f"statement list seems empty.")
-    return statement_list
 
 def _process_children_2(current_pipeline_def: FlinkTablePipelineDefinition):
     """
@@ -481,7 +409,7 @@ def _complement_pipeline_definition(current: FlinkTablePipelineDefinition, compu
     config = get_config()
     current.compute_pool_id=compute_pool_id  # change when managing pool to statement    
     if not current.dml_statement_name:
-        ddl_statement_name, dml_statement_name = _return_ddl_dml_names(current, config)
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(current, config['kafka']['cluster_type'])
         current.dml_statement_name = dml_statement_name
     if current.state_form == "Stateful":
         current.update_children=True
@@ -512,7 +440,7 @@ def _deploy_dml(to_process: FlinkTablePipelineDefinition,
                 dml_already_deleted: bool = False):
     config = get_config()
     if not dml_statement_name:
-        ddl_statement_name, dml_statement_name = _return_ddl_dml_names(to_process, config)
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(to_process, config['kafka']['cluster_type'])
         to_process.dml_statement_name = dml_statement_name
     logger.info(f"Run {dml_statement_name} for {to_process.table_name} table")
     if not dml_already_deleted:
@@ -522,23 +450,16 @@ def _deploy_dml(to_process: FlinkTablePipelineDefinition,
                                     to_process.compute_pool_id, 
                                     dml_statement_name, 
                                     config)
-    _get_or_load_statement_list()[dml_statement_name]=statement.status
-    _save_compute_pool_info_in_metadata(dml_statement_name, to_process.compute_pool_id)
+    get_statement_list()[dml_statement_name]=statement.status
+    save_compute_pool_info_in_metadata(dml_statement_name, to_process.compute_pool_id)
     return statement
-
-def _return_ddl_dml_names(to_process: FlinkTablePipelineDefinition, config: dict) -> Tuple[str,str]:
-    product_name = extract_product_name(to_process.path)
-    return get_ddl_dml_names_from_table(to_process.table_name, 
-                                        config['kafka']['cluster_type'], 
-                                        product_name)
-
 
 
 def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:str, config ) -> str:
     for parent in current_ref.parents:
         if len(parent.children) == 1:
             # as the parent is not shared it can be deleted
-            ddl_statement_name, dml_statement_name = _return_ddl_dml_names(parent, config)
+            ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(parent, config['kafka']['cluster_type'])
             delete_statement_if_exists(ddl_statement_name)
             delete_statement_if_exists(dml_statement_name)
             drop_table(parent.table_name, config['flink']['compute_pool_id'])
@@ -548,7 +469,7 @@ def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:s
         else:
             trace+=f"{parent.table_name} has more than {current_ref.table_name} as child, so no delete"
     if len(current_ref.children) == 1:
-        ddl_statement_name, dml_statement_name = _return_ddl_dml_names(current_ref, config)
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(current_ref, config['kafka']['cluster_type'])
         delete_statement_if_exists(ddl_statement_name)
         delete_statement_if_exists(dml_statement_name)
         drop_table(current_ref.table_name, config['flink']['compute_pool_id'])
@@ -572,93 +493,40 @@ def _stop_child_dmls(pipeline_def: FlinkTablePipelineDefinition, inventory_path:
         _stop_child_dmls(node_ref)
 
 
-def _save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
-    data = {}
-    if os.path.exists(STATEMENT_COMPUTE_POOL_FILE):
-        with open(STATEMENT_COMPUTE_POOL_FILE, "r")  as f:
-            data=json.load(f) 
-    data[statement_name] = {"statement_name": statement_name, "compute_pool_id": compute_pool_id}
-    with open(STATEMENT_COMPUTE_POOL_FILE, "w") as f:
-        json.dump(data, f, indent=4)
 
-def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):
-    for parent in node.parents:
-        results= _search_statement_status(parent, statement_list, results, table_inventory, config)
-    ddl_statement_name, dml_statement_name = _return_ddl_dml_names(node, config)
-    if dml_statement_name in statement_list:
-        status = statement_list[dml_statement_name]
-        results[dml_statement_name]=status
-    return results
-
-def _search_statement_status(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):
-    ddl_statement_name, statement_name = _return_ddl_dml_names(node, config)
-    if statement_name in statement_list:
-        status = statement_list[statement_name]
-        results[statement_name]=status
-        table_ref: FlinkTableReference = get_table_ref_from_inventory(node.table_name, table_inventory)
-        pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-        results = _update_results_from_node(pipeline_def, statement_list, results, table_inventory, config)
-    return results
-
-# ---- compute pool related functions
-
-def _create_compute_pool(table_name: str) -> str:
-    config = get_config()
-    spec = _build_compute_pool_spec(table_name, config)
-    client = ConfluentCloudClient(get_config())
-    result= client.create_compute_pool(client,spec)
-    if result:
-        pool_id = result['id']
-        _verify_compute_pool_provisioned(pool_id)
-
-
-def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
-    spec = {}
-    spec['display_name'] = "cp-" + table_name.replace('_','-')
-    spec['cloud'] = config['confluent_cloud']['provider']
-    spec['region'] = config['confluent_cloud']['region']
-    spec['max_cfu'] =  config['flink']['max_cfu']
-    spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
-    return spec
-
-def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
+def _build_table_graph(current_node: FlinkStatementNode) -> FlinkStatementNode:
     """
-    Wait for the compute pool is provisionned
+    Define the complete static graph of the related parent and children for the pipe_def
     """
-    provisioning = True
-    failed = False
-    while provisioning:
-        logger.info("Wait ...")
-        time.sleep(5)
-        result= client.get_compute_pool_info(pool_id)
-        provisioning = (result['status']['phase'] == "PROVISIONING")
-        failed = (result['status']['phase'] == "FAILED")
-    return False if failed else True
 
+    visited_nodes = set()
+    list_of_roots = set()
+    graph = []
 
-def _get_pool_usage(pool_info: dict) -> float:
-    current = pool_info['status']['current_cfu']
-    max = pool_info['spec']['max_cfu']
-    return (current / max)
+    def _search_all_roots(list_of_roots, node, visited_nodes):
+        if node not in visited_nodes:
+            visited_nodes.add(node)
+            if not node.parents:
+                list_of_roots.add(node)
+            else:
+                for p in node.parents:
+                    pipe_def = read_pipeline_definition_from_file( p.path + "/" + PIPELINE_JSON_FILE_NAME)
+                    node_p = pipe_def.to_node()
+                    _search_all_roots(list_of_roots, node_p, visited_nodes)
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str) -> bool:
-    """
-    Validate a pool exist and with enough resources
-    """
-    try:
-        pool_info=client.get_compute_pool_info(compute_pool_id)
-        if pool_info == None:
-            logger.info(f"Compute Pool not found")
-            raise Exception(f"The given compute pool {compute_pool_id} is not found, prefer to stop")
-        logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
-        ratio = _get_pool_usage(pool_info) 
-        if ratio >= 0.7:
-            raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
-        return pool_info['status']['phase'] == "PROVISIONED"
-    except Exception as e:
-        logger.error(e)
-        logger.info("Continue processing to ignore compute pool constraint")
-        return True
+    def _search_children(graph, node, visited_nodes):
+        if node not in visited_nodes and node not in graph:
+            graph.append(node)
+            visited_nodes.add(node)
+            for c in node.children:
+                pipe_def = read_pipeline_definition_from_file( c.path + "/" + PIPELINE_JSON_FILE_NAME)
+                node_c = pipe_def.to_node()
+                _search_children(graph, node_c, visited_nodes)
 
+    _search_all_roots(list_of_roots, current_node, visited_nodes)
+    visited_nodes=set()
+    for root in list_of_roots:
+        _search_children(graph, root, visited_nodes)
+    return graph
 
-            
+    

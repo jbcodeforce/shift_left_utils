@@ -1,4 +1,5 @@
 import unittest
+import os
 import pathlib
 from shift_left.core.utils.sql_parser import (
     SQLparser
@@ -6,6 +7,11 @@ from shift_left.core.utils.sql_parser import (
 
 
 class TestFileSearch(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
 
     def test_get_table_from_select(self):
         parser = SQLparser()
@@ -109,6 +115,14 @@ class TestFileSearch(unittest.TestCase):
             parser = SQLparser()
             referenced_table_names = parser.extract_table_references(sql_content)
             print(referenced_table_names)
+
+    def test_sql_content_order(self):
+        fname = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        with open(fname, "r") as f:
+            sql_content = f.read()
+            parser = SQLparser()
+            referenced_table_names = parser.extract_table_references(sql_content)
+            assert len(referenced_table_names) == 3
 
 
 if __name__ == '__main__':

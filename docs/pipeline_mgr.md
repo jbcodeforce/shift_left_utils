@@ -164,6 +164,20 @@ For source processing, it may impact more children elements. Most of those proce
 </figure>
 
 
+#### More complex graph for testing
+
+The following graph represents a more complex network of dependencies to illustrate the following patterns:
+
+* intermediate table Z has multiple parents with their own sources. So deploy Z will mean assessing X, and Y trees
+* Running every node may impact restarting any children
+
+![](./images/flink_pipeline_for_test.drawio.png)
+
+*topics are not represented between Flink Statements, only the 3 source topics.
+
+The navigation to the parents needs to follow a depth first search to get all non running parents, while restarting children should follow a breath first search.
+
+The approach is also to build an execution plan and then execute the plan in the order of the definition.
 
 ## Tool Requirements
 

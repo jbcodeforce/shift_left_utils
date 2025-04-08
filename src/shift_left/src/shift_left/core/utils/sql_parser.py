@@ -77,7 +77,7 @@ class SQLparser:
             return matches
         return matches
 
-    def extract_table_names_from_insert_into_statement(self, sql_content) -> str:
+    def extract_table_name_from_insert_into_statement(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
         regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)

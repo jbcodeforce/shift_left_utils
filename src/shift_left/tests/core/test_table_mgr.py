@@ -41,6 +41,12 @@ class TestTableManager(unittest.TestCase):
             print(e)
             self.fail()
     
+    def test_extract_table_name(self):
+        src_fname=os.getenv("PIPELINES") + "/facts/p1/fct_order"
+        tname = tm.extract_table_name(src_fname)
+        assert tname
+        assert tname == "fct_order"
+
     def test_build_update_makefile(self):
         try:
             tm.build_update_makefile(os.getenv("PIPELINES"), "int_table_1")
@@ -81,9 +87,6 @@ class TestTableManager(unittest.TestCase):
         assert files["dml.fct_order"]
         assert ".sql" in files["dml.fct_order"]
         print(files)
-
-    
-    
 
 
 if __name__ == '__main__':

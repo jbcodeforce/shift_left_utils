@@ -10,7 +10,6 @@ from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.statement_mgr import *
-import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 
@@ -25,38 +24,33 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
-        
-
-    def test_clean_things(self):
-        for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
-            dm.drop_table(table)
+    
+    # ---- Statement related  apis tests ------------------- 
 
  
+        
+    def _test_search_non_existant_statement(self):
+        statement_dict = get_statement_list()
+        assert statement_dict == None
+        assert not statement_dict["dummy"]
 
-    def test_src_table_deployment(src):
-        """
-        Given a source table with children, deploy the DDL and DML without the children.
-        """
+    def test_get_statement_list(self):
+        l = get_statement_list()
+        assert l
+
+
+    def _test_execute_show_create_table_then_delete_statement(self):
         config= get_config()
-        inventory_path = os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table("src_table_1", inventory_path, config['flink']['compute_pool_id'], False, False)
-        assert result
-        print(result)
+        sql_path = os.getenv("PIPELINES") + "/intermediates/p1/int_table_1/tests/show_create_table.sql"
+        statement = deploy_flink_statement(sql_path, None, "show-table", config)
+        assert statement
+        print(statement)
+        statement_dict = get_statement_list()
+        assert statement_dict
+        print(f"\n -- {statement_dict["show-table"]}")
+        response = delete_statement_if_exists("show_table")
+        assert response
 
-
-    def test_deploy_pipeline_from_sink_table(self):
-        config = get_config()
-        table_name="fct_order"
-        inventory_path= os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], True, False)
-        assert result
-        print(result)
-        print("Validating running dml")
-        result = dm.report_running_flink_statements(table_name, inventory_path)
-        assert result
-        print(result)
-        
-        
 
 if __name__ == '__main__':
     unittest.main()

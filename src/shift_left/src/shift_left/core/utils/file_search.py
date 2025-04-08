@@ -3,12 +3,12 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 from pathlib import  PosixPath
-from typing import Final, Dict, Optional, Any, Tuple
+from typing import Final, Dict, Optional, Any, Tuple, Set, List
 import json
 from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.app_config import logger 
+from shift_left.core.utils.app_config import logger, get_config
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -16,6 +16,8 @@ Provides a set of function to search files from a given folder path for source p
 INVENTORY_FILE_NAME: Final[str] = "inventory.json"
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
+PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
+
 # ------ Public APIs ------
 
 class InfoNode(BaseModel):
@@ -36,6 +38,79 @@ class FlinkTableReference(InfoNode):
             return NotImplemented
         return self.table_name == other.table_name
 
+class FlinkStatementNode(BaseModel):
+    """
+    To build an execution plan we need one node for each popential Flink Statement to run.
+    A node has 0 to many parents and 0 to many children
+    """
+    name: str
+    path:  Optional[str] =  Field(default=None, description="Name of path")
+    statement_status:  Optional[str] =  Field(default=None, description="Flink statement status")
+    dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
+    ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
+    dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
+    update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
+    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
+    parents: Set =  Field(default=set(), description="List of parent")
+    children: Set = Field(default=set(), description="Child list")
+    to_run: bool = Field(default=False, description="statement must be executed")
+
+    def add_child(self, child):
+        self.children.add(child)
+        child.parents.add(self)
+
+    def add_parent(self, parent):
+        self.parents.add(parent)
+        parent.children.add(self)
+
+    def is_running(self) -> bool:
+        return self.statement_status == "RUNNING"
+    
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, FlinkStatementNode):
+            return NotImplemented
+        return self.name == other.name
+    
+    def __hash__(self) -> int:
+        return hash(self.name)
+    
+
+class FlinkTablePipelineDefinition(InfoNode):
+    """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
+    
+    For source tables, parents will be empty.
+    For sink tables, children will be empty.
+    """
+    path: str
+    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
+    children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
+
+    def __hash__(self) -> int:
+        return hash(self.table_name)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, FlinkTablePipelineDefinition):
+            return NotImplemented
+        return self.table_name == other.table_name
+     
+    def to_node(self) -> FlinkStatementNode:
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(self, get_config()['kafka']['cluster_type'])
+       
+        r = FlinkStatementNode(name= self.table_name,
+                               path= self.path,
+                               dml_statement=dml_statement_name,
+                               ddl_statement=ddl_statement_name)
+        
+        for p in self.parents:
+            node_p:FlinkStatementNode = p.to_node()
+            r.add_parent(node_p)
+        
+        for c in self.children:
+            node_c:FlinkStatementNode = c.to_node()
+            r.add_child(node_c)
+        return r
+    
 def build_inventory(pipeline_folder: str) -> Dict:
     """Build inventory from pipeline folder.
     
@@ -68,7 +143,7 @@ def get_or_build_inventory(
     inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
     
     if not recreate and os.path.exists(inventory_path):
-        return load_existing_inventory(target_path)
+        return _load_existing_inventory(target_path)
         
     inventory = {}
     parser = SQLparser()
@@ -84,7 +159,7 @@ def get_or_build_inventory(
                 # extract table name from dml filefrom sql script   
                 with open(dml_file_name, "r") as f:
                     sql_content = f.read()
-                    table_name = parser.extract_table_names_from_insert_into_statement(sql_content)
+                    table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
                     directory = os.path.dirname(dml_file_name)
                     table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
                     table_type = get_table_type_from_file_path(dml_file_name)
@@ -104,19 +179,7 @@ def get_or_build_inventory(
     logger.info(f"Created inventory file {inventory_path}")
     return inventory
 
-def load_existing_inventory(target_path: str) -> Dict:
-    """Load existing inventory from file.
-    
-    Args:
-        target_path: Path containing inventory file
-        
-    Returns:
-        Dictionary containing inventory data
-    """
-    logger.info(f"load existing inventory from {target_path}")
-    inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
-    with open(inventory_path, "r") as f:
-        return json.load(f)
+
 
 def get_table_type_from_file_path(file_name: str) -> str:
     """
@@ -196,7 +259,31 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
         raise Exception(f"Table {table_name} not in inventory")
     entry = inventory[table_name]
     return FlinkTableReference.model_validate(entry)
+
+
+def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTablePipelineDefinition:
+    """Read pipeline metadata from file.
     
+    Args:
+        file_name: Path to pipeline metadata file
+        
+    Returns:
+        FlinkTablePipelineDefinition object
+    """
+    file_name = from_pipeline_to_absolute(relative_path_file_name)
+    try:
+        with open(file_name, "r") as f:
+            content = FlinkTablePipelineDefinition.model_validate_json(f.read())
+            return content
+    except Exception as e:
+        logger.error(f"processing {file_name} got {e}, ... try to continue")
+        return None
+
+def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):
+    file_name = from_pipeline_to_absolute(relative_path_file_name)
+    with open(file_name, "w") as f:
+        f.write(data.model_dump_json(indent=3))
+
 def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """
     Returns the name of the ddl or dml files
@@ -241,6 +328,27 @@ def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str
     logger.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
     return ddl_n, dml_n
 
+
+
+def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition, 
+                                    prefix: str) -> Tuple[str,str]:
+    product_name = extract_product_name(to_process.path)
+    return get_ddl_dml_names_from_table(to_process.table_name, 
+                                        prefix, 
+                                        product_name)
+
+def get_ddl_file_name(folder_path: str) -> str:
+    """
+    Return the ddl file name if it exists in the given folder. All DDL file must start with ddl
+    or includes a CREATE TABLE statement
+    """
+    folder_path = from_pipeline_to_absolute(folder_path)
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.startswith('ddl'):
+                return from_absolute_to_pipeline(os.path.join(root, file))
+    return ""
+
 def extract_product_name(existing_path: str) -> str:
     """
     Given an existing folder path, get the name of the folder below one of the structural folder as it is the name of the data product.
@@ -266,3 +374,18 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
                 key=file[:-4]
                 sql_files[key]=os.path.join(root, file)
     return sql_files
+
+
+def _load_existing_inventory(target_path: str) -> Dict:
+    """Load existing inventory from file.
+    
+    Args:
+        target_path: Path containing inventory file
+        
+    Returns:
+        Dictionary containing inventory data
+    """
+    logger.info(f"load existing inventory from {target_path}")
+    inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
+    with open(inventory_path, "r") as f:
+        return json.load(f)

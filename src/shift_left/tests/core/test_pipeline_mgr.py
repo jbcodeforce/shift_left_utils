@@ -7,9 +7,12 @@ os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config
     
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
+from shift_left.core.utils.file_search import (
+    PIPELINE_JSON_FILE_NAME,
+    FlinkTablePipelineDefinition
+)
 from shift_left.core.pipeline_mgr import (
-    FlinkTablePipelineDefinition,
-    PIPELINE_JSON_FILE_NAME
+    PipelineReport
 )
 
 
@@ -25,6 +28,11 @@ class TestPipelineManager(unittest.TestCase):
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
 
+    def test_PipelineReport(self):
+        report: PipelineReport = PipelineReport(table_name="fct_order",
+                                                path = "facts/p1/fct_order")
+        assert report
+        assert report.table_name == "fct_order"
   
     def test_build_a_src_pipeline_def(self):
         print("test_build_a_src_pipelinedef")
@@ -65,8 +73,7 @@ class TestPipelineManager(unittest.TestCase):
         assert len(pipe_def.parents) == 1
 
        
-
-    def test_walk_the_hierarchy_for_report_from_sink_table(self):
+    def test_build_pipeline_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
         table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"

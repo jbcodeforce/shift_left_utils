@@ -15,7 +15,7 @@ from shift_left.core.pipeline_mgr import (
 )
 from shift_left.core.utils.file_search import (
         get_table_ref_from_inventory,
-            load_existing_inventory
+        get_or_build_inventory
 )
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
@@ -98,12 +98,12 @@ class TestDeploymentManager(unittest.TestCase):
                                                True)
         """
         #result = dm.full_pipeline_undeploy_from_table(table_name,inventory_path)
-        table_inventory = load_existing_inventory(inventory_path)
+        table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
         pipeline_def: FlinkTablePipelineDefinition= pm.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
         pipeline_def = dm._complement_pipeline_definition(pipeline_def,pool_id)
         queue=deque()
-        result = dm._process_table_deployment(pipeline_def,queue)
+        result = dm._build_execution_plan(pipeline_def,queue)
         assert result
         print(result.model_dump_json(indent=3))
 
