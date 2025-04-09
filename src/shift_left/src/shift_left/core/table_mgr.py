@@ -258,6 +258,8 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
         product=result[2]
 
         ct_violation = True
+        key_context = False
+        value_context = False
         #--- Check CREATE TABLE statement in DDL files
         if name.startswith('ddl'):
             with open(sql_file_name, "r") as f:
@@ -279,6 +281,10 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
             #print ('table(' + table_name + ')changelog(' + changelog_mode + ')cleanup(' + cleanup_policy + ')')
             if ct_violation:
                 violations.append('CREATE TABLE statement')
+            if not key_context:
+                violations.append('key.avro-registry.schema-context NOT FOUND')
+            if not value_context:
+                violations.append('value.avro-registry.schema-context NOT FOUND')    
 
             match type:
                 case 'sources':
