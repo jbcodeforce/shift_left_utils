@@ -158,7 +158,7 @@ def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> b
     return updated
 
 
-def load_sql_content(sql_file_name):
+def load_sql_content(sql_file_name) -> str:
     with open(sql_file_name, "r") as f:
         return f.read()
 

@@ -69,6 +69,7 @@ def delete_statement_if_exists(statement_name):
         statement_list.pop(statement_name)
         return 
     else: # not found in cache, do remote API call
+        logger.info(f"{statement_name} not found in cache trying REST api call")
         config = get_config()
         client = ConfluentCloudClient(config)
         client.delete_flink_statement(statement_name)
@@ -81,7 +82,7 @@ def get_statement(statement_name: str) -> None | Statement:
     logger.info(f"Verify {statement_name} statement's status")
     client = ConfluentCloudClient(get_config())
     statement = client.get_statement_info(statement_name)
-    if statement:
+    if statement and isinstance(statement, Statement):
         logger.info(f"Retrieved statement is {statement.model_dump_json(indent=3)}")
         if statement.status and statement.status.phase:
             get_statement_list()[statement_name] = statement.status.phase

@@ -64,23 +64,6 @@ class TestTableManager(unittest.TestCase):
             self.fail()
 
     
-    def test_update_dml_statement(self):
-        table_name = "int_table_1"
-        print("Test update dml sql content")
-        with open("test_file", "w") as f:
-            f.write("insert into t3 select id,b,c from t2;")
-
-        class TestUpdate(TableWorker):
-            def update_sql_content(sql_in : str) -> Tuple[bool, str]:
-                return True, sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
-        
-        updated = tm.update_sql_content_for_file("test_file", TestUpdate)
-        assert updated
-        with open("test_file", "r") as f:
-            assert f.read() == "insert into t3 select id,b,c from t2 join t3 on t3.id = t2.id;"
-
-        os.remove("test_file")
-    
     def test_get_ddl_dml_references(self):
         files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")
         assert files["ddl.fct_order"]

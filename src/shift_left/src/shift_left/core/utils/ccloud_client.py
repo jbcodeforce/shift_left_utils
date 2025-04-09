@@ -57,7 +57,7 @@ class ConfluentCloudClient:
                     logger.warning(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
                     logger.info(f">>>> Response text: {result['errors'][0]['detail']}")
-                    return None
+                    return result
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
             else:
@@ -172,7 +172,15 @@ class ConfluentCloudClient:
             #logger.debug("Statement execution result:", resp)
             if "data" in resp and resp["data"]:
                 for info in resp["data"]:
-                    results[info["name"]] =  info["status"]["phase"]
+                    statement_info = StatementInfo(name=info['name'],
+                                                   status_phase=info['status']['phase'],
+                                                   status_detail=info['status']['detail'],
+                                                   sql_content=info['spec']['statement'],
+                                                   compute_pool_id=info['spec']['compute_pool_id'],
+                                                   principal=info['spec']['principal'],
+                                                   sql_catalog=info['spec']['properties']['sql.current-catalog'],
+                                                   sql_database=info['spec']['properties']['sql.current-database'])
+                    results[info['name']] = statement_info
             if "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]
                 if not next_page_token:
@@ -240,7 +248,7 @@ class ConfluentCloudClient:
             if response["status"]["phase"] == "PENDING":
                 return self._wait_response(url, statement_name, start_time)
             execution_time = time.perf_counter() - start_time
-            return  StatementResult.model_validate({"loop_counter": 0, "execution_time": execution_time, "results" : [statement]})
+            return  StatementResult.model_validate({"loop_counter": 0, "execution_time": execution_time, "results" : [response]})
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
 
@@ -249,11 +257,14 @@ class ConfluentCloudClient:
         try:
             resp=self.make_request("GET",f"{url}/statements/{statement_name}")
             if resp:
-                return Statement(**resp)
-            return None
+                try:
+                    s: Statement = Statement.model_validate(resp)
+                    return s 
+                except Exception as e:
+                    return Statement(name=statement_name,status = Status(detail=resp['errors'][0]['detail'], phase="FAILED"))
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing GET statement call for {statement_name}: {e}")
-            return None
+            return Statement(name=statement_name)
         
     def get_statement_results(self, statement_name: str)-> Statement:
         url = self._build_flink_url_and_auth_header()
@@ -278,12 +289,15 @@ class ConfluentCloudClient:
         try:
             resp = self.make_request("DELETE",f"{url}/statements/{statement_name}")
             logger.info(resp)
+            if resp:
+                return "deleted"
             counter=0
             while True:
                 statement = self.get_statement_info(statement_name)
-                if statement and statement.status and statement.status.phase == "DELETED":
+                if statement and statement.status and statement.status.phase in ("FAILED", "FAILING", "DELETED"):
                     break
                 else:
+                    logger.debug(statement)
                     counter+=1
                     if counter == 6:
                         timer = 30

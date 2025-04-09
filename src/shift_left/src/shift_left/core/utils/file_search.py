@@ -9,6 +9,7 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
+from shift_left.core.flink_statement_model import StatementInfo
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -45,7 +46,7 @@ class FlinkStatementNode(BaseModel):
     """
     table_name: str
     path:  Optional[str] =  Field(default=None, description="Name of path")
-    statement_status:  Optional[str] =  Field(default=None, description="Flink statement status")
+    existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
     dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
     dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
     ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
@@ -67,7 +68,9 @@ class FlinkStatementNode(BaseModel):
         parent.children.add(self)
 
     def is_running(self) -> bool:
-        return self.statement_status == "RUNNING"
+        if not self.existing_statement_info or self.existing_statement_info.status_phase:
+            return False
+        return self.existing_statement_info.status_phase == "RUNNING"
     
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FlinkStatementNode):

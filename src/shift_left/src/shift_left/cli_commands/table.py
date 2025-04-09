@@ -138,7 +138,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         runner_class = getattr(mod, class_name)
         for file in files_to_process:
             print(f"Assessing file {file}")    
-            updated=update_sql_content_for_file(file, runner_class)
+            updated=update_sql_content_for_file(file, runner_class())
             if updated:
                 print(f"-> {file} processed ")
     print("Done !")

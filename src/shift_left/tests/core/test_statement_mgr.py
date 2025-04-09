@@ -29,7 +29,7 @@ class TestDeploymentManager(unittest.TestCase):
 
  
         
-    def _test_search_non_existant_statement(self):
+    def test_search_non_existant_statement(self):
         statement_dict = get_statement_list()
         assert statement_dict == None
         assert not statement_dict["dummy"]
@@ -39,7 +39,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert l
 
 
-    def _test_execute_show_create_table_then_delete_statement(self):
+    def test_execute_show_create_table_then_delete_statement(self):
         config= get_config()
         sql_path = os.getenv("PIPELINES") + "/intermediates/p1/int_table_1/tests/show_create_table.sql"
         statement = deploy_flink_statement(sql_path, None, "show-table", config)

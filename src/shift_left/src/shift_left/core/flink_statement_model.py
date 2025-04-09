@@ -51,9 +51,9 @@ class Traits(BaseModel):
     upsert_columns: Optional[List[Any]] = Field(default=None, description="Upsert columns if applicable")
 
 class Status(BaseModel):
-    detail: str
-    network_kind: str
-    phase: str
+    detail: Optional[str] =  Field(default=None)
+    network_kind: Optional[str] =  Field(default=None)
+    phase: Optional[str] =  Field(default=None)
     traits: Optional[Traits] = Field(default=None, description="Traits  if applicable")
 
 class Spec(BaseModel):
@@ -64,14 +64,27 @@ class Spec(BaseModel):
     stopped: bool
 
 class Statement(BaseModel):
-    api_version: str
-    environment_id: str
-    kind: str
-    metadata: Metadata
+    api_version: Optional[str] =  Field(default=None)
+    environment_id: Optional[str] =  Field(default=None)
+    kind: Optional[str] =  Field(default=None)
+    metadata: Optional[Metadata]= Field(default=None)
     name: str
-    organization_id: str
-    spec: Spec
-    status: Status
+    organization_id: Optional[str] =  Field(default=None)
+    spec: Optional[Spec] = Field(default=None)
+    status: Optional[Status] = Field(default= None)
     result: Optional[StatementResult] = Field(default=None, description="Result of the statement execution, for example for a select from...")
-    execution_time: Optional[float] = 0
-    loop_counter: Optional[int] = 0
+    execution_time: Optional[float] = Field(default=0)
+    loop_counter: Optional[int] = Field(default=0)
+
+class StatementInfo(BaseModel):
+    """
+    Keep the needed information for redeploying statement
+    """
+    name:   Optional[str] =  Field(default=None, description="Unique name of the Flink statement")
+    status_phase:   Optional[str] =  Field(default=None, description="Current state of the Flink Statement")
+    status_detail:   Optional[str] =  Field(default=None, description="Current state detail of the Flink Statement")
+    sql_content:  Optional[str] =  Field(default=None, description="Current sql content of the Flink Statement")
+    compute_pool_id:   Optional[str] =  Field(default=None, description="Compute pool id hosting the statement")
+    principal:   Optional[str] =  Field(default=None, description="Principal service account")
+    sql_catalog:  Optional[str] =  Field(default=None, description="Flink catalog name")
+    sql_database:  Optional[str] =  Field(default=None, description="Flink database name")

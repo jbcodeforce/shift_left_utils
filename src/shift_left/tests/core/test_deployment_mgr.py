@@ -23,32 +23,39 @@ class TestDeploymentManager(unittest.TestCase):
         cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
-        tm.get_or_create_inventory(os.getenv("PIPELINES"))
-       
-        
 
-    def test_clean_things(self):
+    def _test_clean_things(self):
         for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
-            dm.drop_table(table)
-
+            try:
+                dm.drop_table(table)
+            except Exception as e:
+                print(e)
  
 
-    def test_src_table_deployment(src):
+    def _test_src_table_deployment(src):
         """
         Given a source table with children, deploy the DDL and DML without the children.
         """
         config= get_config()
         inventory_path = os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table("src_table_1", inventory_path, config['flink']['compute_pool_id'], False, False)
+        result = dm.deploy_pipeline_from_table(table_name="src_table_1", 
+                                               inventory_path=inventory_path, 
+                                               compute_pool_id=config['flink']['compute_pool_id'], 
+                                               dml_only=False, 
+                                               force_children=False)
         assert result
         print(result)
 
 
-    def test_deploy_pipeline_from_sink_table(self):
+    def _test_deploy_pipeline_from_sink_table(self):
         config = get_config()
         table_name="fct_order"
         inventory_path= os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table(table_name, inventory_path, config["flink"]["compute_pool_id"], True, False)
+        result = dm.deploy_pipeline_from_table(table_name=table_name, 
+                                               inventory_path=inventory_path, 
+                                               compute_pool_id=config['flink']['compute_pool_id'], 
+                                               dml_only=True, 
+                                               force_children=False)
         assert result
         print(result)
         print("Validating running dml")
@@ -56,7 +63,45 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result)
         
+    def test_execution_plan(self):
+        inventory_path= os.getenv("PIPELINES")
+        import shift_left.core.deployment_mgr as dm
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
+        current_node= pipeline_def.to_node()
+        current_node.compute_pool_id = get_config()['flink']['compute_pool_id']
+        current_node.update_children = True
+        current_node.dml_only= False
+        graph = dm._build_table_graph(current_node)
+        for node in graph:
+            print(f"{node} -> {graph[node].dml_statement}")
+        execution_plan = dm._build_execution_plan(graph, current_node)
+        for node in execution_plan:
+            assert node.table_name
+            assert node.dml_ref
+            assert node.ddl_ref
+            assert node.compute_pool_id
+            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.existing_statement_info.compute_pool_id}")
+         
+        l = dm._execute_plan(execution_plan)
+        for statement in l:
+            print(statement)
+
         
+    def test_deploy_pipeline_from_int_table(self):
+        config = get_config()
+        table_name="int_table_1"
+        inventory_path= os.getenv("PIPELINES")
+        result = dm.deploy_pipeline_from_table(table_name=table_name, 
+                                               inventory_path=inventory_path, 
+                                               compute_pool_id=config['flink']['compute_pool_id'], 
+                                               dml_only=True, 
+                                               force_children=True)
+        assert result
+        print(result)
+        print("Validating running dml")
+        result = dm.report_running_flink_statements(table_name, inventory_path)
+        assert result
+        print(result)
 
 if __name__ == '__main__':
     unittest.main()

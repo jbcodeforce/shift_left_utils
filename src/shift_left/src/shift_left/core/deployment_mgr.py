@@ -29,16 +29,15 @@ from shift_left.core.utils.file_search import (
     from_pipeline_to_absolute
 )
 from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
-from shift_left.core.flink_statement_model import StatementResult, Statement
+from shift_left.core.flink_statement_model import StatementResult, Statement, StatementInfo
 
 
 
 class DeploymentReport(BaseModel):
-    table_name: str
-    compute_pool_id: str
-    statement_name: str
+    table_name: Optional[str] =  Field(default=None)
+    compute_pool_id: Optional[str] =  Field(default=None)
     ddl_dml:  Optional[str] =  Field(default="Both",description="The type of deployment: DML only, or both")
-    update_children: bool
+    update_children: Optional[bool] =  Field(default=False)
     flink_statements_deployed: List[str]
 
     
@@ -79,7 +78,7 @@ def deploy_pipeline_from_table(table_name: str,
     graph = _build_table_graph(current_node)
     execution_plan = _build_execution_plan(graph, current_node)
     statements = _execute_plan(execution_plan)
-    flink_statement_deployed=[current_node.dml_statement_name]
+    flink_statement_deployed=[current_node.dml_statement]
     result = DeploymentReport(table_name=table_name, 
                                              compute_pool_id=compute_pool_id,
                                              update_children=force_children,
@@ -114,7 +113,7 @@ def full_pipeline_undeploy_from_table(table_name: str,
         delete_statement_if_exists(dml_statement_name)
         drop_table(table_name, config['flink']['compute_pool_id'])
         trace = f"{table_name} deleted\n"
-        r=_delete_parent_not_shared(pipeline_def, trace, config)
+        r=_delete_not_shared_parent(pipeline_def, trace, config)
         execution_time = time.perf_counter() - start_time
         logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name} with result: {r}")
         return r
@@ -169,12 +168,16 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
 # ------------------------------------- private APIs  ---------------------------------
 #
 
-def _get_statement_status(statement_name: str) -> str:
+def _get_statement_status(statement_name: str) -> StatementInfo:
     statement_list = get_statement_list()
     #statement_list = None
     if statement_list and statement_name in statement_list:
         return statement_list[statement_name]
-    return "UNKNOWN"
+    statement_info = StatementInfo(name=statement_name,
+                                   status_phase="UNKNOWN",
+                                   status_detail="Statement not found int the existing deployed Statements"
+                                )
+    return statement_info
 
 def _search_parents_to_run(nodes_to_run, node, visited_nodes, node_map):
     if not node in visited_nodes:
@@ -182,14 +185,18 @@ def _search_parents_to_run(nodes_to_run, node, visited_nodes, node_map):
         visited_nodes.add(node)
         for p in node.parents:
             node_p = node_map[p.table_name]
-            node_p.statement_status = _get_statement_status(node_p.dml_statement)
+            node_p.existing_statement_info = _get_statement_status(node_p.dml_statement)
+            if node_p.existing_statement_info.compute_pool_id:
+                node_p.compute_pool_id = node_p.existing_statement_info.compute_pool_id
+            else:
+                node_p.compute_pool_id = node.compute_pool_id
             if not node_p.is_running() and not node_p.to_run:
                 _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
 
 def _add_non_running_parents(node, execution_plan, node_map):
     for p in node.parents:
         node_p = node_map[p.table_name]
-        node_p.statement_status = _get_statement_status(node_p.dml_statement)
+        node_p.existing_statement_info = _get_statement_status(node_p.dml_statement)
         if not node_p.is_running() and not node_p.to_run and node_p not in execution_plan:
             # position the parent before the node to be sure it is started before it
             idx=execution_plan.index(node)
@@ -205,6 +212,7 @@ def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkS
     execution_plan = []
     nodes_to_run = []
     visited_nodes = set()
+    start_node.existing_statement_info = _get_statement_status(start_node.dml_statement)
     _search_parents_to_run(nodes_to_run, start_node, visited_nodes, node_map)
     start_node.to_run = True
      # All the parents - grandparents... reacheable by DFS from the start_node are in nodes_to_run
@@ -220,21 +228,25 @@ def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkS
             if not c.is_running() and not c.to_run and c not in execution_plan:
                 _search_parents_to_run(execution_plan, c, visited_nodes, node_map)
                 c.to_restart = True
+    logger.info("Done with execution plan construction")
+    logger.debug(execution_plan)
     return execution_plan
 
 def _execute_plan(plan) -> list[Statement]:
     print("\n--- Execution Plan  started ---")
     statements = []
     for node in plan:
-        print(f"node: '{node.table_name}' {node.statement_status}")
+        print(f"\n\nnode: '{node}'")
         if node.to_run:
-            print(f"Execute this {node} with statement {node.dml_statement}'")
-            statement=_deploy_dml(node, False)
-            
-        else:
-            print(f"Restarting node: '{node.table_name}' (statement: '{node.dml_statement}')")
+            print(f"Execute statement {node.dml_statement}'")
             if not node.dml_only:
-                statement=_deploy_ddl_dml(node, False)
+                statement=_deploy_ddl_dml(node)
+            else:
+                statement=_deploy_dml(node, False)
+        else:  # TODO to address
+            print(f"Restarting statement: {node.dml_statement})")
+            if not node.dml_only:
+                statement=_deploy_ddl_dml(node)
             else:
                 statement=_deploy_dml(node, False)
         statements.append(statement)
@@ -282,7 +294,7 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
     return statement
 
 
-def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:str, config ) -> str:
+def _delete_not_shared_parent(current_ref: FlinkTablePipelineDefinition, trace:str, config ) -> str:
     for parent in current_ref.parents:
         if len(parent.children) == 1:
             # as the parent is not shared it can be deleted
@@ -292,7 +304,7 @@ def _delete_parent_not_shared(current_ref: FlinkTablePipelineDefinition, trace:s
             drop_table(parent.table_name, config['flink']['compute_pool_id'])
             trace+= f"{parent.table_name} deleted\n"
             pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
-            trace = _delete_parent_not_shared(pipeline_def, trace, config)
+            trace = _delete_not_shared_parent(pipeline_def, trace, config)
         else:
             trace+=f"{parent.table_name} has more than {current_ref.table_name} as child, so no delete"
     if len(current_ref.children) == 1:
@@ -338,7 +350,7 @@ def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementN
     names = list(node_map.keys())
     for parent in names:
         _search_children(node_map, node_map[parent], visited_nodes)
-    logger.debug(f"End build table graph: {node_map}")
+    logger.info("End build table graph:\n" + "\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
 
 
@@ -527,5 +539,5 @@ def _process_queue_element(root_pipeline_def, queue: set):
         #r=_deploy_ddl_dml(current, True)
         #logger.debug(f"{r.model_dump_json(indent=2)}")
         print(f"deploy dml {current.dml_statement_name}")
-        current.statement_status = "RUNNING"
+        current.existing_statement_info.status_phase = "RUNNING"
     logger.debug("Done with child processing")

@@ -4,12 +4,13 @@ import os
 import pathlib
 from collections import deque
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
+#os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
     FlinkTableReference,
     PipelineReport,
+    read_pipeline_definition_from_file,
     FlinkTablePipelineDefinition,
     PIPELINE_JSON_FILE_NAME
 )
@@ -82,7 +83,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert results
         assert len(results) > 0
 
-    def test_deploy_pipeline_from_src_table(self):
+    def _test_deploy_pipeline_from_src_table(self):
         #table_name="src_aqem_tag_tag"
         table_name="int_aqem_tag_tag_dummy"
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
@@ -107,6 +108,31 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result.model_dump_json(indent=3))
 
+    def _test_execution_plan(self):
+        inventory_path= os.getenv("PIPELINES")
+        import shift_left.core.deployment_mgr as dm
+        table_name="fct_order"
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
+        current_node= pipeline_def.to_node()
+        current_node.compute_pool_id = get_config()['flink']['compute_pool_id']
+        current_node.update_children = True
+        current_node.dml_only= False
+        graph = dm._build_table_graph(current_node)
+        for node in graph:
+            print(f"{node} -> {graph[node].dml_statement}")
+        execution_plan = dm._build_execution_plan(graph, current_node)
+        for node in execution_plan:
+            assert node.table_name
+            assert node.dml_ref
+            assert node.ddl_ref
+            assert node.compute_pool_id
+            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.existing_statement_info.compute_pool_id}")
+         
+        l = dm._execute_plan(execution_plan)
+        for statement in l:
+            print(statement)
+
+        
 
 if __name__ == '__main__':
     unittest.main()

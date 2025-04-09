@@ -243,10 +243,7 @@ class TestExecutionPlanBuilder(unittest.TestCase):
         graph: FlinkStatementNode = dm._build_table_graph(pipe_def.to_node())
         assert graph
         print(graph)
-        for node in graph:
-            print(f"{node.table_name} -> {node.dml_statement}")
-            for p in node.children:
-                print(f"\t{p.table_name} -> {p.dml_statement}")
+
 
     def test_deploy_int_table(self):
         import shift_left.core.deployment_mgr as dm

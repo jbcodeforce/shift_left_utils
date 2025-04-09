@@ -11,7 +11,7 @@ WITH (
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.cleanup-policy'= 'compact',
-  'kafka.retention.time' = '0',
+  'kafka.retention.time' = '0', 
   'scan.bounded.mode' = 'unbounded',
   'scan.startup.mode' = 'earliest-offset',
   'value.fields-include' = 'all'

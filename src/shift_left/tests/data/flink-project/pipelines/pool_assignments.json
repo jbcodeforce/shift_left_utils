@@ -21,6 +21,6 @@
     },
     "dev-p1-dml-fct-order": {
         "statement_name": "dev-p1-dml-fct-order",
-        "compute_pool_id": "lfcp-xvrvmz"
+        "compute_pool_id": null
     }
 }
