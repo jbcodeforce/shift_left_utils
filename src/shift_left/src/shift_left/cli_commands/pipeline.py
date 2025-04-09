@@ -7,15 +7,18 @@ from rich import print
 from rich.tree import Tree
 from rich.console import Console
 from shift_left.core.pipeline_mgr import (
-    build_pipeline_definition_from_table, 
+    build_pipeline_definition_from_dml_content, 
     build_pipeline_report_from_table, 
     build_all_pipeline_definitions,
+    get_pipeline_definition_for_table,
     delete_all_metada_files)
 from typing_extensions import Annotated
 from shift_left.core.deployment_mgr import (
     deploy_pipeline_from_table, 
     DeploymentReport,
-    full_pipeline_undeploy_from_table
+    build_execution_plan_from_any_table,
+    full_pipeline_undeploy_from_table,
+
 )
 from shift_left.core.statement_mgr import report_running_flink_statements
 
@@ -52,7 +55,7 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
         print(f"Using pipeline path {pipeline_path}")
         os.environ["PIPELINES"] = pipeline_path
 
-    build_pipeline_definition_from_table(dml_file_name, pipeline_path)
+    build_pipeline_definition_from_dml_content(dml_file_name, pipeline_path)
     print(f"Pipeline built from {dml_file_name}")
 
 @app.command()
@@ -194,6 +197,29 @@ def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table nam
     result = full_pipeline_undeploy_from_table(table_name, inventory_path)
     print(result)
 
+@app.command()
+def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
+        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
+        dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
+        force: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)")):
+    """
+    From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
+    and existing Flink Statement running status.
+    """
+    pipeline_def= get_pipeline_definition_for_table(table_name, inventory_path)
+    execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
+                                                        compute_pool_id=compute_pool_id,
+                                                        dml_only=dml_only,
+                                                        force_children=force)
+    with open("execution_plan.json","w") as f:
+        for node in execution_plan:
+            message = f"Run {node.dml_statement} on cpool_id: {node.compute_pool_id} run-as-parent: {node.to_run} restart-as-child: {node.to_restart}\n"
+            f.write(message)
+            print(message)
+
+
+# ---- Private APIs
 def _display_directed_graph(nodes, edges):
     """
     Displays a directed graph using networkx and matplotlib.
@@ -214,6 +240,9 @@ def _display_directed_graph(nodes, edges):
             font_weight="bold", 
             arrowsize=20)
     plt.show()
+
+
+
 
 def _process_children(nodes_directed, edges_directed, current_node):
     if current_node.children:

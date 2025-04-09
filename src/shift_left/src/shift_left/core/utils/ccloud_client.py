@@ -35,7 +35,7 @@ class ConfluentCloudClient:
             "Content-Type": "application/json"
         }
         response = None
-        logger.info(f">>> Make request {method} to {url}")
+        logger.debug(f">>> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -56,7 +56,7 @@ class ConfluentCloudClient:
                 if response.status_code == 404:
                     logger.warning(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
-                    logger.info(f">>>> Response text: {result['errors'][0]['detail']}")
+                    logger.debug(f">>>> Response text: {result['errors'][0]['detail']}")
                     return result
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
@@ -92,11 +92,11 @@ class ConfluentCloudClient:
             else:
                 resp=self.make_request("GET", url)
             logger.debug(f"compute pool response= {resp}")
-            if resp and "data" in resp and resp["data"]:
-                for info in resp["data"]:
-                    results.append({'id' : info["id"], 'name':  info["spec"]["display_name"]} )
-            if resp and "metadata" in resp and "next" in resp["metadata"]:
-                next_page_token = resp["metadata"]["next"]
+            if resp and "data" in resp and resp.get('data'):
+                for info in resp.get('data'):
+                    results.append({'id' : info["id"], 'name':  info.get('spec').get('display_name')} )
+            if resp and "metadata" in resp and "next" in resp.get('metadata'):
+                next_page_token = resp.get('metadata').get('next')
                 if not next_page_token:
                     break
             else:
@@ -170,16 +170,22 @@ class ConfluentCloudClient:
             else:
                 resp=self.make_request("GET", url)
             #logger.debug("Statement execution result:", resp)
-            if "data" in resp and resp["data"]:
-                for info in resp["data"]:
+            if resp and 'data' in resp:
+                for info in resp.get('data'):
+                    if 'properties' in info.get('spec') and info.get('spec').get('properties'):
+                        catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
+                        database = info.get('spec',{}).get('properties',{}).get('sql.current-database','UNKNOWN')
+                    else:
+                        catalog = 'UNKNOWN'
+                        database = 'UNKNOWN'
                     statement_info = StatementInfo(name=info['name'],
-                                                   status_phase=info['status']['phase'],
-                                                   status_detail=info['status']['detail'],
-                                                   sql_content=info['spec']['statement'],
-                                                   compute_pool_id=info['spec']['compute_pool_id'],
-                                                   principal=info['spec']['principal'],
-                                                   sql_catalog=info['spec']['properties']['sql.current-catalog'],
-                                                   sql_database=info['spec']['properties']['sql.current-database'])
+                                                   status_phase= info.get('status').get('phase', 'UNKNOWN'),
+                                                   status_detail= info.get('status').get('detail', 'UNKNOWN'),
+                                                   sql_content= info.get('spec').get('statement', 'UNKNOWN'),
+                                                   compute_pool_id= info.get('spec').get('compute_pool_id'),
+                                                   principal= info.get('spec').get('principal', 'UNKNOWN'),
+                                                   sql_catalog=catalog,
+                                                   sql_database=database)
                     results[info['name']] = statement_info
             if "metadata" in resp and "next" in resp["metadata"]:
                 next_page_token = resp["metadata"]["next"]

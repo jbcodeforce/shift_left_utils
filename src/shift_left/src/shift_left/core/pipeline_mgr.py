@@ -55,7 +55,14 @@ class PipelineReport(BaseModel):
     children: Optional[Set[Any]] = Field(default=set(),  description="users of the table created by this flink dml")
 
 
-def build_pipeline_definition_from_table(dml_file_name: str, pipeline_path: str) -> FlinkTablePipelineDefinition:
+def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> FlinkTablePipelineDefinition:
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+    if not table_ref:
+        raise Exception(f"Table {table_name} not found. Stop processing")
+    return read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    
+def build_pipeline_definition_from_dml_content(dml_file_name: str, pipeline_path: str) -> FlinkTablePipelineDefinition:
     """Build pipeline definition hierarchy starting from given dml file. This is the exposed API
     so entry point of the processing.
     
@@ -197,7 +204,7 @@ def _process_one_sink_folder(sink_folder_path, pipeline_path):
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
                 if file_path.is_file() and file_path.name.startswith("dml"):
                     logger.info(f"Process the dml {file_path}")
-                    build_pipeline_definition_from_table(str(file_path.resolve()), pipeline_path)
+                    build_pipeline_definition_from_dml_content(str(file_path.resolve()), pipeline_path)
     
 
 def _build_pipeline_definition(

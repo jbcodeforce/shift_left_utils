@@ -213,3 +213,6 @@ The following may be considered:
 The modules to support the management of pipeline is `pipeline_mgr.py` and `deployment_mgr.py`.
 
 * Testing a Flink deployment see [test - ]
+
+
+For deployment the approach is to build a graph from the table developer want to deploy. The graph includes the parents and then the children. The graph is built reading static information about the relationship between statement, and then go over each statement and assess if for this table the dml is running. For a parent it does nothing

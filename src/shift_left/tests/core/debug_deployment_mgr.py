@@ -3,8 +3,8 @@ import unittest
 import os
 import pathlib
 from collections import deque
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-#os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
+#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
@@ -66,7 +66,7 @@ class TestDeploymentManager(unittest.TestCase):
     def _test_one_table(self):
         os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
         print(os.getenv("PIPELINES"))
-        report = pm.build_pipeline_definition_from_table(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
+        report = pm.build_pipeline_definition_from_dml_content(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
         print(report)
 
 
@@ -83,7 +83,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert results
         assert len(results) > 0
 
-    def _test_deploy_pipeline_from_src_table(self):
+    def test_deploy_pipeline_from_src_table(self):
         #table_name="src_aqem_tag_tag"
         table_name="int_aqem_tag_tag_dummy"
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
@@ -102,11 +102,13 @@ class TestDeploymentManager(unittest.TestCase):
         table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
         pipeline_def: FlinkTablePipelineDefinition= pm.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-        pipeline_def = dm._complement_pipeline_definition(pipeline_def,pool_id)
-        queue=deque()
-        result = dm._build_execution_plan(pipeline_def,queue)
+      
+        result = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def,
+                                                        compute_pool_id=pool_id)
         assert result
-        print(result.model_dump_json(indent=3))
+        for statement in result:
+            print(f"Run {statement.dml_statement} on {statement.compute_pool_id} run: {statement.to_run} restart: {statement.to_restart}")
+
 
     def _test_execution_plan(self):
         inventory_path= os.getenv("PIPELINES")
@@ -128,7 +130,7 @@ class TestDeploymentManager(unittest.TestCase):
             assert node.compute_pool_id
             print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.existing_statement_info.compute_pool_id}")
          
-        l = dm._execute_plan(execution_plan)
+        l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
         for statement in l:
             print(statement)
 
