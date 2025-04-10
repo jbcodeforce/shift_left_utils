@@ -278,6 +278,10 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
                         cleanup_policy=normalized_line.split("=")[1].strip()
                     elif 'sql.local-time-zone' in normalized_line:
                         sql_ltz=normalized_line.split("=")[1].strip()
+                    elif 'key.avro-registry.schema-context' in normalized_line:
+                        key_context=True
+                    elif 'value.avro-registry.schema-context' in normalized_line:
+                        value_context=True
             #print ('table(' + table_name + ')changelog(' + changelog_mode + ')cleanup(' + cleanup_policy + ')')
             if ct_violation:
                 violations.append('CREATE TABLE statement')
