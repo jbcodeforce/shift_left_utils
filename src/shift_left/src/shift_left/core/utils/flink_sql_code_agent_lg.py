@@ -90,11 +90,15 @@ Remove column named: dl_landed_at, __ts_ms, __source_ms within create table or  
 
 Finish the statement with the following declaration:
    PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
-) WITH ( 'changelog.mode' = 'retract',
-   'value.format' = 'avro-registry',
-    'kafka.cleanup-policy'= 'compact',
-   'kafka.retention.time' = '0',
-   'key.format' = 'avro-registry',
+) WITH ( 
+   'changelog.mode' = 'retract',
+   'kafka.cleanup-policy'= 'compact',
+   'key.avro-registry.schema-context' = '.flink-dev',
+   'value.avro-registry.schema-context' = '.flink-dev',
+  'key.format' = 'avro-registry',
+  'value.format' = 'avro-registry',
+  'kafka.retention.time' = '0',
+  'kafka.producer.compression.type' = 'snappy',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
    'sql.local-time-zone' = 'UTC',

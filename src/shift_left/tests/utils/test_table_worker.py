@@ -4,7 +4,7 @@ from importlib import import_module
 import os
 from typing import Tuple
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-      
+from shift_left.core.utils.app_config import get_config
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import (
     TableWorker, 
@@ -150,6 +150,52 @@ class TestTableWorker(unittest.TestCase):
         assert updated
         assert "'kafka.producer.compression.type'='snappy'" in sql_out
         print(sql_out)
+
+    def test_sql_content_update_from_env(self):
+        module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        get_config()['kafka']['cluster_type']='stage'
+        sql_in="""
+        CREATE TABLE table_1 (
+        ) WITH (
+            'key.avro-registry.schema-context' = '.flink-dev',
+            'value.avro-registry.schema-context' = '.flink-dev',
+            'changelog.mode' = 'upsert',
+            'kafka.retention.time' = '0',
+            'scan.bounded.mode' = 'unbounded',
+            'scan.startup.mode' = 'earliest-offset',
+            'value.fields-include' = 'all',
+            'key.format' = 'avro-registry',
+            'value.format' = 'avro-registry'
+        )
+        """
+        updated, sql_out= runner_class().update_sql_content(sql_in)
+        print(sql_out)
+        assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
+        assert "'value.avro-registry.schema-context' = '.flink-stage'" in sql_out
+
+    def test_dml_sql_content_update_from_env(self):
+        module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        get_config()['kafka']['cluster_type']='stage'
+        sql_in="""
+        INSERT INTO src_order
+        SELECT 
+            id,
+            status,
+            name,
+            after.is_mx_migrated,
+            op,
+            source.lsn as source_lsn
+        FROM
+            `ap-tag-dev.order`
+        );
+        """
+        updated, sql_out= runner_class().update_sql_content(sql_in)
+        print(sql_out)
+        assert "ap-tag-stage" in sql_out
 
 if __name__ == '__main__':
     unittest.main()

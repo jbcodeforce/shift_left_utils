@@ -60,6 +60,7 @@ class ConfluentCloudClient:
                     return result
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
+                    return result
             else:
                 raise 
     
@@ -294,7 +295,6 @@ class ConfluentCloudClient:
         timer= self.config['flink'].get("poll_timer", 10)
         try:
             resp = self.make_request("DELETE",f"{url}/statements/{statement_name}")
-            logger.info(resp)
             if resp:
                 return "deleted"
             counter=0

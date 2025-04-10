@@ -16,7 +16,7 @@ from collections import deque
 from typing import Optional, List
 
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import get_config, logger, log_dir
 
 from shift_left.core.utils.file_search import ( 
     PIPELINE_JSON_FILE_NAME,
@@ -64,7 +64,7 @@ def deploy_pipeline_from_table(table_name: str,
                 else deploy ddl and dml
             else deploy ddl and dml
     """    
-    logger.info("#"*20 + f"\n# Start deploying pipeline from table {table_name}\n" + "#"*20)
+    logger.info("#"*10 + f"# Start deploying pipeline from table {table_name}" + "#"*10)
     start_time = time.perf_counter()
     pipeline_def: FlinkTablePipelineDefinition = get_pipeline_definition_for_table(table_name, inventory_path)
     compute_pool_id =  get_or_build_compute_pool(compute_pool_id, pipeline_def)
@@ -72,7 +72,9 @@ def deploy_pipeline_from_table(table_name: str,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         force_children=force_children)
-    
+    if get_config().get('app').get('logging') == 'DEBUG':
+       persist_execution_plan(execution_plan)
+
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
                                              compute_pool_id=compute_pool_id,
@@ -169,6 +171,12 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     delete_statement_if_exists(statement_name)
 
 
+def persist_execution_plan(execution_plan):
+     with open(log_dir + "/last_execution_plan.json","w") as f:
+        for node in execution_plan:
+            message = f"Run {node.dml_statement} on cpool_id: {node.compute_pool_id} run-as-parent: {node.to_run} restart-as-child: {node.to_restart}\n"
+            f.write(message)
+
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
@@ -260,26 +268,27 @@ def _add_non_running_parents(node, execution_plan, node_map):
 
 
 
-def _execute_plan(plan, compute_pool_id: str) -> list[Statement]:
+def _execute_plan(plan: List[FlinkStatementNode], compute_pool_id: str) -> list[Statement]:
     logger.info("\n--- Execution Plan  started ---")
     statements = []
     for node in plan:
-        logger.info(f"\n\nnode: '{node}'")
+        logger.info(f"table: '{node.table_name}'")
         if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
         if node.to_run:
-            logger.info(f"Execute statement {node.dml_statement}'")
+            logger.info(f"Execute statement {node.dml_statement}' with dml only: {node.dml_only}")
             if not node.dml_only:
                 statement=_deploy_ddl_dml(node)
             else:
                 statement=_deploy_dml(node, False)
-        else:  # TODO to address
-            logger.info(f"Restarting statement: {node.dml_statement})")
+            statements.append(statement)
+        elif node.to_restart:
+            logger.info(f"Restarting statement: {node.dml_statement} with dml only: {node.dml_only})")
             if not node.dml_only:
                 statement=_deploy_ddl_dml(node)
             else:
                 statement=_deploy_dml(node, False)
-        statements.append(statement)
+            statements.append(statement)
     return statements
 
 

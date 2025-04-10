@@ -3,11 +3,13 @@ Copyright 2024-2025 Confluent, Inc.
 """
 from typing import List
 import os
+from importlib import import_module
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
-    get_or_build_inventory
+    get_or_build_inventory,
+    PIPELINE_JSON_FILE_NAME
 )
 from shift_left.core.utils.file_search import ( 
     read_pipeline_definition_from_file,
@@ -37,11 +39,13 @@ def deploy_flink_statement(flink_statement_file_path: str,
     full_file_path = from_pipeline_to_absolute(flink_statement_file_path)
     with open(full_file_path, "r") as f:
         sql_content = f.read()
+        transformer = _get_or_build_sql_content_transformer()
+        _, sql_out= transformer.update_sql_content(sql_content)
         client = ConfluentCloudClient(config)
         properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
         statement= client.post_flink_statement(compute_pool_id, 
                                            statement_name, 
-                                           sql_content,  
+                                           sql_out,  
                                            properties )
         if statement and "king" in statement and statement["king"] == "Statement":
             return StatementResult(results={"data" : statement})
@@ -120,3 +124,13 @@ def _search_statement_status(node: FlinkTablePipelineDefinition, statement_list,
         pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
         results = _update_results_from_node(pipeline_def, statement_list, results, table_inventory, config)
     return results
+
+_runner_class = None
+def _get_or_build_sql_content_transformer():
+    global _runner_class
+    if not _runner_class:
+        class_to_use = get_config().get('app').get('sql_content_modifier')
+        module_path, class_name = class_to_use.rsplit('.',1)
+        mod = import_module(module_path)
+        _runner_class = getattr(mod, class_name)()
+    return _runner_class

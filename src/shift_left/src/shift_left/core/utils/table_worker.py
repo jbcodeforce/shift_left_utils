@@ -6,6 +6,7 @@ Interface definition to support modifying SQL code to multiple sql statements.
 import logging
 from typing import Tuple
 import re
+from shift_left.core.utils.app_config import logger, get_config
 
 class TableWorker():
     """
@@ -98,3 +99,43 @@ class Change_CompressionType(TableWorker):
         return updated, sql_out
      
      
+class ReplaceEnvInSqlContent(TableWorker):
+    """
+    Special worker to update schema and src topic name in sql content
+    """
+    config = get_config()
+    env = config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
+    dml_replacements = {
+        "stage": {
+            "adapt": {
+                "search": rf"(ap-.*?)-(dev)(\.)",
+                "replace": rf"\1-{env}\3"
+            }
+
+        }
+    }
+    ddl_replacements = {
+        "stage": {
+            "schema-context": {
+                "search": rf"(.flink)-(dev)",
+                "replace": rf"\1-{env}"
+            }
+
+        }
+    }
+
+    def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+        updated = False
+        if "CREATE TABLE" in sql_content:
+            if self.env in self.ddl_replacements:
+                for k, v in self.ddl_replacements[self.env].items():
+                    sql_content = re.sub(v["search"], v["replace"], sql_content)
+                    updated = True
+                    logger.debug(f"{k} , {v} ")
+        else:
+            for k, v in self.dml_replacements[self.env].items():
+                sql_content = re.sub(v["search"], v["replace"], sql_content)
+                updated = True
+                logger.debug(f"{k} , {v} ")
+        logger.debug(sql_content)
+        return updated, sql_content

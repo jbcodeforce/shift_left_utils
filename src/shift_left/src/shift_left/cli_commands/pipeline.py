@@ -18,7 +18,7 @@ from shift_left.core.deployment_mgr import (
     DeploymentReport,
     build_execution_plan_from_any_table,
     full_pipeline_undeploy_from_table,
-
+    persist_execution_plan
 )
 from shift_left.core.statement_mgr import report_running_flink_statements
 
@@ -212,11 +212,8 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         force_children=force)
-    with open("execution_plan.json","w") as f:
-        for node in execution_plan:
-            message = f"Run {node.dml_statement} on cpool_id: {node.compute_pool_id} run-as-parent: {node.to_run} restart-as-child: {node.to_restart}\n"
-            f.write(message)
-            print(message)
+    persist_execution_plan(execution_plan)
+   
 
 
 # ---- Private APIs

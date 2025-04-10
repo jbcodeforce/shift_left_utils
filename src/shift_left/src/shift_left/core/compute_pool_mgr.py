@@ -99,7 +99,7 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str) -> bool
         pool_info=client.get_compute_pool_info(compute_pool_id)
         if pool_info == None:
             logger.info(f"Compute Pool not found")
-            raise Exception(f"The given compute pool {compute_pool_id} is not found, prefer to stop")
+            raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
         ratio = _get_pool_usage(pool_info) 
         if ratio >= 0.7:

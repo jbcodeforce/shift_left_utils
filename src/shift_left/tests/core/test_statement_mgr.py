@@ -9,7 +9,12 @@ import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
-from  shift_left.core.statement_mgr import *
+from  shift_left.core.statement_mgr import (
+    _get_or_build_sql_content_transformer,
+    get_statement_list,
+    deploy_flink_statement,
+    delete_statement_if_exists
+)
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 
@@ -50,6 +55,27 @@ class TestDeploymentManager(unittest.TestCase):
         print(f"\n -- {statement_dict["show-table"]}")
         response = delete_statement_if_exists("show_table")
         assert response
+
+    def test_get_sql_content_transformer(self):
+        sql_in="""
+        CREATE TABLE table_1 (
+        ) WITH (
+            'key.avro-registry.schema-context' = '.flink-dev',
+            'value.avro-registry.schema-context' = '.flink-dev',
+            'changelog.mode' = 'upsert',
+            'kafka.retention.time' = '0',
+            'scan.bounded.mode' = 'unbounded',
+            'scan.startup.mode' = 'earliest-offset',
+            'value.fields-include' = 'all',
+            'key.format' = 'avro-registry',
+            'value.format' = 'avro-registry'
+        )
+        """
+        transformer = _get_or_build_sql_content_transformer()
+        assert transformer
+        _, sql_out=transformer.update_sql_content(sql_in)
+        assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
+        print(sql_out)
 
 
 if __name__ == '__main__':
