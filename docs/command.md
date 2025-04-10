@@ -195,7 +195,8 @@ $ table search-source-dependencies [OPTIONS] TABLE_SQL_FILE_NAME SRC_PROJECT_FOL
 
 ### `table migrate`
 
-Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work.
+Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
+The command uses the SRC_FOLDER to access to src_path folder.
 
 **Usage**:
 
@@ -288,7 +289,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 
 * `--ddl`: Focus on DDL processing. Default is only DML
 * `--both-ddl-dml`: Run both DDL and DML sql files
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x124ab65a0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1119c6bd0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`
@@ -331,7 +332,8 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report`: Generate a report showing the pipeline...
 * `deploy`: Deploy a pipeline from a given table name,...
 * `report-running-dmls`: Assess for a given table, what are the...
-* `undeploy`: From a given table, when it is a sink it...
+* `undeploy`: From a given sink table, this command goes...
+* `build-execution-plan-from-table`: From a given table, this command goes all...
 
 ### `pipeline build-metadata`
 
@@ -408,6 +410,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--yaml`: Output the report in YAML format
 * `--json`: Output the report in JSON format
 * `--graph`: Output the report in Graphical tree
+* `--output-file-name TEXT`: Output file name to save the report.
 * `--help`: Show this message and exit.
 
 ### `pipeline deploy`
@@ -453,7 +456,7 @@ $ pipeline report-running-dmls [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 ### `pipeline undeploy`
 
-From a given table, when it is a sink it goes all the way to the full pipeline and delete tables and Flink statements not shared
+From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
 
 **Usage**:
 
@@ -463,9 +466,32 @@ $ pipeline undeploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 **Arguments**:
 
+* `TABLE_NAME`: The sink table name containing pipeline_definition.json, from where the undeploy will run.  [required]
+* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `pipeline build-execution-plan-from-table`
+
+From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
+and existing Flink Statement running status.
+
+**Usage**:
+
+```console
+$ pipeline build-execution-plan-from-table [OPTIONS] TABLE_NAME INVENTORY_PATH
+```
+
+**Arguments**:
+
 * `TABLE_NAME`: The table name containing pipeline_definition.json.  [required]
 * `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
 
 **Options**:
 
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
+* `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
+* `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
 * `--help`: Show this message and exit.
