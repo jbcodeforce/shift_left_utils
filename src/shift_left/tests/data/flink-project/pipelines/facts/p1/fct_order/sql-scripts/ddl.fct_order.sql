@@ -13,6 +13,9 @@ WITH (
   'kafka.cleanup-policy'= 'compact',
   'kafka.retention.time' = '0', 
 'sql.local-time-zone' = 'UTC-0', 
+'sql.local-time-zone' = 'UTC-0', 
+'sql.local-time-zone' = 'UTC-0', 
+'sql.local-time-zone' = 'UTC-0', 
   'scan.bounded.mode' = 'unbounded',
   'scan.startup.mode' = 'earliest-offset',
   'value.fields-include' = 'all'

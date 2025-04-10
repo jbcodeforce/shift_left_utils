@@ -13,3 +13,4 @@ site/
 tmp/
 .DS_Store
 .webui_secret_key
+set_test_env

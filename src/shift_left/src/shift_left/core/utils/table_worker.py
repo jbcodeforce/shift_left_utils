@@ -98,6 +98,29 @@ class Change_CompressionType(TableWorker):
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
+class Change_SchemaContext(TableWorker):
+     """
+     Predefined class to change the DDL setting for a 'c
+     """
+     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+        updated = False
+        sql_out: str = ""
+        with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
+        if not 'key.avro-registry.schema-context' in sql_content:
+            sql_out=with_statement.sub("WITH (\n        'key.avro-registry.schema-context' = '.flink-dev',\n     'value.avro-registry.schema-context' = '.flink-dev',\n", sql_content)
+            updated = True
+        else:
+            for line in sql_content.split('\n'):
+                if 'key.avro-registry.schema-context' in line:
+                    sql_out+="         'key.avro-registry.schema-context'='.flink-dev',"
+                    updated = True
+                if 'value.avro-registry.schema-context' in line:
+                    sql_out+="         'value.avro-registry.schema-context'='.flink-dev',"
+                    updated = True
+                else:
+                    sql_out+=line
+        logging.debug(f"SQL transformed to {sql_out}")
+        return updated, sql_out
      
 class ReplaceEnvInSqlContent(TableWorker):
     """

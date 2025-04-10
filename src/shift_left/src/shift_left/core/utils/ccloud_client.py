@@ -60,7 +60,7 @@ class ConfluentCloudClient:
                     return result
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
-                    return result
+                    return response.text
             else:
                 raise 
     

@@ -5,7 +5,7 @@
     * Still under construction
 
 
-This chapter details the migration development process recipes and illustrates the use of shift_left CLI for Flink project management and Flink pipeline management with the different development use cases
+This chapter details the standard activities to manage a Flink project with the shift_left tools when doing a ETL to real-time miration project. The recipes addresses new project initiative or migration project from an existing SQL based ETL solution.
 
 [Refer to the high-level component](./index.md#context) view for project organization details:
 
@@ -30,6 +30,8 @@ export CCLOUD_ENV_ID=env-xxxxxx
 ## Project related tasks
 
 ### Create a Flink project structure
+
+This activity is done when starting a new Flink project.
 
 * Get help for the shift_left project management CLI
 

@@ -34,7 +34,6 @@ def mock_pipeline_data():
         "base_path": "pipelines/test_table",
         "ddl_path": "pipelines/test_table/sql-scripts/ddl_test_table.sql",
         "dml_path": "pipelines/test_table/sql-scripts/dml_test_table.sql",
-        "compute_pool_id": "cnp",
         "parents": [
             {
                 "table_name": "parent_table1",

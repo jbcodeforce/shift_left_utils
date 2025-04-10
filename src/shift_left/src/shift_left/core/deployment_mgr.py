@@ -164,7 +164,10 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     statement_name = "drop-" + table_name.replace('_','-')
     delete_statement_if_exists(statement_name)
     try:
-        result= client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
+        result= client.post_flink_statement(compute_pool_id, 
+                                            statement_name, 
+                                            sql_content, 
+                                            properties)
         logger.debug(f"Run drop table {result}")
     except Exception as e:
         logger.error(e)

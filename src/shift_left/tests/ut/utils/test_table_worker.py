@@ -3,7 +3,7 @@ import pathlib
 from importlib import import_module 
 import os
 from typing import Tuple
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 from shift_left.core.utils.app_config import get_config
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import (
@@ -11,6 +11,7 @@ from shift_left.core.utils.table_worker import (
     Change_CompressionType, 
     Change_Concat_to_Concat_WS,
     ChangeLocalTimeZone,
+    Change_SchemaContext,
     ChangeChangeModeToUpsert,
     ChangePK_FK_to_SID)
 
@@ -20,7 +21,7 @@ class TestTableWorker(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        data_dir = pathlib.Path(__file__).parent.parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 
     def test_update_retention_ddl_statement(self):
@@ -134,6 +135,27 @@ class TestTableWorker(unittest.TestCase):
         assert "'sql.local-time-zone'" in sql_out
         print(sql_out)
 
+    def test_Change_SchemaContext(self):
+        sql_in="""
+        create table T_schema_context (
+           id string,
+           a_pk_fk string,
+           primary key (id) not enforced
+        ) with (
+           'changelog.mode' = 'append',
+            'key.format' = 'avro-registry',
+            'value.format' = 'avro-registry',
+            'value.fields-include' = 'all'
+        )
+        """
+        worker = Change_SchemaContext()
+        updated, sql_out= worker.update_sql_content(sql_in)
+        assert sql_out
+        assert updated
+        assert "'key.avro-registry.schema-context' = '.flink-dev'" in sql_out
+        assert "'value.avro-registry.schema-context' = '.flink-dev'" in sql_out
+        print(sql_out)
+
     def test_Change_CompressionType(self):
         sql_in="""
         create table Tcompress_type (
@@ -158,6 +180,7 @@ class TestTableWorker(unittest.TestCase):
         get_config()['kafka']['cluster_type']='stage'
         sql_in="""
         CREATE TABLE table_1 (
+            a string
         ) WITH (
             'key.avro-registry.schema-context' = '.flink-dev',
             'value.avro-registry.schema-context' = '.flink-dev',

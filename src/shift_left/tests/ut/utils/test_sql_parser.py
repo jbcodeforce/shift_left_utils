@@ -10,7 +10,7 @@ class TestFileSearch(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        cls.data_dir = pathlib.Path(__file__).parent.parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
 
     def test_get_table_from_select(self):

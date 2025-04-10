@@ -28,7 +28,7 @@ class TestFileSearch(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        data_dir = pathlib.Path(__file__).parent.parent.parent / "./data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
 

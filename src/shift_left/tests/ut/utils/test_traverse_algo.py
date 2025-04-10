@@ -211,7 +211,7 @@ class TestExecutionPlanBuilder(unittest.TestCase):
         for node in [self.src_a, self.src_b, self.src_c, self.node_a, self.node_x, self.node_y, self.node_z, self.node_p, self.node_c, self.node_d, self.node_e, self.node_f]:
             node.is_running = False
 
-    def _test_start_with_int(self):
+    def test_start_with_int(self):
         print("\n--- Scenario 1: Starting node 'Z' ---")
         self.node_z.is_running = False # Ensure it's not running initially
         plan1 = build_execution_plan(self.node_z)
@@ -219,38 +219,20 @@ class TestExecutionPlanBuilder(unittest.TestCase):
         execute_plan(plan1)
         self._reset_nodes()
     
-    def _test_start_from_leaf(self):
+    def test_start_from_leaf(self):
         print("\n--- Scenario 2: Starting node 'E' ---")
         plan2 = build_execution_plan(self.node_e)
         print(plan2)
         execute_plan(plan2)
         self._reset_nodes()
 
-    def _test_start_from_root(self):
+    def test_start_from_root(self):
         # Scenario 3: Starting the root node
         print("\n--- Scenario 3: Starting node 'Root' ---")
         plan3 = build_execution_plan(self.src_a)
         print(plan3)
         execute_plan(plan3)
 
-
-    def _test_build_graph_from_pipeline_def(self):
-        print("1-load a pipeline def, create nodes for it and parent and children, add edges\n")
-        pipe_def = read_pipeline_definition_from_file( os.getenv("PIPELINES") + "/intermediates/aqem/tag_tag_dummy/" + PIPELINE_JSON_FILE_NAME)
-        assert pipe_def
-        import shift_left.core.deployment_mgr as dm
-        
-        graph: FlinkStatementNode = dm._build_table_graph(pipe_def.to_node())
-        assert graph
-        print(graph)
-
-
-    def test_deploy_int_table(self):
-        import shift_left.core.deployment_mgr as dm
-        config = get_config()
-        graph = dm.deploy_pipeline_from_table("int_aqem_tag_tag_dummy", 
-                                              os.getenv("PIPELINES"), 
-                                              config['flink']['compute_pool_id'])
 
 
 if __name__ == "__main__":
