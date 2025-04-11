@@ -239,8 +239,8 @@ Some standard reported violations:
 | Error message | Action | Comments |
 | --- | --- | ---|
 | CREATE TABLE statement | CREATE TABLE IF NOT EXISTS statement| Missing 'IF NOT EXISTS' |
-| WRONG FILE NAME | <ddl|dml>.<int|src>_<product>_<table_name>.sql | Refer for DDL, DML file naming [standards](./index.md/#shift_left_tooling) | 
-| MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory sturcture [standards]()|
+| WRONG FILE NAME | `<ddl|dml>.<int|src>_<product>_<table_name>.sql` | Refer DDL,DML file naming [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#ddldml-file-naming-convention) |
+| MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory sturcture [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#git-repo-directory-structure)|
 
 ### Understand the current Flink Statement relationship
 
