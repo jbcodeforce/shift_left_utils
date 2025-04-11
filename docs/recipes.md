@@ -240,7 +240,15 @@ Some standard reported violations:
 | --- | --- | ---|
 | CREATE TABLE statement | CREATE TABLE IF NOT EXISTS statement| Missing 'IF NOT EXISTS' |
 | WRONG FILE NAME | `<ddl|dml>.<int|src>_<product>_<table_name>.sql` | Refer DDL,DML file naming [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#ddldml-file-naming-convention) |
-| MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory sturcture [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#git-repo-directory-structure)|
+| WRONG TABLE NAME | `<src|int>_<product>_<table_name>` | Refer Table naming [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#table-naming-convention)|
+| WRONG `changelog.mode` | `changelog.mode` should be `upsert` for source, intermediate. `retract` for sink | None |
+| WRONG `kafka.cleanup-policy` | `kafka.cleanup-policy` should be `delete` for source, intermediate. `compact` for sink | Note `delete` is default |
+| `key.avro-registry.schema-context` NOT FOUND | `.flink-dev` or `.flink-stage` | Needed for 2 clusters 1 Schema Registry setup ... dev & stage |
+| `value.avro-registry.schema-context` NOT FOUND | `.flink-dev` or `.flink-stage` | Needed for 2 clusters 1 Schema Registry setup ... dev & stage |
+| MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory structure [standards](https://github.com/MasterControlInc/data-platform-flink/blob/pipelines-1/docs/implementation_decisions.md#git-repo-directory-structure)|
+| INVALID pipeline ddl_ref | `ddl_ref` path in `pipeline_definition.json` doesnt exist |  Run the shift_left utils tool to resolve |
+| INVALID pipeline dml_ref | `dml_ref` path in `pipeline_definition.json` doesnt exist |  Run the shift_left utils tool to resolve |
+| INVALID pipeline table_name | `table_name` in `pipeline_definition.json` is invalid  | Due to a bug in the past the tool may write `No-Table`. Investigate and resolve |
 
 ### Understand the current Flink Statement relationship
 
