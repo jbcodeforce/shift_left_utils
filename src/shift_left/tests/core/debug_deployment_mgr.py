@@ -116,23 +116,19 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
         inventory_path= os.getenv("PIPELINES")
         import shift_left.core.deployment_mgr as dm
-        table_name="fct_order"
-        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
-        current_node= pipeline_def.to_node()
-        current_node.compute_pool_id = get_config()['flink']['compute_pool_id']
-        current_node.update_children = True
-        current_node.dml_only= False
-        graph = dm._build_table_graph(current_node)
-        for node in graph:
-            print(f"{node} -> {graph[node].dml_statement}")
-        execution_plan = dm._build_execution_plan(graph, current_node)
+        config = get_config()
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/intermediates/aqem/tag_tag_dummy/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                config.get('flink').get('compute_pool_id'), 
+                                                                True, 
+                                                                False)
         for node in execution_plan:
+            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.compute_pool_id}")
             assert node.table_name
             assert node.dml_ref
             assert node.ddl_ref
             assert node.compute_pool_id
-            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.existing_statement_info.compute_pool_id}")
-         
+           
         #l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
         #for statement in l:
         #    print(statement)

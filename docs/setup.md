@@ -167,7 +167,7 @@ Those declarations are loaded by the Kafka Producer and Consumer and with tools 
 
 
 ???- warning "Security access"
-  The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
+    The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 
 
 You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process) or use the [recipes](./recipes.md) to get how to do some common activities.

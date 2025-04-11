@@ -68,9 +68,10 @@ class FlinkStatementNode(BaseModel):
         parent.children.add(self)
 
     def is_running(self) -> bool:
-        if not self.existing_statement_info or self.existing_statement_info.status_phase:
+        if self.existing_statement_info and self.existing_statement_info.status_phase:
+            return (self.existing_statement_info.status_phase == "RUNNING")
+        else:
             return False
-        return (self.existing_statement_info.status_phase == "RUNNING")
     
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FlinkStatementNode):

@@ -28,7 +28,7 @@ from shift_left.core.utils.file_search import (
     read_pipeline_definition_from_file
 )
 from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
-from shift_left.core.flink_statement_model import Statement, StatementInfo
+from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementResult
 
 
 
@@ -37,7 +37,7 @@ class DeploymentReport(BaseModel):
     compute_pool_id: Optional[str] =  Field(default=None)
     ddl_dml:  Optional[str] =  Field(default="Both",description="The type of deployment: DML only, or both")
     update_children: Optional[bool] =  Field(default=False)
-    flink_statements_deployed: List[str]
+    flink_statements_deployed: List[Any]
 
     
 def deploy_pipeline_from_table(table_name: str, 
@@ -70,15 +70,14 @@ def deploy_pipeline_from_table(table_name: str,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         force_children=force_children)
-    if get_config().get('app').get('logging') == 'INFO':
-       persist_execution_plan(execution_plan, table_name)
+    persist_execution_plan(execution_plan, table_name)
 
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
-                                             compute_pool_id=compute_pool_id,
-                                             update_children=force_children,
-                                             ddl_dml= "DML" if dml_only else "Both",
-                                             flink_statements_deployed=statements)
+                            compute_pool_id=compute_pool_id,
+                            update_children=force_children,
+                            ddl_dml= "DML" if dml_only else "Both",
+                            flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
     logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
     return result
@@ -97,7 +96,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     current_node.compute_pool_id = compute_pool_id
     current_node.update_children = force_children
     graph = _build_table_graph(current_node)
-    return _build_execution_plan(graph, current_node)
+    return _build_execution_plan(graph, current_node, compute_pool_id)
 
 def full_pipeline_undeploy_from_table(table_name: str, 
                                inventory_path: str ) -> str:
@@ -160,7 +159,7 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
     client = ConfluentCloudClient(config)
-    sql_content = f"drop table {table_name};"
+    sql_content = f"drop table if exists {table_name};"
     properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     statement_name = "drop-" + table_name.replace('_','-')
     delete_statement_if_exists(statement_name)
@@ -235,17 +234,18 @@ def _search_parents_to_run(nodes_to_run, current_node, visited_nodes, node_map):
         for p in current_node.parents:
             node_p = node_map[p.table_name]
             _update_statement_info_for_node(node_p)
-            if not node_p.is_running() and not node_p.to_run:  # could add in the future if the sql did not change do nothing
-                if node_p.compute_pool_id:  # no existing compute pool take the one specified as argument
-                    node_p.compute_pool_id = current_node.compute_pool_id
-                node_p.to_run = True
-                _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
+            if not node_p.is_running():
+                if not node_p.to_run:  # could add in the future if the sql did not change do nothing
+                    if not node_p.compute_pool_id:  # no existing compute pool take the one specified as argument
+                        node_p.compute_pool_id = current_node.compute_pool_id
+                    node_p.to_run = True
+                    _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
             else:
                 node_p.to_run = False
 
 
 
-def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkStatementNode) -> List[FlinkStatementNode]:
+def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkStatementNode, compute_pool_id: str) -> List[FlinkStatementNode]:
     """
     Build an execution plan from the static relationship between Flink Statements
     node_map includes all the FlinkStatement information has a hash map <flink_statement_name>, <statement_metadata>
@@ -279,6 +279,8 @@ def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkS
                     c.to_restart = True    # TODO be more precise by looking at upgrade mode
                     if c.existing_statement_info.compute_pool_id:
                         c.compute_pool_id = c.existing_statement_info.compute_pool_id
+                    else:
+                        c.compute_pool_id = compute_pool_id
     logger.info("Done with execution plan construction")
     logger.debug(execution_plan)
     return execution_plan
@@ -296,7 +298,7 @@ def _add_non_running_parents(node, execution_plan, node_map):
 
 
 def _execute_plan(plan: List[FlinkStatementNode], compute_pool_id: str) -> list[Statement]:
-    logger.info("\n--- Execution Plan  started ---")
+    logger.info("--- Execution Plan  started ---")
     statements = []
     for node in plan:
         logger.info(f"table: '{node.table_name}'")
@@ -317,7 +319,7 @@ def _execute_plan(plan: List[FlinkStatementNode], compute_pool_id: str) -> list[
                 statement=_deploy_dml(node, False)
             statements.append(statement)
         else:
-            logger.info(node)
+            logger.info(f"No restart no to run, strange!")
     return statements
 
 
@@ -335,14 +337,16 @@ def _deploy_ddl_dml(to_process: FlinkStatementNode):
     rep= drop_table(to_process.table_name)
     logger.info(f"Dropped table {to_process.table_name} status is : {rep}")
 
-    statement=deploy_flink_statement(to_process.ddl_ref, 
+    statement: Statement =deploy_flink_statement(to_process.ddl_ref, 
                                 to_process.compute_pool_id, 
                                 to_process.ddl_statement, 
                                 config)
-    logger.info(f"Create table {to_process.table_name} status is : {statement.status}")
+
+    logger.info(f"Statement: {to_process.ddl_statement} status is: {statement.status.phase}")
     get_statement_list()[to_process.ddl_statement]=statement.status.phase   # important to avoid doing an api call
     delete_statement_if_exists(to_process.ddl_statement)
     statement = _deploy_dml(to_process, True)
+    
     return statement   
     
 
@@ -353,12 +357,13 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
     if not dml_already_deleted:
         delete_statement_if_exists(to_process.dml_statement)
     
-    statement=deploy_flink_statement(to_process.dml_ref, 
+    statement: StatementResult =deploy_flink_statement(to_process.dml_ref, 
                                     to_process.compute_pool_id, 
                                     to_process.dml_statement, 
                                     config)
     get_statement_list()[to_process.dml_statement]=statement.status
     save_compute_pool_info_in_metadata(to_process.dml_statement, to_process.compute_pool_id)
+    logger.info(f"Statement: {to_process.dml_statement} status is: {statement.status.phase}")
     return statement
 
 

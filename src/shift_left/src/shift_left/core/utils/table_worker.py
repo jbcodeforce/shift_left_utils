@@ -15,17 +15,6 @@ class TableWorker():
     def update_sql_content(sql_content: str) -> Tuple[bool, str]:
         return (False, sql_content)
     
-class ChangeLocalTimeZone(TableWorker):
-     """
-     Predefined class to change the DDL setting to get UTC as a time zone
-     """
-     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
-        updated = False
-        with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
-        sql_out=with_statement.sub("WITH (\n\t'sql.local-time-zone' = 'UTC-0',", sql_content)
-        updated = True
-        logging.debug(f"SQL transformed to {sql_out}")
-        return updated, sql_out
      
 class ChangeChangeModeToUpsert(TableWorker):              
      """

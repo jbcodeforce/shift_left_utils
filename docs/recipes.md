@@ -327,7 +327,6 @@ There are some cases when we need to apply a set of updates to a lot of Flink St
 | Update name | Type of changes  | Class name |
 | --- | --- | --- |
 | CompressionType |  Add the `'kafka.producer.compression.type' = 'snappy'` in the WITH section of the DDL |  `shift_left.core.utils.table_worker.Change_CompressionType `|
-| LocalTimeZone |  add or change the `'sql.local-time-zone' = 'UTC-0'` in the DDL | `shift_left.core.utils.table_worker.ChangeLocalTimeZone` |
 | ChangeModeToUpsert| Set the `'changelog.mode' = 'upsert'` configuration | `shift_left.core.utils.table_worker.ChangeChangeModeToUpsert` |
 | ChangePK_FK_to_SID | apply replace("_pk_fk", "_sid") to dml | `shift_left.core.utils.table_worker.ChangePK_FK_to_SID` |
 | Concat_to_Concat_WS | change the type of concat to use | `shift_left.core.utils.table_worker.Change_Concat_to_Concat_WS` |
