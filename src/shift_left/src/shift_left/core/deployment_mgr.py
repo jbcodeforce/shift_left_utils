@@ -240,6 +240,8 @@ def _search_parents_to_run(nodes_to_run, current_node, visited_nodes, node_map):
                     node_p.compute_pool_id = current_node.compute_pool_id
                 node_p.to_run = True
                 _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
+            else:
+                node_p.to_run = False
 
 
 
@@ -267,15 +269,16 @@ def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkS
         _add_non_running_parents(node, execution_plan, node_map)
         node.to_run = True  
     """
-    # 3. Restart all children of each node in the execution plan if they are not yet there
+    # 3. Restart all children of each runnable node in the execution plan if they are not yet there
     for node in execution_plan:
-        for c in node.children:
-            _update_statement_info_for_node(c)
-            if not c.is_running() and not c.to_run and c not in execution_plan:
-                _search_parents_to_run(execution_plan, c, visited_nodes, node_map)
-                c.to_restart = True
-                if c.existing_statement_info.compute_pool_id:
-                    c.compute_pool_id = c.existing_statement_info.compute_pool_id
+        if node.to_run or node.to_restart:
+            for c in node.children:
+                _update_statement_info_for_node(c)
+                if not c.is_running() and not c.to_run and c not in execution_plan:
+                    _search_parents_to_run(execution_plan, c, visited_nodes, node_map)
+                    c.to_restart = True    # TODO be more precise by looking at upgrade mode
+                    if c.existing_statement_info.compute_pool_id:
+                        c.compute_pool_id = c.existing_statement_info.compute_pool_id
     logger.info("Done with execution plan construction")
     logger.debug(execution_plan)
     return execution_plan
@@ -313,6 +316,8 @@ def _execute_plan(plan: List[FlinkStatementNode], compute_pool_id: str) -> list[
             else:
                 statement=_deploy_dml(node, False)
             statements.append(statement)
+        else:
+            logger.info(node)
     return statements
 
 

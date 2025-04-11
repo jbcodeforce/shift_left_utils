@@ -53,6 +53,8 @@ The involved recipes are:
 * [Table inventory](#build-an-inventory-of-all-the-flink-sql-ddl-and-dml-statements-with-table-name-as-key)
 * [Build dependency metadata](#build-structured-pipeline-metadata-and-walk-through)
 * [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
+* [Review the current execution plan from a Flink statement](#assess-a-flink-statement-execution-plan)
+* [Deploy a Flink Statement taking into consideration its execution plan](#pipeline-deployment)
 
 ### Migration use cases
 
@@ -83,7 +85,7 @@ export CCLOUD_ENV_ID=env-xxxxxx
 
 ### The config.yaml file
 
-The config.yaml file is important to set up and reference with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-setup)
+The `config.yaml` file is important to set up and reference with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-setup)
 
 ## Project related tasks
 
@@ -565,9 +567,19 @@ Only the facts tables:
 shift_left pipeline delete-metadata $PIPELINES/facts
 ```
 
-### Process all the tables from a folder
+### Define pipeline definitions for all the tables within a folder hierarchy
 
-It may relevant to update all the metadata definitions. Start by deleting all and then recreate:
+It may be relevant to update all the metadata definitions within a given folder. Start by deleting all and then recreate:
+
+* For facts or dimensions
+
+```sh
+shift_left pipeline delete-metadata $PIPELINES/facts
+#
+shift_left pipeline build-all-metadata $PIPELINES/facts
+```
+
+* For all pipelines
 
 ```sh
 shift_left pipeline delete-metadata $PIPELINES
@@ -583,7 +595,7 @@ shift_left pipeline build-all-metadata
 
 ```sh
 shift_left pipeline report fct_table
-# explicitly specifying the pipeline folder.
+# explicitly specifying the pipeline folder. (this is to demonstrate that it can run in STAGING folder too)
 shift_left pipeline report fct_table $PIPELINES
 ```
 
@@ -596,11 +608,34 @@ shift_left pipeline report src_table
 The same approach works for intermediate tables.
 
 
-### Assess a pipeline execution plan
+
+### Assess a Flink Statement execution plan
+
+The execution plan is a hierarchical Flink statement hierarchy enriched with current state of the running DMLs on the platform and with a plan to start non running parents, and update or restart the children depending of the upgrade mode: stateless or stateful.
+
+Here is a basic command for an intermediate table:
+
+```sh
+shift_left pipeline build-execution-plan-from-table int_table_2 --compute-pool-id  lfcp-123456 --dml-only --force
+```
+
+It will take into account the following parameters in the config.yaml:
+
+```yaml
 
 ```
-pipeline build-execution-plan-from-table int_table_2 --compute-pool-id  lfcp-123456 --dml-only --force
-```
+
+???- example "The outcome of an execution plan"
+    The information reported is taking into account the table hierarchy and the state of the Statement currently running:
+
+    ```
+    To deploy fct_order the following statements need to be executed in the order
+
+    --- Parents impacted ---
+	src_2 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
+	src_1 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
+    src_3 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
+    ```
 
 ???+ info "For any help of pipeline commands"
 

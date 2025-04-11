@@ -63,9 +63,8 @@ class TestDeploymentManager(unittest.TestCase):
         print(result.model_dump_json())
 
 
-    def test_one_table(self):
+    def _test_creating_pipeline_definition(self):
         os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
-        print(os.getenv("PIPELINES"))
         filename=os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql"
         filename=os.getenv("PIPELINES") + "/dimensions/aqem/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql"
         
@@ -113,7 +112,8 @@ class TestDeploymentManager(unittest.TestCase):
             print(f"Run {statement.dml_statement} on {statement.compute_pool_id} run: {statement.to_run} restart: {statement.to_restart}")
 
 
-    def _test_execution_plan(self):
+    def test_build_execution_plan(self):
+        os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
         inventory_path= os.getenv("PIPELINES")
         import shift_left.core.deployment_mgr as dm
         table_name="fct_order"
@@ -133,9 +133,9 @@ class TestDeploymentManager(unittest.TestCase):
             assert node.compute_pool_id
             print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.existing_statement_info.compute_pool_id}")
          
-        l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
-        for statement in l:
-            print(statement)
+        #l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
+        #for statement in l:
+        #    print(statement)
 
         
 

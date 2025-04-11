@@ -44,10 +44,14 @@ source .venv/bin/activate
 
 
 
-* Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): 
+* Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the wheel, thery are under the `src/shift_left/dist` folder, the last version as of 4/11 is 0.1.8 but it will change, so the documentation may not reflect the last version.
 
 ```sh
-pip install src/shift_left/dist/shift_left-0.1.1-py3-none-any.whl
+pip install src/shift_left/dist/shift_left-0.1.8-py3-none-any.whl
+# for the developers using uv, the installation is
+uv tool list
+uv tool uninstall shift_left
+uv tool install shift_left@src/shift_left/dist/shift_left-0.1.8-py3-none-any.whl
 ```
 
 * Validate the CLI is available via:

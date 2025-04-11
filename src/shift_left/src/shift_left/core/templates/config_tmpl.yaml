@@ -39,4 +39,6 @@ app:
   src_table_name_suffix: ""
   src_table_name_prefix: src_
   logging: INFO
+  products: ["p1", "p2", "p3"]
+  sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
  
