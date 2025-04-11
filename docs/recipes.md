@@ -236,11 +236,11 @@ shift_left table validate-table-names $PIPELINES
 
 Some standard reported violations:
 
-| Error message | Action |
-| --- | --- |
-| CREATE TABLE statement | |
-| WRONG FILE NAME | | 
-|  MISSING pipeline definition | | 
+| Error message | Action | Comments |
+| --- | --- | ---|
+| CREATE TABLE statement | CREATE TABLE IF NOT EXISTS statement| Missing 'IF NOT EXISTS' |
+| WRONG FILE NAME | <ddl|dml>.<int|src>_<product>_<table_name>.sql | Refer for DDL, DML file naming [standards](./index.md/#shift_left_tooling) | 
+| MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory sturcture [standards]()|
 
 ### Understand the current Flink Statement relationship
 
