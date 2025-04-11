@@ -70,7 +70,7 @@ class FlinkStatementNode(BaseModel):
     def is_running(self) -> bool:
         if not self.existing_statement_info or self.existing_statement_info.status_phase:
             return False
-        return self.existing_statement_info.status_phase == "RUNNING"
+        return (self.existing_statement_info.status_phase == "RUNNING")
     
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FlinkStatementNode):
@@ -156,15 +156,15 @@ def get_or_build_inventory(
         
     inventory = {}
     parser = SQLparser()
-    
+    count = 0
     for root, dirs, _ in os.walk(pipeline_folder):
         for dir in dirs:
             if SCRIPTS_DIR == dir:
                 ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
+                logger.debug(f"Processing file {dml_file_name}")
+                count+=1
                 if not dml_file_name:
                     continue
-                    
-                logger.debug(f"Processing file {dml_file_name}")
                 # extract table name from dml filefrom sql script   
                 with open(dml_file_name, "r") as f:
                     sql_content = f.read()
@@ -179,9 +179,11 @@ def get_or_build_inventory(
                         "dml_ref": from_absolute_to_pipeline(dml_file_name),
                         "table_folder_name": table_folder
                     })
-                    
                     logger.debug(ref)
+                    if ref.table_name in inventory:
+                        logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                     inventory[ref.table_name] = ref.model_dump()
+    logger.info(f"processed {count} files and got {len(inventory)} entries")
                     
     with open(inventory_path, "w") as f:
         json.dump(inventory, f, indent=4)
@@ -211,7 +213,7 @@ def get_table_type_from_file_path(file_name: str) -> str:
     elif "dead_letter" in file_name:
         return "dead_letter"
     else:
-        return "unknow-type"
+        return "unknown-type"
 
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):
@@ -299,7 +301,7 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """
     ddl_file_name = None
     dml_file_name = None
-    base_scripts=os.path.join(root,dir)
+    base_scripts=os.path.join(root, dir)
     for file in os.listdir(base_scripts):
         if file.startswith("ddl."):
             ddl_file_name=os.path.join(base_scripts,file)

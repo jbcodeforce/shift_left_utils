@@ -63,10 +63,13 @@ class TestDeploymentManager(unittest.TestCase):
         print(result.model_dump_json())
 
 
-    def _test_one_table(self):
+    def test_one_table(self):
         os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
         print(os.getenv("PIPELINES"))
-        report = pm.build_pipeline_definition_from_dml_content(os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql", os.getenv("PIPELINES"))
+        filename=os.getenv("PIPELINES") + "/intermediates/mx/int_mx_vaults/sql-scripts/dml.int_mx_vaults.sql"
+        filename=os.getenv("PIPELINES") + "/dimensions/aqem/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql"
+        
+        report = pm.build_pipeline_definition_from_dml_content(filename, os.getenv("PIPELINES"))
         print(report)
 
 
@@ -83,7 +86,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert results
         assert len(results) > 0
 
-    def test_deploy_pipeline_from_src_table(self):
+    def _test_deploy_pipeline_from_src_table(self):
         #table_name="src_aqem_tag_tag"
         table_name="int_aqem_tag_tag_dummy"
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"

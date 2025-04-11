@@ -176,9 +176,13 @@ def _build_pipeline_definitions_from_sql_content(
                 if current_table_name in referenced_table_names:
                     referenced_table_names.remove(current_table_name)
                 for table_name in referenced_table_names:
-                    table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[table_name])
-                    if not table_ref:
+                    # strangely it is possible that the tablename was a field name because of SQL code like TRIM(BOTH '" ' FROM
+                    try:
+                        table_ref_dict= table_inventory[table_name]
+                    except Exception as e:
+                        logger.warning(f"{table_name} is most likely not a known table name")
                         continue
+                    table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
                     logger.info(f"{current_table_name} - depends on: {table_name}") 
                     dependencies.add(_build_pipeline_definition(
                         table_name, 

@@ -44,7 +44,7 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     """
     print("#" * 30 + f" Build Inventory in {pipeline_path}")
     inventory= get_or_create_inventory(pipeline_path)
-    print(inventory)
+    #print(inventory)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
 @app.command()
@@ -107,7 +107,7 @@ def find_table_users(table_name: Annotated[str, typer.Argument(help="The name of
 @app.command()
 def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"],help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """
-    Go over the pipeline folder to assess table name and naming convention are respected.
+    Go over the pipeline folder to assess if table name,  naming convention, and other development best practices are respected.
     """
     print("#" * 30 + f"\nValidate_table_names in {pipeline_folder_name}")
     validate_table_cross_products(pipeline_folder_name)
@@ -136,12 +136,18 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         module_path, class_name = class_to_use.rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
+        count=0
+        processed=0
         for file in files_to_process:
             print(f"Assessing file {file}")    
             updated=update_sql_content_for_file(file, runner_class())
             if updated:
                 print(f"-> {file} processed ")
-    print("Done !")
+                processed+=1
+            else:
+                print(f"-> already up to date ")
+            count+=1
+    print(f"Done: processed: {processed} of {count} files!")
 
 
 @app.command()

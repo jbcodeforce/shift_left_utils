@@ -6,7 +6,6 @@ import time
 
 from pydantic import BaseModel, Field
 from shift_left.core.pipeline_mgr import (
-    build_pipeline_definition_from_dml_content,
     get_pipeline_definition_for_table
 )  
 
@@ -26,11 +25,10 @@ from shift_left.core.utils.file_search import (
     get_table_ref_from_inventory,
     FlinkTablePipelineDefinition,
     get_ddl_dml_names_from_pipe_def,
-    read_pipeline_definition_from_file,
-    from_pipeline_to_absolute
+    read_pipeline_definition_from_file
 )
 from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
-from shift_left.core.flink_statement_model import StatementResult, Statement, StatementInfo
+from shift_left.core.flink_statement_model import Statement, StatementInfo
 
 
 
@@ -72,8 +70,8 @@ def deploy_pipeline_from_table(table_name: str,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         force_children=force_children)
-    if get_config().get('app').get('logging') == 'DEBUG':
-       persist_execution_plan(execution_plan)
+    if get_config().get('app').get('logging') == 'INFO':
+       persist_execution_plan(execution_plan, table_name)
 
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
@@ -90,6 +88,9 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                                compute_pool_id: str,
                                dml_only: bool = False,
                                force_children: bool = False ) -> List[FlinkStatementNode]:
+    """
+    Build execution plan, helps to assess the current situation of running statement and assess what needs to be deployed or not.
+    """
     
     current_node= pipeline_def.to_node()
     current_node.dml_only = dml_only
@@ -174,12 +175,32 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     delete_statement_if_exists(statement_name)
 
 
-def persist_execution_plan(execution_plan):
-     with open(log_dir + "/last_execution_plan.json","w") as f:
+def persist_execution_plan(execution_plan, table_name: str):
+    with open(log_dir + "/last_execution_plan.json","w") as f:
+        f.write(f"To deploy {table_name} the following statements need to be executed in the order\n\n")
+        count_p = 0
+        count_c = 0
         for node in execution_plan:
-            message = f"Run {node.dml_statement} on cpool_id: {node.compute_pool_id} run-as-parent: {node.to_run} restart-as-child: {node.to_restart}\n"
-            f.write(message)
-
+            if node.to_run:
+                if count_p == 0:
+                    f.write("--- Parents impacted ---\n")
+                count_p+=1
+                message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
+                f.write(message)
+            else:
+                if count_c == 0:
+                    f.write(f"--- {count_p} parents to run\n")
+                    f.write("--- Children to restart ---\n")
+                message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
+                f.write(message)
+                count_c+=1
+        f.write(f"--- {count_c} children to restart")
+            
+    logger.info(f"Execution plan in {log_dir}/last_execution_plan.json")
+    if logger.level == "INFO":
+        with open(log_dir + "/last_execution_plan.json","r") as f:
+            print(f.read())
+        
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
@@ -241,7 +262,7 @@ def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkS
     for node in reversed(nodes_to_run):
         execution_plan.append(node)
         """
-        NOT SURE about that anymore
+        NOT SURE about that code anymore:
         # to be starteable each parent needs to be part of the running ancestors
         _add_non_running_parents(node, execution_plan, node_map)
         node.to_run = True  
@@ -360,23 +381,25 @@ def _delete_not_shared_parent(current_ref: FlinkTablePipelineDefinition, trace:s
 
 def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementNode]:
     """
-    Define the complete static graph of the related parent and children for the pipe_def
+    Define the complete static graph of the related parents and children for the current node. It uses a DFS
+    to reach all parents, and then a BFS to construct the list of reachable children.
+    The graph built has no loop.
     """
     logger.debug("start build table graph")
     visited_nodes = set()
-    node_map = {}
+    node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search for statement name as key.
 
-    def _search_parent_from_current(list_of_parents, current, visited_nodes):
+    def _search_parent_from_current(list_of_parents: dict[str, FlinkStatementNode], current: FlinkStatementNode, visited_nodes):
         if current not in visited_nodes:
             visited_nodes.add(current)
             for p in current.parents:
                 pipe_def = read_pipeline_definition_from_file( p.path + "/" + PIPELINE_JSON_FILE_NAME)
                 node_p = pipe_def.to_node()
                 _search_parent_from_current(list_of_parents, node_p, visited_nodes)
-                list_of_parents[node_p.table_name]=(node_p)
+                list_of_parents[node_p.table_name] = node_p
                 
 
-    def _search_children(node_map, node, visited_nodes):
+    def _search_children(node_map: dict[str, FlinkStatementNode], node, visited_nodes):
         for c in node.children:
             if c.table_name not in node_map:
                 pipe_def = read_pipeline_definition_from_file( c.path + "/" + PIPELINE_JSON_FILE_NAME)

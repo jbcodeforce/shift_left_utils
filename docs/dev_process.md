@@ -1,4 +1,4 @@
-# Migration process
+# Development process
 
 ???- info "Version"
     Created February 2025 - 

@@ -131,7 +131,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `migrate`: Migrate a source SQL Table defined in a...
 * `update-makefile`: Update existing Makefile for a given table...
 * `find-table-users`: Find the Flink Statements, user of a given...
-* `validate-table-names`: Go over the pipeline folder to assess...
+* `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
 * `unit-test`: Run all the unit tests or a specified test...
 
@@ -255,7 +255,7 @@ $ table find-table-users [OPTIONS] TABLE_NAME PIPELINE_PATH
 
 ### `table validate-table-names`
 
-Go over the pipeline folder to assess table name and naming convention are respected.
+Go over the pipeline folder to assess if table name,  naming convention, and other development best practices are respected.
 
 **Usage**:
 
@@ -289,7 +289,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 
 * `--ddl`: Focus on DDL processing. Default is only DML
 * `--both-ddl-dml`: Run both DDL and DML sql files
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1119c6bd0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1098c6ab0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table unit-test`

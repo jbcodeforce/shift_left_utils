@@ -4,13 +4,14 @@ site_url: https://jeromeboyer.net/shift_left_utils
 copyright: Copyright &copy; 2024 Jerome Boyer
 nav:
   - Introduction: index.md
-  - Migration Process: migration.md 
+  - Development Process: dev_process.md 
   - Setup: setup.md
   - Recipes: recipes.md
   - CLI commands: command.md
   - Test Harness: test_harness.md
   - Pipeline management: pipeline_mgr.md
   - Contributing: contributing.md
+  - Feature Tracking: tracking.md
 theme: 
   name: material
   logo: assets/logo.drawio.png
@@ -45,6 +46,7 @@ plugins:
   - minify:
       minify_html: true
   - mkdocstrings
+  - table-reader
 
 markdown_extensions:
   - abbr

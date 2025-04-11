@@ -7,3 +7,4 @@ mkdocs>=1.6.1
 pytest
 mkdocstrings-python
 pymdown-extensions
+mkdocs-table-reader-plugin

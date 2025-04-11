@@ -44,7 +44,7 @@ class ChangeChangeModeToUpsert(TableWorker):
                     sql_out+="   'changelog.mode' = 'upsert',"
                     updated = True
                 else:
-                    sql_out+=line
+                    sql_out+=line + "\n"
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
@@ -86,39 +86,39 @@ class Change_CompressionType(TableWorker):
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
         if not 'kafka.producer.compression.type' in sql_content:
-            sql_out=with_statement.sub("WITH (\n        'kafka.producer.compression.type'='snappy',", sql_content)
+            sql_out=with_statement.sub("WITH (\n        'kafka.producer.compression.type' = 'snappy',", sql_content)
             updated = True
         else:
             for line in sql_content.split('\n'):
-                if 'kafka.producer.compression.type' in line:
-                    sql_out+="         'kafka.producer.compression.type'='snappy',"
+                if "'kafka.producer.compression.type'" in line and not  'snappy' in line:
+                    sql_out+="         'kafka.producer.compression.type' = 'snappy',\n"
                     updated = True
                 else:
-                    sql_out+=line
+                    sql_out+=line + "\n"
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
 class Change_SchemaContext(TableWorker):
      """
-     Predefined class to change the DDL setting for a 'c
+     Predefined class to change the DDL setting for the schema-context
      """
      def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
         if not 'key.avro-registry.schema-context' in sql_content:
-            sql_out=with_statement.sub("WITH (\n        'key.avro-registry.schema-context' = '.flink-dev',\n     'value.avro-registry.schema-context' = '.flink-dev',\n", sql_content)
+            sql_out=with_statement.sub("WITH (\n   'key.avro-registry.schema-context' = '.flink-dev',\n   'value.avro-registry.schema-context' = '.flink-dev',\n", sql_content)
             updated = True
         else:
             for line in sql_content.split('\n'):
-                if 'key.avro-registry.schema-context' in line:
+                if 'key.avro-registry.schema-context' in line and not '.flink-dev' in line:
                     sql_out+="         'key.avro-registry.schema-context'='.flink-dev',"
                     updated = True
-                if 'value.avro-registry.schema-context' in line:
+                if 'value.avro-registry.schema-context' in line and not '.flink-dev' in line:
                     sql_out+="         'value.avro-registry.schema-context'='.flink-dev',"
                     updated = True
                 else:
-                    sql_out+=line
+                    sql_out+=line + "\n"
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      

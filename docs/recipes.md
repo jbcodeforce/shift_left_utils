@@ -2,23 +2,77 @@
 
 ???- info "Version"
     * Created January 2025.
-    * Still under construction
+    * Update: 04/10/2025. 
 
+This chapter details the standard activities to manage a Confluent Cloud Flink project with the `shift_left` tool when doing a ETL to real-time migration project. The recipes address new project initiative or a migration project from an existing SQL based ETL solution.
 
-This chapter details the standard activities to manage a Flink project with the shift_left tools when doing a ETL to real-time miration project. The recipes addresses new project initiative or migration project from an existing SQL based ETL solution.
-
-[Refer to the high-level component](./index.md#context) view for project organization details:
+As introduced in the [context chapter](./index.md#context) the CLI groups a set of commands to manage project, tables, and Flink statements as part of pipelines.
 
 ![](./images/components.drawio.png)
 
 
+The audience for the recipes chapter are the Data Engineers and the SREs.
+
+## Tool context
+
+The shift_left CLI may help to support different Data Engineers and SREs activities. For that, the tool will build and use a set of different components. The figures below groups what the different components are for different use cases.
+
+The major constructs managed by the tools are:
+
+* Project, with the structure of the different folders
+* Table with the structure of a **table folder structure**, with sql-scripts, makefile and tests
+* **Table inventory** to keep an up to date inventory of table, with the references to the ddl and dml. Tables not in the inventory do not exist.
+* **Pipeline definition**: metadata about a table and its parents and / or children. Sink tables have only parents, source tables have only children.
+* **Flink SQL statements** for DDL and DML
+* For complex DML it may make sense to have dedicated **test definitions**
+
+### Developer centric use cases
+
+Developers are responsible to develop the Flink SQL statements and potentially the tests. 
+
+![](./images/dev_comp.drawio.png)
+
+The table folder structure, table inventory and pipeline_definitions are generated and managed by tools. No human edit is needed and event discouraged.
+
+See the following recipes to support the management of those elements:
+
+* [Create a Flink project](#create-a-flink-project-structure)
+* [Create table folder structure](#add-a-table-structure-to-the-flink-project)
+* [Validate best practices](#validate-naming-convention-and-best-practices)
+* [Test harness](./test_harness.md)
+* [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
+
+### Deployment centric use cases
+
+For pipeline deployment, there are very important elements that keep the deployment consistent, most of them are described above, but the execution plan is interesting tool to assess, once a pipeline is defined, how it can be deployed depending if SREs deploy from the source, the sink or an intermediate. (See [pipeline managmeent section](pipeline_mgr.md))
+
+![](./images/deployment_comp.drawio.png)
+
+The involved recipes are:
+
+* [Table inventory](#build-an-inventory-of-all-the-flink-sql-ddl-and-dml-statements-with-table-name-as-key)
+* [Build dependency metadata](#build-structured-pipeline-metadata-and-walk-through)
+* [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
+
+### Migration use cases
+
+This use case applies only when the source project is available and based on dbt or SQL. (ksql will be possible in the future)
+
+![](./images/migration_comp.drawio.png)
+
+* [Migrate existing SQL source file to Flink SQL using AI.](#migrate-sql-tables-from-source-to-staging)
+
+## Setup
+
+To use the CLI be sure to follow the [setup instructions.](./setup.md)
+
 Ensure the following environment variables are set: in a `.env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
 
 ```sh
-export FLINK_PROJECT=$HOME/Code/link-project
+export FLINK_PROJECT=$HOME/Code/flink-project
 export STAGING=$FLINK_PROJECT/staging
 export PIPELINES=$FLINK_PROJECT/pipelines
-export SRC_FOLDER=$HOME/Code/customers/master-control/de-datawarehouse/models
+export SRC_FOLDER=$HOME/Code/datawarehouse/models
 export CCLOUD_CONTEXT=login.....
 export CPOOL_ID=lfcp-xxxxxx
 export TOPIC_LIST_FILE=$FLINK_PROJECT/src_topic_list.txt 
@@ -27,13 +81,17 @@ export DB_NAME=kafka_env_name
 export CCLOUD_ENV_ID=env-xxxxxx
 ```
 
+### The config.yaml file
+
+The config.yaml file is important to set up and reference with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-setup)
+
 ## Project related tasks
 
 ### Create a Flink project structure
 
-This activity is done when starting a new Flink project.
+This activity is done when starting a new Flink project. The lead developer will jump start a project by running this command to create folder and git init.
 
-* Get help for the shift_left project management CLI
+* Get help for the [shift_left project management](./command.md/#project) CLI
 
 ```sh
 shift_left project --help
@@ -42,7 +100,7 @@ shift_left project --help
 * To create a new project:
 
 ```sh
-shift_left project init <project_name> <project_path> --project-type 
+shift_left project init <project_name> <project_path> 
 # example for a default Kimball project
 shift_left project init flink-project ../
 # For a project more focused on developing data as a product
@@ -72,6 +130,40 @@ shift_left project init flink-project ../ --project-type data-product
         └── staging
         ```
 
+### List the topics
+
+Build a txt file with the list of topic for the Kafka Cluster defined in the config.yaml. 
+
+```sh
+shift_left project list-topics $PIPELINES
+```
+
+Each topic has a json object to describe its metadata.
+
+???- example "topic metadata"
+    ```json
+       {
+        'kind': 'KafkaTopic',
+        'metadata': {
+            'self': 'https://p....confluent.cloud/kafka/v3/clusters/lkc-..../topics/....audit-trail',
+            'resource_name': 'crn:///kafka=lkc-..../topic=....audit-trail....'
+        },
+        'cluster_id': 'lkc-.....',
+        'topic_name': '....audit-trail',
+        'is_internal': False,
+        'replication_factor': 3,
+        'partitions_count': 1,
+        'partitions': {'related': 'https://.../partitions'},
+        'configs': {'related': 'https://...../configs'},
+        'partition_reassignments': {'related': 'https://..../partitions/-/reassignment'},
+        'authorized_operations': []
+    }
+    ```
+
+## Table related tasks
+
+On a day to day basis Data Engineer may need to add a table and the SQL statements to create and insert records to the new table. The table has to land in one of the hierarchy: **facts, dimensions, views, intermediates, sources**.
+
 ### Add a table structure to the Flink project
 
 * Get help for the shift_left table management CLI
@@ -80,15 +172,15 @@ shift_left project init flink-project ../ --project-type data-product
 shift_left table --help
 ```
 
-* The goal of this tool is to create a folder structure to start migrating SQL manually:
+* Create a new table folder structure to start writing SQL statements using basic templates: (see the [command description](./command.md/#table-init)). There are two mandatory arguments: the table name and the folder to write the new table structure to. Be sure to following table name naming convention.
 
 ```sh
 shift_left table init fct_user $PIPELINES/facts/p1
 ```
 
-???- info "Output"
-
-        ```
+???- example "Output example"
+    ```
+    facts
         └── p1
             └── fct_user
                 ├── Makefile
@@ -97,13 +189,21 @@ shift_left table init fct_user $PIPELINES/facts/p1
                 │   └── dml.fct_user.sql
                 ├── tests
                 └── tracking.md
-        ```
+    ```
 
+???- info "A table name naming convention"
+    The folder name may be used as a table name in a lot of commands. The following naming convention is defined:
+    
+    * Sources:  Template: `src_<product>_<table_name>`   Examples: `src_p1_records, src_p2_users` 
+    * Intermediates:  Template: `int_<product>_<table_name>` Examples: `int_p1_action, int_p2_inventory_event`
+    * Facts or dimensions: Template: `<product>_<fct|dim><table_name>` Examples: `p1_dim_user_role,  p2_fct_event_link`
+    * Materialized Views: Template: `<product>_mv_<table_name>`  Examples: `p2_mv_cancel_event, p2_mv_config_users`
 
+### Discover the current source dependencies
 
-### Discover the current source pipeline
+When doing a migration project it may be interesting to understand the current SQL statement relationship with the tables it uses.
 
-The source project, is constructed with the Kimball approach. Developer may want to understand the how the source pipelines are constructed. Existing Data Platforms have such capabilities, but we found interesting to get a simple tool that goes within the source SQL content and build a dependencies graph. The current SQL parser is good to parse dbt SQL file.
+It is assumed the source project, is constructed with the Kimball approach. Existing Data Platforms have such capabilities, but we found interesting to get a simple tool that goes within the source SQL content file and build a dependencies graph. The current SQL parser is good to parse dbt SQL file, as Flink SQL.
 
 Starting with a single fact table, the following command will identify the dependency hierarchy and include elements to track the migration project:
 
@@ -115,7 +215,7 @@ shift_left table search-source-dependencies $SRC_FOLDER/facts/fact_education_doc
 
 ```sh
 -- Process file: $SRC_FOLDER/facts/fact_education_document.sql
-Table: fact_education_document in the SQL ../facts/fact_education_document.sql  depends o
+Table: fact_education_document in the SQL ../facts/fact_education_document.sql  depends on:
   - int_education_completed  in SQL ../intermediates/int_education_completed.sql
   - int_non_abandond_training  in SQL ../intermediates/int_non_abandond_training.sql
   - int_unassigned_curriculum  in SQL ../intermediates/int_unassigned_curriculum.sql
@@ -124,7 +224,132 @@ Table: fact_education_document in the SQL ../facts/fact_education_document.sql  
 ```
 
 
-## Migrate SQL tables from source to staging
+### Validate naming convention and best practices
+
+It is possible to assess a set of basic rules against all files in the $PIPELINES folder
+
+```sh
+shift_left table validate-table-names $PIPELINES
+```
+
+Some standard reported violations:
+
+| Error message | Action |
+| --- | --- |
+| CREATE TABLE statement | |
+| WRONG FILE NAME | | 
+|  MISSING pipeline definition | | 
+
+### Understand the current Flink Statement relationship
+
+When the DML is created with the FROM, JOINS,... it is possible to use the tool to get the hierarchy of parents and build the pipeline_definition.json file for a table. It is strongly recommended to use sink tables, like `dimensions, facts or views` dml statements.
+
+1. It is important that table inventory is up to date. See [this section](#build-an-inventory-of-all-the-flink-sql-ddl-and-dml-statements-with-table-name-as-key)
+1. Run the command to update the current pipeline definition metadata and update the parents ones, recursively.
+
+```sh
+shift_left pipeline build-metadata $PIPELINES/dimensions/p1/dim_event/sql-scripts/dml.p1_dim_event.sql
+```
+
+This will build the `pipeline_definition.json`.
+
+???- example "a simple metadata file"
+    ```json
+    {
+    "table_name": "fct_order",
+    "type": "fact",
+    "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+    "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
+    "path": "pipelines/facts/p1/fct_order",
+    "state_form": "Stateful",
+    "parents": [
+        {
+            "table_name": "int_table_2",
+            "type": "intermediate",
+            "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_table_2.sql",
+            "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_table_2.sql",
+            "path": "pipelines/intermediates/p1/int_table_2",
+            "state_form": "Stateful",
+            "parents": [],
+            "children": [
+                {
+                "table_name": "fct_order",
+                "type": "fact",
+                "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+                "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
+                "path": "pipelines/facts/p1/fct_order",
+                "state_form": "Stateful",
+                "parents": [],
+                "children": []
+                }
+            ]
+        },
+        {
+            "table_name": "int_table_1",
+            "type": "intermediate",
+            "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_table_1.sql",
+            "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_table_1.sql",
+            "path": "pipelines/intermediates/p1/int_table_1",
+            "state_form": "Stateful",
+            "parents": [],
+            "children": [
+                {
+                "table_name": "fct_order",
+                "type": "fact",
+                "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.fct_order.sql",
+                "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.fct_order.sql",
+                "path": "pipelines/facts/p1/fct_order",
+                "state_form": "Stateful",
+                "parents": [],
+                "children": []
+                }
+            ]
+        }
+    ],
+    "children": []
+    }
+    ```
+
+### Update tables content recursively
+
+There are some cases when we need to apply a set of updates to a lot of Flink Statement files in one run. The update can be coded into a python file which includes classes that implement an interface. The following updates are already supported.
+
+| Update name | Type of changes  | Class name |
+| --- | --- | --- |
+| CompressionType |  Add the `'kafka.producer.compression.type' = 'snappy'` in the WITH section of the DDL |  `shift_left.core.utils.table_worker.Change_CompressionType `|
+| LocalTimeZone |  add or change the `'sql.local-time-zone' = 'UTC-0'` in the DDL | `shift_left.core.utils.table_worker.ChangeLocalTimeZone` |
+| ChangeModeToUpsert| Set the `'changelog.mode' = 'upsert'` configuration | `shift_left.core.utils.table_worker.ChangeChangeModeToUpsert` |
+| ChangePK_FK_to_SID | apply replace("_pk_fk", "_sid") to dml | `shift_left.core.utils.table_worker.ChangePK_FK_to_SID` |
+| Concat_to_Concat_WS | change the type of concat to use | `shift_left.core.utils.table_worker.Change_Concat_to_Concat_WS` |
+| ReplaceEnvInSqlContent | Replace the name of the raw topic with the environement prefix| `shift_left.core.utils.table_worker.ReplaceEnvInSqlContent` |
+
+
+Example of a command to modify all the DDL files in the $PIPELINES folder hierarchy:
+
+```sh
+shift_left table update-tables $PIPELINES  --ddl --class-to-use shift_left.core.utils.table_worker.Change_CompressionType
+```
+
+???- info "Extending the TableWorker"
+    The class is in shift_left.core.utils.table_worker.py module. Each new class needs to extend the TabeWorker interface
+
+    ```python
+    class TableWorker():
+    """
+    Worker to update the content of a sql content, applying some specific logic
+    """
+    def update_sql_content(sql_content: str) -> Tuple[bool, str]:
+        return (False, sql_content)
+
+
+    class YourOwnUpdate(TableWorker):
+
+     def update_sql_content(sql_content: str) -> Tuple[bool, str]:
+        # your code here
+        return updated, new_content
+    ```
+
+### Migrate SQL tables from source to staging
 
 As presented in the [introduction](./index.md/#shift_left-tooling), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
 
@@ -197,7 +422,7 @@ class FlinkTableReference(BaseModel):
 shift_left table build-inventory $PIPELINES
 ```
 
-???- info "Example of inventory created"
+???- example "Example of inventory created"
 
         ```json
         "src_table_2": {
@@ -239,52 +464,94 @@ The `inventory.json` file is saved under the $PIPELINES folder and it is used in
 
 ## Work with pipelines
 
-The table inventory, as created in previous recipe, is important to get the pipeline metadata created. The approach is to define metadata for each table to keep relevant information for the DDL and DML files the parents and children relationships.
-
-The model look like:
-
-```python
-class FlinkStatementHierarchy(BaseModel):
-    table_name: str
-    type: str
-    path: str
-    ddl_ref: str
-    dml_ref: str
-    parents: Optional[Set[FlinkTableReference]]
-    children: Optional[Set[FlinkTableReference]]
-```
+The table inventory, as created in previous recipe, is important to get the pipeline metadata created. The approach is to define metadata for each table to keep relevant information for the DDL and DML files, the parents and children relationships. The recursive information is limited to 2 levels to avoid infinite loops.
 
 A source table will not have parent, while a sink table will not have children. Intermediate tables have both.
 
-???+ info "For any help of pipeline commands"
-
-    ```sh
-    shift_left pipeline --help
-    ```
+For deeper analysis of the challenges of deploying Flink statements, we recommend reading [Confluent Cloud Flink product documentation - Query evolution chapter](https://docs.confluent.io/cloud/current/flink/concepts/schema-statement-evolution.html#query-evolution) and the [pipeline manager chapter.](./pipeline_mgr.md)
 
 ### Build structured pipeline metadata and walk through
 
-A pipeline is discovered by walking from the sink to the sources via intermediate statements. Each pipeline is a list of existing dimension and fact tables, and for each table the tool creates the `pipeline_definition.json` reflecting the data structure presented in previous section.
+A pipeline is discovered by walking from the sink to the sources via intermediate statements. Each pipeline is a list of existing dimension and fact tables, and for each table the tool creates the `pipeline_definition.json`.
 
-The structured folder for a table looks like:
+The project folder structure for a table looks like in the following convention:
 
 `<facts | intermediates | dimensions | sources>/<product_name>/<table_name>`
 
-The `pipeline_definition.json` is persisted under the <table_name> folder.
+The `pipeline_definition.json` is persisted under the `<table_name>` folder. 
 
 The tool needs to get an up-to-date inventory, see [previous section to build it](#build-an-inventory-of-flink-sql-ddl-and-dml-statements).
 
-* Build all the `pipeline_definition.json` from a given sink:
+* Build all the `pipeline_definition.json` from a given sink by specifying the **DML** file path:
 
 ```sh
 shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql
-# you can add a folder to get the path to the inventory
+# you can add a folder, as CLI argument, to get the path to the inventory. By default it uses the environment variable.
 shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql $PIPELINES
 ```
 
-The tool will keep existing file and merge content, as the use case should address when a developer is adding a child table and reuse an existing table.
+The tool goes over the SQL content and get table names from the JOINs, and the FROM. It will remove CTE and any extracted string that are not table names. The regular expression may have some misses, so the tool searches within the table inventory, anyway.
 
-### Delete pipeline_defition.json files for a given folder
+The following figure illustrates what will happen for each parent of the referenced table. The first figure illustrates existing Flink statement hierarchy, which means, existing tables have a pipeline_definition.json file in their repective folder, created from previous run. 
+
+![](./images/build_pipeline_def_1.drawio.png)
+
+As a developer the sink table **E** is added and the tool is executed. The **E** and **C** pipeline definitions are new so created, while the **Z** already exists, so the tool update its pipeline_definition children list , by adding the child **C**.
+
+![](./images/build_pipeline_def_2.drawio.png)
+
+The tool will keep existing file and merge content.
+
+???- example "The different pipeline_definition.json impacted"
+    The sink table **E** will have a new metadata file:
+
+    ```json
+    {
+    "table_name": "E",
+    "type": "fact",
+    "parents": [
+        {
+            "table_name": "C",
+            "type": "intermediate",
+            "path": "pipelines/intermediates/p1/C",
+    }
+    ```
+
+    Table **C** will also have a new one:
+
+    ```json
+    {
+    "table_name": "C",
+    "type": "intermediate",
+    "parents": [
+        {
+            "table_name": "Z",
+            "type": "intermediate",
+            "path": "pipelines/intermediates/p/Z",
+        }],
+    "children": [ { "table_name": "E", ...} ]
+    }
+    ```
+
+    While **Z** get a new child:
+
+    ```json
+    {
+    "table_name": "Z",
+    "type": "intermediate",
+    "parents": [{ "table_name": "X", ...},
+            { "table_name": "Y", ...},
+        ],
+    "children": [ { "table_name": "D", ...},
+                    { "table_name": "P", ...},
+                     { "table_name": "C", ...}
+                ]
+    }
+    ```
+
+
+
+### Delete pipeline_definition.json files for a given folder
 
 Delete all the `pipeline_definition.json` files from a given folder. The command walk down the folder tree to find table folder.
 
@@ -296,6 +563,18 @@ Only the facts tables:
 
 ```sh
 shift_left pipeline delete-metadata $PIPELINES/facts
+```
+
+### Process all the tables from a folder
+
+It may relevant to update all the metadata definitions. Start by deleting all and then recreate:
+
+```sh
+shift_left pipeline delete-metadata $PIPELINES
+#
+shift_left pipeline build-all-metadata $PIPELINES
+# same as env variable will be used
+shift_left pipeline build-all-metadata
 ```
 
 ### Build pipeline reports 
@@ -316,6 +595,20 @@ shift_left pipeline report src_table
 
 The same approach works for intermediate tables.
 
+
+### Assess a pipeline execution plan
+
+```
+pipeline build-execution-plan-from-table int_table_2 --compute-pool-id  lfcp-123456 --dml-only --force
+```
+
+???+ info "For any help of pipeline commands"
+
+    ```sh
+    shift_left pipeline --help
+    ```
+
+
 ### Pipeline Deployment
 
 There are multiple choices to deploy a Flink Statement:
@@ -327,47 +620,6 @@ There are multiple choices to deploy a Flink Statement:
 
 The deployment will take the full pipeline from the source to sink giving a sink table name.
 
-#### Using Confluent CLI / makefile
-
-Each confluent cli commands are defined in a common makefile, and each sql to be deploy has also a makefile with a set of targets:
-
-* To create the Flink dynamic table using the target Flink compute pool do:
-
-  ```sh
-  make create_flink_ddl
-  ```
-
-This action creates the Kafka topic with the name of the table and create the schema definitions for the key and the value in the Schema Registry of the Confluent Cloud environment. A DDL execution will terminate and the Flink job statement is set to be Completed.
-
-* Verify the completion of the job using cli:
-
-  ```sh
-  make describe_flink_ddl
-  ```
-
-* If the table is also controlled by a DML, for example for joins, or deduplication, a DML may be deployed using:
-
-  ```sh
-  make create_flink_dml
-  ```
-
-* Verify the running job using cli:
-
-  ```sh
-  make describe_flink_dml
-  ```
-
-* Sometime, developer may need to delete the created topics and schemas, for that the makefile target is:
-
-  ```sh
-  make drop_table_<table_name>
-  ```
-
-* Each Flink Statement is named, so it may be relevant to delete a created statement with the command:
-
-  ```sh
-  make delete_flink_statements
-  ```
 
 #### Using the deploy pipeline command
 

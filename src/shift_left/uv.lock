@@ -1073,7 +1073,7 @@ wheels = [
 
 [[package]]
 name = "shift-left"
-version = "0.1.7"
+version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },

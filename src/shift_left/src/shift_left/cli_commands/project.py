@@ -47,7 +47,7 @@ def list_topics(project_path: Annotated[str, typer.Argument(help="Project path t
         """
         print("#" * 30 + f" List topic {project_path}")
         list_of_topics = get_topic_list(project_path + "/topic_list.txt")
-        print(list_of_topics)
+        print(f"Topic list saved in {project_path}/topic_list.txt")
 
 @app.command()
 def list_compute_pools(environment_id: Annotated[str , typer.Option(help="Environment_id to return all compute pool")] = None):

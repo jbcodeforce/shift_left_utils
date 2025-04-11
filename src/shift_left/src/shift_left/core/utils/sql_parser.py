@@ -64,7 +64,7 @@ class SQLparser:
             not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
             matches=set()
             for table in tables:
-                logger.info(table)
+                logger.debug(table)
                 if 'REPLACE' in table[1].upper():
                     continue
                 retrieved_table=table[1].replace('`','')

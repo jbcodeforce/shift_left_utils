@@ -212,7 +212,8 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         force_children=force)
-    persist_execution_plan(execution_plan)
+    persist_execution_plan(execution_plan, table_name)
+    
    
 
 
