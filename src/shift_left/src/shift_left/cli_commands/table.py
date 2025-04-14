@@ -10,7 +10,7 @@ from shift_left.core.table_mgr import (
     build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
     extract_table_name, 
-    build_update_makefile, 
+    update_makefile_in_folder, 
     validate_table_cross_products,
     search_users_of_table,
     update_sql_content_for_file,
@@ -92,7 +92,7 @@ def update_makefile(
         pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """ Update existing Makefile for a given table or build a new one """
 
-    build_update_makefile(pipeline_folder_name, table_name)
+    update_makefile_in_folder(pipeline_folder_name, table_name)
     print(f"Makefile updated for table {table_name}")
 
 

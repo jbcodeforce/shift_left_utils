@@ -137,6 +137,7 @@ class ReplaceEnvInSqlContent(TableWorker):
     }
 
     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+        logger.debug(f"{sql_content} in {self.env}")
         updated = False
         if "CREATE TABLE" in sql_content:
             if self.env in self.ddl_replacements:

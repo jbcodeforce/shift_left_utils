@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import pathlib
 from importlib import import_module 

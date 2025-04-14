@@ -1,4 +1,6 @@
 """
+Copyright 2024-2025 Confluent, Inc.
+
 A test manager processes the test definition and executes all or a specific test.
 The test definition is done in yaml
 """
@@ -11,6 +13,7 @@ from logging.handlers import RotatingFileHandler
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.deployment_mgr import *
+from shift_left.core.table_mgr import drop_table
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"

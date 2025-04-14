@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 from collections import deque
 import os
 import unittest

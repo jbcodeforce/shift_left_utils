@@ -171,9 +171,12 @@ The following graph represents a more complex network of dependencies to illustr
 * intermediate table Z has multiple parents with their own sources. So deploy Z will mean assessing X, and Y trees
 * Running every node may impact restarting any children
 
+<figure markdown="span">
 ![](./images/flink_pipeline_for_test.drawio.png)
+ <figcaption>Topology used for test</figcaption>
+</figure>
 
-*topics are not represented between Flink Statements, only the 3 source topics.
+*topics are not represented between Flink Statements, only the four source topics.*
 
 The navigation to the parents needs to follow a depth first search to get all non running parents, while restarting children should follow a breath first search.
 

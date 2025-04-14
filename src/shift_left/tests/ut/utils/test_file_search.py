@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import os
 from shift_left.core.utils.file_search import (
@@ -148,10 +151,13 @@ class TestFileSearch(unittest.TestCase):
     def test_extract_product_name(self):
         pname = extract_product_name(os.getenv("PIPELINES") + "/facts/p1/fct_order")
         assert "p1" == pname
-    
-    def test_list_src_sql_files(self):
-        sql_files = list_src_sql_files(os.getenv("PIPELINES"))
-        print(sql_files)
+
+    def test_get_ddl_dml_references(self):
+        files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")
+        assert files["ddl.fct_order"]
+        assert files["dml.fct_order"]
+        assert ".sql" in files["dml.fct_order"]
+        print(files)
 
 if __name__ == '__main__':
     unittest.main()

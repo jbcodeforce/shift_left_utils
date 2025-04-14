@@ -5,6 +5,7 @@ import os
 from pathlib import  PosixPath
 from typing import Final, Dict, Optional, Any, Tuple, Set, List
 import json
+from datetime import datetime
 from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
@@ -46,6 +47,7 @@ class FlinkStatementNode(BaseModel):
     """
     table_name: str
     path:  Optional[str] =  Field(default=None, description="Name of path")
+    created_at: Optional[datetime] = Field(default=None)
     existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
     dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
     dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
@@ -80,7 +82,11 @@ class FlinkStatementNode(BaseModel):
     
     def __hash__(self) -> int:
         return hash(self.table_name)
-    
+
+class FlinkStatementExecutionPlan(BaseModel):
+    created_at: datetime = Field(default=None)
+    start_table_name: str = Field(default=None)
+    nodes: List[FlinkStatementNode] = Field(default=[])
 
 class FlinkTablePipelineDefinition(InfoNode):
     """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
@@ -289,6 +295,7 @@ def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTab
             return content
     except Exception as e:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
+        #return FlinkStatementExecutionPlan()
         return None
 
 def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):

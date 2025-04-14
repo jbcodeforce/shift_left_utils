@@ -76,6 +76,14 @@ class Statement(BaseModel):
     execution_time: Optional[float] = Field(default=0)
     loop_counter: Optional[int] = Field(default=0)
 
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Statement):
+            return NotImplemented
+        return self.name == other.name
+
 class StatementInfo(BaseModel):
     """
     Keep the needed information for redeploying statement

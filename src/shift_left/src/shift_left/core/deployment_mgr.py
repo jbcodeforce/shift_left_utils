@@ -3,32 +3,32 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 import time
+from datetime import datetime
 
 from pydantic import BaseModel, Field
+from collections import deque
+from typing import Optional, List, Any, Set
+
 from shift_left.core.pipeline_mgr import (
     get_pipeline_definition_for_table
 )  
-
 from shift_left.core.compute_pool_mgr import get_or_build_compute_pool, save_compute_pool_info_in_metadata
+from shift_left.core.table_mgr import drop_table
+from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
+from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementResult
 
-from collections import deque
-from typing import Optional, List
-
-from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, log_dir
-
 from shift_left.core.utils.file_search import ( 
     PIPELINE_JSON_FILE_NAME,
     FlinkTableReference,
     FlinkStatementNode,
+    FlinkStatementExecutionPlan,
     get_or_build_inventory,
     get_table_ref_from_inventory,
     FlinkTablePipelineDefinition,
     get_ddl_dml_names_from_pipe_def,
     read_pipeline_definition_from_file
 )
-from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
-from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementResult
 
 
 
@@ -65,12 +65,15 @@ def deploy_pipeline_from_table(table_name: str,
     logger.info("#"*10 + f"# Start deploying pipeline from table {table_name}" + "#"*10)
     start_time = time.perf_counter()
     pipeline_def: FlinkTablePipelineDefinition = get_pipeline_definition_for_table(table_name, inventory_path)
+
     compute_pool_id =  get_or_build_compute_pool(compute_pool_id, pipeline_def)
-    execution_plan = build_execution_plan_from_any_table(pipeline_def,
+    
+    execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        force_children=force_children)
-    persist_execution_plan(execution_plan, table_name)
+                                                        force_children=force_children, 
+                                                        start_time=datetime.fromtimestamp(time.time()))
+    persist_execution_plan(execution_plan)
 
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
@@ -79,6 +82,7 @@ def deploy_pipeline_from_table(table_name: str,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
+    _print_execution_plan(execution_plan)
     logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
     return result
 
@@ -86,17 +90,61 @@ def deploy_pipeline_from_table(table_name: str,
 def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefinition, 
                                compute_pool_id: str,
                                dml_only: bool = False,
-                               force_children: bool = False ) -> List[FlinkStatementNode]:
+                               force_children: bool = False,
+                               start_time= None ) -> FlinkStatementExecutionPlan:
     """
-    Build execution plan, helps to assess the current situation of running statement and assess what needs to be deployed or not.
+    Build an execution plan from the static relationship between Flink Statements
+    node_map includes all the FlinkStatement information has a hash map <flink_statement_name>, <statement_metadata>
+    start_node is the matching statement metadata to be the root of the graph navigation. 
     """
+    logger.info("Build execution plan")
+
+    start_node = pipeline_def.to_node()
+    start_node.created_at = start_time
+    start_node.dml_only = dml_only
+    start_node.compute_pool_id = compute_pool_id
+    start_node.update_children = force_children
+    # 1 Build the static graph from the Flink statement relationship
+    graph = _build_table_graph_for_node(start_node)
+
+    # TODO reload a plan may be...
+    execution_plan = FlinkStatementExecutionPlan(created_at=start_time,
+                                                 start_table_name=pipeline_def.table_name)
+    nodes_to_run = []
+    visited_nodes = set()
+    _update_statement_info_for_node(start_node)
+    # Search if there is a need to run parent to run
+    _search_parents_to_run(nodes_to_run, start_node, visited_nodes, graph)
+    start_node.to_run = True
+     # All the parents - grandparents... reacheable by DFS from the start_node and need to be executed are in nodes_to_run
+    # Execution plan should start from the source, higher level of the hiearchy
+    for node in reversed(nodes_to_run):
+        execution_plan.nodes.append(node)
+        """
+        NOT SURE about that code anymore:
+        # to be starteable each parent needs to be part of the running ancestors
+        _add_non_running_parents(node, execution_plan, node_map)
+        node.to_run = True  
+        """
+    # Restart all children of each runnable node in the execution plan if they are not yet there
+    for node in execution_plan.nodes:
+        if node.to_run or node.to_restart:
+            for c in node.children: 
+                node_c = graph[c.table_name]  # c children may not have grand children or parent so node_c will have
+                _update_statement_info_for_node(node_c)
+                if not node_c.is_running() and not node_c.to_run and node_c not in execution_plan.nodes:
+                    # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
+                    #graph=_merge_graphs(graph, _build_table_graph_for_node(node_c)) 
+                    #_search_parents_to_run(execution_plan.nodes, node_c, visited_nodes, graph)
+                    node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
+                    if node_c.existing_statement_info.compute_pool_id:
+                        node_c.compute_pool_id = node_c.existing_statement_info.compute_pool_id
+                    else:
+                        node_c.compute_pool_id = compute_pool_id
+    logger.info("Done with execution plan construction")
+    logger.debug(execution_plan)
+    return execution_plan
     
-    current_node= pipeline_def.to_node()
-    current_node.dml_only = dml_only
-    current_node.compute_pool_id = compute_pool_id
-    current_node.update_children = force_children
-    graph = _build_table_graph(current_node)
-    return _build_execution_plan(graph, current_node, compute_pool_id)
 
 def full_pipeline_undeploy_from_table(table_name: str, 
                                inventory_path: str ) -> str:
@@ -125,80 +173,12 @@ def full_pipeline_undeploy_from_table(table_name: str,
         logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name} with result: {r}")
         return r
 
-def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
-    """
-    Run a show create table statement to get information about a table
-    return the statement with the description of the table
-    """
-    logger.debug(f"{table_name}")
-    statement_name = "show-" + table_name.replace('_','-')
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    sql_content = f"show create table {table_name};"
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    delete_statement_if_exists(statement_name)
-    try:
-        statement = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
-        if statement and statement.status.phase in ("RUNNING", "COMPLETED"):
-            statement_result = client.get_statement_results(statement_name)
-            if len(statement_result.results.data) > 0:
-                result_str = str(statement_result.results.data)
-                logger.debug(f"Run show create table in {result_str}")
-                client.delete_flink_statement(statement_name)
-                return result_str
-        return None
-    except Exception as e:
-        logger.error(f"get_table_structure {e}")
-        client.delete_flink_statement(statement_name)
-        return None
-
-def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    sql_content = f"drop table if exists {table_name};"
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    statement_name = "drop-" + table_name.replace('_','-')
-    delete_statement_if_exists(statement_name)
-    try:
-        result= client.post_flink_statement(compute_pool_id, 
-                                            statement_name, 
-                                            sql_content, 
-                                            properties)
-        logger.debug(f"Run drop table {result}")
-    except Exception as e:
-        logger.error(e)
-    delete_statement_if_exists(statement_name)
 
 
-def persist_execution_plan(execution_plan, table_name: str):
-    with open(log_dir + "/last_execution_plan.json","w") as f:
-        f.write(f"To deploy {table_name} the following statements need to be executed in the order\n\n")
-        count_p = 0
-        count_c = 0
-        for node in execution_plan:
-            if node.to_run:
-                if count_p == 0:
-                    f.write("--- Parents impacted ---\n")
-                count_p+=1
-                message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
-                f.write(message)
-            else:
-                if count_c == 0:
-                    f.write(f"--- {count_p} parents to run\n")
-                    f.write("--- Children to restart ---\n")
-                message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
-                f.write(message)
-                count_c+=1
-        f.write(f"--- {count_c} children to restart")
-            
-    logger.info(f"Execution plan in {log_dir}/last_execution_plan.json")
-    if logger.level == "INFO":
-        with open(log_dir + "/last_execution_plan.json","r") as f:
-            print(f.read())
+def persist_execution_plan(execution_plan: FlinkStatementExecutionPlan):
+    filename=f"{log_dir}/{execution_plan.start_table_name}_execution_plan.json"
+    with open(filename,"w") as f:
+        f.write(execution_plan.model_dump_json(indent=3))
         
 #
 # ------------------------------------- private APIs  ---------------------------------
@@ -232,58 +212,30 @@ def _search_parents_to_run(nodes_to_run, current_node, visited_nodes, node_map):
         nodes_to_run.append(current_node)
         visited_nodes.add(current_node)
         for p in current_node.parents:
-            node_p = node_map[p.table_name]
-            _update_statement_info_for_node(node_p)
-            if not node_p.is_running():
-                if not node_p.to_run:  # could add in the future if the sql did not change do nothing
-                    if not node_p.compute_pool_id:  # no existing compute pool take the one specified as argument
-                        node_p.compute_pool_id = current_node.compute_pool_id
-                    node_p.to_run = True
-                    _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
-            else:
-                node_p.to_run = False
+            try:
+                node_p = node_map[p.table_name]
+                _update_statement_info_for_node(node_p)
+                if not node_p.is_running():
+                    if not node_p.to_run:  # could add in the future if the sql did not change do nothing
+                        if not node_p.compute_pool_id:  # no existing compute pool take the one specified as argument
+                            node_p.compute_pool_id = current_node.compute_pool_id
+                        node_p.to_run = True
+                        _search_parents_to_run(nodes_to_run, node_p, visited_nodes, node_map)
+                else:
+                    node_p.to_run = False
+            except Exception as e:
+                logger.error(f"{p.table_name} is not found in the node map, this may be due to a data consitency issue")
 
 
-
-def _build_execution_plan(node_map: dict[FlinkStatementNode], start_node: FlinkStatementNode, compute_pool_id: str) -> List[FlinkStatementNode]:
+def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
     """
-    Build an execution plan from the static relationship between Flink Statements
-    node_map includes all the FlinkStatement information has a hash map <flink_statement_name>, <statement_metadata>
-    start_node is the matching statement metadata to be the root of the graph navigation. 
+    It may be possible while navigating to the children that some parent of those children are not part
+    of the current graph, so there is a need to merge the graph
     """
-    logger.info("Build execution plan")
-    execution_plan = []
-    nodes_to_run = []
-    visited_nodes = set()
-    _update_statement_info_for_node(start_node)
-    _search_parents_to_run(nodes_to_run, start_node, visited_nodes, node_map)
-    start_node.to_run = True
-     # All the parents - grandparents... reacheable by DFS from the start_node and need to be executed are in nodes_to_run
-    # Execution plan should start from the source, higher level of the hiearchy
-
-    for node in reversed(nodes_to_run):
-        execution_plan.append(node)
-        """
-        NOT SURE about that code anymore:
-        # to be starteable each parent needs to be part of the running ancestors
-        _add_non_running_parents(node, execution_plan, node_map)
-        node.to_run = True  
-    """
-    # 3. Restart all children of each runnable node in the execution plan if they are not yet there
-    for node in execution_plan:
-        if node.to_run or node.to_restart:
-            for c in node.children:
-                _update_statement_info_for_node(c)
-                if not c.is_running() and not c.to_run and c not in execution_plan:
-                    _search_parents_to_run(execution_plan, c, visited_nodes, node_map)
-                    c.to_restart = True    # TODO be more precise by looking at upgrade mode
-                    if c.existing_statement_info.compute_pool_id:
-                        c.compute_pool_id = c.existing_statement_info.compute_pool_id
-                    else:
-                        c.compute_pool_id = compute_pool_id
-    logger.info("Done with execution plan construction")
-    logger.debug(execution_plan)
-    return execution_plan
+    for table_name in in_graph:
+        if table_name not in in_out_graph:
+            in_out_graph[table_name]=in_graph[table_name]
+    return in_out_graph
 
 def _add_non_running_parents(node, execution_plan, node_map):
     for p in node.parents:
@@ -291,16 +243,16 @@ def _add_non_running_parents(node, execution_plan, node_map):
         _update_statement_info_for_node(node_p)
         if not node_p.is_running() and not node_p.to_run and node_p not in execution_plan:
             # position the parent before the node to be sure it is started before it
-            idx=execution_plan.index(node)
-            execution_plan.insert(idx,node_p)
+            idx=execution_plan.nodes.index(node)
+            execution_plan.nodes.insert(idx,node_p)
             node_p.to_run = True
 
 
 
-def _execute_plan(plan: List[FlinkStatementNode], compute_pool_id: str) -> list[Statement]:
+def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> list[Statement]:
     logger.info("--- Execution Plan  started ---")
     statements = []
-    for node in plan:
+    for node in plan.nodes:
         logger.info(f"table: '{node.table_name}'")
         if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
@@ -389,13 +341,13 @@ def _delete_not_shared_parent(current_ref: FlinkTablePipelineDefinition, trace:s
     return trace
         
 
-def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementNode]:
+def _build_table_graph_for_node(current_node: FlinkStatementNode) -> dict[str,FlinkStatementNode]:
     """
     Define the complete static graph of the related parents and children for the current node. It uses a DFS
     to reach all parents, and then a BFS to construct the list of reachable children.
     The graph built has no loop.
     """
-    logger.debug("start build table graph")
+    logger.debug(f"start build table static graph for {current_node.table_name}")
     visited_nodes = set()
     node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search for statement name as key.
 
@@ -404,18 +356,21 @@ def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementN
             visited_nodes.add(current)
             for p in current.parents:
                 pipe_def = read_pipeline_definition_from_file( p.path + "/" + PIPELINE_JSON_FILE_NAME)
-                node_p = pipe_def.to_node()
-                _search_parent_from_current(list_of_parents, node_p, visited_nodes)
-                list_of_parents[node_p.table_name] = node_p
+                if pipe_def:
+                    node_p = pipe_def.to_node()
+                    _search_parent_from_current(list_of_parents, node_p, visited_nodes)
+                    list_of_parents[node_p.table_name] = node_p
+                else:
+                    logger.warning(f"Data consistency issue for {p.path} as no pipeline definition found or wrong reference in {current.table_name}. The execution plan may not deploy successfuly")
                 
 
-    def _search_children(node_map: dict[str, FlinkStatementNode], node, visited_nodes):
-        for c in node.children:
+    def _search_children_from_current(node_map: dict[str, FlinkStatementNode], current: FlinkStatementNode, visited_nodes: Set[FlinkStatementNode]):
+        for c in current.children:
             if c.table_name not in node_map:
                 pipe_def = read_pipeline_definition_from_file( c.path + "/" + PIPELINE_JSON_FILE_NAME)
                 node_c = pipe_def.to_node()
                 if node_c not in visited_nodes:
-                    _search_children(node_map, node_c, visited_nodes)
+                    _search_children_from_current(node_map, node_c, visited_nodes)
                     node_map[node_c.table_name] = node_c
             
 
@@ -424,9 +379,30 @@ def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementN
     visited_nodes.add(current_node)
     names = list(node_map.keys())
     for parent in names:
-        _search_children(node_map, node_map[parent], visited_nodes)
-    logger.debug("End build table graph:\n" + "\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
+        _search_children_from_current(node_map, node_map[parent], visited_nodes)
+    logger.debug(f"End build table graph for {current_node.table_name}:\n" + "\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
+
+
+def _print_execution_plan(execution_plan:  FlinkStatementExecutionPlan):
+    print(f"To deploy {execution_plan.start_table_name} the following statements need to be executed in the order\n\n")
+    count_p = 0
+    count_c = 0
+    for node in execution_plan.nodes:
+        if node.to_run:
+            if count_p == 0:
+                print("--- Parents impacted ---\n")
+            count_p+=1
+            message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
+            print(message)
+        else:
+            if count_c == 0:
+                print(f"--- {count_p} parents to run\n")
+                print("--- Children to restart ---\n")
+            message = f"\t{node.dml_statement} is : {node.existing_statement_info.status_phase} on cpool_id: {node.compute_pool_id} may run-as-parent: {node.to_run} or restart-as-child: {node.to_restart}\n"
+            print(message)
+            count_c+=1
+    print(f"--- {count_c} children to restart")
 
 
 # --- to work on for stateless ---------------
@@ -435,65 +411,11 @@ def _build_table_graph(current_node: FlinkStatementNode) -> dict[FlinkStatementN
 #
 # --- dead code -----
 #
-def _process_table_deployment_2(current_pipeline_def,
-                              queue_to_process,
-                              already_processed_list) -> Statement:
-    """
-    For the given ddl if this is a sink (no children), we need to assess if parents are running or not. Create non running parent.
-    As a recursive function, going to parent means intermediate and source tables are processed too. This is a way to start a full pipeline.
-    for each node to process
-            if there is a parent not yet deployed add parent to node to process. recursive call to do a BFS
-            if current table already exist
-                if only dml, redeploy dml taking into accound children when intermediate or src and not coming from a leaf path
-                else deploy ddl and dml navigate to children if not coming from leaf path as the recursive will take care of the children
-            else deploy ddl and dml
-    """
-    if len(queue_to_process) > 0:
-        current_pipeline_def: FlinkTablePipelineDefinition  = queue_to_process.pop()
-        logger.info(f"Start processing {current_pipeline_def.table_name}")
-        logger.debug(f"--- {current_pipeline_def}")
-        for parent in current_pipeline_def.parents:
-            parent.compute_pool_id= current_pipeline_def.compute_pool_id
-            if not _table_exists(parent):
-                logger.info(f"Table: {parent.table_name} not present, add it for processing.")
-                parent_pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
-                parent_pipeline_def.update_children=False
-                parent_pipeline_def.dml_only=False
-                queue_to_process.add(parent_pipeline_def)
-                _build_execution_plan(queue_to_process, already_processed_list)
-            else:
-                logger.debug(f"Parent {parent.table_name} is running, there is no need to change that!")
-        # process current node to run dml with ddl: will be in the order of higher in the hierarchy to the lower 
-        logger.info(f"Perform dml or ddl deployment for {current_pipeline_def.table_name}")
-        if not current_pipeline_def.dml_only:
-            statement=_deploy_ddl_dml(current_pipeline_def, False)
-        else:
-            statement=_deploy_dml(current_pipeline_def, current_pipeline_def.dml_statement_name, False)
-        return statement 
-    
+
 
 def _table_exists(table_ref: FlinkTablePipelineDefinition) -> bool:
     return False
 
-def _table_exists_1(table_ref: FlinkTablePipelineDefinition) -> bool:
-    """
-    Table exists if there is a running dml writing to it, or if "show create table" returns a result
-    """
-    global statement_list
-    config = get_config()
-    ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(table_ref, config['kafka']['cluster_type'])
-    table_ref.dml_statement_name=dml_statement_name
-    statement_list=get_statement_list()
-    if statement_list and dml_statement_name in statement_list:
-        if statement_list[dml_statement_name] == "RUNNING":
-            return True
-        elif  statement_list[dml_statement_name] in ("FAILED", "STOPPED"):
-            delete_statement_if_exists(dml_statement_name)
-            return False
-    else: 
-        statement = get_table_structure(table_ref.table_name, table_ref.compute_pool_id)
-        logger.debug(f"{statement}")
-        return statement != None
     
 
 

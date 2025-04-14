@@ -1,4 +1,6 @@
-
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 from unittest.mock import patch, MagicMock
 import os
@@ -84,7 +86,7 @@ class TestDeploymentManager(unittest.TestCase):
         current_node.compute_pool_id = get_config()['flink']['compute_pool_id']
         current_node.update_children = True
         current_node.dml_only= False
-        graph = dm._build_table_graph(current_node)
+        graph = dm._build_table_graph_for_node(current_node)
         for node in graph:
             print(f"{node} -> {graph[node].dml_statement}")
         execution_plan = dm._build_execution_plan(graph, current_node)

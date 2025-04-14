@@ -5,15 +5,19 @@ import logging
 import os, re, json
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
+from typing import Optional
 
 from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
     read_pipeline_definition_from_file, 
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME)
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.table_worker import TableWorker
 from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
+from shift_left.core.statement_mgr import delete_statement_if_exists
+
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
     get_or_build_source_file_inventory, 
@@ -92,7 +96,7 @@ def extract_table_name(src_file_name: str) -> str:
         table_name = table_name.replace("src_","",1)
     return table_name
 
-def build_update_makefile(pipeline_folder: str, table_name: str):
+def update_makefile_in_folder(pipeline_folder: str, table_name: str):
     inventory = get_or_build_inventory(pipeline_folder, pipeline_folder, False)
     if table_name not in inventory:
         logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
@@ -161,6 +165,55 @@ def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> b
 def load_sql_content(sql_file_name) -> str:
     with open(sql_file_name, "r") as f:
         return f.read()
+
+def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
+    """
+    Run a show create table statement to get information about a table
+    return the statement with the description of the table
+    """
+    logger.debug(f"{table_name}")
+    statement_name = "show-" + table_name.replace('_','-')
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id=config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    sql_content = f"show create table {table_name};"
+    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+    delete_statement_if_exists(statement_name)
+    try:
+        statement = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
+        if statement and statement.status.phase in ("RUNNING", "COMPLETED"):
+            statement_result = client.get_statement_results(statement_name)
+            if len(statement_result.results.data) > 0:
+                result_str = str(statement_result.results.data)
+                logger.debug(f"Run show create table in {result_str}")
+                client.delete_flink_statement(statement_name)
+                return result_str
+        return None
+    except Exception as e:
+        logger.error(f"get_table_structure {e}")
+        client.delete_flink_statement(statement_name)
+        return None
+
+def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id=config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    sql_content = f"drop table if exists {table_name};"
+    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+    statement_name = "drop-" + table_name.replace('_','-')
+    delete_statement_if_exists(statement_name)
+    try:
+        result= client.post_flink_statement(compute_pool_id, 
+                                            statement_name, 
+                                            sql_content, 
+                                            properties)
+        logger.debug(f"Run drop table {result}")
+    except Exception as e:
+        logger.error(e)
+    delete_statement_if_exists(statement_name)
+    return f"{table_name} dropped"
 
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
