@@ -1,5 +1,11 @@
 INSERT INTO c
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+b.b_value
+concat_ws('-', b.b_value, 'c-value') as c_value
+FROM b  
+union all
+select 
+z.default_key,
+z.z_value,
+concat_ws('-', z.z_value, 'c-value') as c_value
+from z

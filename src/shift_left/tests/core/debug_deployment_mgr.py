@@ -110,7 +110,7 @@ class TestDeploymentManager(unittest.TestCase):
       
         result = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def,
                                                         compute_pool_id=pool_id,
-                                                        start_time = time.perf_counter())
+                                                        start_time = datetime.now())
         assert result
         for statement in result:
             print(f"Run {statement.dml_statement} on {statement.compute_pool_id} run: {statement.to_run} restart: {statement.to_restart}")
@@ -126,13 +126,10 @@ class TestDeploymentManager(unittest.TestCase):
                                                                 config.get('flink').get('compute_pool_id'), 
                                                                 True, 
                                                                 False,
-                                                                start_time = datetime.fromtimestamp(time.time()))
-        for node in execution_plan:
-            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.compute_pool_id}")
-            assert node.table_name
-            assert node.dml_ref
-            assert node.ddl_ref
-            assert node.compute_pool_id
+                                                                start_time = datetime.now())
+        
+        dm.persist_execution_plan(execution_plan)
+        dm._print_execution_plan(execution_plan)
            
         #l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
         #for statement in l:

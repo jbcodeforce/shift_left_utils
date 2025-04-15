@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS src_x (
-
+  default_key STRING,
+  x_value STRING,
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED
 ) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS

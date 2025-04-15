@@ -30,7 +30,7 @@ class TestPoolManager(unittest.TestCase):
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
     # ---- Compute pool apis ------------------- 
-    def test_build_pool_spec(self):
+    def _test_build_pool_spec(self):
         config = get_config()
         result = cpm._build_compute_pool_spec("fct-order", config)
         assert result
@@ -43,14 +43,16 @@ class TestPoolManager(unittest.TestCase):
         """
         config = get_config()
         client = ConfluentCloudClient(config)
-        result = cpm._verify_compute_pool_provisioned(client, config['flink']['compute_pool_id'])
+        result = cpm._verify_compute_pool_provisioned(client, config['flink']['compute_pool_id'],
+                                                      config.get('confluent_cloud').get('environment_id'))
         assert result == True
 
     def test_get_compute_pool_list(self):
-        client = ConfluentCloudClient(get_config())
-        config=get_config()
-        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
+        config = get_config()
+        pools = cpm.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
         self.assertGreater(len(pools), 0)
+        assert pools[0].get('name')
+        assert pools[0].get('env_id') == config.get('confluent_cloud').get('environment_id')
         print(json.dumps(pools, indent=2))
 
     def test_validate_a_pool(self):

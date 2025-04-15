@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS p (
-
+  default_key STRING,
+  p_value STRING,
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED
 ) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS

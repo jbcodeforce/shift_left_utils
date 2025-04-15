@@ -1,5 +1,5 @@
 INSERT INTO p
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+z.default_key,
+'p-value' as p_value
+FROM z

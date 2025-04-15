@@ -38,7 +38,7 @@ def mock_llm_result():
 
 def test_process_one_file(mock_llm_result):
     with patch("shift_left.core.process_src_tables.translate_to_flink_sqls", return_value=mock_llm_result) as mock_translate:
-        data_dir = pathlib.Path(__file__).parent / "../data" 
+        data_dir = pathlib.Path(__file__).parent.parent.parent / "data" 
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["CONFIG_FILE"] = str(data_dir / "config.yaml")
@@ -53,7 +53,7 @@ def test_process_one_file(mock_llm_result):
 
 def test_process_one_file_recurring(mock_llm_result):
     with patch("shift_left.core.process_src_tables.translate_to_flink_sqls", return_value=mock_llm_result) as mock_translate:
-        data_dir = pathlib.Path(__file__).parent / "../data" 
+        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["CONFIG_FILE"] = str(data_dir / "config.yaml")

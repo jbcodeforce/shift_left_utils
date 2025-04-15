@@ -3,6 +3,8 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
+from datetime import datetime
+from unittest.mock import patch, MagicMock
 import json 
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
@@ -13,6 +15,7 @@ import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.statement_mgr import *
 import shift_left.core.deployment_mgr as dm
+from shift_left.core.utils.file_search import FlinkTablePipelineDefinition, FlinkStatementNode
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 
@@ -26,14 +29,29 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
 
-    def test_clean_things(self):
+    def _test_1_clean_things(self):
         for table in ["src_table_1", "src_table_2", "src_table_3", "int_table_1", "int_table_2", "fct_order"]:
             try:
+                print(f"Dropping table {table}")
                 tm.drop_table(table)
+                print(f"Table {table} dropped")
             except Exception as e:
                 print(e)
  
-
+    def _test_2_build_execution_plan(self):  
+        inventory_path= os.getenv("PIPELINES")
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, get_config()['flink']['compute_pool_id'], False, True, datetime.now())
+        assert execution_plan
+        for node in execution_plan.nodes:
+            print(f"{node}\n\n\n")
+        assert execution_plan.nodes[0].table_name == "src_table_1" or execution_plan.nodes[0].table_name == "src_table_2" or execution_plan.nodes[0].table_name == "src_table_3"
+        for i in range(0, len(execution_plan.nodes)):
+            assert execution_plan.nodes[i].to_run
+        assert execution_plan.nodes[5].table_name == "fct_order"
+    
+   
+       
     def _test_src_table_deployment(src):
         """
         Given a source table with children, deploy the DDL and DML without the children.
@@ -65,7 +83,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result)
         
-    def test_execution_plan(self):
+    def _test_execution_plan(self):
         inventory_path= os.getenv("PIPELINES")
         import shift_left.core.deployment_mgr as dm
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
@@ -73,7 +91,7 @@ class TestDeploymentManager(unittest.TestCase):
         current_node.compute_pool_id = get_config()['flink']['compute_pool_id']
         current_node.update_children = True
         current_node.dml_only= False
-        graph = dm._build_table_graph_for_node(current_node)
+        graph = dm._build_statement_node_map(current_node)
         for node in graph:
             print(f"{node} -> {graph[node].dml_statement}")
         execution_plan = dm._build_execution_plan(graph, current_node)

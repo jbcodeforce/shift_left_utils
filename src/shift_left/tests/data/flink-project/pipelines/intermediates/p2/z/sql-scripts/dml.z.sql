@@ -1,5 +1,7 @@
 INSERT INTO z
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+y.default_key,
+concat(y.y_value,'-', x.x_value) as z_value
+
+FROM y 
+join x on y.x_key = x.default_key

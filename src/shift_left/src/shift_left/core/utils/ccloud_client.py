@@ -95,7 +95,13 @@ class ConfluentCloudClient:
             logger.debug(f"compute pool response= {resp}")
             if resp and "data" in resp and resp.get('data'):
                 for info in resp.get('data'):
-                    results.append({'id' : info["id"], 'name':  info.get('spec').get('display_name')} )
+                    results.append({'id' : info["id"], 
+                                    'name':  info.get('spec').get('display_name'), 
+                                    'env_id': info.get('spec').get('environment').get('id'),
+                                    'max_cfu': info.get('spec').get('max_cfu'),
+                                    'region': info.get('spec').get('region'),
+                                    'status_phase': info.get('status').get('phase'),
+                                    'current_cfu': info.get('status').get('current_cfu')})
             if resp and "metadata" in resp and "next" in resp.get('metadata'):
                 next_page_token = resp.get('metadata').get('next')
                 if not next_page_token:
@@ -105,12 +111,8 @@ class ConfluentCloudClient:
         return results
         
 
-    def get_compute_pool_info(self, compute_pool_id: str):
+    def get_compute_pool_info(self, compute_pool_id: str, env_id: str):
         """Get the info of a compute pool"""
-        self.api_key = self.config["flink"]["api_key"]
-        self.api_secret = self.config["flink"]["api_secret"]
-        self.auth_header = self._generate_auth_header()
-        env_id=self.config["confluent_cloud"]["environment_id"]
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
 

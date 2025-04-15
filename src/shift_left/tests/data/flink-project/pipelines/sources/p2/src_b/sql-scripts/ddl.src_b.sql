@@ -1,5 +1,6 @@
-CREATE TABLE IF NOT EXISTS it2 (
-
+CREATE TABLE IF NOT EXISTS src_b (
+  default_key STRING,
+  b_value STRING,
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED
 ) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS

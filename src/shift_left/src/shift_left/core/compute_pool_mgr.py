@@ -45,6 +45,15 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
             return _create_compute_pool(pool_spec)
 
 
+_compute_pool_list = None
+def get_compute_pool_list(env_id: str):
+    global _compute_pool_list
+    if not _compute_pool_list:
+        client = ConfluentCloudClient(get_config())
+        _compute_pool_list = client.get_compute_pool_list(env_id)
+    return _compute_pool_list
+
+
 def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
     data = {}
     if os.path.exists(STATEMENT_COMPUTE_POOL_FILE):
@@ -74,7 +83,7 @@ def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
     return spec
 
-def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
+def _verify_compute_pool_provisioned(client, pool_id: str, env_id: str) -> bool:
     """
     Wait for the compute pool is provisionned
     """
@@ -83,7 +92,7 @@ def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
     while provisioning:
         logger.info("Wait ...")
         time.sleep(5)
-        result= client.get_compute_pool_info(pool_id)
+        result= client.get_compute_pool_info(pool_id, env_id)
         provisioning = (result['status']['phase'] == "PROVISIONING")
         failed = (result['status']['phase'] == "FAILED")
     return False if failed else True

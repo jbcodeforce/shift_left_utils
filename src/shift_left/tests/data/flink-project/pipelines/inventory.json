@@ -2,30 +2,30 @@
     "src_a": {
         "table_name": "src_a",
         "type": "source",
-        "dml_ref": "pipelines/sources/p2/a/sql-scripts/dml.src_a.sql",
-        "ddl_ref": "pipelines/sources/p2/a/sql-scripts/ddl.src_a.sql",
-        "table_folder_name": "pipelines/sources/p2/a"
-    },
-    "src_x": {
-        "table_name": "src_x",
-        "type": "source",
-        "dml_ref": "pipelines/sources/p2/x/sql-scripts/dml.src_x.sql",
-        "ddl_ref": "pipelines/sources/p2/x/sql-scripts/ddl.src_x.sql",
-        "table_folder_name": "pipelines/sources/p2/x"
+        "dml_ref": "pipelines/sources/p2/src_a/sql-scripts/dml.src_a.sql",
+        "ddl_ref": "pipelines/sources/p2/src_a/sql-scripts/ddl.src_a.sql",
+        "table_folder_name": "pipelines/sources/p2/src_a"
     },
     "src_b": {
         "table_name": "src_b",
         "type": "source",
-        "dml_ref": "pipelines/sources/p2/b/sql-scripts/dml.src_b.sql",
-        "ddl_ref": "pipelines/sources/p2/b/sql-scripts/ddl.src_b.sql",
-        "table_folder_name": "pipelines/sources/p2/b"
+        "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
+        "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
+        "table_folder_name": "pipelines/sources/p2/src_b"
     },
     "src_y": {
         "table_name": "src_y",
         "type": "source",
-        "dml_ref": "pipelines/sources/p2/y/sql-scripts/dml.src_y.sql",
-        "ddl_ref": "pipelines/sources/p2/y/sql-scripts/ddl.src_y.sql",
-        "table_folder_name": "pipelines/sources/p2/y"
+        "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
+        "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
+        "table_folder_name": "pipelines/sources/p2/src_y"
+    },
+    "src_x": {
+        "table_name": "src_x",
+        "type": "source",
+        "dml_ref": "pipelines/sources/p2/src_x/sql-scripts/dml.src_x.sql",
+        "ddl_ref": "pipelines/sources/p2/src_x/sql-scripts/ddl.src_x.sql",
+        "table_folder_name": "pipelines/sources/p2/src_x"
     },
     "src_table_2": {
         "table_name": "src_table_2",

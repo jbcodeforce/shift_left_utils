@@ -1,5 +1,8 @@
 INSERT INTO d
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+y.default_key,
+'d-value' as d_value,
+count(*) as sum_value
+FROM y  
+join z on y.x_key = z.default_key
+

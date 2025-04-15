@@ -14,11 +14,7 @@ class TestStatementManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
-        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
+        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
         
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
     @patch('shift_left.core.statement_mgr.get_statement_list')

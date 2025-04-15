@@ -29,8 +29,9 @@ class TestConfluentClient(unittest.TestCase):
         print(json.dumps(pools, indent=2))
 
     def test_verify_compute_exist(self):
-        client = ConfluentCloudClient(get_config())
-        pool = client.get_compute_pool_info(get_config()['flink']['compute_pool_id'])
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        pool = client.get_compute_pool_info(config.get('flink').get('compute_pool_id'), config.get('confluent_cloud').get('environment_id'))
         assert pool
         print(pool['spec'])
         print(f"{pool['status']['current_cfu']} over {pool['spec']['max_cfu']}")

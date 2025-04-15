@@ -1,5 +1,5 @@
 INSERT INTO f
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+d.default_key,
+'f-value' as f_value
+FROM d

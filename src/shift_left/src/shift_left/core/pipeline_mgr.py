@@ -96,6 +96,8 @@ def build_all_pipeline_definitions(pipeline_path: str):
     _process_one_sink_folder(facts_path, pipeline_path)
     views_path = Path(pipeline_path) / "views"
     _process_one_sink_folder(views_path, pipeline_path)
+    views_path = Path(pipeline_path) / "intermediates"
+    _process_one_sink_folder(views_path, pipeline_path)
 
     
 def get_static_pipeline_report_from_table(table_name: str, inventory_path: str) -> PipelineReport:

@@ -1,5 +1,6 @@
 INSERT INTO e
 SELECT 
--- part to select stuff
-FROM src_table
-WHERE -- where condition or remove it
+c.default_key,
+'e-value' as e_field,
+c.c_value
+FROM c

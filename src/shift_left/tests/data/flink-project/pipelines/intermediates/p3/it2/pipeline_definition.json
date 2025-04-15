@@ -1,0 +1,10 @@
+{
+   "table_name": "it2",
+   "type": "intermediate",
+   "dml_ref": "pipelines/intermediates/p3/it2/sql-scripts/dml.it2.sql",
+   "ddl_ref": "pipelines/intermediates/p3/it2/sql-scripts/ddl.it2.sql",
+   "path": "pipelines/intermediates/p3/it2",
+   "state_form": "Stateful",
+   "parents": [],
+   "children": []
+}

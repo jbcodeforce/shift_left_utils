@@ -44,7 +44,7 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     """
     print("#" * 30 + f" Build Inventory in {pipeline_path}")
     inventory= get_or_create_inventory(pipeline_path)
-    #print(inventory)
+    print(inventory)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
 @app.command()

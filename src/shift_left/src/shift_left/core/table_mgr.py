@@ -173,6 +173,7 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
     """
     logger.debug(f"{table_name}")
     statement_name = "show-" + table_name.replace('_','-')
+    result_str = None
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
@@ -187,13 +188,12 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
             if len(statement_result.results.data) > 0:
                 result_str = str(statement_result.results.data)
                 logger.debug(f"Run show create table in {result_str}")
-                client.delete_flink_statement(statement_name)
-                return result_str
-        return None
+
     except Exception as e:
         logger.error(f"get_table_structure {e}")
+    finally:
         client.delete_flink_statement(statement_name)
-        return None
+        return result_str
 
 def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     config = get_config()
