@@ -2,7 +2,7 @@
 
 ???- info "Version"
     * Created January 2025.
-    * Update: 04/10/2025. 
+    * Update: 04/16/2025. 
 
 This chapter details the standard activities to manage a Confluent Cloud Flink project with the `shift_left` tool when doing a ETL to real-time migration project. The recipes address new project initiative or a migration project from an existing SQL based ETL solution.
 
@@ -68,24 +68,10 @@ This use case applies only when the source project is available and based on dbt
 
 To use the CLI be sure to follow the [setup instructions.](./setup.md)
 
-Ensure the following environment variables are set: in a `.env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
-
-```sh
-export FLINK_PROJECT=$HOME/Code/flink-project
-export STAGING=$FLINK_PROJECT/staging
-export PIPELINES=$FLINK_PROJECT/pipelines
-export SRC_FOLDER=$HOME/Code/datawarehouse/models
-export CCLOUD_CONTEXT=login.....
-export CPOOL_ID=lfcp-xxxxxx
-export TOPIC_LIST_FILE=$FLINK_PROJECT/src_topic_list.txt 
-export CONFIG_FILE=$FLINK_PROJECT/config.yaml
-export DB_NAME=kafka_env_name
-export CCLOUD_ENV_ID=env-xxxxxx
-```
 
 ### The config.yaml file
 
-The `config.yaml` file is important to set up and reference with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-setup)
+The `config.yaml` file is important to set up and is referenced with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables)
 
 ## Project related tasks
 
@@ -177,18 +163,37 @@ shift_left table --help
 * Create a new table folder structure to start writing SQL statements using basic templates: (see the [command description](./command.md/#table-init)). There are two mandatory arguments: the table name and the folder to write the new table structure to. Be sure to following table name naming convention.
 
 ```sh
-shift_left table init fct_user $PIPELINES/facts/p1
+shift_left table init fct_user $PIPELINES/facts --product-name p3
 ```
 
 ???- example "Output example"
     ```
     facts
-        └── p1
+        └── p3
             └── fct_user
                 ├── Makefile
                 ├── sql-scripts
-                │   ├── ddl.fct_user.sql
-                │   └── dml.fct_user.sql
+                │   ├── ddl.p3_fct_user.sql
+                │   └── dml.p3_fct_user.sql
+                ├── tests
+                └── tracking.md
+    ```
+
+* Another example for an intermediate table:
+
+```sh
+shift_left table init int_p3_users $PIPELINES/intermediates --product-name p3
+```
+
+???- example "Output example"
+    ```
+    intermediates
+        └── p3
+            └── int_p3_users
+                ├── Makefile
+                ├── sql-scripts
+                │   ├── ddl.int_p3_users.sql
+                │   └── dml.int_p3_users.sql
                 ├── tests
                 └── tracking.md
     ```
@@ -434,7 +439,7 @@ As part of the process, developers need to validate the generated DDL and update
 
 Normally the DML is not executable until all dependent tables are created.
 
-## Build an inventory of all the Flink SQL DDL and DML statements with table name as key
+## Build table inventory
 
 The inventory is built by crowling the Flink project `pipelines` folder and by looking at each dml to get the table name. The inventory is a hashmap with the key being the table name and the value is a `FlinkTableReference` defined as:
 

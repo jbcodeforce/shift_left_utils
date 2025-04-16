@@ -42,107 +42,29 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-
-
 * Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the wheel, thery are under the `src/shift_left/dist` folder, the last version as of 4/11 is 0.1.8 but it will change, so the documentation may not reflect the last version.
 
 ```sh
-pip install src/shift_left/dist/shift_left-0.1.8-py3-none-any.whl
+pip install src/shift_left/dist/shift_left-0.1.9-py3-none-any.whl
 # for the developers using uv, the installation is
 uv tool list
 uv tool uninstall shift_left
 uv tool install shift_left@src/shift_left/dist/shift_left-0.1.8-py3-none-any.whl
 ```
 
-* Validate the CLI is available via:
+### Set up configuration yaml file
 
-```sh
-shift_left --help
-```
+The configuration file has to be named config.yaml and will be referenced by the environment variables: CONFIG_FILE.
 
-## Create a new Flink data project
-
-This is step is only valuable when starting a new Confluent Flink project, or a new data as a product using Flink and Confluent. 
-
-```sh
-shift_left project init <project_name> <project_path> --project-type 
-# example for a default Kimball project
-shift_left project init flink-project ../
-# For a project more focused on developing data as a product
-shift_left project init flink-project ../ --project-type data-product
-```
-
-At this stage, you should have three folders for the project: flink_project, the dbt_source, the shift_left_utils. For the Kimball based flink project there is a pipelines folder with the same structure as defined by the Kimball guidelines:
-
-```sh
-├── flink-project
-│   ├── pipelines
-│      ├── common.mk
-│      ├── dimensions
-│      ├── facts
-│      ├── intermediates
-│      ├── sources
-│      └── stage
-└── src_dbt_project
-```
-
-or for a data product:
-
-```sh
-├── pipelines
-│   ├── common.mk
-│   └── data_product_1
-│       ├── dimensions
-│       ├── facts
-│       │   └── fct_order
-│       │       ├── Makefile
-│       │       ├── sql-scripts
-│       │       │   ├── ddl.fct_order.sql
-│       │       │   └── dml.fct_order.sql
-│       │       ├── tests
-│       │       └── tracking.md
-│       ├── intermediates
-│       └── sources
-└── staging
-```
-
-## Working in a project
-
-* Start a Terminal
-* Connect to Confluent Cloud with CLI, then get the environment and compute pool identifiers:
-
-```sh
-confluent login --save
-```
-
-* Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool. If you do not have such environment Confluent cli has a quickstart plugin:
-
-```sh
-confluent flink quickstart --name dbt-migration --max-cfu 50 --region us-west-2 --cloud aws
-```
-
-* Define environment variables in the .env file
-
-```sh
-FLINK_PROJECT=.
-CCLOUD_ENV_NAME=
-CLOUD_PROVIDER=
-CLOUD_REGION=
-CCLOUD_CONTEXT=
-CCLOUD_KAFKA_CLUSTER=
-CCLOUD_COMPUTE_POOL_ID=
-SRC_FOLDER=../../src-dbt-project/models
-STAGING=$FLINK_PROJECT/staging
-PIPELINES=$FLINK_PROJECT/pipelines
-```
-
-* Define a config.yaml file to keep some important parameters of the CLI. 
+* Copy the  `config.yaml` template file to keep some important parameters for the CLI. 
 
 ```sh
 cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
 ```
 
-* Modify the `config.yaml` in the root of the Flink project, with the corresponding values. The Kafka section is to access the Kafka Cluster and topics:
+* Modify the `config.yaml`, with the corresponding values. Some sections are mandatory
+
+The Kafka section is to access the Kafka Cluster and topics :
 
 ```yaml
 kafka:
@@ -169,14 +91,41 @@ Those declarations are loaded by the Kafka Producer and Consumer and with tools 
 ???- warning "Security access"
     The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 
-
-You are ready to use the different tools, as a next step read an example of migration approach in [this note](./migration.md#migration-process) or use the [recipes](./recipes.md) to get how to do some common activities.
-
-
-## Working with the migration AI agent
-
-* Install Ollama: [using one of the downloads](https://ollama.com/download).
-* Start Ollama using `ollama serve` then download the one of the Qwen model used by the AI Agent: `qwen2.5-coder:32b` or `qwen2.5-coder:14b` depending of your memory and GPU resources.
+### Environment variables
 
 
+Ensure the following environment variables are set: in a `set_env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
+
+```sh
+export FLINK_PROJECT=$HOME/Code/flink-project
+export STAGING=$FLINK_PROJECT/staging
+export PIPELINES=$FLINK_PROJECT/pipelines
+export SRC_FOLDER=$HOME/Code/datawarehouse/models
+
+
+export CONFIG_FILE=./config.yaml
+# The following variables are used when deploying with the Makefile.
+export CCLOUD_KAFKA_CLUSTER=dev-us-west-2-dedicated
+export CCLOUD_ENV_ID=env-xxxx
+export CCLOUD_ENV_NAME=j9r-env
+export CCLOUD_KAFKA_CLUSTER=jxxxxx
+export CLOUD_REGION=us-west-2
+export CLOUD_PROVIDER=aws
+export CCLOUD_CONTEXT=login-jboyer@confluent.io-https://confluent.cloud
+export CCLOUD_COMPUTE_POOL_ID=lfcp-xxxx
+```
+
+To get the environment variables configured for your Terminal session do:
+
+```sh
+source set_env
+```
+
+### Validate the CLI
+
+```sh
+shift_left --help
+```
+
+#### Next>> [Recipes section](recipes.md)
 

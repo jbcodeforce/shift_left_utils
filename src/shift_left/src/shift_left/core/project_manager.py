@@ -43,9 +43,6 @@ def get_topic_list(file_name: str):
                 f.write(topic["topic_name"]+"\n")
     return topics["data"]
 
-def get_list_of_compute_pool(env_id: str) -> List[str]:
-    ccloud = ConfluentCloudClient(get_config())
-    return ccloud.get_compute_pool_list(env_id)
 
 # --- Private APIs ---
 

@@ -96,11 +96,13 @@ def build_all_pipeline_definitions(pipeline_path: str):
     _process_one_sink_folder(facts_path, pipeline_path)
     views_path = Path(pipeline_path) / "views"
     _process_one_sink_folder(views_path, pipeline_path)
+    views_path = Path(pipeline_path) / "intermediates"
+    _process_one_sink_folder(views_path, pipeline_path)
 
     
-def build_pipeline_report_from_table(table_name: str, inventory_path: str) -> PipelineReport:
+def get_static_pipeline_report_from_table(table_name: str, inventory_path: str) -> PipelineReport:
     """
-    Walk the hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
+    Walk the static hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
     The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
     The parents are a list of dictionnary with the same structure, and so on.
     """

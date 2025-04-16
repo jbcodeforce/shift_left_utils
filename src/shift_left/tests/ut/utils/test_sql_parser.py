@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import os
 import pathlib
@@ -108,16 +111,10 @@ class TestFileSearch(unittest.TestCase):
         assert "src_table" in rep
         print(rep)
 
-    def test_sql_content(self):
-        fname = pathlib.Path(__file__).parent / "./tmp/dml.test_cpx_1.sql"
-        with open(fname, "r") as f:
-            sql_content = f.read()
-            parser = SQLparser()
-            referenced_table_names = parser.extract_table_references(sql_content)
-            print(referenced_table_names)
+
 
     def test_sql_content_order(self):
-        fname = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        fname = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
         with open(fname, "r") as f:
             sql_content = f.read()
             parser = SQLparser()

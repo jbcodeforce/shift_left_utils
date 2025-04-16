@@ -1,6 +1,9 @@
-
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import os
+import time
 import pathlib
 from collections import deque
 #os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
@@ -106,7 +109,8 @@ class TestDeploymentManager(unittest.TestCase):
         pipeline_def: FlinkTablePipelineDefinition= pm.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
       
         result = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def,
-                                                        compute_pool_id=pool_id)
+                                                        compute_pool_id=pool_id,
+                                                        start_time = datetime.now())
         assert result
         for statement in result:
             print(f"Run {statement.dml_statement} on {statement.compute_pool_id} run: {statement.to_run} restart: {statement.to_restart}")
@@ -121,13 +125,11 @@ class TestDeploymentManager(unittest.TestCase):
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
                                                                 config.get('flink').get('compute_pool_id'), 
                                                                 True, 
-                                                                False)
-        for node in execution_plan:
-            print(f"{node.table_name}  {node.existing_statement_info.status_phase}, {node.compute_pool_id}")
-            assert node.table_name
-            assert node.dml_ref
-            assert node.ddl_ref
-            assert node.compute_pool_id
+                                                                False,
+                                                                start_time = datetime.now())
+        
+        dm.persist_execution_plan(execution_plan)
+        dm._print_execution_plan(execution_plan)
            
         #l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
         #for statement in l:

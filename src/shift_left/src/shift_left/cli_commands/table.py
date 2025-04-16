@@ -9,8 +9,8 @@ from typing_extensions import Annotated
 from shift_left.core.table_mgr import (
     build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
-    extract_table_name, 
-    build_update_makefile, 
+    get_short_table_name, 
+    update_makefile_in_folder, 
     validate_table_cross_products,
     search_users_of_table,
     update_sql_content_for_file,
@@ -28,13 +28,14 @@ app = typer.Typer()
 
 @app.command()
 def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],
-         table_path: Annotated[str, typer.Argument(help="Path in which the table folder stucture will be created under.")]):
+         table_path: Annotated[str, typer.Argument(help="Folder Path in which the table folder structure will be created.")],
+         product_name: Annotated[str, typer.Option(help="Product name to use for the table. If not provided, it will use the table_path last folder as product name")]):
     """
     Build a new table structure under the specified path. For example to add a source table structure use for example the command:
     `shift_left table init src_table_1 $PIPELINES/sources/p1`
     """
     print("#" * 30 + f" Build Table in {table_path}")
-    table_folder, table_name= build_folder_structure_for_table(table_name, table_path)
+    table_folder, table_name= build_folder_structure_for_table(table_name, table_path, product_name)
     print(f"Created folder {table_folder} for the table {table_name}")
 
 @app.command()
@@ -44,7 +45,7 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     """
     print("#" * 30 + f" Build Inventory in {pipeline_path}")
     inventory= get_or_create_inventory(pipeline_path)
-    #print(inventory)
+    print(inventory)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
 @app.command()
@@ -58,7 +59,7 @@ def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argumen
         exit(1)
     print(f"The dependencies for {table_sql_file_name} from the {src_project_folder} project are:")
     dependencies = search_source_dependencies_for_dbt_table(table_sql_file_name, src_project_folder)
-    table_name = extract_table_name(table_sql_file_name)
+    table_name = get_short_table_name(table_sql_file_name)
     print(f"Table {table_name} in the SQL {table_sql_file_name} depends on:")
     for table in dependencies:
         print(f"  - {table['table']} (in {table['src_dbt']})")
@@ -92,7 +93,7 @@ def update_makefile(
         pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
     """ Update existing Makefile for a given table or build a new one """
 
-    build_update_makefile(pipeline_folder_name, table_name)
+    update_makefile_in_folder(pipeline_folder_name, table_name)
     print(f"Makefile updated for table {table_name}")
 
 

@@ -1,7 +1,7 @@
 include ../../../common.mk
 
 # --- int_table_1
-TABLE_NAME=int_table_1
+TABLE_NAME=int_p1_table_1
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 

@@ -24,35 +24,45 @@ from shift_left.core.utils.file_search import (
 
 
 def deploy_flink_statement(flink_statement_file_path: str, 
-                           compute_pool_id: str, 
-                           statement_name: str, 
-                           config: dict) -> StatementResult:
+                           compute_pool_id: str = None, 
+                           statement_name: str= None, 
+                           config: dict = None) -> StatementResult | None:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool. If the statement fails, propagate the exception to higher level.
     """
     logger.debug(f"{statement_name} with content: {flink_statement_file_path} deploy to {compute_pool_id}")
+    if not config:
+        config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
     if not statement_name:
-        statement_name = os.path.basename(flink_statement_file_path).replace('.sql','').replace('_','-')
+        statement_name = (config['kafka']['cluster_type'] + "-" + os.path.basename(flink_statement_file_path).replace('.sql','')).replace('_','-').replace('.','-')
     full_file_path = from_pipeline_to_absolute(flink_statement_file_path)
-    with open(full_file_path, "r") as f:
-        sql_content = f.read()
-        transformer = _get_or_build_sql_content_transformer()
-        _, sql_out= transformer.update_sql_content(sql_content)
-        client = ConfluentCloudClient(config)
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-        statement= client.post_flink_statement(compute_pool_id, 
-                                           statement_name, 
-                                           sql_out,  
-                                           properties )
-        if statement and "king" in statement and statement["king"] == "Statement":
-            return StatementResult(results={"data" : statement})
-        else:
-            return statement
+    try:
+        with open(full_file_path, "r") as f:
+            sql_content = f.read()
+            transformer = _get_or_build_sql_content_transformer()
+            _, sql_out= transformer.update_sql_content(sql_content)
+            client = ConfluentCloudClient(config)
+            properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+            statement= client.post_flink_statement(compute_pool_id, 
+                                            statement_name, 
+                                            sql_out,  
+                                            properties )
+            if statement and "king" in statement and statement["king"] == "Statement":
+                return StatementResult(results={"data" : statement})
+            else:
+                return statement
+    except Exception as e:
+        logger.error(e)
+        return None
+    
         
 def report_running_flink_statements(table_name: str, inventory_path: str):
+    """
+    Report running flink statements from a table
+    """
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
@@ -60,23 +70,26 @@ def report_running_flink_statements(table_name: str, inventory_path: str):
     client = ConfluentCloudClient(config)
     statement_list = client.get_flink_statement_list()
     results = {}
+    # TO DO to terminate
     return results
 
-def delete_statement_if_exists(statement_name):
+def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"{statement_name}")
     statement_list = get_statement_list()
     if statement_name in statement_list:
         logger.info(f"{statement_name} in the cached statement list")
         config = get_config()
         client = ConfluentCloudClient(config)
-        client.delete_flink_statement(statement_name)
-        statement_list.pop(statement_name)
-        return 
+        result = client.delete_flink_statement(statement_name)
+        if result == "deleted":
+            statement_list.pop(statement_name)
+            return "deleted"
+        return None
     else: # not found in cache, do remote API call
         logger.info(f"{statement_name} not found in cache trying REST api call")
         config = get_config()
         client = ConfluentCloudClient(config)
-        client.delete_flink_statement(statement_name)
+        return client.delete_flink_statement(statement_name)
 
 
 def get_statement(statement_name: str) -> None | Statement:
@@ -94,7 +107,7 @@ def get_statement(statement_name: str) -> None | Statement:
 
 _statement_list = None  # cache the statment loaded to limit the number of call to CC API
 
-def get_statement_list() -> List[Statement]:
+def get_statement_list() -> dict[str, Statement]:
     global _statement_list
     if _statement_list == None:
         logger.info("Load the current list of Flink statements from REST API")

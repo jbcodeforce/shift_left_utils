@@ -1,4 +1,6 @@
-
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import os
 import json 
@@ -78,7 +80,7 @@ class TestPipelineManager(unittest.TestCase):
         path= os.getenv("PIPELINES")
         table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
         pm.build_pipeline_definition_from_dml_content(table_path, path)
-        result = pm.build_pipeline_report_from_table("fct_order", os.getenv("PIPELINES"))
+        result = pm.get_static_pipeline_report_from_table("fct_order", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
 
@@ -87,7 +89,7 @@ class TestPipelineManager(unittest.TestCase):
         path= os.getenv("PIPELINES")
         table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
         pm.build_pipeline_definition_from_dml_content(table_path, path)
-        result = pm.build_pipeline_report_from_table("int_table_1", os.getenv("PIPELINES"))
+        result = pm.get_static_pipeline_report_from_table("int_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
     

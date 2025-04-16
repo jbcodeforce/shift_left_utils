@@ -1,11 +1,17 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import unittest
 import json
-
+import os, pathlib
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
 class TestConfluentClient(unittest.TestCase):
-
+    @classmethod
+    def setUpClass(cls):
+        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config-all.yaml")
 
     def test_get_environment_list(self):
         print("#"*30 + "\ntest_get_environment_list\n")
@@ -26,8 +32,9 @@ class TestConfluentClient(unittest.TestCase):
         print(json.dumps(pools, indent=2))
 
     def test_verify_compute_exist(self):
-        client = ConfluentCloudClient(get_config())
-        pool = client.get_compute_pool_info(get_config()['flink']['compute_pool_id'])
+        config = get_config()
+        client = ConfluentCloudClient(config)
+        pool = client.get_compute_pool_info(config.get('flink').get('compute_pool_id'), config.get('confluent_cloud').get('environment_id'))
         assert pool
         print(pool['spec'])
         print(f"{pool['status']['current_cfu']} over {pool['spec']['max_cfu']}")

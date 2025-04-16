@@ -112,18 +112,17 @@ class Change_SchemaContext(TableWorker):
         return updated, sql_out
      
 class ReplaceEnvInSqlContent(TableWorker):
+    env = "dev"
+
     """
     Special worker to update schema and src topic name in sql content
     """
-    config = get_config()
-    env = config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
     dml_replacements = {
         "stage": {
             "adapt": {
                 "search": rf"(ap-.*?)-(dev)(\.)",
                 "replace": rf"\1-{env}\3"
             }
-
         }
     }
     ddl_replacements = {
@@ -132,11 +131,18 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "search": rf"(.flink)-(dev)",
                 "replace": rf"\1-{env}"
             }
-
         }
     }
 
+    def __init__(self):
+        self.config = get_config()
+        self.env = self.config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
+        # Update the replacements with the current env
+        self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1-{self.env}\3"
+        self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
+
     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+        logger.debug(f"{sql_content} in {self.env}")
         updated = False
         if "CREATE TABLE" in sql_content:
             if self.env in self.ddl_replacements:

@@ -1,3 +1,6 @@
+"""
+Copyright 2024-2025 Confluent, Inc.
+"""
 import time
 import os, json
 from shift_left.core.utils.app_config import get_config, logger
@@ -24,14 +27,14 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
 
     client = ConfluentCloudClient(config)
-    if compute_pool_id and _validate_a_pool(client, compute_pool_id):
+    env_id = config['confluent_cloud']['environment_id']
+    if compute_pool_id and _validate_a_pool(client, compute_pool_id, env_id):
         return compute_pool_id
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
         product_name = extract_product_name(pipeline_def.path)
         _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                    config['kafka']['cluster_type'], 
-                                                    product_name)
+                                                    config['kafka']['cluster_type'])
         statement = get_statement(dml_statement_name)
         pool_id= statement.spec.compute_pool_id
         if pool_id:
@@ -40,6 +43,15 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
             logger.info(f"Build a new compute pool")
             pool_spec = _build_compute_pool_spec(pipeline_def.table_name)
             return _create_compute_pool(pool_spec)
+
+
+_compute_pool_list = None
+def get_compute_pool_list(env_id: str):
+    global _compute_pool_list
+    if not _compute_pool_list:
+        client = ConfluentCloudClient(get_config())
+        _compute_pool_list = client.get_compute_pool_list(env_id)
+    return _compute_pool_list
 
 
 def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
@@ -59,7 +71,8 @@ def _create_compute_pool(table_name: str) -> str:
     result= client.create_compute_pool(client,spec)
     if result:
         pool_id = result['id']
-        _verify_compute_pool_provisioned(pool_id)
+        env_id = config['confluent_cloud']['environment_id']
+        _verify_compute_pool_provisioned(pool_id, env_id)
 
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
@@ -71,7 +84,7 @@ def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
     return spec
 
-def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
+def _verify_compute_pool_provisioned(client, pool_id: str, env_id: str) -> bool:
     """
     Wait for the compute pool is provisionned
     """
@@ -80,7 +93,7 @@ def _verify_compute_pool_provisioned(client, pool_id: str) -> bool:
     while provisioning:
         logger.info("Wait ...")
         time.sleep(5)
-        result= client.get_compute_pool_info(pool_id)
+        result= client.get_compute_pool_info(pool_id, env_id)
         provisioning = (result['status']['phase'] == "PROVISIONING")
         failed = (result['status']['phase'] == "FAILED")
     return False if failed else True
@@ -91,12 +104,12 @@ def _get_pool_usage(pool_info: dict) -> float:
     max = pool_info['spec']['max_cfu']
     return (current / max)
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str) -> bool:
+def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id: str) -> bool:
     """
     Validate a pool exist and with enough resources
     """
     try:
-        pool_info=client.get_compute_pool_info(compute_pool_id)
+        pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
         if pool_info == None:
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")

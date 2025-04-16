@@ -3,12 +3,13 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import typer
 import json
+import datetime
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
 from shift_left.core.pipeline_mgr import (
     build_pipeline_definition_from_dml_content, 
-    build_pipeline_report_from_table, 
+    get_static_pipeline_report_from_table, 
     build_all_pipeline_definitions,
     get_pipeline_definition_for_table,
     delete_all_metada_files)
@@ -90,7 +91,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        pipeline_def=build_pipeline_report_from_table(table_name, inventory_path)
+        pipeline_def=get_static_pipeline_report_from_table(table_name, inventory_path)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -211,8 +212,9 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
     execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        force_children=force)
-    persist_execution_plan(execution_plan, table_name)
+                                                        force_children=force,
+                                                        start_time=datetime.datetime.now())
+    persist_execution_plan(execution_plan)
     
    
 
