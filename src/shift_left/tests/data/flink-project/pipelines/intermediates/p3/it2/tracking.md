@@ -1,4 +1,4 @@
-## Fact Table: it2
+## Fact Table: int_p3_it2
 
 Status date:
 

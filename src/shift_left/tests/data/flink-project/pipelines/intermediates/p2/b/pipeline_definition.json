@@ -9,9 +9,9 @@
       {
          "table_name": "src_b",
          "type": "source",
-         "dml_ref": "pipelines/sources/p2/b/sql-scripts/dml.src_b.sql",
-         "ddl_ref": "pipelines/sources/p2/b/sql-scripts/ddl.src_b.sql",
-         "path": "pipelines/sources/p2/b",
+         "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
+         "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
+         "path": "pipelines/sources/p2/src_b",
          "state_form": "Stateful",
          "parents": [],
          "children": [

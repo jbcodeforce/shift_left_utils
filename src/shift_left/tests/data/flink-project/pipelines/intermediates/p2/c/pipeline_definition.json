@@ -7,11 +7,11 @@
    "state_form": "Stateful",
    "parents": [
       {
-         "table_name": "z",
+         "table_name": "b",
          "type": "intermediate",
-         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
-         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
-         "path": "pipelines/intermediates/p2/z",
+         "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
+         "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
+         "path": "pipelines/intermediates/p2/b",
          "state_form": "Stateful",
          "parents": [],
          "children": [
@@ -28,11 +28,11 @@
          ]
       },
       {
-         "table_name": "b",
+         "table_name": "z",
          "type": "intermediate",
-         "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
-         "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
-         "path": "pipelines/intermediates/p2/b",
+         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+         "path": "pipelines/intermediates/p2/z",
          "state_form": "Stateful",
          "parents": [],
          "children": [

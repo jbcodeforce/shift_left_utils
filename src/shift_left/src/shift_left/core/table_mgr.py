@@ -5,7 +5,7 @@ import logging
 import os, re, json
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
-from typing import Optional
+from typing import Optional, Tuple
 
 from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
@@ -26,42 +26,61 @@ from shift_left.core.utils.file_search import (
     get_table_ref_from_inventory,
     extract_product_name,
     get_ddl_dml_names_from_table,
+    derive_table_type_product_name_from_path,
+    get_table_type_from_file_path,
     build_inventory)
 
 
 
 """
-Table management is for managing table folder, and table content.
+Table management is for managing table folder, and table content as well as the table inventory and action to
+Flink Table drop table. 
+
+Naming convention for table name:
+- For source tables: src_<product_name>_<table_name>
+- For intermediate tables: int_<product_name>_<table_name>
+- For fact tables: <product_name>_fct_<table_name>
+- For dimension tables: <product_name>_dim_<table_name>
+- For view tables: <product_name>_mv_<table_name>
+
+Naming convention for ddl and dml file names
+- Sources: `<ddl|dml>.src_<product>_<table_name>.sql`
+- Intermediates: `<ddl|dml>.int_<product>_<table_name>.sql`
+- Facts, Dimensions & Views: `<ddl|dml>.<product>_<fct|dim|mv>_<table_name>.sql`
 """
 
 # --------- Public APIs ---------------
-def build_folder_structure_for_table(table_name: str, 
-                                    target_path: str):
+def build_folder_structure_for_table(table_folder_name: str, 
+                                    target_path: str,
+                                    product_name: str) -> Tuple[str, str]:
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
     
-    * `target_path/table_name/sql-scripts/`:  with two template files, one for ddl. and one for dml.
-    * `target_path/table_name/tests`: for test harness content
-    * `target_path/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
+    * `target_path/product_name/table_name/sql-scripts/`:  with two template files, one for ddl. and one for dml.
+    * `target_path/product_name/table_name/tests`: for test harness content
+    * `target_path/product_name/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
-    logging.info(f"Create folder {table_name} in {target_path}")
+    logging.info(f"Create folder {table_folder_name} in {target_path}")
     config = get_config()
-    if table_name.startswith("src_"):
-        table_name = table_name.replace("src_", "")
-    table_folder = f"{target_path}/{table_name}"
+    table_type = get_table_type_from_file_path(target_path)
+    if not product_name:
+        table_folder = f"{target_path}/{table_folder_name}"
+        product_name= extract_product_name(table_folder)
+        
+    else:
+        table_folder = f"{target_path}/{product_name}/{table_folder_name}"
+
+   
     create_folder_if_not_exist(f"{table_folder}/" +  SCRIPTS_DIR)
     create_folder_if_not_exist(f"{table_folder}/tests")
-    if "source" in target_path:
-        internal_table_name = config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
-    else:
-        internal_table_name=table_name
-    product_name = extract_product_name(table_folder)
-    _create_makefile(internal_table_name, table_folder, config["kafka"]["cluster_type"], product_name)
+    internal_table_name=get_long_table_name(table_folder_name, product_name, table_type)
+
+    _create_makefile(internal_table_name, table_folder, config["kafka"]["cluster_type"])
     _create_tracking_doc(internal_table_name, "", table_folder)
-    _create_ddl_skeleton(internal_table_name, table_folder)
-    _create_dml_skeleton(internal_table_name, table_folder)
-    logging.debug(f"Created folder {table_folder} for the table {table_name}")
-    return table_folder, table_name
+    _create_ddl_skeleton(internal_table_name, table_folder, product_name)
+    _create_dml_skeleton(internal_table_name, table_folder, product_name)
+    logging.debug(f"Created folder {table_folder} for the table {table_folder_name}")
+    return table_folder, internal_table_name
 
 def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_folder: str) -> str:
     """
@@ -86,14 +105,66 @@ def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_fol
             return dependencies
     return []
 
-def extract_table_name(src_file_name: str) -> str:
+def get_short_table_name(src_file_name: str) -> Tuple[str,str,str]:
     """
     Extract the name of the table given a src file name
     """
     the_path= Path(src_file_name)
     table_name = the_path.stem
-    if table_name.startswith("src_"):
-        table_name = table_name.replace("src_","",1)
+    parts = table_name.split("_")
+    if len(parts) >= 3:
+        if table_name.startswith("src_") or table_name.startswith("int_"):
+            table_type = table_name.split("_")[0]
+            product_name = table_name.split("_")[1]
+            table_name = "_".join(table_name.split("_")[2:])
+        else:
+            product_name = table_name.split("_")[0]
+            table_type = table_name.split("_")[1]
+            table_name = "_".join(table_name.split("_")[2:])   
+    else:
+        table_type = ""
+        product_name = ""
+    return table_type, product_name, table_name
+
+def get_long_table_name(table_name: str, product_name: str, table_type: str) -> str:
+    """
+    Get the table name for a given table name, product name and table type
+    """
+    if table_type == "fact":
+        table_type = "fct"
+        if table_name.startswith("fct_"):
+            table_name= table_name.replace("fct_","",1)
+        if product_name:
+            return f"{product_name}_{table_type}_{table_name}"  
+        else:
+            return f"{table_type}_{table_name}"
+    elif table_type == "dimension":
+        table_type = "dim"
+        if table_name.startswith("dim_"):
+            table_name= table_name.replace("dim_","",1)
+        if product_name:
+            return f"{product_name}_{table_type}_{table_name}"
+        else:
+            return f"{table_type}_{table_name}"
+    elif table_type == "intermediate":
+        table_type = "int"
+        if table_name.startswith("int_"):
+            table_name= table_name.replace("int_","",1)
+        if product_name:
+            return f"{table_type}_{product_name}_{table_name}"
+        else:
+            return f"{table_type}_{table_name}"
+    elif table_type == "view":
+        table_type = "mv"
+        return f"{product_name}_{table_type}_{table_name}"
+    elif table_type == "source":
+        table_type = "src"  
+        if table_name.startswith("src_"):
+            table_name= table_name.replace("src_","",1)
+        if product_name:
+            return f"{table_type}_{product_name}_{table_name}"
+        else:
+            return f"{table_type}_{table_name}"
     return table_name
 
 def update_makefile_in_folder(pipeline_folder: str, table_name: str):
@@ -105,7 +176,7 @@ def update_makefile_in_folder(pipeline_folder: str, table_name: str):
     table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
     _create_makefile( table_name, 
                     table_folder, 
-                    get_config()["kafka"]["cluster_type"], None)
+                    get_config()["kafka"]["cluster_type"])
 
 def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     """
@@ -154,7 +225,7 @@ def validate_table_cross_products(rootdir: str):
 def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> bool:
     """
     """
-    sql_content= load_sql_content(sql_file_name)
+    sql_content= load_sql_content_from_file(sql_file_name)
     updated, new_content= processor.update_sql_content(sql_content)
     if updated:
         with open(sql_file_name, "w") as f:
@@ -162,14 +233,33 @@ def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> b
     return updated
 
 
-def load_sql_content(sql_file_name) -> str:
+def load_sql_content_from_file(sql_file_name) -> str:
     with open(sql_file_name, "r") as f:
         return f.read()
 
 def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
     """
-    Run a show create table statement to get information about a table
-    return the statement with the description of the table
+    Retrieves the DDL structure of a Flink SQL table by executing a SHOW CREATE TABLE statement.
+
+    This function connects to a Confluent Cloud Flink compute pool and executes a SHOW CREATE TABLE
+    statement to get the full table definition, including columns, properties and other attributes.
+
+    Args:
+        table_name: The name of the table to get the structure for
+        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
+                        from the configuration.
+
+    Returns:
+        str | None: The CREATE TABLE statement as a string if successful, None if the table doesn't exist
+                   or there was an error.
+
+    Raises:
+        No exceptions are raised - errors are logged and None is returned.
+
+    Example:
+        >>> structure = get_table_structure("my_table")
+        >>> print(structure)
+        'CREATE TABLE my_table (...) WITH (...)'
     """
     logger.debug(f"{table_name}")
     statement_name = "show-" + table_name.replace('_','-')
@@ -194,8 +284,111 @@ def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) 
     finally:
         client.delete_flink_statement(statement_name)
         return result_str
+    
+
+def create_table(table_name: str, ddl_content: str, compute_pool_id: Optional[str] = None) -> str:
+    """
+    Creates a new Flink SQL table using the provided DDL statement.
+
+    This function connects to a Confluent Cloud Flink compute pool and executes a CREATE TABLE
+    statement to create a new table with the specified structure.
+
+    Args:
+        table_name: The name of the table to create
+        ddl_content: The full CREATE TABLE DDL statement to execute
+        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
+                        from the configuration.
+
+    Returns:
+        str: A message indicating the table was created successfully
+
+    Raises:
+        No exceptions are raised - errors are logged and a status message is returned.
+
+    Example:
+        >>> ddl = "CREATE TABLE my_table (id INT PRIMARY KEY) WITH ('connector'='kafka',...)"
+        >>> result = create_table("my_table", ddl)
+        >>> print(result)
+        'my_table created'
+    """
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id = config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    properties = {'sql.current-catalog': config['flink']['catalog_name'],
+                 'sql.current-database': config['flink']['database_name']}
+    statement_name = "create-" + table_name.replace('_', '-')
+    delete_statement_if_exists(statement_name)
+    try:
+        result = client.post_flink_statement(compute_pool_id,
+                                           statement_name,
+                                           ddl_content,
+                                           properties)
+        logger.debug(f"Run create table {result}")
+    except Exception as e:
+        logger.error(e)
+    delete_statement_if_exists(statement_name)
+    return f"{table_name} created"
+
+def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str:
+    """
+    Gets the structure of an existing Flink SQL table.
+
+    This function connects to a Confluent Cloud Flink compute pool and executes a DESCRIBE statement
+    to retrieve the table structure, including column definitions and table properties.
+
+    Args:
+        table_name: The name of the table to describe
+        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
+                        from the configuration.
+
+    Returns:
+        str: A string containing the table structure description, or an error message if the table
+             does not exist or there was an error retrieving the structure.
+
+    Example:
+        >>> result = get_table_structure("my_table")
+
+    """
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id = config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    sql_content = f"DESCRIBE {table_name};"
+    properties = {'sql.current-catalog': config['flink']['catalog_name'],
+                 'sql.current-database': config['flink']['database_name']}
+    statement_name = "describe-" + table_name.replace('_', '-')
+    delete_statement_if_exists(statement_name)
+    result_str = ""
+    try:
+        result = client.post_flink_statement(compute_pool_id,
+                                           statement_name,
+                                           sql_content,
+                                           properties)
+        if result and result.status.phase in ("RUNNING", "COMPLETED"):
+            result_str = result.results.data
+    except Exception as e:
+        logger.error(e)
+    finally:
+        delete_statement_if_exists(statement_name)
+        return result_str
 
 def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
+    """
+    Drops a Flink SQL table if it exists.
+
+    This function connects to a Confluent Cloud Flink compute pool and executes a DROP TABLE
+    statement to remove the table from the database.
+
+    Args:
+        table_name: The name of the table to drop
+        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
+                        from the configuration.
+
+    Returns:
+        str: A message indicating the table was dropped successfully
+    """
+
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
@@ -227,8 +420,9 @@ def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     with open(out_dir + '/tracking.md', 'w') as f:
         f.write(rendered_tracking_md)
 
-def _create_ddl_skeleton(table_name: str,out_dir: str):
+def _create_ddl_skeleton(table_name: str, out_dir: str, product_name: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    ddl_name = "ddl." + table_name
     ddl_tmpl = env.get_template(f"create_table_skeleton.jinja")
     context = {
         'table_name': table_name,
@@ -236,12 +430,13 @@ def _create_ddl_skeleton(table_name: str,out_dir: str):
         'column_definitions': '-- put here column definitions'
     }
     rendered_ddl = ddl_tmpl.render(context)
-    with open(out_dir + '/sql-scripts/ddl.' + table_name + ".sql", 'w') as f:
+    with open(out_dir + '/sql-scripts/' + ddl_name + '.sql', 'w') as f:
         f.write(rendered_ddl)
 
-def _create_dml_skeleton(table_name: str,out_dir: str):
+def _create_dml_skeleton(table_name: str, out_dir: str, product_name: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     dml_tmpl = env.get_template(f"dml_src_tmpl.jinja")
+    dml_name = "dml." + table_name
     context = {
         'table_name': table_name,
         'sql_part': '-- part to select stuff',
@@ -249,14 +444,13 @@ def _create_dml_skeleton(table_name: str,out_dir: str):
         'src_table': 'src_table'
     }
     rendered_dml = dml_tmpl.render(context)
-    with open(out_dir + '/sql-scripts/dml.' + table_name + ".sql", 'w') as f:
+    with open(out_dir + '/sql-scripts/' + dml_name + ".sql", 'w') as f:
         f.write(rendered_dml)
 
     
 def _create_makefile(table_name: str, 
                      out_dir: str, 
-                     cluster_type: str, 
-                     product_name: str):
+                     cluster_type: str):
     """
     Create a makefile to help deploy Flink statements for the given table name
     When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
@@ -273,6 +467,8 @@ def _create_makefile(table_name: str,
     # Write the rendered Makefile to a file
     with open(out_dir + '/Makefile', 'w') as f:
         f.write(rendered_makefile)
+
+
 
 
 def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:

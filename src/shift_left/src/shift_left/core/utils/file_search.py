@@ -159,7 +159,9 @@ def get_or_build_inventory(
     inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
     
     if not recreate and os.path.exists(inventory_path):
-        return _load_existing_inventory(target_path)
+        with open(inventory_path, "r") as f:
+            inventory= json.load(f)
+            return inventory
         
     inventory = {}
     parser = SQLparser()
@@ -221,6 +223,16 @@ def get_table_type_from_file_path(file_name: str) -> str:
         return "dead_letter"
     else:
         return "unknown-type"
+
+def derive_table_type_product_name_from_path(path: str) -> Tuple[str, str, str]:
+    """
+    Derive the table type and product name from the path
+
+    """
+    table_type = get_table_type_from_file_path(path)
+    product_name = extract_product_name(path)
+    table_name = os.path.basename(path)
+    return table_type, product_name, table_name
 
 def create_folder_if_not_exist(new_path: str) -> str:
     if not os.path.exists(new_path):
@@ -334,10 +346,8 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     file_paths.update(list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
-def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str) -> Tuple[str,str]:
+def get_ddl_dml_names_from_table(table_name: str, prefix: str) -> Tuple[str,str]:
      
-    if product_name:
-        prefix= prefix + "-" + product_name
     if prefix:
         ddl_n = prefix + "-ddl-" + table_name.replace("_","-")
         dml_n = prefix + "-dml-" + table_name.replace("_","-")
@@ -351,10 +361,8 @@ def get_ddl_dml_names_from_table(table_name: str, prefix: str, product_name: str
 
 def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition, 
                                     prefix: str) -> Tuple[str,str]:
-    product_name = extract_product_name(to_process.path)
     return get_ddl_dml_names_from_table(to_process.table_name, 
-                                        prefix, 
-                                        product_name)
+                                        prefix)
 
 def get_ddl_file_name(folder_path: str) -> str:
     """
@@ -395,16 +403,4 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     return sql_files
 
 
-def _load_existing_inventory(target_path: str) -> Dict:
-    """Load existing inventory from file.
-    
-    Args:
-        target_path: Path containing inventory file
-        
-    Returns:
-        Dictionary containing inventory data
-    """
-    logger.info(f"load existing inventory from {target_path}")
-    inventory_path = os.path.join(target_path, INVENTORY_FILE_NAME)
-    with open(inventory_path, "r") as f:
-        return json.load(f)
+  

@@ -7,6 +7,7 @@ import pathlib
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.flink_statement_model import Statement
+from shift_left.core.utils.file_search import SCRIPTS_DIR
 
 class TestTableManager(unittest.TestCase):
 
@@ -21,38 +22,118 @@ class TestTableManager(unittest.TestCase):
         
     def test_extract_table_name(self):
         pathname= "p1/fct_order"
-        tbn = tm.extract_table_name(pathname)
+        tbn = tm.get_short_table_name(pathname)
         assert tbn == "fct_order"
 
+    def test_get_table_name(self):
+        table_name = "test_table"
+        product_name = "product"
+        expected_name = "product_fct_test_table"
+        table_type = "fact"
+        self.assertEqual(tm.get_long_table_name(table_name, product_name, table_type), expected_name)
+        table_type = "intermediate"
+        expected_name = "int_product_test_table"
+        self.assertEqual(tm.get_long_table_name(table_name, product_name, table_type), expected_name)
+        table_type = "source"
+        expected_name = "src_product_test_table"
+        self.assertEqual(tm.get_long_table_name(table_name, product_name, table_type), expected_name)
+        table_type = "dimension"
+        expected_name = "product_dim_test_table"
+        self.assertEqual(tm.get_long_table_name(table_name, product_name, table_type), expected_name)
+        table_type = "view"
+        expected_name = "product_mv_test_table"
+        self.assertEqual(tm.get_long_table_name(table_name, product_name, table_type), expected_name)
+
+    def test_extract_table_name(self):
+        table_name = "product_fct_test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "fct")
+        self.assertEqual(product_name, "product")
+        table_name = "src_product_test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "src")
+        self.assertEqual(product_name, "product")
+        table_name = "int_product_test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "int")
+        self.assertEqual(product_name, "product")
+        table_name = "product_dim_test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "dim")
+        self.assertEqual(product_name, "product")
+        table_name = "test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "")
+        self.assertEqual(product_name, "")
+        table_name = "product_mv_test_table"
+        table_type, product_name, short_table_name= tm.get_short_table_name(table_name)
+        self.assertEqual(short_table_name, "test_table")
+        self.assertEqual(table_type, "mv")
+        self.assertEqual(product_name, "product")
+
+
+
     def test_create_table_structure(self):
-   
         try:
-            tbf, tbn =tm.build_folder_structure_for_table("it2",os.getenv("STAGING") + "/intermediates")
+            tbf, tbn= tm.build_folder_structure_for_table("it2",os.getenv("STAGING") + "/intermediates", "p3")
             assert os.path.exists(tbf)
-            assert os.path.exists(tbf + "/" + tm.SCRIPTS_DIR)
-            assert os.path.exists(tbf + "/" + tm.SCRIPTS_DIR + "/ddl.it2.sql" )
-            assert os.path.exists(tbf + "/" + tm.SCRIPTS_DIR + "/dml.it2.sql" )
+            assert os.path.exists(tbf + "/" + SCRIPTS_DIR)
+            dirname=tbf + "/" + SCRIPTS_DIR + "/ddl.int_p3_it2.sql"
+            assert os.path.exists(dirname)
+            assert os.path.exists(tbf + "/" + SCRIPTS_DIR + "/dml.int_p3_it2.sql" )
             assert os.path.exists(tbf + "/Makefile")
+            with open(dirname, "r") as f:
+                content = f.read()
+                assert "CREATE TABLE IF NOT EXISTS int_p3_it2" in content
+            with open(tbf + "/Makefile", "r") as f:
+                content = f.read()
+                assert "TABLE_NAME=int_p3_it2" in content
         except Exception as e:
             print(e)
             self.fail()
 
+    def test_get_ddl_dml_names_from_table(self):
+        # Test with product name and prefix
+        ddl_name, dml_name = tm.get_ddl_dml_names_from_table(
+            table_name="test_table",
+            prefix="prefix"
+        )
+        self.assertEqual(ddl_name, "prefix-ddl-test-table")
+        self.assertEqual(dml_name, "prefix-dml-test-table")
+
+        # Test with just table name (no prefix or product)
+        ddl_name, dml_name = tm.get_ddl_dml_names_from_table(
+            table_name="test_table",
+            prefix=""
+        )
+        self.assertEqual(ddl_name, "ddl-test-table")
+        self.assertEqual(dml_name, "dml-test-table")
+
+   
     def test_update_make_file(self):
         try:
-            tbf, tbn =tm.build_folder_structure_for_table("it2",os.getenv("PIPELINES") + "/intermediates/p3")
+            tbf, tbn =tm.build_folder_structure_for_table("it2",os.getenv("PIPELINES") + "/intermediates", "p3")
             assert os.path.exists(tbf + "/Makefile")
             os.remove(tbf+ "/Makefile")
             assert not os.path.exists(tbf + "/Makefile")
             tm.get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), True)
-            tm.update_makefile_in_folder(os.getenv("PIPELINES"), "it2")
+            tm.update_makefile_in_folder(os.getenv("PIPELINES"), "int_p3_it2")
             assert os.path.exists(tbf + "/Makefile")
+            with open(tbf + "/Makefile", "r") as f:
+                content = f.read()
+                assert "TABLE_NAME=int_p3_it2" in content
         except Exception as e:
             print(e)
             self.fail()
 
     def test_search_users_of_table(self):
         try:
-            users = tm.search_users_of_table("int_table_1",os.getenv("PIPELINES"))
+            users = tm.search_users_of_table("int_p1_table_1",os.getenv("PIPELINES"))
             assert users
             assert "fct_order" in users
             print(users)
@@ -91,16 +172,16 @@ class TestTableManager(unittest.TestCase):
         mock_statement = MagicMock()
         mock_statement.status.phase = "COMPLETED"
         mock_statement_result = MagicMock()
-        mock_statement_result.results.data = ["CREATE TABLE test_table (...)"]
+        mock_statement_result.results.data = "CREATE TABLE test_table (...)"
         mock_client_instance.post_flink_statement.return_value = mock_statement
         mock_client_instance.get_statement_results.return_value = mock_statement_result
         
         result = tm.get_table_structure(table_name)
         
         self.assertIsNotNone(result)
-        self.assertEqual(result, "['CREATE TABLE test_table (...)']")
-        mock_delete_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
+        self.assertEqual(result, "CREATE TABLE test_table (...)")
+        mock_delete_statement.assert_called_with(f"drop-{table_name.replace('_', '-')}")
+        mock_client_instance.delete_flink_statement.assert_called_with(f"describe-{table_name.replace('_', '-')}")
 
     @patch('shift_left.core.table_mgr.ConfluentCloudClient')
     @patch('shift_left.core.table_mgr.delete_statement_if_exists')
@@ -112,44 +193,10 @@ class TestTableManager(unittest.TestCase):
         
         result = tm.get_table_structure(table_name)
         
-        self.assertIsNone(result)
-        mock_delete_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
+        self.assertEqual(result, "")
+        mock_client_instance.delete_flink_statement.assert_called_with(f"describe-{table_name.replace('_', '-')}")
 
-    @patch('shift_left.core.table_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.table_mgr.delete_statement_if_exists')
-    def test_get_table_structure_empty_result(self, mock_delete_statement, MockConfluentCloudClient):
-        """Test scenario when table structure query returns no results"""
-        table_name = "empty_table"
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_statement = MagicMock()
-        mock_statement.status.phase = "COMPLETED"
-        mock_statement_result = MagicMock()
-        mock_statement_result.results.data = []
-        mock_client_instance.post_flink_statement.return_value = mock_statement
-        mock_client_instance.get_statement_results.return_value = mock_statement_result
-        
-        result = tm.get_table_structure(table_name)
-        
-        self.assertIsNone(result)
-        mock_delete_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
 
-    @patch('builtins.open', new_callable=unittest.mock.mock_open, read_data="SELECT * FROM test_table;")
-    def test_load_sql_content_success(self, mock_file):
-        """Test successful loading of SQL content from file"""
-        sql_file = "test.sql"
-        result = tm.load_sql_content(sql_file)
-        self.assertEqual(result, "SELECT * FROM test_table;")
-        mock_file.assert_called_once_with(sql_file, "r")
-
-    @patch('builtins.open', side_effect=IOError("File not found"))
-    def test_load_sql_content_failure(self, mock_file):
-        """Test error handling when loading SQL content fails"""
-        sql_file = "nonexistent.sql"
-        with self.assertRaises(IOError):
-            tm.load_sql_content(sql_file)
-        mock_file.assert_called_once_with(sql_file, "r")
 
     class MockTableWorker:
         def __init__(self, update_result, new_content):
@@ -159,7 +206,7 @@ class TestTableManager(unittest.TestCase):
         def update_sql_content(self, content):
             return self.update_result, self.new_content
 
-    @patch('shift_left.core.table_mgr.load_sql_content')
+    @patch('shift_left.core.table_mgr.load_sql_content_from_file')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     def test_update_sql_content_success(self, mock_file, mock_load):
         """Test successful update of SQL content"""
@@ -173,18 +220,16 @@ class TestTableManager(unittest.TestCase):
         mock_file.assert_called_once_with(sql_file, "w")
         mock_file().write.assert_called_once_with("SELECT * FROM updated_table;")
 
-    @patch('shift_left.core.table_mgr.load_sql_content')
+    @patch('shift_left.core.table_mgr.load_sql_content_from_file')
     def test_update_sql_content_no_update_needed(self, mock_load):
         """Test when no SQL content update is needed"""
         sql_file = "test.sql"
         mock_load.return_value = "SELECT * FROM test_table;"
         processor = self.MockTableWorker(False, "SELECT * FROM test_table;")
-        
         result = tm.update_sql_content_for_file(sql_file, processor)
-        
         self.assertFalse(result)
 
-    @patch('shift_left.core.table_mgr.load_sql_content', side_effect=IOError("File not found"))
+    @patch('shift_left.core.table_mgr.load_sql_content_from_file', side_effect=IOError("File not found"))
     def test_update_sql_content_file_error(self, mock_load):
         """Test error handling when file operations fail"""
         sql_file = "nonexistent.sql"

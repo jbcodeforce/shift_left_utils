@@ -6,6 +6,7 @@ import os
 import unittest
 
 from shift_left.core.utils.app_config import get_config
+from shift_left.core.flink_statement_model import StatementInfo
 from shift_left.core.utils.file_search import (
     read_pipeline_definition_from_file,
     FlinkStatementNode,
@@ -15,24 +16,24 @@ from shift_left.core.utils.file_search import (
 
 def execute_node(node):
     """Simulates the execution of a node's statement_name."""
-    print(f"Executing program '{node.flink_statement}' for node '{node.name}'...")
+    print(f"Executing program '{node.path}' for node '{node.table_name}'...")
     # Simulate statement_name execution (replace with actual statement_name call)
     import time
     time.sleep(0.5)
-    node.is_running = True
-    print(f"Node '{node.name}' finished execution.")
+    node.existing_statement_info = StatementInfo(status_phase="RUNNING")
+    print(f"Node '{node.table_name}' finished execution.")
 
 def _search_parents_to_run(nodes_to_run, node, visited_nodes):
     if node not in visited_nodes:
         nodes_to_run.append(node)
         visited_nodes.add(node)
         for p in node.parents:
-            if not p.is_running:
+            if not p.is_running():
                 _search_parents_to_run(nodes_to_run, p, visited_nodes)
 
 def _add_non_running_parents(node, execution_plan):
     for p in node.parents:
-        if not p.is_running and p not in execution_plan:
+        if not p.is_running() and p not in execution_plan:
             # position the parent before the node to be sure it is started
             idx=execution_plan.index(node)
             execution_plan.insert(idx,p)
@@ -53,14 +54,14 @@ def build_execution_plan(start_node):
     _search_parents_to_run(nodes_to_run, start_node, visited_nodes)
             
     #nodes_to_run.insert(0,start_node)
-    start_node.is_running = True
+    start_node.existing_statement_info = StatementInfo(status_phase="RUNNING")
     # All the parents - grandparents... reacheable by DFS from the start_node are in nodes_to_run
     # 2. Add the non-running ancestors to the execution plan 
     for node in reversed(nodes_to_run):
         execution_plan.append(node)
         # to be starteable each parent needs to be part of the running ancestors
         _add_non_running_parents(node, execution_plan)
-        node.is_running = True  # Mark as running as they will be executed
+        node.to_run = True  # Mark as running as they will be executed
 
     # execution_plan.append(("run", start_node))
     # start_node.is_running = True  # Mark the starting node as running
@@ -68,7 +69,7 @@ def build_execution_plan(start_node):
     # 3. Restart all children of each node in the execution plan if they are not yet there
     for node in execution_plan:
         for c in node.children:
-            if not c.is_running and c not in execution_plan:
+            if not c.is_running() and not c.to_run and c not in execution_plan:
                 _search_parents_to_run(execution_plan, c, visited_nodes)
                 #execution_plan.append(c)
                 c.to_restart = True
@@ -176,7 +177,7 @@ def execute_plan(plan):
         if node.is_running:
             execute_node(node)
         else:
-            print(f"Restarting node: '{node.table_name}' (program: '{node.flink_statement}')")
+            print(f"Restarting node: '{node.table_name}' (program: '{node.path}')")
 
 
 class TestExecutionPlanBuilder(unittest.TestCase):
@@ -212,18 +213,22 @@ class TestExecutionPlanBuilder(unittest.TestCase):
     
     def _reset_nodes(self):
         for node in [self.src_a, self.src_b, self.src_c, self.node_a, self.node_x, self.node_y, self.node_z, self.node_p, self.node_c, self.node_d, self.node_e, self.node_f]:
-            node.is_running = False
+            node.to_run = False
+            node.existing_statement_info = StatementInfo(status_phase=None)
 
     def test_start_with_int(self):
         print("\n--- Scenario 1: Starting node 'Z' ---")
-        self.node_z.is_running = False # Ensure it's not running initially
+        self._reset_nodes()
+        self.node_z.to_run = False # Ensure it's not running initially
         plan1 = build_execution_plan(self.node_z)
-        assert plan1[0] == self.src_a or plan1[0] == self.src_b
+        print(plan1)
+        assert plan1[0] == self.node_a or plan1[0] == self.src_b
         execute_plan(plan1)
         self._reset_nodes()
     
     def test_start_from_leaf(self):
         print("\n--- Scenario 2: Starting node 'E' ---")
+        self._reset_nodes()
         plan2 = build_execution_plan(self.node_e)
         print(plan2)
         execute_plan(plan2)
@@ -232,6 +237,7 @@ class TestExecutionPlanBuilder(unittest.TestCase):
     def test_start_from_root(self):
         # Scenario 3: Starting the root node
         print("\n--- Scenario 3: Starting node 'Root' ---")
+        self._reset_nodes()
         plan3 = build_execution_plan(self.src_a)
         print(plan3)
         execute_plan(plan3)

@@ -12,10 +12,17 @@ import os
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 from shift_left.core.utils.flink_sql_code_agent_lg import translate_to_flink_sqls
-from shift_left.core.utils.file_search import create_folder_if_not_exist, SCRIPTS_DIR, get_or_build_source_file_inventory
+from shift_left.core.utils.file_search import (
+    create_folder_if_not_exist, 
+    SCRIPTS_DIR,
+    get_or_build_source_file_inventory, 
+    extract_product_name,
+    get_table_type_from_file_path
+    
+)
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
+from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions, get_long_table_name
 from typing import List
 
 
@@ -33,12 +40,13 @@ def process_one_file(table_name: str,
                     staging_target_folder: str, 
                     src_folder_path: str,
                     process_parents: bool = False):
-    """ Process one source sql file to extract code and migrate to Flink SQL """
+    """ Process one source sql file to extract code from and migrate to Flink SQL """
     logger.debug(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     if sql_src_file.endswith(".sql"):
         create_folder_if_not_exist(staging_target_folder)
+        product_name= extract_product_name(sql_src_file)
         if sql_src_file.find("source") > 0:
-            _process_source_sql_file(table_name, sql_src_file, staging_target_folder)
+            _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name)
         else:
             _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
     else:
@@ -74,9 +82,9 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
         pk_to_use= config["app"]["default_PK"]
     else:
         pk_to_use="__pd"
-    fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
-    file_name=f"{target_folder}/ddl.{fname}.sql" 
-    logger.info(f"Create DDL Skeleton for {fname}")
+   
+    file_name=f"{target_folder}/ddl.{table_name}.sql" 
+    logger.info(f"Create DDL Skeleton for {table_name}")
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
     try:
@@ -87,7 +95,7 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
         column_definitions = "-- add columns"
         fields=""
     context = {
-        'table_name': fname,
+        'table_name': table_name,
         'column_definitions': column_definitions,
         'default_PK': pk_to_use
     }
@@ -105,14 +113,13 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     :param target_folder: The folder where to create the dml statement as sql file
     :return: create a file in the target folder
     """
-    if "source" in target_folder:
-        table_fname=config["app"]["src_table_name_prefix"] + table_name + config["app"]["src_table_name_suffix"]
-    file_name=f"{target_folder}/dml.{table_fname}.sql" 
+
+    file_name=f"{target_folder}/dml.{table_name}.sql" 
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
     topic_name=_search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
     context = {
-        'table_name': table_fname,
+        'table_name': table_name,
         'topic_name': f"`{topic_name}`",
         'fields': fields
     }
@@ -149,14 +156,15 @@ def _save_one_file(fname: str, content: str):
     with open(fname,"w") as f:
         f.write(content)
 
-def _save_dml_ddl(content_path: str, table_name: str, dml: str, ddl: str):
+def _save_dml_ddl(content_path: str, internal_table_name: str, dml: str, ddl: str):
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
-    ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
+    ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{internal_table_name}.sql"
     _save_one_file(ddl_fn, ddl)
     _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
-    _save_one_file(f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql",dml)
+    dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{internal_table_name}.sql"
+    _save_one_file(dml_fn,dml)
 
 
 def _remove_already_processed_table(parents: list[str]) -> list[str]:
@@ -187,7 +195,8 @@ def _search_table_in_processed_tables(table_name: str) -> bool:
 
 def _process_source_sql_file(table_name: str,
                             src_file_name: str, 
-                             target_path: str):
+                             target_path: str, 
+                             product_name: str):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
     It creates a tests folder.
@@ -199,12 +208,11 @@ def _process_source_sql_file(table_name: str,
 
     """
     print(f"process src SQL file {src_file_name} from {target_path}")
-    table_folder, table_name = build_folder_structure_for_table(table_name,  target_path + "/sources")
+    table_folder, internal_table_name = build_folder_structure_for_table(table_name,  target_path + "/sources", product_name)
     config = get_config()
-    fields = _create_src_ddl_statement(table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
-    _create_dml_statement(f"{table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
-    _create_test_dedup(f"int_{table_name}_deduped",f"{table_folder}/tests") 
-
+    fields = _create_src_ddl_statement(internal_table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
+    _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
+    
 
 def _process_non_source_sql_file(table_name: str, 
                                 sql_src_file_name: str, 
@@ -223,7 +231,7 @@ def _process_non_source_sql_file(table_name: str,
     logger.debug(f"process SQL file {sql_src_file_name}")
     product_path = os.path.dirname(sql_src_file_name).replace(src_folder_path, "",1)[1:]
     where_to_write_path = os.path.join(target_path, product_path)
-    table_folder, _ = build_folder_structure_for_table(table_name, where_to_write_path)
+    table_folder, internal_table_name = build_folder_structure_for_table(table_name, where_to_write_path, None)
     parents=[]
     with open(sql_src_file_name, "r") as f:
         sql_content= f.read()
@@ -232,7 +240,7 @@ def _process_non_source_sql_file(table_name: str,
         if table_name in parents:
             parents.remove(table_name)
         dml, ddl = translate_to_flink_sqls(table_name, sql_content)
-        _save_dml_ddl(table_folder, table_name, dml, ddl)
+        _save_dml_ddl(table_folder, internal_table_name, dml, ddl)
     if walk_parent:
         parents=_remove_already_processed_table(parents)
         for parent_table_name in parents:

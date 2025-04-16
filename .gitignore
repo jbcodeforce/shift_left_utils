@@ -1,4 +1,4 @@
-**/config.yaml
+**/config*.yaml
 IaC/tf_aws_ec2/.terraform/
 **/__pycache__/
 utils/reports

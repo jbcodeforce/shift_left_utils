@@ -27,14 +27,14 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
 
     client = ConfluentCloudClient(config)
-    if compute_pool_id and _validate_a_pool(client, compute_pool_id):
+    env_id = config['confluent_cloud']['environment_id']
+    if compute_pool_id and _validate_a_pool(client, compute_pool_id, env_id):
         return compute_pool_id
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
         product_name = extract_product_name(pipeline_def.path)
         _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                    config['kafka']['cluster_type'], 
-                                                    product_name)
+                                                    config['kafka']['cluster_type'])
         statement = get_statement(dml_statement_name)
         pool_id= statement.spec.compute_pool_id
         if pool_id:
@@ -71,7 +71,8 @@ def _create_compute_pool(table_name: str) -> str:
     result= client.create_compute_pool(client,spec)
     if result:
         pool_id = result['id']
-        _verify_compute_pool_provisioned(pool_id)
+        env_id = config['confluent_cloud']['environment_id']
+        _verify_compute_pool_provisioned(pool_id, env_id)
 
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
@@ -103,12 +104,12 @@ def _get_pool_usage(pool_info: dict) -> float:
     max = pool_info['spec']['max_cfu']
     return (current / max)
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str) -> bool:
+def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id: str) -> bool:
     """
     Validate a pool exist and with enough resources
     """
     try:
-        pool_info=client.get_compute_pool_info(compute_pool_id)
+        pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
         if pool_info == None:
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")

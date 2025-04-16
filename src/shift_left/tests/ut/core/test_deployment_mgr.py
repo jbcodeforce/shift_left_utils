@@ -8,15 +8,13 @@ import pathlib
 from datetime import datetime
 import time
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../data/flink-project/pipelines")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "../data/flink-project/pipelines")
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.statement_mgr import *
 import shift_left.core.deployment_mgr as dm
-from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 from shift_left.core.deployment_mgr import (
     deploy_pipeline_from_table,
     full_pipeline_undeploy_from_table,
@@ -40,10 +38,11 @@ class TestDeploymentManager(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "./data"  # Path to the data directory
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def setUp(self):
         self.config = get_config()
@@ -55,15 +54,13 @@ class TestDeploymentManager(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr._deploy_dml')
     @patch('shift_left.core.deployment_mgr._get_statement_status')
     def test_deploy_pipeline_from_table_success(self, mock_get_status, mock_deploy_dml, mock_deploy_ddl_dml):
-        table_name = "a"
+        table_name = "z"
         def mock_status(statement_name):
-            if statement_name.startswith("dev-p2-dml-src-a"):
-                return MagicMock(status_phase="RUNNING", compute_pool_id="test-pool-123")
+            if statement_name.startswith("dev-dml-z"):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")
             else:
-                return MagicMock(status_phase="UNKNOWN", compute_pool_id=None)
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
         mock_get_status.side_effect = mock_status
-
-       
         
         mock_statement = MagicMock(spec=Statement)
         mock_deploy_ddl_dml.return_value = mock_statement
@@ -111,6 +108,9 @@ class TestDeploymentManager(unittest.TestCase):
         mock_delete.assert_called()
         mock_drop.assert_called_with(self.table_name, self.config['flink']['compute_pool_id'])
 
+
+
+
     @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
     @patch('shift_left.core.deployment_mgr.get_table_ref_from_inventory')
     def test_full_pipeline_undeploy_from_table_not_found(self, mock_get_ref, mock_inventory):
@@ -126,6 +126,8 @@ class TestDeploymentManager(unittest.TestCase):
 
         # Verify
         self.assertEqual(result, f"ERROR: Table {self.table_name} not found in table inventory")
+
+
 
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     def test_build_table_graph_for_node(self, mock_read):
@@ -146,6 +148,8 @@ class TestDeploymentManager(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertIn(start_node.table_name, result)
         self.assertEqual(result[start_node.table_name], start_node)
+
+
 
     @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
     @patch('shift_left.core.deployment_mgr._deploy_dml')
@@ -274,9 +278,9 @@ class TestDeploymentManager(unittest.TestCase):
 
         def mock_status(statement_name):
             if statement_name.startswith("dev-p1-dml-src-") or statement_name.startswith("dev-dml-src-"):
-                return MagicMock(status_phase="RUNNING", compute_pool_id="test-pool-123")
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")
             else:
-                return MagicMock(status_phase="UNKNOWN", compute_pool_id=None)
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
         mock_get_status.side_effect = mock_status
 
         inventory_path= os.getenv("PIPELINES")

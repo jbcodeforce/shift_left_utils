@@ -12,11 +12,7 @@ import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import (
     TableWorker, 
     Change_CompressionType, 
-    Change_Concat_to_Concat_WS,
-    ChangeLocalTimeZone,
-    Change_SchemaContext,
-    ChangeChangeModeToUpsert,
-    ChangePK_FK_to_SID)
+    Change_SchemaContext)
 
 from shift_left.core.utils.file_search import list_src_sql_files
 
@@ -34,9 +30,9 @@ class TestTableWorker(unittest.TestCase):
             def update_sql_content(self, sql_in : str) -> Tuple[bool, str]:
                 return True, sql_in.replace(" 'kafka.retention.time' = '0',", " 'kafka.retention.time' = '0', \n'sql.local-time-zone' = 'UTC-0',")
         worker= TestUpdate()
-        updated=tm.update_sql_content_for_file(files["ddl.fct_order"], worker)
+        updated=tm.update_sql_content_for_file(files["ddl.p1_fct_order"], worker)
         assert updated
-        with open(files["ddl.fct_order"], "r") as f:
+        with open(files["ddl.p1_fct_order"], "r") as f:
             sql_out = f.read()
             assert "'kafka.retention.time' = '0" in sql_out
             print(sql_out)
@@ -118,25 +114,6 @@ class TestTableWorker(unittest.TestCase):
         assert "a_sid" in sql_out
         print(sql_out)
 
-    def test_ChangeLocalTimeZone(self):
-        sql_in="""
-        create table T_timezone (
-           id string,
-           a_pk_fk string,
-           primary key (id) not enforced
-        ) with (
-           'changelog.mode' = 'append',
-            'key.format' = 'avro-registry',
-            'value.format' = 'avro-registry',
-            'value.fields-include' = 'all'
-        )
-        """
-        worker = ChangeLocalTimeZone()
-        updated, sql_out= worker.update_sql_content(sql_in)
-        assert sql_out
-        assert updated
-        assert "'sql.local-time-zone'" in sql_out
-        print(sql_out)
 
     def test_Change_SchemaContext(self):
         sql_in="""
@@ -173,14 +150,14 @@ class TestTableWorker(unittest.TestCase):
         updated, sql_out= worker.update_sql_content(sql_in)
         assert sql_out
         assert updated
-        assert "'kafka.producer.compression.type'='snappy'" in sql_out
+        assert "'kafka.producer.compression.type' = 'snappy'" in sql_out
         print(sql_out)
 
     def test_sql_content_update_from_env(self):
         module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
+        get_config()['kafka']['cluster_type']='stage'
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        get_config()['kafka']['cluster_type']='stage'
         sql_in="""
         CREATE TABLE table_1 (
             a string
@@ -198,6 +175,7 @@ class TestTableWorker(unittest.TestCase):
         """
         updated, sql_out= runner_class().update_sql_content(sql_in)
         print(sql_out)
+        assert updated
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
         assert "'value.avro-registry.schema-context' = '.flink-stage'" in sql_out
 

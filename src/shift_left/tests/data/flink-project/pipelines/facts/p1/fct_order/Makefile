@@ -1,7 +1,7 @@
 include ../../../common.mk
 
 # --- fct_order
-TABLE_NAME=fct_order
+TABLE_NAME=p1_fct_order
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 

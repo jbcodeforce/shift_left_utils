@@ -1,0 +1,1 @@
+insert into src_s1 ();
