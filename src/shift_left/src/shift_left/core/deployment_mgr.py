@@ -20,7 +20,13 @@ from typing import Optional, List, Any, Set
 from shift_left.core.pipeline_mgr import (
     get_pipeline_definition_for_table
 )  
-from shift_left.core.compute_pool_mgr import get_or_build_compute_pool, save_compute_pool_info_in_metadata
+from shift_left.core.compute_pool_mgr import (
+    get_or_build_compute_pool, 
+    save_compute_pool_info_in_metadata,
+    get_compute_pool_list, 
+    search_for_matching_compute_pool, 
+    get_compute_pool_with_id
+)
 from shift_left.core.table_mgr import drop_table
 from shift_left.core.statement_mgr import delete_statement_if_exists, get_statement_list, deploy_flink_statement
 from shift_left.core.flink_statement_model import (
@@ -56,7 +62,7 @@ def deploy_pipeline_from_table(table_name: str,
                                inventory_path: str, 
                                compute_pool_id: str,
                                dml_only: bool = False,
-                               force_children: bool = False ) -> DeploymentReport:
+                               may_start_children: bool = False ) -> DeploymentReport:
     """
     Given the table name, executes the dml and ddl to deploy a pipeline.
     If the compute pool id is present it will use it. If not it will 
@@ -78,19 +84,17 @@ def deploy_pipeline_from_table(table_name: str,
     start_time = time.perf_counter()
     pipeline_def: FlinkTablePipelineDefinition = get_pipeline_definition_for_table(table_name, inventory_path)
 
-    compute_pool_id =  get_or_build_compute_pool(compute_pool_id, pipeline_def)
-    
     execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        may_start_children=force_children, 
+                                                        may_start_children=may_start_children, 
                                                         start_time=datetime.now())
     persist_execution_plan(execution_plan)
 
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
                             compute_pool_id=compute_pool_id,
-                            update_children=force_children,
+                            update_children=may_start_children,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
@@ -127,6 +131,9 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     logger.info("Build execution plan")
     if not compute_pool_id:
         compute_pool_id = get_config()['flink']['compute_pool_id']
+        compute_pool_list = get_compute_pool_list(get_config().get('confluent_cloud').get('environment'), get_config().get('confluent_cloud').get('region'))
+        compute_pool_id =  get_or_build_compute_pool(compute_pool_id)
+    
     start_node = pipeline_def.to_node()
     if not start_time:
         start_time = str(datetime.now())
@@ -276,6 +283,8 @@ def _get_and_update_statement_info_for_node(node):
     node.existing_statement_info = _get_statement_status(node.dml_statement)
     if node.existing_statement_info.compute_pool_id:
         node.compute_pool_id = node.existing_statement_info.compute_pool_id
+    else:
+        logger.warning(f"Search pool id for {node.table_name}")
 
 def _search_parents_to_run(nodes_to_run, current_node, visited_nodes, node_map):
     """

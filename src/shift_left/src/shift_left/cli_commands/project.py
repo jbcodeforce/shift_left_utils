@@ -50,7 +50,8 @@ def list_topics(project_path: Annotated[str, typer.Argument(help="Project path t
         print(f"Topic list saved in {project_path}/topic_list.txt")
 
 @app.command()
-def list_compute_pools(environment_id: Annotated[str , typer.Option(help="Environment_id to return all compute pool")] = None):
+def list_compute_pools(environment_id: str = typer.Option(None, help="Environment_id to return all compute pool"),
+                      region: str = typer.Option(None, help="Region_id to return all compute pool")):
         """
         Get the complete list and detail of the compute pools of the given environment_id. If the environment_id is not specified, it will use the conflig.yaml
         with the ['confluent_cloud']['environment_id']
@@ -58,7 +59,7 @@ def list_compute_pools(environment_id: Annotated[str , typer.Option(help="Enviro
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
         print("#" * 30 + f" List conpute pool {environment_id}")
-        list_of_pools = get_compute_pool_list(environment_id)
+        list_of_pools = get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
 @app.command()

@@ -62,7 +62,7 @@ class TestDeploymentManager(unittest.TestCase):
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=False, 
-                                               force_children=False)
+                                               may_start_children=False)
         assert result
         print(result)
 
@@ -75,7 +75,7 @@ class TestDeploymentManager(unittest.TestCase):
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=True, 
-                                               force_children=False)
+                                               may_start_children=False)
         assert result
         print(result)
         print("Validating running dml")
@@ -115,7 +115,7 @@ class TestDeploymentManager(unittest.TestCase):
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=True, 
-                                               force_children=True)
+                                               may_start_children=True)
         assert result
         print(result)
         print("Validating running dml")

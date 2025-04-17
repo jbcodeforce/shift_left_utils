@@ -58,7 +58,7 @@ class TestPoolManager(unittest.TestCase):
     def test_validate_a_pool(self):
         config = get_config()
         client = ConfluentCloudClient(config)
-        result = cpm._validate_a_pool(client, config['flink']['compute_pool_id'])
+        result = cpm._validate_a_pool(client, config['flink']['compute_pool_id'], config.get('confluent_cloud').get('environment_id'))
         assert result
 
 

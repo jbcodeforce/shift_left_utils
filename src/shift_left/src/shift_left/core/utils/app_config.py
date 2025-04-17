@@ -28,8 +28,8 @@ def get_config() -> dict[str, str] | None:
           _config=yaml.load(f,Loader=yaml.FullLoader)
   return _config
 
-
-log_dir = os.path.join(os.path.expanduser("~"), '.shift_left/logs')
+shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left') 
+log_dir = os.path.join(shift_left_dir, 'logs')
 logger = logging.getLogger("shift_left")
 os.makedirs(log_dir, exist_ok=True)
 logger.setLevel(get_config()["app"]["logging"])

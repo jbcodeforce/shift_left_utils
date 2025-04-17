@@ -9,6 +9,7 @@ from base64 import b64encode
 from typing import List
 from shift_left.core.utils.app_config import logger
 from shift_left.core.flink_statement_model import *
+from shift_left.core.flink_compute_pool_model import *
 
 
 class ConfluentCloudClient:
@@ -75,16 +76,18 @@ class ConfluentCloudClient:
             logger.info(f"Error executing rest call: {e}")
             return None
     
-    def get_compute_pool_list(self, env_id: str) -> List[str]:
+    def get_compute_pool_list(self, env_id: str, region: str) -> ComputePoolList:
         """Get the list of compute pools"""
         if not env_id:
             env_id=self.config["confluent_cloud"]["environment_id"]
-        region=self.config["confluent_cloud"]["region"]
-        results=[]
+        if not region:
+            region=self.config["confluent_cloud"]["region"]
+        compute_pool_list = ComputePoolList(created_at=str(datetime.now()))
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}&page_size={page_size}"
-        
+        logger.info(f"compute pool url= {url}")
+        logger.debug(f"{self.api_key}")
         while True:
             if next_page_token:
                 #parsed_url = urlparse(next_page_token)
@@ -92,23 +95,18 @@ class ConfluentCloudClient:
                 resp=self.make_request("GET", next_page_token + f"?page_size={page_size}")
             else:
                 resp=self.make_request("GET", url)
-            logger.debug(f"compute pool response= {resp}")
-            if resp and "data" in resp and resp.get('data'):
-                for info in resp.get('data'):
-                    results.append({'id' : info["id"], 
-                                    'name':  info.get('spec').get('display_name'), 
-                                    'env_id': info.get('spec').get('environment').get('id'),
-                                    'max_cfu': info.get('spec').get('max_cfu'),
-                                    'region': info.get('spec').get('region'),
-                                    'status_phase': info.get('status').get('phase'),
-                                    'current_cfu': info.get('status').get('current_cfu')})
-            if resp and "metadata" in resp and "next" in resp.get('metadata'):
+            logger.info(f"compute pool response= {resp}")
+            resp_obj = ComputePoolListResponse.model_validate(resp)
+            if resp_obj.data:
+                compute_pool_list.pools.append(resp_obj.data)
+            if resp_obj.metadata.next:
                 next_page_token = resp.get('metadata').get('next')
                 if not next_page_token:
                     break
             else:
                 break
-        return results
+        logger.info(f"compute pool results= {compute_pool_list.model_dump_json(indent=3)}")
+        return compute_pool_list
         
 
     def get_compute_pool_info(self, compute_pool_id: str, env_id: str):
