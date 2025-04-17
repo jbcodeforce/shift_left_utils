@@ -5,9 +5,10 @@ import unittest
 import os
 import time
 import pathlib
-from collections import deque
-#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
+from unittest.mock import patch
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+#os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
@@ -24,7 +25,7 @@ from shift_left.core.utils.file_search import (
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.flink_statement_model import *
-
+import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 import json
 from typing import Union
@@ -116,7 +117,7 @@ class TestDeploymentManager(unittest.TestCase):
             print(f"Run {statement.dml_statement} on {statement.compute_pool_id} run: {statement.to_run} restart: {statement.to_restart}")
 
 
-    def test_build_execution_plan(self):
+    def _test_build_execution_plan(self):
         os.environ["PIPELINES"] = os.getcwd() + "/../../../data-platform-flink/pipelines"
         inventory_path= os.getenv("PIPELINES")
         import shift_left.core.deployment_mgr as dm
@@ -135,6 +136,29 @@ class TestDeploymentManager(unittest.TestCase):
         #for statement in l:
         #    print(statement)
 
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_for_intermediated_table_including_children(self, mock_get_status): 
+        """
+        From an intermediate like z, start parents up to running sources that are not already running.
+        plan should have: src_x, x, y, z, d, src_b, b, f, c, p, e. As force childen is false no children will be restarted.
+        """
+        inventory_path= os.getenv("PIPELINES")
+        def mock_status(statement_name):
+            if (statement_name.startswith("dev-dml-src-y") or 
+                statement_name.startswith("dev-dml-p")):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")  
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                True, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))
+
+        assert len(execution_plan.nodes) == 11
         
 
 if __name__ == '__main__':

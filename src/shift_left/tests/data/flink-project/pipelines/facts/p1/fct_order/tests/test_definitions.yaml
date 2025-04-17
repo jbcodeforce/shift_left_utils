@@ -1,28 +1,30 @@
 foundations:
   - table_name: int_table_1
-    ddl_for_test: ../tests/ddl_int_table_1.sql
+    ddl_for_test: ./tests/ddl_int_table_1.sql
   - table_name: int_table_2
-    ddl_for_test: ../tests/ddl_int_table_2.sql
+    ddl_for_test: ./tests/ddl_int_table_2.sql
   - table_name: fct_order
-    ddl_for_test: ddl.fct_order.sql
+    ddl_for_test: ./sql-scripts/ddl.p1_fct_order.sql
 test_suite:
 - name: test_case_1
   inputs:
     - table_name: int_table_1
-      sql_file_name: ../tests/insert_int_table_1_1.sql
+      sql_file_name: ./tests/insert_int_table_1_1.sql
     - table_name: int_table_2
-      sql_file_name: ../tests/insert_int_table_2_1.sql
+      sql_file_name: ./tests/insert_int_table_2_1.sql
     - table_name: fct_order
-      sql_file_name: dml.fct_order.sql
+      sql_file_name: ./tests/dml.fct_order.sql
   outputs:
     - table_name: fct_order
-      sql_file_name: ../tests/validate_fct_order_1.sql
+      sql_file_name: ./tests/validate_fct_order_1.sql
 - name: test_case_2
   inputs:
     - table_name: int_table_1
-      sql_file_name: tests/insert_int_table_1_2.sql
+      sql_file_name: ./tests/insert_int_table_1_2.sql
     - table_name: int_table_2
-      sql_file_name: tests/insert_int_table_2_2.sql
+      sql_file_name: ./tests/insert_int_table_2_2.sql
+    - table_name: fct_order
+      sql_file_name: ./sql-scripts/dml.p1_fct_order.sql
   outputs:
     - table_name: fct_order
-      sql_file_name: tests/validate_fct_order_2.sql
+      sql_file_name: ./validate_fct_order_2.sql

@@ -1,6 +1,15 @@
 {
+    "int_p3_data_mesh": {
+        "table_name": "int_p3_data_mesh",
+        "product_name": "p3",
+        "type": "unknown-type",
+        "dml_ref": "pipelines/p3/int_p3_data_mesh/sql-scripts/dml.int_p3_data_mesh.sql",
+        "ddl_ref": "pipelines/p3/int_p3_data_mesh/sql-scripts/ddl.int_p3_data_mesh.sql",
+        "table_folder_name": "pipelines/p3/int_p3_data_mesh"
+    },
     "src_p2_a": {
         "table_name": "src_p2_a",
+        "product_name": "p2",
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_a/sql-scripts/dml.src_p2_a.sql",
         "ddl_ref": "pipelines/sources/p2/src_a/sql-scripts/ddl.src_p2_a.sql",
@@ -8,6 +17,7 @@
     },
     "src_b": {
         "table_name": "src_b",
+        "product_name": "p2",
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
         "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
@@ -15,6 +25,7 @@
     },
     "src_y": {
         "table_name": "src_y",
+        "product_name": "p2",
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
         "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
@@ -22,6 +33,7 @@
     },
     "src_x": {
         "table_name": "src_x",
+        "product_name": "p2",
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_x/sql-scripts/dml.src_x.sql",
         "ddl_ref": "pipelines/sources/p2/src_x/sql-scripts/ddl.src_x.sql",
@@ -29,6 +41,7 @@
     },
     "src_p1_table_2": {
         "table_name": "src_p1_table_2",
+        "product_name": "p1",
         "type": "source",
         "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_p1_table_2.sql",
         "ddl_ref": "pipelines/sources/p1/src_table_2/sql-scripts/ddl.src_p1_table_2.sql",
@@ -36,6 +49,7 @@
     },
     "src_p1_table_3": {
         "table_name": "src_p1_table_3",
+        "product_name": "p1",
         "type": "source",
         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
@@ -43,27 +57,15 @@
     },
     "src_table_1": {
         "table_name": "src_table_1",
+        "product_name": "",
         "type": "source",
         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
         "table_folder_name": "pipelines/sources/src_table_1"
     },
-    "int_p4_taxi_rides": {
-        "table_name": "int_p4_taxi_rides",
-        "type": "intermediate",
-        "dml_ref": "pipelines/intermediates/p4/taxi_rides/sql-scripts/dml.int_p4_taxi_rides.sql",
-        "ddl_ref": "pipelines/intermediates/p4/taxi_rides/sql-scripts/ddl.int_p4_taxi_rides.sql",
-        "table_folder_name": "pipelines/intermediates/p4/taxi_rides"
-    },
-    "int_p3_it2": {
-        "table_name": "int_p3_it2",
-        "type": "intermediate",
-        "dml_ref": "pipelines/intermediates/p3/it2/sql-scripts/dml.int_p3_it2.sql",
-        "ddl_ref": "pipelines/intermediates/p3/it2/sql-scripts/ddl.int_p3_it2.sql",
-        "table_folder_name": "pipelines/intermediates/p3/it2"
-    },
     "z": {
         "table_name": "z",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
@@ -71,6 +73,7 @@
     },
     "a": {
         "table_name": "a",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/a/sql-scripts/dml.a.sql",
         "ddl_ref": "pipelines/intermediates/p2/a/sql-scripts/ddl.a.sql",
@@ -78,6 +81,7 @@
     },
     "c": {
         "table_name": "c",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/c/sql-scripts/dml.c.sql",
         "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
@@ -85,6 +89,7 @@
     },
     "d": {
         "table_name": "d",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
@@ -92,6 +97,7 @@
     },
     "x": {
         "table_name": "x",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
         "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
@@ -99,6 +105,7 @@
     },
     "b": {
         "table_name": "b",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
         "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
@@ -106,6 +113,7 @@
     },
     "y": {
         "table_name": "y",
+        "product_name": "p2",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
         "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
@@ -113,6 +121,7 @@
     },
     "int_p1_table_2": {
         "table_name": "int_p1_table_2",
+        "product_name": "p1",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_p1_table_2.sql",
         "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_p1_table_2.sql",
@@ -120,6 +129,7 @@
     },
     "int_p1_table_1": {
         "table_name": "int_p1_table_1",
+        "product_name": "p1",
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_p1_table_1.sql",
         "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_p1_table_1.sql",
@@ -127,6 +137,7 @@
     },
     "f": {
         "table_name": "f",
+        "product_name": "p2",
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/f/sql-scripts/dml.f.sql",
         "ddl_ref": "pipelines/facts/p2/f/sql-scripts/ddl.f.sql",
@@ -134,6 +145,7 @@
     },
     "e": {
         "table_name": "e",
+        "product_name": "p2",
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/e/sql-scripts/dml.e.sql",
         "ddl_ref": "pipelines/facts/p2/e/sql-scripts/ddl.e.sql",
@@ -141,6 +153,7 @@
     },
     "p": {
         "table_name": "p",
+        "product_name": "p2",
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/p/sql-scripts/dml.p.sql",
         "ddl_ref": "pipelines/facts/p2/p/sql-scripts/ddl.p.sql",
@@ -148,6 +161,7 @@
     },
     "p1_fct_order": {
         "table_name": "p1_fct_order",
+        "product_name": "p1",
         "type": "fact",
         "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
         "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",

@@ -1,27 +1,30 @@
 {
    "table_name": "b",
+   "product_name": "p2",
    "type": "intermediate",
    "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
    "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
    "path": "pipelines/intermediates/p2/b",
-   "state_form": "Stateful",
+   "state_form": "Stateless",
    "parents": [
       {
          "table_name": "src_b",
+         "product_name": "p2",
          "type": "source",
          "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
          "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
          "path": "pipelines/sources/p2/src_b",
-         "state_form": "Stateful",
+         "state_form": "Stateless",
          "parents": [],
          "children": [
             {
                "table_name": "b",
+               "product_name": "p2",
                "type": "intermediate",
                "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
                "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
                "path": "pipelines/intermediates/p2/b",
-               "state_form": "Stateful",
+               "state_form": "Stateless",
                "parents": [],
                "children": []
             }
@@ -31,11 +34,12 @@
    "children": [
       {
          "table_name": "c",
+         "product_name": "p2",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p2/c/sql-scripts/dml.c.sql",
          "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
          "path": "pipelines/intermediates/p2/c",
-         "state_form": "Stateful",
+         "state_form": "Stateless",
          "parents": [],
          "children": []
       }

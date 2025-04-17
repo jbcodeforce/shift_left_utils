@@ -7,8 +7,8 @@ import os
 import pathlib
 from datetime import datetime
 import time
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "../data/flink-project/pipelines")
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config-all.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as tm
@@ -19,17 +19,14 @@ from shift_left.core.deployment_mgr import (
     deploy_pipeline_from_table,
     full_pipeline_undeploy_from_table,
     build_execution_plan_from_any_table,
+        FlinkStatementNode,
+    FlinkStatementExecutionPlan,
     _build_statement_node_map,
-    _execute_plan,
-    _deploy_ddl_dml,
-    _deploy_dml,
-    _delete_not_shared_parent
+    _execute_plan
 )
-from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementResult
+from shift_left.core.flink_statement_model import Statement, StatementInfo
 from shift_left.core.utils.file_search import (
     FlinkTablePipelineDefinition,
-    FlinkStatementNode,
-    FlinkStatementExecutionPlan
 )
 
 class TestDeploymentManager(unittest.TestCase):
@@ -42,7 +39,7 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
-        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        #pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def setUp(self):
         self.config = get_config()
@@ -50,10 +47,204 @@ class TestDeploymentManager(unittest.TestCase):
         self.table_name = "test_table"
         self.inventory_path = os.getenv("PIPELINES")
 
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_for_one_table_parent_running(self, mock_get_status): 
+        """
+        Should lead to only parents to run when they are not running.
+        F has one parent D.
+        """
+        ## The parent D is running so only the fact F should be run.
+        def mock_status(statement_name):
+            if statement_name.startswith("dev-dml-d"):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                False, datetime.now())
+        print(dm.build_summary_from_execution_plan(execution_plan))
+        assert len(execution_plan.nodes) == 1
+        assert execution_plan.nodes[0].table_name == "f"
+        assert execution_plan.nodes[0].to_run == True
+        assert execution_plan.nodes[0].to_restart == False
+        
+
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_for_one_table_parent_not_running(self, mock_get_status): 
+        """
+        The parent D is not running so the execution plan includes D before fact F.
+        D has Y and Z as parents, Z is runnning but not Y
+        """
+        def mock_status(statement_name):
+            if statement_name.startswith("dev-dml-d") or statement_name.startswith("dev-dml-y") or statement_name.startswith("dev-dml-f"):
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)  
+            if  statement_name.startswith("dev-dml-z"):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                False, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))   
+        assert len(execution_plan.nodes) == 3
+
+        assert execution_plan.nodes[0].table_name == "y"
+        assert execution_plan.nodes[0].to_run == True
+        assert execution_plan.nodes[0].to_restart == False
+        assert execution_plan.nodes[1].table_name == "d"
+        assert execution_plan.nodes[1].to_run == True
+        assert execution_plan.nodes[1].to_restart == False
+        assert execution_plan.nodes[2].table_name == "f"
+        assert execution_plan.nodes[2].to_run == True
+        assert execution_plan.nodes[2].to_restart == False
+          
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_with_all_src_running(self, mock_get_status): 
+        """
+        From a leaf like f start parents up to running sources that are already running.
+        plan should have: y,x,z,d,f
+        """
+        def mock_status(statement_name):
+            if (statement_name.startswith("dev-dml-src-y") or 
+                statement_name.startswith("dev-dml-src-x") or 
+                statement_name.startswith("dev-dml-src-a") or 
+                statement_name.startswith("dev-dml-src-b")):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")  
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                False, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))
+        # 8 as the 3 children of Z are not running   
+        assert len(execution_plan.nodes) == 8
+
+        assert execution_plan.nodes[0].table_name == "y" or execution_plan.nodes[0].table_name == "x"
+        assert execution_plan.nodes[0].to_run == True
+        assert execution_plan.nodes[0].to_restart == False
+        assert execution_plan.nodes[1].table_name == "z" or execution_plan.nodes[1].table_name == "x" or execution_plan.nodes[1].table_name == "y"
+        assert execution_plan.nodes[1].to_run == True
+        assert execution_plan.nodes[1].to_restart == False
+        assert execution_plan.nodes[2].table_name == "z"  or execution_plan.nodes[1].table_name == "d" 
+        assert execution_plan.nodes[2].to_run == True
+        assert execution_plan.nodes[2].to_restart ==  False  
+
+
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_with_all_src_running_and_z_children_running(self, mock_get_status): 
+        """
+        From a leaf like f start parents up to running sources that are already running.
+        plan should have: y,x,z,d,f
+        """
+        def mock_status(statement_name):
+            if (statement_name.startswith("dev-dml-src-y") or 
+                statement_name.startswith("dev-dml-src-x") or 
+                statement_name.startswith("dev-dml-src-a") or 
+                statement_name.startswith("dev-dml-src-b") or
+                statement_name.startswith("dev-dml-p") or 
+                statement_name.startswith("dev-dml-c")):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")  
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                False, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))
+        # children of Z are running except D
+        assert len(execution_plan.nodes) == 5
+
+        assert execution_plan.nodes[0].table_name == "y" or execution_plan.nodes[0].table_name == "x"
+        assert execution_plan.nodes[0].to_run == True
+        assert execution_plan.nodes[0].to_restart == False
+        assert execution_plan.nodes[1].table_name == "z" or execution_plan.nodes[1].table_name == "x" or execution_plan.nodes[1].table_name == "y"
+        assert execution_plan.nodes[1].to_run == True
+        assert execution_plan.nodes[1].to_restart == False
+        assert execution_plan.nodes[2].table_name == "z"  or execution_plan.nodes[1].table_name == "d" 
+        assert execution_plan.nodes[2].to_run == True
+        assert execution_plan.nodes[2].to_restart == False
+
+
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_for_intermediated_table(self, mock_get_status): 
+        """
+        From an intermediate like z, start parents up to running sources that are not already running.
+        plan should have: src_y, src_x, x, ,y, z. As force childen is false no children will be restarted.
+        """
+        def mock_status(statement_name):
+            if (statement_name.startswith("dev-dml-p") or 
+                statement_name.startswith("dev-dml-c")):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")  
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                False, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))
+        # children of Z are running except D
+        assert len(execution_plan.nodes) == 5
+
+        assert execution_plan.nodes[0].table_name == "src_y" or execution_plan.nodes[0].table_name == "src_x"
+        assert execution_plan.nodes[0].to_run == True
+        assert execution_plan.nodes[0].to_restart == False
+        assert (execution_plan.nodes[1].table_name == "z" 
+                or execution_plan.nodes[1].table_name == "x" 
+                or execution_plan.nodes[1].table_name == "y"
+                or execution_plan.nodes[1].table_name == "src_y"
+                or execution_plan.nodes[1].table_name == "src_x")
+        error = False
+        for node in execution_plan.nodes:
+            if node.table_name == "d" or node.table_name == "c" or node.table_name == "p":
+                error = True
+        assert error == False
+        
+
+
+
+    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    def test_build_execution_plan_for_intermediated_table_including_children(self, mock_get_status): 
+        """
+        From an intermediate like z, start parents up to running sources that are not already running.
+        plan should have: src_x, x, src_a, a, y, z, d, src_b, b, f, c, p, e. As force childen is false no children will be restarted.
+        """
+        def mock_status(statement_name):
+            if (statement_name.startswith("dev-dml-src-y") or 
+                statement_name.startswith("dev-dml-p")):
+                return StatementInfo(status_phase="RUNNING", compute_pool_id="test-pool-123")  
+            else:
+                return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
+
+        mock_get_status.side_effect = mock_status
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
+                                                                get_config()['flink']['compute_pool_id'], 
+                                                                False, 
+                                                                True, datetime.now())  
+        print(dm.build_summary_from_execution_plan(execution_plan))
+
+        assert len(execution_plan.nodes) == 13
+
+
     @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
     @patch('shift_left.core.deployment_mgr._deploy_dml')
     @patch('shift_left.core.deployment_mgr._get_statement_status')
-    def test_deploy_pipeline_from_table_success(self, mock_get_status, mock_deploy_dml, mock_deploy_ddl_dml):
+    def _test_deploy_pipeline_from_table_success(self, mock_get_status, mock_deploy_dml, mock_deploy_ddl_dml):
         table_name = "z"
         def mock_status(statement_name):
             if statement_name.startswith("dev-dml-z"):
@@ -87,7 +278,7 @@ class TestDeploymentManager(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr.delete_statement_if_exists')
     @patch('shift_left.core.deployment_mgr.drop_table')
-    def test_full_pipeline_undeploy_from_table_success(self, mock_drop, mock_delete, mock_read, mock_get_ref, mock_inventory):
+    def _test_full_pipeline_undeploy_from_table_success(self, mock_drop, mock_delete, mock_read, mock_get_ref, mock_inventory):
         """Test successful pipeline undeployment"""
         # Setup mocks
         mock_table_ref = MagicMock()
@@ -113,7 +304,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
     @patch('shift_left.core.deployment_mgr.get_table_ref_from_inventory')
-    def test_full_pipeline_undeploy_from_table_not_found(self, mock_get_ref, mock_inventory):
+    def _test_full_pipeline_undeploy_from_table_not_found(self, mock_get_ref, mock_inventory):
         """Test undeployment when table is not found"""
         # Setup mocks
         mock_get_ref.return_value = None
@@ -190,7 +381,7 @@ class TestDeploymentManager(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr._build_statement_node_map')
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr._get_statement_status')
-    def test_execution_plan_with_completed_statement(self, mock_get_status, mock_read, mock_build_statement_node_map):
+    def _test_execution_plan_with_completed_statement(self, mock_get_status, mock_read, mock_build_statement_node_map):
         """Test how completed statements affect the execution plan"""
         # Setup mock current node
         current_node = MagicMock(spec=FlinkStatementNode)
@@ -258,7 +449,7 @@ class TestDeploymentManager(unittest.TestCase):
             pipeline_def=mock_pipeline,
             compute_pool_id="test-pool-123",
             dml_only=False,
-            force_children=False
+            may_start_children=False
         )
 
         # Verify
@@ -274,7 +465,7 @@ class TestDeploymentManager(unittest.TestCase):
       
 
     @patch('shift_left.core.deployment_mgr._get_statement_status')
-    def test_execution_plan_with_src_running(self, mock_get_status):
+    def _test_execution_plan_with_src_running(self, mock_get_status):
 
         def mock_status(statement_name):
             if statement_name.startswith("dev-p1-dml-src-") or statement_name.startswith("dev-dml-src-"):

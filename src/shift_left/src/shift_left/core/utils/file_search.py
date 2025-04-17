@@ -10,7 +10,7 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
-from shift_left.core.flink_statement_model import StatementInfo
+from shift_left.core.flink_statement_model import StatementInfo, FlinkStatementNode
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -24,6 +24,7 @@ PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
 
 class InfoNode(BaseModel):
     table_name: Final[str]
+    product_name: Optional[str]
     type: Optional[str]
     dml_ref: Optional[str]
     ddl_ref: Optional[str]
@@ -39,54 +40,6 @@ class FlinkTableReference(InfoNode):
         if not isinstance(other, FlinkTableReference):
             return NotImplemented
         return self.table_name == other.table_name
-
-class FlinkStatementNode(BaseModel):
-    """
-    To build an execution plan we need one node for each popential Flink Statement to run.
-    A node has 0 to many parents and 0 to many children
-    """
-    table_name: str
-    path:  Optional[str] =  Field(default=None, description="Name of path")
-    created_at: Optional[datetime] = Field(default=None)
-    existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
-    dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
-    dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
-    ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
-    ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
-    dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
-    update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Used during deployment")
-    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
-    parents: Set =  Field(default=set(), description="List of parent")
-    children: Set = Field(default=set(), description="Child list")
-    to_run: bool = Field(default=False, description="statement must be executed")
-    to_restart: bool = Field(default=False, description="statement will be restarted, this is to differentiate child treatment from parent")
-
-    def add_child(self, child):
-        self.children.add(child)
-        child.parents.add(self)
-
-    def add_parent(self, parent):
-        self.parents.add(parent)
-        parent.children.add(self)
-
-    def is_running(self) -> bool:
-        if self.existing_statement_info and self.existing_statement_info.status_phase:
-            return (self.existing_statement_info.status_phase == "RUNNING")
-        else:
-            return False
-    
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, FlinkStatementNode):
-            return NotImplemented
-        return self.table_name == other.table_name
-    
-    def __hash__(self) -> int:
-        return hash(self.table_name)
-
-class FlinkStatementExecutionPlan(BaseModel):
-    created_at: datetime = Field(default=None)
-    start_table_name: str = Field(default=None)
-    nodes: List[FlinkStatementNode] = Field(default=[])
 
 class FlinkTablePipelineDefinition(InfoNode):
     """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
@@ -112,10 +65,12 @@ class FlinkTablePipelineDefinition(InfoNode):
        
         r = FlinkStatementNode(table_name= self.table_name,
                                path= self.path,
+                               product_name=self.product_name,
                                dml_statement=dml_statement_name,
                                dml_ref=self.dml_ref,
                                ddl_statement=ddl_statement_name,
-                               ddl_ref=self.ddl_ref
+                               ddl_ref=self.ddl_ref,
+                               upgrade_mode=self.state_form
                                )
         
         for p in self.parents:
@@ -178,15 +133,19 @@ def get_or_build_inventory(
                 with open(dml_file_name, "r") as f:
                     sql_content = f.read()
                     table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
+                    upgrade_mode = parser.extract_upgrade_mode(sql_content)
                     directory = os.path.dirname(dml_file_name)
                     table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
                     table_type = get_table_type_from_file_path(dml_file_name)
+                    product_name = extract_product_name(table_folder)
                     ref = FlinkTableReference.model_validate({
                         "table_name": table_name,
                         "type": table_type,
+                        "product_name": product_name,
                         "ddl_ref": from_absolute_to_pipeline(ddl_file_name),
                         "dml_ref": from_absolute_to_pipeline(dml_file_name),
-                        "table_folder_name": table_folder
+                        "table_folder_name": table_folder,
+                        "state_form": upgrade_mode
                     })
                     logger.debug(ref)
                     if ref.table_name in inventory:

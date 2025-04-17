@@ -1,27 +1,30 @@
 {
    "table_name": "e",
+   "product_name": "p2",
    "type": "fact",
    "dml_ref": "pipelines/facts/p2/e/sql-scripts/dml.e.sql",
    "ddl_ref": "pipelines/facts/p2/e/sql-scripts/ddl.e.sql",
    "path": "pipelines/facts/p2/e",
-   "state_form": "Stateful",
+   "state_form": "Stateless",
    "parents": [
       {
          "table_name": "c",
+         "product_name": "p2",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p2/c/sql-scripts/dml.c.sql",
          "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
          "path": "pipelines/intermediates/p2/c",
-         "state_form": "Stateful",
+         "state_form": "Stateless",
          "parents": [],
          "children": [
             {
                "table_name": "e",
+               "product_name": "p2",
                "type": "fact",
                "dml_ref": "pipelines/facts/p2/e/sql-scripts/dml.e.sql",
                "ddl_ref": "pipelines/facts/p2/e/sql-scripts/ddl.e.sql",
                "path": "pipelines/facts/p2/e",
-               "state_form": "Stateful",
+               "state_form": "Stateless",
                "parents": [],
                "children": []
             }

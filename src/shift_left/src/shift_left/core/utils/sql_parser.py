@@ -105,3 +105,14 @@ class SQLparser:
         except Exception as e:
             raise Exception(f"Error reading SQL file: {str(e)}")
         
+    def extract_upgrade_mode(self, sql_content) -> str:
+        """
+        Extract the upgrade mode from the sql_content. Stateful is when the dml uses joins and
+        other stateful operators.
+        """
+        sql_content=self._normalize_sql(sql_content)
+        if re.search(r'\b(JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|GROUP BY, TUMBLE)\s+', sql_content, re.IGNORECASE):
+            return "Stateful"
+        else:
+            return "Stateless"
+    

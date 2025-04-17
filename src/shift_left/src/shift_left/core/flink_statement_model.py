@@ -3,7 +3,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 
 class MetadataResult(BaseModel):
     self_ref:  Optional[str] =  Field(alias="self", default=None)
@@ -96,3 +96,61 @@ class StatementInfo(BaseModel):
     principal:   Optional[str] =  Field(default=None, description="Principal service account")
     sql_catalog:  Optional[str] =  Field(default=None, description="Flink catalog name")
     sql_database:  Optional[str] =  Field(default=None, description="Flink database name")
+
+
+class FlinkStatementNode(BaseModel):
+    """
+    To build an execution plan we need one node for each popential Flink Statement to run.
+    A node has 0 to many parents and 0 to many children
+    """
+    table_name: str
+    product_name: Optional[str]
+    path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
+    created_at: Optional[datetime] = Field(default=None)
+    existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
+    dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
+    dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
+    ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
+    ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
+    dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
+    update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Will take care of statefulness. Used during deployment")
+    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
+    parents: Set =  Field(default=set(), description="List of parent")
+    children: Set = Field(default=set(), description="Child list")
+    to_run: bool = Field(default=False, description="statement must be executed")
+    to_restart: bool = Field(default=False, description="statement will be restarted, this is to differentiate child treatment from parent")
+    upgrade_mode: str = Field(default="Stateful", description="upgrade mode will depend if the node state is stateful or not.")
+
+    def add_child(self, child):
+        self.children.add(child)
+        child.parents.add(self)
+
+    def add_parent(self, parent):
+        self.parents.add(parent)
+        parent.children.add(self)
+
+    def is_running(self) -> bool:
+        if self.existing_statement_info and self.existing_statement_info.status_phase:
+            return (self.existing_statement_info.status_phase == "RUNNING")
+        else:
+            return False
+    
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, FlinkStatementNode):
+            return NotImplemented
+        return self.table_name == other.table_name
+    
+    def __hash__(self) -> int:
+        return hash(self.table_name)
+
+class FlinkStatementExecutionPlan(BaseModel):
+    """
+    Execution plan from the current start table to all the children and parents not already deployed.
+    The start node is part of the nodes list.
+    The nodes list is sorted by the order of execution
+    """
+    created_at: datetime = Field(default=None)
+    start_table_name: str = Field(default=None)
+    nodes: List[FlinkStatementNode] = Field(default=[])
+
+

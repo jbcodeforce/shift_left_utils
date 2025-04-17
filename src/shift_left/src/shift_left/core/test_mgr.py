@@ -1,13 +1,10 @@
 """
 Copyright 2024-2025 Confluent, Inc.
-
-A test manager processes the test definition and executes all or a specific test.
-The test definition is done in yaml
 """
 from pydantic import BaseModel
 from typing import List, Final
 import yaml
-import logging,time
+import logging, time
 import os
 from logging.handlers import RotatingFileHandler
 from shift_left.core.utils.app_config import get_config
@@ -18,6 +15,7 @@ from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
+TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
 
 log_dir = os.path.join(os.getcwd(), 'logs')
 logger = logging.getLogger("test_harness")
@@ -36,6 +34,11 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 logger.addHandler(console_handler)
 
+"""
+Test manager defines what are test cases and test suites.
+It also defines a set of functions to run test on Confluent Cloud
+"""
+
 class SLTestData(BaseModel):
     table_name: str
     sql_file_name: str
@@ -46,10 +49,14 @@ class SLTestCase(BaseModel):
     outputs: List[SLTestData]
 
 class Foundation(BaseModel):
+    """
+    represent the table to test and the ddl for the input tables to be created during tests.
+    Those tables will be deleted after the tests are run.
+    """
     table_name: str
     ddl_for_test: str
 
-class SLTestSuite(BaseModel):
+class SLTestDefinition(BaseModel):
     foundations: List[Foundation]
     test_suite: List[SLTestCase]
 
@@ -58,80 +65,34 @@ def log( table_folder,message):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         f.write(f"[{timestamp}] {message}\n")
 
-def drop_validation_tables(table_folder):
-    ddl_dir = os.path.join(table_folder, SCRIPTS_DIR)
-    ddl_dir1 = os.path.join(table_folder, "tests")
-
-    # Loop through files
-    for directory in [ddl_dir, ddl_dir1]:
-        full_dir = os.path.abspath(directory)
-        for filename in os.listdir(full_dir):
-            if filename.startswith(("ddl.", "ddl_")) and filename.endswith(".sql"):
-                if filename.startswith("ddl."):
-                    table_name = filename[len("ddl."): -len(".sql")] + "_ut"
-                else:
-                    table_name = filename[len("ddl_"): -len(".sql")] + "_ut"
-                drop_table(table_name)
-                print(f"{table_name} table dropped")
-
-def drop_validation_statements(client,statement_names):
-    for stmt_name in statement_names:
-
-        if client.get_statement_info(stmt_name):
-            client.delete_flink_statement(stmt_name)
-            print(f"Deleted statement {stmt_name}")
-        else:
-            print(f"Statement {stmt_name} doesn't exist")
-
-def create_test_tables(sql_path: str,statement_name,compute_pool_id: Optional[str] = None) -> str:
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id = config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    with open(sql_path) as f:
-        sql_content = f.read()
-
-    parser = SQLparser()
-    table_names = parser.extract_table_references(sql_content)
-    print(f"Tables found {table_names}")
-
-    for table in table_names:
-        sql_content = sql_content.replace(table, f"{table}_ut")
-
-    properties = {'sql.current-catalog': config['flink']['catalog_name'],
-                  'sql.current-database': config['flink']['database_name']}
-    if client.get_statement_info(statement_name) is None:
-      try:
-        result = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
-        logger.debug(f"Run create table {result}")
-        print(sql_content)
-        print(f"{statement_name} statement and table created")
-      except Exception as e:
-        logger.error(e)
-    else:
-      print(f"{statement_name} statement already exists")
-    return sql_content
-#def execute_all_tests(table_folder: str, test_case_name: str):
-
+# ----------- Public APIs  ------------------------------------------------------------
 def execute_one_test(table_folder: str, test_case_name: str):
-    definition = load_test_definition(table_folder)
-    config = get_config()
-    client = ConfluentCloudClient(config)
+    """
+    Execute a single test case from the test suite definition.
+    
+    Args:
+        table_folder (str): Path to the folder containing the table definition and test files
+        test_case_name (str): Name of the test case to execute from the test suite
+        
+    Returns:
+        bool: True if test executes successfully
+        
+    The function:
+    1. Loads test suite definition from yaml file
+    2. Creates foundation tables using DDL
+    3. Executes input SQL statements to populate test data
+    4. Runs validation SQL to verify results
+    5. Polls validation results with retries
+    """
+    test_suite_def = _load_test_suite_definition(table_folder)
+    client = ConfluentCloudClient(get_config())
     statement_names = []
 
-    print(f"**********************-Starting Validation Test Case-********************** ")
-    for foundation in definition.foundations:
-        ddl_path = os.path.join(table_folder, SCRIPTS_DIR, foundation.ddl_for_test)
-        logger.info(f"Deploying foundation DDL: {foundation.ddl_for_test}")
-
-        # Create a new create statement if doesn't exist already
-        statement_name = f"{test_case_name.replace('_', '-')}-create-{foundation.table_name.replace('_', '-').replace('.', '-')}-ut"
-        create_test_tables(ddl_path,statement_name)
-        statement_names.append(statement_name)
+    
         #print(sql_content)
 
     # Parse through test case suite in yaml file, run the test case provided in parameter
-    for test_case in definition.test_suite:
+    for test_case in test_suite_def.test_suite:
         if test_case.name == test_case_name:
             logger.info(f"Running test case: {test_case.name}")
 
@@ -141,7 +102,7 @@ def execute_one_test(table_folder: str, test_case_name: str):
                 logger.info(f"Executing input SQL: {input_step.sql_file_name}")
                 insert_statement_name = f"{test_case_name.replace('_', '-')}-{input_step.table_name.replace('_', '-').replace('.', '-')}-ut"
                 statement_names.append(insert_statement_name)
-                create_test_tables(sql_path, insert_statement_name)
+                _create_test_tables(sql_path, insert_statement_name)
 
             # Create validation statement if doesn't exist already
             for output_step in test_case.outputs:
@@ -149,7 +110,7 @@ def execute_one_test(table_folder: str, test_case_name: str):
                 logger.info(f"Executing validation SQL: {output_step.sql_file_name}")
                 validate_statement_name = f"{test_case_name.replace('_', '-')}-validate-ut"
                 statement_names.append(validate_statement_name)
-                create_test_tables(sql_path, validate_statement_name)
+                _create_test_tables(sql_path, validate_statement_name)
 
                 #Get result from the validation query
                 resp = None
@@ -194,10 +155,125 @@ def execute_one_test(table_folder: str, test_case_name: str):
             return True
     return False
 
-def load_test_definition(table_folder: str) -> SLTestSuite:
-    test_definitions = table_folder + "/tests/test_definitions.yaml"
+def execute_all_tests(table_name: str, test_case_name: str, compute_pool_id: Optional[str] = None):
+    """
+    Execute all test cases defined in the test suite definition for a given table.
+    """
+    print(f"**********************-Starting Validation Test Case-********************** ")
+    statement_names=[]
+    for foundation in test_suite_def.foundations:
+        ddl_path = os.path.join(table_folder, SCRIPTS_DIR, foundation.ddl_for_test)
+        logger.info(f"Deploying foundation DDL: {foundation.ddl_for_test}")
+
+        # Create a new create statement if doesn't exist already
+        statement_name = f"{test_case_name.replace('_', '-')}-create-{foundation.table_name.replace('_', '-').replace('.', '-')}-ut"
+        _create_test_tables(ddl_path, statement_name)
+        
+
+    if not test_case_name:
+        _run_foundations(table_name, compute_pool_id, statement_names)
+        test_suite_def = _load_test_suite_definition(table_name)
+        for test_case in test_suite_def.test_suite:
+            execute_one_test(table_name, test_case.name, compute_pool_id)
+    else:
+        _run_foundations(table_name, compute_pool_id, statement_names)
+        execute_one_test(table_name, test_case_name, compute_pool_id)   
+
+# ----------- Private APIs  ------------------------------------------------------------
+def _run_foundations(table_folder: str, compute_pool_id: Optional[str] = None, statement_names: List[str] = []):
+    """
+    Run the foundation tables for a given table.
+    """
+    test_suite_def = _load_test_suite_definition(table_folder)
+    for foundation in test_suite_def.foundations:
+        statement_name = f"{foundation.table_name.replace('_', '-').replace('.', '-')}-ut"
+        testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
+        _create_test_tables(testfile_path, statement_name, compute_pool_id)
+        statement_names.append(statement_name)
+         
+def drop_validation_tables(table_folder):
+    ddl_dir = os.path.join(table_folder, SCRIPTS_DIR)
+    ddl_dir1 = os.path.join(table_folder, "tests")
+
+    # Loop through files
+    for directory in [ddl_dir, ddl_dir1]:
+        full_dir = os.path.abspath(directory)
+        for filename in os.listdir(full_dir):
+            if filename.startswith(("ddl.", "ddl_")) and filename.endswith(".sql"):
+                if filename.startswith("ddl."):
+                    table_name = filename[len("ddl."): -len(".sql")] + "_ut"
+                else:
+                    table_name = filename[len("ddl_"): -len(".sql")] + "_ut"
+                drop_table(table_name)
+                print(f"{table_name} table dropped")
+
+def drop_validation_statements(client,statement_names):
+    for stmt_name in statement_names:
+
+        if client.get_statement_info(stmt_name):
+            client.delete_flink_statement(stmt_name)
+            print(f"Deleted statement {stmt_name}")
+        else:
+            print(f"Statement {stmt_name} doesn't exist")
+
+
+def _create_test_tables(sql_path: str, statement_name: str, compute_pool_id: Optional[str] = None) -> str:
+    """
+    Creates test tables in Flink by executing SQL DDL statements.
+    
+    Args:
+        sql_path (str): Path to the SQL file containing DDL statements
+        statement_name (str): Name to give the Flink statement
+        compute_pool_id (Optional[str]): ID of Flink compute pool to use. If not provided, uses config default.
+    
+    Returns:
+        str: The SQL content that was executed
+        
+    The function:
+    1. Reads SQL from file
+    2. Extracts table names and appends "_ut" suffix for test tables
+    3. Creates Flink statement to execute the DDL if it doesn't exist
+    4. Returns the modified SQL content
+    """
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id = config['flink']['compute_pool_id']
+    client = ConfluentCloudClient(config)
+    sql_content = _change_table_names_for_test_in_sql_content(sql_path)
+
+    properties = {'sql.current-catalog': config['flink']['catalog_name'],
+                  'sql.current-database': config['flink']['database_name']}
+    if client.get_statement_info(statement_name) is None:
+      try:
+        result = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
+        logger.debug(f"Run create table {result}")
+        logger.debug(f"Run create table {sql_content}")
+        print(f"{statement_name} statement and table created")
+      except Exception as e:
+        logger.error(e)
+    else:
+      print(f"{statement_name} statement already exists")
+    return sql_content
+
+
+
+
+def _load_test_suite_definition(table_folder: str) -> SLTestDefinition:
+    test_definitions = table_folder + "/tests/" + TEST_DEFINITION_FILE_NAME
     with open(test_definitions) as f:
           cfg_as_dict=yaml.load(f,Loader=yaml.FullLoader)
- #         print(cfg_as_dict)
-          definition= SLTestSuite.model_validate(cfg_as_dict)
+          definition= SLTestDefinition.model_validate(cfg_as_dict)
           return definition
+
+
+def _change_table_names_for_test_in_sql_content(sql_file_path: str) -> str:
+    with open(sql_file_path) as f:
+        sql_content = f.read()
+
+    parser = SQLparser()
+    table_names = parser.extract_table_references(sql_content)
+    print(f"Tables found {table_names}")
+
+    for table in table_names:
+        sql_content = sql_content.replace(table, f"{table}_ut")
+    return sql_content

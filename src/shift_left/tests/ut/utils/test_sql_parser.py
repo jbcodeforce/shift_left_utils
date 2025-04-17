@@ -24,6 +24,7 @@ class TestFileSearch(unittest.TestCase):
         rep=parser.extract_table_references(query)
         assert rep
         assert "table1" in rep
+        assert "Stateless" in parser.extract_upgrade_mode(query)
 
     def test_get_tables_from_join(self):
         parser = SQLparser()
@@ -36,6 +37,7 @@ class TestFileSearch(unittest.TestCase):
         assert rep
         assert "schema1.table1" in rep
         assert "table2" in rep
+        assert "Stateful" in parser.extract_upgrade_mode(query)
 
     def test_get_tables_from_inner_join(self):
         parser = SQLparser()
@@ -50,6 +52,7 @@ class TestFileSearch(unittest.TestCase):
         assert "schema2.table2" in rep
         assert "table1" in rep
         assert "table3" in rep
+        assert "Stateful" in parser.extract_upgrade_mode(query)
 
     def test_get_tables_from_right_join(self):
         parser = SQLparser()
@@ -64,7 +67,9 @@ class TestFileSearch(unittest.TestCase):
         assert "table2" in rep
         assert "table1" in rep
         assert "table3" in rep
-    
+        assert "Stateful" in parser.extract_upgrade_mode(query)
+
+        
     def test_get_tables_without_ctes(self):
         parser = SQLparser()
         query= """
@@ -88,6 +93,7 @@ class TestFileSearch(unittest.TestCase):
         assert "table2" in rep
         assert not "cte1" in rep
         print(rep)
+        assert "Stateful" in parser.extract_upgrade_mode(query)
     
 
     def test_get_tables_without_ctes(self):
@@ -102,6 +108,7 @@ class TestFileSearch(unittest.TestCase):
         rep=parser.extract_table_references(query)
         assert rep
         print(rep)
+        assert "Stateless" in parser.extract_upgrade_mode(query)
 
     def test_extract_table_name_from_insert(self):
         parser = SQLparser()
@@ -110,7 +117,7 @@ class TestFileSearch(unittest.TestCase):
         assert rep
         assert "src_table" in rep
         print(rep)
-
+        assert "Stateless" in parser.extract_upgrade_mode(query)
 
 
     def test_sql_content_order(self):
@@ -120,7 +127,15 @@ class TestFileSearch(unittest.TestCase):
             parser = SQLparser()
             referenced_table_names = parser.extract_table_references(sql_content)
             assert len(referenced_table_names) == 3
+            assert "Stateful" in parser.extract_upgrade_mode(sql_content)
 
+    def test_stateless_from_dml_ref(self):
+        parser = SQLparser()
+        fname = os.getenv("PIPELINES") + "/sources/p2/src_a/sql-scripts/dml.src_p2_a.sql"
+        with open(fname, "r") as f:
+            sql_content = f.read()
+            upgrade_mode = parser.extract_upgrade_mode(sql_content)
+            assert "Stateless"  == upgrade_mode
 
 if __name__ == '__main__':
     unittest.main()

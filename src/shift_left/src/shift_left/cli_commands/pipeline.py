@@ -19,7 +19,8 @@ from shift_left.core.deployment_mgr import (
     DeploymentReport,
     build_execution_plan_from_any_table,
     full_pipeline_undeploy_from_table,
-    persist_execution_plan
+    persist_execution_plan,
+    build_summary_from_execution_plan
 )
 from shift_left.core.statement_mgr import report_running_flink_statements
 
@@ -173,7 +174,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
 
 
 @app.command()
-def report_running_dmls(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json to get child list")],
+def report_running_statements(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json to get child list")],
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
     """
     Assess for a given table, what are the running dmls from its children, using recursively. 
@@ -203,18 +204,22 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
-        force: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)")):
+        may_start_children: bool = typer.Option(False, help="The children will not be started by default. They may be started differently according to the fact they are stateful or stateless.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
     """
+    print(f"Build an execution plan for table {table_name}")
     pipeline_def= get_pipeline_definition_for_table(table_name, inventory_path)
     execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        force_children=force,
+                                                        may_start_children=may_start_children,
                                                         start_time=datetime.datetime.now())
     persist_execution_plan(execution_plan)
+    summary=build_summary_from_execution_plan(execution_plan)
+    print(f"Execution plan built and persisted for table {table_name}")
+    print(summary)
     
    
 
