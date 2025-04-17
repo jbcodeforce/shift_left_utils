@@ -165,7 +165,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     for node in execution_plan.nodes:
         if node.to_run or node.to_restart:
             for c in node.children: 
-                if c not in execution_plan.nodes and node.update_children:
+                if c not in execution_plan.nodes and node.update_children and c.product_name == node.product_name:
                     node_c = node_map[c.table_name]  # c children may not have grand children or its  parent but node_c will have the static hierachy
                     _get_and_update_statement_info_for_node(node_c)
                     if not node_c.is_running() and not node_c.to_run:

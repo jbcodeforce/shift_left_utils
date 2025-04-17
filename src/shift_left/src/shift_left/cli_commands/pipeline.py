@@ -158,7 +158,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
-        force: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
+        may_start_children: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
         ):
     """
     Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
