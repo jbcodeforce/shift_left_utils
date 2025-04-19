@@ -73,7 +73,7 @@ class TestConfluentClient(unittest.TestCase):
             print(f"\n\n---- {statement}")
             assert statement.result.results
             print( statement.result.results[0]['results']['data'][0]['row'])
-            statement = client.get_statement_info(statement_name)
+            statement = client.get_flink_statement(statement_name)
             assert statement
             print(f"--- {statement}")
             print("#"*30 + "\n Verify get flink statement list\n")

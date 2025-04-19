@@ -7,20 +7,12 @@ import datetime
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
-from shift_left.core.pipeline_mgr import (
-    build_pipeline_definition_from_dml_content, 
-    get_static_pipeline_report_from_table, 
-    build_all_pipeline_definitions,
-    get_pipeline_definition_for_table,
-    delete_all_metada_files)
+import shift_left.core.pipeline_mgr as pipeline_mgr
+
 from typing_extensions import Annotated
+import shift_left.core.deployment_mgr as deployment_mgr
 from shift_left.core.deployment_mgr import (
-    deploy_pipeline_from_table, 
     DeploymentReport,
-    build_execution_plan_from_any_table,
-    full_pipeline_undeploy_from_table,
-    persist_execution_plan,
-    build_summary_from_execution_plan
 )
 from shift_left.core.statement_mgr import report_running_flink_statements
 
@@ -57,7 +49,7 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
         print(f"Using pipeline path {pipeline_path}")
         os.environ["PIPELINES"] = pipeline_path
 
-    build_pipeline_definition_from_dml_content(dml_file_name, pipeline_path)
+    pipeline_mgr.build_pipeline_definition_from_dml_content(dml_file_name, pipeline_path)
     print(f"Pipeline built from {dml_file_name}")
 
 @app.command()
@@ -66,7 +58,7 @@ def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argumen
     Delete all pipeline definition json files from a given folder path
     """
     print(f"Delete pipeline definition from {path_from_where_to_delete}")
-    delete_all_metada_files(path_from_where_to_delete)
+    pipeline_mgr.delete_all_metada_files(path_from_where_to_delete)
 
 
 @app.command()
@@ -75,7 +67,7 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
     Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recurring walk through
     """
     print(f"Build all pipeline definitions for dimension, fact tables in {pipeline_path}")
-    build_all_pipeline_definitions(pipeline_path)
+    pipeline_mgr.build_all_pipeline_definitions(pipeline_path)
     print("Done")
     
 
@@ -92,7 +84,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        pipeline_def=get_static_pipeline_report_from_table(table_name, inventory_path)
+        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -165,7 +157,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     """
     print(f"#### Deploy pipeline from table {table_name} in {compute_pool_id}")
     try:
-        result: DeploymentReport = deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, force)
+        result: DeploymentReport = deployment_mgr.deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, may_start_children)
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -196,7 +188,7 @@ def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table nam
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
     print(f"#### Full Delete of a pipeline from the table {table_name} for not shareable tables")
-    result = full_pipeline_undeploy_from_table(table_name, inventory_path)
+    result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     print(result)
 
 @app.command()
@@ -210,14 +202,14 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
     and existing Flink Statement running status.
     """
     print(f"Build an execution plan for table {table_name}")
-    pipeline_def= get_pipeline_definition_for_table(table_name, inventory_path)
-    execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
+    pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+    execution_plan=deployment_mgr.build_execution_plan_from_any_table(pipeline_def=pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         may_start_children=may_start_children,
                                                         start_time=datetime.datetime.now())
-    persist_execution_plan(execution_plan)
-    summary=build_summary_from_execution_plan(execution_plan)
+    deployment_mgr.persist_execution_plan(execution_plan)
+    summary=deployment_mgr.build_summary_from_execution_plan(execution_plan)
     print(f"Execution plan built and persisted for table {table_name}")
     print(summary)
     

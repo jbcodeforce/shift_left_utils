@@ -10,9 +10,8 @@ from logging.handlers import RotatingFileHandler
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.deployment_mgr import *
-from shift_left.core.table_mgr import drop_table
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-
+import shift_left.core.statement_mgr as statement_mgr
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
@@ -155,7 +154,7 @@ def execute_one_test(table_folder: str, test_case_name: str):
             return True
     return False
 
-def execute_all_tests(table_name: str, test_case_name: str, compute_pool_id: Optional[str] = None):
+def execute_all_tests(table_folder: str, test_case_name: str, compute_pool_id: Optional[str] = None):
     """
     Execute all test cases defined in the test suite definition for a given table.
     """
@@ -171,13 +170,13 @@ def execute_all_tests(table_name: str, test_case_name: str, compute_pool_id: Opt
         
 
     if not test_case_name:
-        _run_foundations(table_name, compute_pool_id, statement_names)
-        test_suite_def = _load_test_suite_definition(table_name)
+        _run_foundations(table_folder, compute_pool_id, statement_names)
+        test_suite_def = _load_test_suite_definition(table_folder)
         for test_case in test_suite_def.test_suite:
-            execute_one_test(table_name, test_case.name, compute_pool_id)
+            execute_one_test(table_folder, test_case.name, compute_pool_id)
     else:
-        _run_foundations(table_name, compute_pool_id, statement_names)
-        execute_one_test(table_name, test_case_name, compute_pool_id)   
+        _run_foundations(table_folder, compute_pool_id, statement_names)
+        execute_one_test(table_folder, test_case_name, compute_pool_id)   
 
 # ----------- Private APIs  ------------------------------------------------------------
 def _run_foundations(table_folder: str, compute_pool_id: Optional[str] = None, statement_names: List[str] = []):
@@ -204,7 +203,7 @@ def drop_validation_tables(table_folder):
                     table_name = filename[len("ddl."): -len(".sql")] + "_ut"
                 else:
                     table_name = filename[len("ddl_"): -len(".sql")] + "_ut"
-                drop_table(table_name)
+                statement_mgr.drop_table(table_name)
                 print(f"{table_name} table dropped")
 
 def drop_validation_statements(client,statement_names):
@@ -235,20 +234,16 @@ def _create_test_tables(sql_path: str, statement_name: str, compute_pool_id: Opt
     3. Creates Flink statement to execute the DDL if it doesn't exist
     4. Returns the modified SQL content
     """
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id = config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
+    logger.debug(f"Run create table {sql_path} {statement_name}")
     sql_content = _change_table_names_for_test_in_sql_content(sql_path)
 
-    properties = {'sql.current-catalog': config['flink']['catalog_name'],
-                  'sql.current-database': config['flink']['database_name']}
-    if client.get_statement_info(statement_name) is None:
+    if statement_mgr.get_statement_info(statement_name) is None:
       try:
-        result = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
-        logger.debug(f"Run create table {result}")
+        statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_content)
+        logger.debug(f"Run create table {statement}")
         logger.debug(f"Run create table {sql_content}")
-        print(f"{statement_name} statement and table created")
+        if statement:
+            print(f"{statement_name} statement and table created")
       except Exception as e:
         logger.error(e)
     else:

@@ -100,22 +100,7 @@ class TestTableManager(unittest.TestCase):
             print(e)
             self.fail()
 
-    def test_get_ddl_dml_names_from_table(self):
-        # Test with product name and prefix
-        ddl_name, dml_name = tm.get_ddl_dml_names_from_table(
-            table_name="test_table",
-            prefix="prefix"
-        )
-        self.assertEqual(ddl_name, "prefix-ddl-test-table")
-        self.assertEqual(dml_name, "prefix-dml-test-table")
 
-        # Test with just table name (no prefix or product)
-        ddl_name, dml_name = tm.get_ddl_dml_names_from_table(
-            table_name="test_table",
-            prefix=""
-        )
-        self.assertEqual(ddl_name, "ddl-test-table")
-        self.assertEqual(dml_name, "dml-test-table")
 
    
     def test_update_make_file(self):
@@ -144,62 +129,7 @@ class TestTableManager(unittest.TestCase):
             print(e)
             self.fail()
        
-    @patch('shift_left.core.table_mgr.delete_statement_if_exists')
-    @patch('shift_left.core.table_mgr.ConfluentCloudClient')
-    def test_drop_table(self, MockConfluentCloudClient, mock_delete_statement_if_exists):
-        table_name = "fct_order"
-        mock_delete_statement_if_exists.return_value = "deleted"
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.post_flink_statement.return_value =  Statement(name= "drop-fct-order")
-        result = tm.drop_table(table_name=table_name)
-        
-        self.assertEqual(result, "fct_order dropped")
-
-        MockConfluentCloudClient.assert_called_once()
-        config = get_config()
-        cpi= config['flink']['compute_pool_id']
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    
-        mock_client_instance.post_flink_statement.assert_called_with(cpi,
-                                                                     "drop-fct-order",
-                                                                     "drop table if exists fct_order;",
-                                                                     properties)
-        mock_delete_statement_if_exists.assert_called_with("drop-fct-order")
-
-    @patch('shift_left.core.table_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.table_mgr.delete_statement_if_exists')
-    def test_get_table_structure_success(self, mock_delete_statement, MockConfluentCloudClient):
-        """Test successful retrieval of table structure"""
-        table_name = "test_table"
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_statement = MagicMock()
-        mock_statement.status.phase = "COMPLETED"
-        mock_statement_result = MagicMock()
-        mock_statement_result.results.data = "CREATE TABLE test_table (...)"
-        mock_client_instance.post_flink_statement.return_value = mock_statement
-        mock_client_instance.get_statement_results.return_value = mock_statement_result
-        
-        result = tm.get_table_structure(table_name)
-        
-        self.assertIsNotNone(result)
-        self.assertEqual(result, "CREATE TABLE test_table (...)")
-        mock_delete_statement.assert_called_with(f"drop-{table_name.replace('_', '-')}")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"describe-{table_name.replace('_', '-')}")
-
-    @patch('shift_left.core.table_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.table_mgr.delete_statement_if_exists')
-    def test_get_table_structure_failure(self, mock_delete_statement, MockConfluentCloudClient):
-        """Test failure scenario when getting table structure"""
-        table_name = "non_existent_table"
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.post_flink_statement.side_effect = Exception("API Error")
-        
-        result = tm.get_table_structure(table_name)
-        
-        self.assertEqual(result, "")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"describe-{table_name.replace('_', '-')}")
-
-
+ 
 
     class MockTableWorker:
         def __init__(self, update_result, new_content):

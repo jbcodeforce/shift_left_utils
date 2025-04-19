@@ -30,7 +30,7 @@ app:
         yield
 
 @pytest.fixture
-def mock_pipeline_data():
+def mock_pipeline_data(tbname, inventory_path):
     return {
         "table_name": "test_table",
         "type": "fact",
@@ -61,7 +61,7 @@ class TestPipelineCLI(unittest.TestCase):
 
     def test_report_command_success(self, mock_pipeline_data):
         """Test successful execution of the report command"""
-        with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
+        with patch('shift_left.cli_commands.pipeline.get_static_pipeline_report_from_table') as mock_walk:
             mock_walk.return_value = mock_pipeline_data
             runner = CliRunner()
             result = runner.invoke(app, ['report', 'test_table'])
@@ -72,11 +72,15 @@ class TestPipelineCLI(unittest.TestCase):
 
     def test_report_command_error(self, mock_pipeline_data):
         """Test error handling when pipeline data cannot be retrieved"""
-        with patch('shift_left.cli_commands.pipeline.walk_the_hierarchy_for_report_from_table') as mock_walk:
+        with patch('shift_left.cli_commands.pipeline.get_static_pipeline_report_from_table') as mock_walk:
             mock_walk.side_effect = Exception("Pipeline definition not found")
             runner = CliRunner()
             result = runner.invoke(app, ['report', 'non_existent_table'])
             
             assert result.exit_code == 1
-            assert "Error: Pipeline definition not found" in result.stdout
+            assert "Error: pipeline definition not found" in result.stdout
             mock_walk.assert_called_once_with('non_existent_table')
+
+
+if __name__ == '__main__':
+    unittest.main()

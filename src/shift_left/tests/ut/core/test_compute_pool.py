@@ -168,7 +168,7 @@ class TestComputePoolMgr(unittest.TestCase):
                                                     status_phase="PROVISIONED", 
                                                     current_cfu=1))
         assert len(cpl.pools) == 40
-        cpl2= cpm.search_for_matching_compute_pool(cpl, "mv-config-3")
+        cpl2= cpm.search_for_matching_compute_pools(cpl, "mv-config-3")
         assert cpl2 is not None
         assert len(cpl2) >= 11
         for pool in cpl2:

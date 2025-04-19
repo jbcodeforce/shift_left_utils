@@ -45,7 +45,6 @@ class Spec(BaseModel):
     @field_validator('enable_ai', mode='before')
     @classmethod
     def validate_enable_ai(cls, v):
-        print(v)
         if isinstance(v, str):
             return v.lower() == 'true'
         return bool(v)

@@ -41,4 +41,5 @@ app:
   logging: INFO
   products: ["p1", "p2", "p3"]
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
+  dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
  

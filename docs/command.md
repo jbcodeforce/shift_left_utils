@@ -95,6 +95,7 @@ $ project list-compute-pools [OPTIONS]
 **Options**:
 
 * `--environment-id TEXT`: Environment_id to return all compute pool
+* `--region TEXT`: Region_id to return all compute pool
 * `--help`: Show this message and exit.
 
 ### `project clear-logs`
@@ -133,7 +134,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `find-table-users`: Find the Flink Statements, user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
-* `unit-test`: Run all the unit tests or a specified test...
+* `run-unit-tests`: Run all the unit tests or a specified test...
 
 ### `table init`
 
@@ -149,10 +150,11 @@ $ table init [OPTIONS] TABLE_NAME TABLE_PATH
 **Arguments**:
 
 * `TABLE_NAME`: Table name to build  [required]
-* `TABLE_PATH`: Path in which the table folder stucture will be created under.  [required]
+* `TABLE_PATH`: Folder Path in which the table folder structure will be created.  [required]
 
 **Options**:
 
+* `--product-name TEXT`: Product name to use for the table. If not provided, it will use the table_path last folder as product name  [required]
 * `--help`: Show this message and exit.
 
 ### `table build-inventory`
@@ -289,17 +291,17 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 
 * `--ddl`: Focus on DDL processing. Default is only DML
 * `--both-ddl-dml`: Run both DDL and DML sql files
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1098c6ab0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10662b530&gt;]]
 * `--help`: Show this message and exit.
 
-### `table unit-test`
+### `table run-unit-tests`
 
 Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
 
 **Usage**:
 
 ```console
-$ table unit-test [OPTIONS] TABLE_NAME
+$ table run-unit-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -331,7 +333,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the pipeline...
 * `deploy`: Deploy a pipeline from a given table name,...
-* `report-running-dmls`: Assess for a given table, what are the...
+* `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `build-execution-plan-from-table`: From a given table, this command goes all...
 
@@ -432,17 +434,17 @@ $ pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
-* `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
+* `--may-start-children / --no-may-start-children`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-children]
 * `--help`: Show this message and exit.
 
-### `pipeline report-running-dmls`
+### `pipeline report-running-statements`
 
 Assess for a given table, what are the running dmls from its children, using recursively.
 
 **Usage**:
 
 ```console
-$ pipeline report-running-dmls [OPTIONS] TABLE_NAME INVENTORY_PATH
+$ pipeline report-running-statements [OPTIONS] TABLE_NAME INVENTORY_PATH
 ```
 
 **Arguments**:
@@ -493,5 +495,5 @@ $ pipeline build-execution-plan-from-table [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
-* `--force / --no-force`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-force]
+* `--may-start-children / --no-may-start-children`: The children will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-children]
 * `--help`: Show this message and exit.

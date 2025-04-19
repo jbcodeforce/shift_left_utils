@@ -65,6 +65,7 @@ class FlinkTablePipelineDefinition(InfoNode):
        
         r = FlinkStatementNode(table_name= self.table_name,
                                path= self.path,
+                               created_at=datetime.now(),
                                product_name=self.product_name,
                                dml_statement=dml_statement_name,
                                dml_ref=self.dml_ref,

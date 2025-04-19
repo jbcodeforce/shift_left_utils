@@ -5,7 +5,7 @@ import time
 import os, json
 from pydantic import BaseModel
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
-from shift_left.core.statement_mgr import get_statement
+from shift_left.core.statement_mgr import get_statement_info
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.flink_compute_pool_model import *
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
@@ -39,7 +39,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
         product_name = extract_product_name(pipeline_def.path)
         _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
                                                     config['kafka']['cluster_type'])
-        statement = get_statement(dml_statement_name)
+        statement = get_statement_info(dml_statement_name)
         pool_id= statement.spec.compute_pool_id
         if pool_id:
             return pool_id
@@ -57,14 +57,25 @@ def get_compute_pool_list(env_id: str, region: str):
         if os.path.exists(COMPUTE_POOL_LIST_FILE):
             with open(COMPUTE_POOL_LIST_FILE, "r") as f:
                 _compute_pool_list = ComputePoolList.model_validate_json(f.read())
-            if _compute_pool_list.created_at and (datetime.now() - datetime.fromisoformat(_compute_pool_list.created_at)).total_seconds() < 3600:  
+            if _compute_pool_list.created_at and (datetime.now() - datetime.fromisoformat(_compute_pool_list.created_at)).total_seconds() < 4*3600:  
                 # keep the list if it was created in the last 60 minutes
                 reload = False
         if reload:
             logger.info(f"Get the compute pool list for environment {env_id}, {region} using API")
             client = ConfluentCloudClient(get_config())
-            _compute_pool_list = client.get_compute_pool_list(env_id, region)
+            response: ComputePoolListResponse = client.get_compute_pool_list(env_id, region)
+            _compute_pool_list = ComputePoolList(created_at=datetime.now().isoformat())
+            for pool in response.data:
+                cp_pool = ComputePoolInfo(id=pool.id,
+                                        name=pool.spec.display_name, 
+                                        env_id=pool.spec.environment.id,
+                                        max_cfu=pool.spec.max_cfu,
+                                        region=pool.spec.region,
+                                        status_phase=pool.status.phase,
+                                        current_cfu=pool.status.current_cfu)
+                _compute_pool_list.pools.append(cp_pool)
             _save_compute_pool_list(_compute_pool_list)
+            logger.debug(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
     return _compute_pool_list
 
 
@@ -78,10 +89,11 @@ def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
     with open(STATEMENT_COMPUTE_POOL_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def search_for_matching_compute_pool(compute_pool_list: ComputePoolList, table_name: str) -> List[ComputePoolInfo]:
+def search_for_matching_compute_pools(compute_pool_list: ComputePoolList, table_name: str) -> List[ComputePoolInfo]:
     matching_pools = []
+    _table_name = table_name.replace('_', '-')
     for pool in compute_pool_list.pools:
-        if table_name in pool.name:
+        if _table_name in pool.name:
             matching_pools.append(pool)
     return matching_pools
 

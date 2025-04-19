@@ -7,9 +7,8 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock
 import json 
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../data/flink-project/pipelines")
-import shift_left.core.pipeline_mgr as pm
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
+#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../data/flink-project/pipelines")
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
@@ -52,7 +51,7 @@ class TestDeploymentManager(unittest.TestCase):
     
    
        
-    def _test_src_table_deployment(src):
+    def test_src_table_deployment(src):
         """
         Given a source table with children, deploy the DDL and DML without the children.
         """
@@ -60,7 +59,7 @@ class TestDeploymentManager(unittest.TestCase):
         inventory_path = os.getenv("PIPELINES")
         result = dm.deploy_pipeline_from_table(table_name="src_table_1", 
                                                inventory_path=inventory_path, 
-                                               compute_pool_id=config['flink']['compute_pool_id'], 
+                                               compute_pool_id=None, 
                                                dml_only=False, 
                                                may_start_children=False)
         assert result

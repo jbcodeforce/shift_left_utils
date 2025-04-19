@@ -15,8 +15,7 @@ from shift_left.core.pipeline_mgr import (
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.table_worker import TableWorker
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.statement_mgr import delete_statement_if_exists
+import shift_left.core.statement_mgr as statement_mgr
 
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
@@ -25,8 +24,6 @@ from shift_left.core.utils.file_search import (
     SCRIPTS_DIR, 
     get_table_ref_from_inventory,
     extract_product_name,
-    get_ddl_dml_names_from_table,
-    derive_table_type_product_name_from_path,
     get_table_type_from_file_path,
     build_inventory)
 
@@ -237,176 +234,7 @@ def load_sql_content_from_file(sql_file_name) -> str:
     with open(sql_file_name, "r") as f:
         return f.read()
 
-def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
-    """
-    Retrieves the DDL structure of a Flink SQL table by executing a SHOW CREATE TABLE statement.
 
-    This function connects to a Confluent Cloud Flink compute pool and executes a SHOW CREATE TABLE
-    statement to get the full table definition, including columns, properties and other attributes.
-
-    Args:
-        table_name: The name of the table to get the structure for
-        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
-                        from the configuration.
-
-    Returns:
-        str | None: The CREATE TABLE statement as a string if successful, None if the table doesn't exist
-                   or there was an error.
-
-    Raises:
-        No exceptions are raised - errors are logged and None is returned.
-
-    Example:
-        >>> structure = get_table_structure("my_table")
-        >>> print(structure)
-        'CREATE TABLE my_table (...) WITH (...)'
-    """
-    logger.debug(f"{table_name}")
-    statement_name = "show-" + table_name.replace('_','-')
-    result_str = None
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    sql_content = f"show create table {table_name};"
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    delete_statement_if_exists(statement_name)
-    try:
-        statement = client.post_flink_statement(compute_pool_id, statement_name, sql_content, properties)
-        if statement and statement.status.phase in ("RUNNING", "COMPLETED"):
-            statement_result = client.get_statement_results(statement_name)
-            if len(statement_result.results.data) > 0:
-                result_str = str(statement_result.results.data)
-                logger.debug(f"Run show create table in {result_str}")
-
-    except Exception as e:
-        logger.error(f"get_table_structure {e}")
-    finally:
-        client.delete_flink_statement(statement_name)
-        return result_str
-    
-
-def create_table(table_name: str, ddl_content: str, compute_pool_id: Optional[str] = None) -> str:
-    """
-    Creates a new Flink SQL table using the provided DDL statement.
-
-    This function connects to a Confluent Cloud Flink compute pool and executes a CREATE TABLE
-    statement to create a new table with the specified structure.
-
-    Args:
-        table_name: The name of the table to create
-        ddl_content: The full CREATE TABLE DDL statement to execute
-        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
-                        from the configuration.
-
-    Returns:
-        str: A message indicating the table was created successfully
-
-    Raises:
-        No exceptions are raised - errors are logged and a status message is returned.
-
-    Example:
-        >>> ddl = "CREATE TABLE my_table (id INT PRIMARY KEY) WITH ('connector'='kafka',...)"
-        >>> result = create_table("my_table", ddl)
-        >>> print(result)
-        'my_table created'
-    """
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id = config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    properties = {'sql.current-catalog': config['flink']['catalog_name'],
-                 'sql.current-database': config['flink']['database_name']}
-    statement_name = "create-" + table_name.replace('_', '-')
-    delete_statement_if_exists(statement_name)
-    try:
-        result = client.post_flink_statement(compute_pool_id,
-                                           statement_name,
-                                           ddl_content,
-                                           properties)
-        logger.debug(f"Run create table {result}")
-    except Exception as e:
-        logger.error(e)
-    delete_statement_if_exists(statement_name)
-    return f"{table_name} created"
-
-def get_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str:
-    """
-    Gets the structure of an existing Flink SQL table.
-
-    This function connects to a Confluent Cloud Flink compute pool and executes a DESCRIBE statement
-    to retrieve the table structure, including column definitions and table properties.
-
-    Args:
-        table_name: The name of the table to describe
-        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
-                        from the configuration.
-
-    Returns:
-        str: A string containing the table structure description, or an error message if the table
-             does not exist or there was an error retrieving the structure.
-
-    Example:
-        >>> result = get_table_structure("my_table")
-
-    """
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id = config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    sql_content = f"DESCRIBE {table_name};"
-    properties = {'sql.current-catalog': config['flink']['catalog_name'],
-                 'sql.current-database': config['flink']['database_name']}
-    statement_name = "describe-" + table_name.replace('_', '-')
-    delete_statement_if_exists(statement_name)
-    result_str = ""
-    try:
-        result = client.post_flink_statement(compute_pool_id,
-                                           statement_name,
-                                           sql_content,
-                                           properties)
-        if result and result.status.phase in ("RUNNING", "COMPLETED"):
-            result_str = result.results.data
-    except Exception as e:
-        logger.error(e)
-    finally:
-        delete_statement_if_exists(statement_name)
-        return result_str
-
-def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
-    """
-    Drops a Flink SQL table if it exists.
-
-    This function connects to a Confluent Cloud Flink compute pool and executes a DROP TABLE
-    statement to remove the table from the database.
-
-    Args:
-        table_name: The name of the table to drop
-        compute_pool_id: Optional ID of the Flink compute pool to use. If not provided, uses the default
-                        from the configuration.
-
-    Returns:
-        str: A message indicating the table was dropped successfully
-    """
-
-    config = get_config()
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
-    sql_content = f"drop table if exists {table_name};"
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-    statement_name = "drop-" + table_name.replace('_','-')
-    delete_statement_if_exists(statement_name)
-    try:
-        result= client.post_flink_statement(compute_pool_id, 
-                                            statement_name, 
-                                            sql_content, 
-                                            properties)
-        logger.debug(f"Run drop table {result}")
-    except Exception as e:
-        logger.error(e)
-    delete_statement_if_exists(statement_name)
-    return f"{table_name} dropped"
 
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):

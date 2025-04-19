@@ -151,9 +151,10 @@ class ReplaceEnvInSqlContent(TableWorker):
                     updated = True
                     logger.debug(f"{k} , {v} ")
         else:
-            for k, v in self.dml_replacements[self.env].items():
-                sql_content = re.sub(v["search"], v["replace"], sql_content)
-                updated = True
-                logger.debug(f"{k} , {v} ")
+            if self.env in self.dml_replacements:
+                for k, v in self.dml_replacements[self.env].items():
+                    sql_content = re.sub(v["search"], v["replace"], sql_content)
+                    updated = True
+                    logger.debug(f"{k} , {v} ")
         logger.debug(sql_content)
         return updated, sql_content

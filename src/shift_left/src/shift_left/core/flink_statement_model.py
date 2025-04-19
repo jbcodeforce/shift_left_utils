@@ -103,24 +103,26 @@ class FlinkStatementNode(BaseModel):
     To build an execution plan we need one node for each popential Flink Statement to run.
     A node has 0 to many parents and 0 to many children
     """
+    # -- static information
     table_name: str
     product_name: Optional[str]
     path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
     created_at: Optional[datetime] = Field(default=None)
-    existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
     dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
     dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
     ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
     ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
+    upgrade_mode: str = Field(default="Stateful", description="upgrade mode will depend if the node state is stateful or not.")
+    # -- dynamic information
     dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
     update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Will take care of statefulness. Used during deployment")
     compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
-    parents: Set =  Field(default=set(), description="List of parent")
-    children: Set = Field(default=set(), description="Child list")
+    parents: Set =  Field(default=set(), description="List of parent to run before this node")
+    children: Set = Field(default=set(), description="Child list to run after this node")
+    existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
     to_run: bool = Field(default=False, description="statement must be executed")
     to_restart: bool = Field(default=False, description="statement will be restarted, this is to differentiate child treatment from parent")
-    upgrade_mode: str = Field(default="Stateful", description="upgrade mode will depend if the node state is stateful or not.")
-
+    
     def add_child(self, child):
         self.children.add(child)
         child.parents.add(self)

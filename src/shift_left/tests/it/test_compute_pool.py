@@ -6,8 +6,8 @@ import unittest
 import sys
 import os
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
-
+#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
+os.environ["CONFIG_FILE"] =  "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
 
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.flink_compute_pool_model import *
