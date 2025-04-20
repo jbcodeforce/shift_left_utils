@@ -92,7 +92,7 @@ class TestDeploymentManager(unittest.TestCase):
         current_node.dml_only= False
         graph = dm._build_statement_node_map(current_node)
         for node in graph:
-            print(f"{node} -> {graph[node].dml_statement}")
+            print(f"{node} -> {graph[node].dml_statement_name}")
         execution_plan = dm._build_execution_plan(graph, current_node)
         for node in execution_plan:
             assert node.table_name

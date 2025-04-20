@@ -90,7 +90,7 @@ class ConfluentCloudClient:
         previous_token=None
         while True:
             if next_page_token:
-                resp=self.make_request("GET", next_page_token)
+                resp=self.make_request("GET", next_page_token+"&page_size="+str(page_size))
             else:
                 resp=self.make_request("GET", url)
             logger.debug(f"compute pool response= {resp}")

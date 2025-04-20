@@ -12,15 +12,11 @@ os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-pl
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
-    FlinkTableReference,
-    PipelineReport,
     read_pipeline_definition_from_file,
-    FlinkTablePipelineDefinition,
-    PIPELINE_JSON_FILE_NAME
+    FlinkTablePipelineDefinition
 )
 from shift_left.core.utils.file_search import (
-        get_table_ref_from_inventory,
-        get_or_build_inventory
+        PIPELINE_JSON_FILE_NAME
 )
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
@@ -38,33 +34,6 @@ class TestDeploymentManager(unittest.TestCase):
         so it will run ddl, then ddls of all parent recursively.
         As we deploy both DDL and DML, force does not need to be True
         """
-        table_name="fct_order"
-        #table_name="int_table_1"
-        inventory_path= os.getenv("PIPELINES")
-        import shift_left.core.deployment_mgr as dm
-        """
-        result = dm.deploy_pipeline_from_table(table_name, 
-                                               inventory_path, 
-                                               config["flink"]["compute_pool_id"], 
-                                               False, 
-                                               False)
-        """
-        result = dm.full_pipeline_undeploy_from_table(table_name,inventory_path)
-        assert result
-        print(result.model_dump_json())
-
-
-
-    def _test_list_of_compute_pools(self):
-        import shift_left.core.project_manager as pmm
-        config = get_config()
-        env_id=config['confluent_cloud']['environment_id']
-        results = pmm.get_list_of_compute_pool(env_id)
-        assert results
-        assert len(results) > 0
-
-    def test_build_execution_plan(self):
-
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         os.environ["PIPELINES"]=inventory_path
         import shift_left.core.deployment_mgr as dm
@@ -74,22 +43,22 @@ class TestDeploymentManager(unittest.TestCase):
         result=dm.deploy_pipeline_from_table("src_aqem_tag_tag", inventory_path, config.get('flink').get('compute_pool_id'), False, False)
         print(result.model_dump_json())
         assert result
-        """
-        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + table_path + PIPELINE_JSON_FILE_NAME)
 
+
+    def test_build_execution_plan(self):
+        inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        table_path="/intermediates/aqem/tag_tag_dummy/"
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + table_path + PIPELINE_JSON_FILE_NAME)
+        config = get_config()
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
                                                                 config.get('flink').get('compute_pool_id'), 
-                                                                True, 
+                                                                False, 
                                                                 False,
                                                                 start_time = datetime.now())
         
-        #dm.persist_execution_plan(execution_plan)
+        dm.persist_execution_plan(execution_plan)
         print(dm.build_summary_from_execution_plan(execution_plan))
            
-        #l = dm._execute_plan(execution_plan, get_config()['flink']['compute_pool_id'])
-        #for statement in l:
-        #    print(statement)
-        """
         
     @patch('shift_left.core.deployment_mgr._get_and_update_statement_info_for_node')
     def _test_build_execution_plan_for_intermediated_table_including_children(self, mock_get_status): 

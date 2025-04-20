@@ -54,7 +54,7 @@ class TestDeploymentManager(unittest.TestCase):
         node_map = dm._build_statement_node_map(pipeline_def.to_node())
         assert len(node_map) == 14
         for node in node_map.values():
-            print(node.table_name, node.upgrade_mode, node.dml_statement)
+            print(node.table_name, node.upgrade_mode, node.dml_statement_name)
         assert node_map["src_y"].upgrade_mode == "Stateless"
         assert node_map["src_x"].upgrade_mode == "Stateless"
         assert node_map["src_b"].upgrade_mode == "Stateless"
@@ -385,10 +385,10 @@ class TestDeploymentManager(unittest.TestCase):
         print("test_execute_plan")
         # Setup
         plan = FlinkStatementExecutionPlan(nodes=[])
-        node1 = FlinkStatementNode(table_name="table1", product_name="product1", dml_statement="dml1", ddl_statement="ddl1", compute_pool_id="cp001")
+        node1 = FlinkStatementNode(table_name="table1", product_name="product1", dml_statement_name="dml1", ddl_statement_name="ddl1", compute_pool_id="cp001")
         node1.to_run = True
         node1.dml_only = False
-        node2 = FlinkStatementNode(table_name="table2", product_name="product1", dml_statement="dml2", ddl_statement="ddl2", compute_pool_id="cp001")
+        node2 = FlinkStatementNode(table_name="table2", product_name="product1", dml_statement_name="dml2", ddl_statement_name="ddl2", compute_pool_id="cp001")
         node2.to_run = False
         node2.to_restart = True
         node2.dml_only = True

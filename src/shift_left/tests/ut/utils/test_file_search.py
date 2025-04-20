@@ -40,22 +40,22 @@ class TestFileSearch(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
 
     def test_table_ref_equality(self):
-        ref1 = FlinkTableReference.model_validate({"table_name": "table1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
-        ref2 = FlinkTableReference.model_validate({"table_name": "table1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
+        ref1 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
+        ref2 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
         self.assertEqual(ref1, ref2)
         self.assertEqual(ref1.__hash__(), ref2.__hash__())
 
     def test_table_ref_inequality(self):
-        ref1 = FlinkTableReference.model_validate({"table_name": "table1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
-        ref2 = FlinkTableReference.model_validate({"table_name": "table2", "type": "fact", "dml_ref": "dml2", "ddl_ref": "ddl2", "table_folder_name": "folder2" })
+        ref1 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
+        ref2 = FlinkTableReference.model_validate({"table_name": "table2", "product_name": "p1", "type": "fact", "dml_ref": "dml2", "ddl_ref": "ddl2", "table_folder_name": "folder2" })
         self.assertNotEqual(ref1, ref2)
         self.assertNotEqual(ref1.__hash__(), ref2.__hash__())  
 
     def test_flink_statement_node(self):
-        node = FlinkStatementNode(table_name="root_node")
+        node = FlinkStatementNode(table_name="root_node", product_name="p1")
         assert node.table_name
         assert not node.to_run
-        child = FlinkStatementNode(table_name="child_1")
+        child = FlinkStatementNode(table_name="child_1", product_name="p1")
         node.add_child(child)
         assert len(node.children) == 1
         assert len(child.parents) == 1
@@ -63,12 +63,17 @@ class TestFileSearch(unittest.TestCase):
     def test_FlinkTablePipelineDefinition(self):
         pipe_def= FlinkTablePipelineDefinition(table_name="src_table",
                                                type="source",
+                                               product_name="p1",
                                                path= "src/src_table",
-                                               dml_ref="src/src_table/sql_scripts/dml.file.sql",
-                                               ddl_ref="src/src_table/sql_scripts/ddl.file.sql")
+                                               dml_ref="src/src_table/sql_scripts/dml.src_p1_table.sql",
+                                               ddl_ref="src/src_table/sql_scripts/ddl.src_p1_table.sql")
         assert pipe_def
         assert pipe_def.path == "src/src_table"
         assert pipe_def.state_form == "Stateful"
+        node = pipe_def.to_node()
+        assert node.dml_statement_name == "dev-p1-dml-src-table"
+        assert node.ddl_statement_name == "dev-p1-ddl-src-table"
+
     
     def test_read_pipeline_definition_from_file(self):
         result: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
@@ -137,17 +142,17 @@ class TestFileSearch(unittest.TestCase):
 
 
     def test_get_ddl_dml_names_from_table(self):
-        ddl, dml = get_ddl_dml_names_from_table("fct_order", "dev")
-        assert ddl == "dev-ddl-fct-order"
-        assert dml == "dev-dml-fct-order"
+        ddl, dml = get_ddl_dml_names_from_table("fct_order")
+        assert ddl == "ddl-fct-order"
+        assert dml == "dml-fct-order"
 
 
     def test_dml_ddl_names(self):
         pipe_def = read_pipeline_definition_from_file( os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
         config = get_config()
-        ddl, dml = get_ddl_dml_names_from_pipe_def(pipe_def,  config['kafka']['cluster_type'])
-        assert ddl == "dev-ddl-p1-fct-order"
-        assert dml == "dev-dml-p1-fct-order"
+        ddl, dml = get_ddl_dml_names_from_pipe_def(pipe_def)
+        assert ddl == "ddl-p1-fct-order"
+        assert dml == "dml-p1-fct-order"
 
     def test_get_ddl_file_name(self):
         fname = get_ddl_file_name(os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts")

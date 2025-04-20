@@ -97,6 +97,10 @@ class StatementInfo(BaseModel):
     sql_catalog:  Optional[str] =  Field(default=None, description="Flink catalog name")
     sql_database:  Optional[str] =  Field(default=None, description="Flink database name")
 
+class StatementListCache(BaseModel):
+    created_at: Optional[str] = Field(default=None)
+    statement_list: Optional[dict[str, StatementInfo]] = Field(default={})
+
 
 class FlinkStatementNode(BaseModel):
     """
@@ -109,9 +113,9 @@ class FlinkStatementNode(BaseModel):
     path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
     created_at: Optional[datetime] = Field(default=None)
     dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
-    dml_statement: Optional[str] =  Field(default=None, description="DML Statement name")
+    dml_statement_name: Optional[str] =  Field(default=None, description="DML Statement name")
     ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
-    ddl_statement: Optional[str] =  Field(default=None, description="DDL Statement name")
+    ddl_statement_name: Optional[str] =  Field(default=None, description="DDL Statement name")
     upgrade_mode: str = Field(default="Stateful", description="upgrade mode will depend if the node state is stateful or not.")
     # -- dynamic information
     dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")

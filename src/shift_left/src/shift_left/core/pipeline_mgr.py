@@ -13,7 +13,7 @@ from collections import deque
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, Final, Any, Set, List, Tuple, Union
+from typing import Dict, Optional, Any, Set, Tuple
 
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
@@ -30,7 +30,6 @@ from shift_left.core.utils.file_search import (
     get_or_build_inventory,
     get_table_type_from_file_path,
     read_pipeline_definition_from_file
-
 )
 
 
@@ -91,14 +90,16 @@ def build_pipeline_definition_from_dml_content(dml_file_name: str, pipeline_path
     return current_node
 
 def build_all_pipeline_definitions(pipeline_path: str):
+    count = 0
     dimensions_path = Path(pipeline_path) / "dimensions"
-    _process_one_sink_folder(dimensions_path, pipeline_path)
+    count += _process_one_sink_folder(dimensions_path, pipeline_path, count)
     facts_path = Path(pipeline_path) / "facts"
-    _process_one_sink_folder(facts_path, pipeline_path)
+    count += _process_one_sink_folder(facts_path, pipeline_path, count)
     views_path = Path(pipeline_path) / "views"
-    _process_one_sink_folder(views_path, pipeline_path)
+    count += _process_one_sink_folder(views_path, pipeline_path, count)
     views_path = Path(pipeline_path) / "intermediates"
-    _process_one_sink_folder(views_path, pipeline_path)
+    count += _process_one_sink_folder(views_path, pipeline_path, count)
+    logger.info(f"Total number of pipeline definitions created: {count}")
 
     
 def get_static_pipeline_report_from_table(table_name: str, inventory_path: str) -> PipelineReport:
@@ -136,6 +137,7 @@ def delete_all_metada_files(root_folder: str):
     """
     Delete all the files with the given name in the given root folder tree
     """
+    count = 0
     file_to_delete = PIPELINE_JSON_FILE_NAME
     logger.info(f"Delete {file_to_delete} from folder: {root_folder}")
     for root, dirs, files in os.walk(root_folder):
@@ -144,6 +146,8 @@ def delete_all_metada_files(root_folder: str):
                 file_path=os.path.join(root, file)
                 os.remove(file_path)
                 logger.info(f"File '{file_path}' deleted successfully.")
+                count += 1
+    logger.info(f"Total number of files deleted: {count}")
 
 
 
@@ -212,13 +216,15 @@ def _build_pipeline_definitions_from_sql_content(
         return ERROR_TABLE_NAME, set(), None
 
     
-def _process_one_sink_folder(sink_folder_path, pipeline_path):
+def _process_one_sink_folder(sink_folder_path, pipeline_path, count: int):
     for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
         if sql_scripts_path.is_dir():
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
                 if file_path.is_file() and file_path.name.startswith("dml"):
                     logger.info(f"Process the dml {file_path}")
+                    count += 1
                     build_pipeline_definition_from_dml_content(str(file_path.resolve()), pipeline_path)
+    return count
     
 
 def _build_pipeline_definition(

@@ -23,7 +23,6 @@ theme:
       - content.code.annotate
       - content.code.copy
       - content.tooltips
-      - content.code.copy
       - content.tabs.link
       - search.suggest
       - search.highlight
@@ -57,12 +56,17 @@ markdown_extensions:
   - footnotes
   - tables
   #- pymdownx.blocks.caption
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.smartsymbols
   - toc:
       permalink: true
       toc_depth: 3
-  #- pymdownx.tabbed
-  - pymdownx.highlight
+  - pymdownx.tabbed
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences

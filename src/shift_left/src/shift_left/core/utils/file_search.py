@@ -2,6 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import os
+from importlib import import_module
 from pathlib import  PosixPath
 from typing import Final, Dict, Optional, Any, Tuple, Set, List
 import json
@@ -10,7 +11,8 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
-from shift_left.core.flink_statement_model import StatementInfo, FlinkStatementNode
+from shift_left.core.flink_statement_model import FlinkStatementNode
+from shift_left.core.utils.naming_convention import DmlNameModifier
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
 """
@@ -61,18 +63,19 @@ class FlinkTablePipelineDefinition(InfoNode):
         return self.table_name == other.table_name
      
     def to_node(self) -> FlinkStatementNode:
-        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(self, get_config()['kafka']['cluster_type'])
-       
+        dml_statement_name = "dml-" + self.table_name.replace("_", "-")
+        ddl_statement_name = "ddl-" + self.table_name.replace("_", "-")
         r = FlinkStatementNode(table_name= self.table_name,
                                path= self.path,
                                created_at=datetime.now(),
                                product_name=self.product_name,
-                               dml_statement=dml_statement_name,
+                               dml_statement_name=dml_statement_name,
                                dml_ref=self.dml_ref,
-                               ddl_statement=ddl_statement_name,
+                               ddl_statement_name=ddl_statement_name,
                                ddl_ref=self.ddl_ref,
                                upgrade_mode=self.state_form
                                )
+        _apply_naming_convention(r)
         
         for p in self.parents:
             node_p:FlinkStatementNode = p.to_node()
@@ -306,23 +309,13 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     file_paths.update(list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
-def get_ddl_dml_names_from_table(table_name: str, prefix: str) -> Tuple[str,str]:
-     
-    if prefix:
-        ddl_n = prefix + "-ddl-" + table_name.replace("_","-")
-        dml_n = prefix + "-dml-" + table_name.replace("_","-")
-    else:
-        ddl_n = "ddl-" + table_name.replace("_","-")
-        dml_n = "dml-" + table_name.replace("_","-")
-    #logger.debug(f"Get dml name from table {table_name} and {product_name} as {ddl_n} and {dml_n}") 
+def get_ddl_dml_names_from_table(table_name: str) -> Tuple[str,str]:
+    ddl_n = "ddl-" + table_name.replace("_","-")
+    dml_n = "dml-" + table_name.replace("_","-")
     return ddl_n, dml_n
 
-
-
-def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition, 
-                                    prefix: str) -> Tuple[str,str]:
-    return get_ddl_dml_names_from_table(to_process.table_name, 
-                                        prefix)
+def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition) -> Tuple[str,str]:
+    return get_ddl_dml_names_from_table(to_process.table_name)
 
 def get_ddl_file_name(folder_path: str) -> str:
     """
@@ -363,4 +356,22 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     return sql_files
 
 
-  
+def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
+    dml_n = _get_statement_name_modifier().modify_statement_name(node, node.dml_statement_name, get_config().get('kafka').get('cluster_type'))
+    ddl_n = _get_statement_name_modifier().modify_statement_name(node, node.ddl_statement_name, get_config().get('kafka').get('cluster_type'))
+    node.dml_statement_name = dml_n
+    node.ddl_statement_name = ddl_n
+    return node
+
+_statement_name_modifier = None
+def _get_statement_name_modifier():
+    global _statement_name_modifier
+    if not _statement_name_modifier:
+        if get_config().get('app').get('dml_naming_convention_modifier'):
+            class_to_use = get_config().get('app').get('dml_naming_convention_modifier')
+            module_path, class_name = class_to_use.rsplit('.',1)
+            mod = import_module(module_path)
+            _statement_name_modifier = getattr(mod, class_name)()
+        else:
+            _statement_name_modifier = DmlNameModifier()
+    return _statement_name_modifier

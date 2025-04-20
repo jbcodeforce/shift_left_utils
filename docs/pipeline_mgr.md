@@ -1,7 +1,7 @@
 # Pipeline Management
 
 ???- info "Version"
-    Created Mars 21- 2025 - Update 3/28/25
+    Created Mars 21- 2025 - Update 4/19/25
 
 The goals of this chapter is to present the requirements, design, and validation of the pipeline management tools.
 
@@ -19,7 +19,7 @@ Flink statements are inherently interdependent, consuming and joining tables pro
 ???- info "Test data"
     The folder [src/shift_left/tests/data](https://github.com/jbcodeforce/shift_left_utils/tree/cli/src/shift_left/tests/data) includes a Flink-project with the DDLs and DMLs to support the graph illustrated above, and it is used in all the test cases.
 
-## Managing the pipeline
+## Core concepts for managing Flink Statement pipelines
 
 The [recipe chapter](./recipes.md) has how-to descriptions for the specific commands to use during development and during the pipeline management by system reliability engineers. The following high level concepts are the foundations for this management:
 
@@ -115,18 +115,68 @@ The [recipe chapter](./recipes.md) has how-to descriptions for the specific comm
 1. Hierarchy view is used to deploy a selected table, its parents and eventually its children. 
 1. For deployment they are some heuristic to follow:
 
-    1. when deploying a Flink statement, any parent (tables used for select or joins) not running, need to start them
-    1. When the current intermediate table, one with children and parents, is stateful and needs to be dropped then children will be impacted. 
-    1. For a current intermediate table, if a child is stateful, then need to restart this child once the current topic / table is created. If the child is stateless then offset management needs to be done. 
-    1. The deployment follows a LIFO queue
-    1. A table is running if a topic exist. Do we need to consider the DML writing to this table to also be running. It may not be a strong argument.
+    1. when deploying a Flink statement, for any parent (tables used for select or joins) currently not running, the tools needs to start them
+    1. When the current intermediate table, one with children and parents, is generating events from a stateful processing, the output table needs to be recreated, the consumers who consumed from the earliest needs to be restarted. Eventually this means cascading down the children graph to restart all the impacted children.
+    1. For a current intermediate table, if a child is stateful, then the tool needs to restart this child once the current topic / table is created. If the child is stateless then offset management needs to be done: the children is stopped, and restarted from last committed offset. 
+    1. The deployment follows a sources to sink deployment to ensure that for a given table all parents are running.
 
+
+### Multi-cluster support
+
+Flink is deployed at the environment level. An environment may have multiple Kafka clusters. A schema registry is also at the environment level. The tool needs to support conflicting consistency: do not overwrite schema, separate cluster or topics within the same cluster. The following figure illustrates those concepts:
+
+![](./images/multiple-cluster.drawio.png)
+
+Therefore the following are important requirements to address:
+
+* Tables are created by flink job and may avoid conflicting so a naming convention is needed, sepcially when a unique cluster is used for dev and staging: dev-<table-name>; <stage-tablename> 
+* Flink job (dml-*) needs to follow a naming convention to easily find compute pool to statement allocation in the Console.
+* Sources topics may have been created by external systems so it may also being created with naming convention, or the same source topics used by the different deployment.
+* Schemas in the registry needs to support context and each created table definition uses the `key.avro-registry.schema-context`  = '.flink-stage' or '.flink-dev'  settings.
+* Table name needs to follow a naming convention to separate dev and stage.
+* When stage is a separate kafka cluster then the catalog and database names are used to define the scope of the created tables.
+
+
+<style>
+table th:first-of-type {
+    width: 50%;
+}
+table th:nth-of-type(1) {
+    width: 50%;
+}
+</style>
+| table name | schema context | 
+| --- | --- | 
+| src_p1_table_1 | .flink-dev | 
+| src_p1_table_2 | .flink-dev | 
+| src_p1_table_3 | .flink-dev |
+| p1_fct_table_1 | .flink-dev |
+| src_p1_table_1 | .flink-stage |
+| src_p1_table_2 | .flink-stage |
+| src_p1_table_3 | .flink-stage |
+| p1_fct_table_1 | .flink-stage |
+
+The shift_left `config..yaml` file needs to be specific per deployment target. The table illustrates the parameters specific for a given environment
+
+<style>
+table th:first-of-type {
+    width: 40%;
+}
+table th:nth-of-type(2) {
+    width: 30%;
+}
+</style>
+| Use case | Goal |Parameter to set|
+| --- | --- | --- |
+| Deploy to dev env and cluster| Tables are create with prefix | `kafka.cluster_type: dev` and  `flink.catalog_name: dev-env` `flink.database_name: dev-cluster`|
+| Deploy to stage same kafka cluster, same env| Tables are create with prefix to separate from dev | `kafka.cluster_type: stage` and  `flink.catalog_name: dev-env` `flink.database_name: dev-cluster`|
+| Deploy to stage different kafka cluster same environment | Tables are create with prefix but the database name is different too. | `kafka.cluster_type: stage` and   `flink.catalog_name: dev-env` `flink.database_name: stage-cluster` |
 
 ### Different constraints for pipeline deployment
 
 #### Deploying a fact table
 
-During development, Flink SQL developers use the makefile: see [recipe]() to deploy statement. While preparing for staging or integration tests, it may be relevant to deploy a full pipeline from a sink table. For example SREs want to deploy the sink `fct_order` table. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, tables and topics have messages. Before deploying the `fct_order dml`, the tool needs to assess what are the current parents table running. If there are missing tables, the tool needs to deploy those, taking into consideration parents of parents. For example, for the `int_table_1` which is not created, the tool needs first to run the DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC), thne run the `int_table_1` DDL and DML, to finally deploy the `fct_order` DDL and DML. 
+During development, Flink SQL developers use the makefile: see [this recipe](./recipes.md/#developer-centric-use-cases) to deploy statement. While preparing for staging or integration tests, it may be relevant to deploy a full pipeline from a sink table. For example SREs want to deploy the sink `fct_order` table. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, tables and topics have messages. Before deploying the `fct_order dml`, the tool needs to assess what are the current parents table running. If there are missing tables, the tool needs to deploy those, taking into consideration parents of parents. For example, for the `int_table_1` which is not created, the tool needs first to run the DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC), thne run the `int_table_1` DDL and DML, to finally deploy the `fct_order` DDL and DML. 
 
 <figure markdown="span">
 ![](./images/flink_pipeline_1.drawio.png)
@@ -137,8 +187,8 @@ The red color highlights what is the goal of the deployment. The white represent
 
 ???- info "Step to demonstrate a sink table deployment"
     * Remove any older logs with `rm ~/.shift_left/logs/*.log*`
-    * Be sure `config.yaml` has the good parameters in particular the flink and Confluent cloud access keys,secrets, a default compute_pool_id and the logging level.
-    * Defines the PIPELINES and CONFIG_FILE environement variables
+    * Be sure `config.yaml` has the good parameters in particular the flink and Confluent cloud access API keys, secrets, a default compute_pool_id and the appropriate logging level.
+    * Defines the PIPELINES and CONFIG_FILE environment variables
     * Ensure the table inventory is up to date, if not run `shift_left table build-inventory $PIPELINES`
     * If for any reason, the pipeline definitions for the given pipeline needs to be recreated, run: `shift_left pipeline build-metadata fct_order $PIPELINES`
     * Verify a report works on the fact table: `shift_left pipeline report fct_order $PIPELINES`.  

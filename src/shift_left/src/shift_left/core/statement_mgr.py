@@ -5,9 +5,11 @@ A set of operations to manage a flink statement
 from typing import List, Optional
 import os
 import time
+import json
+from datetime import datetime
 from importlib import import_module
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
     get_or_build_inventory,
@@ -19,11 +21,12 @@ from shift_left.core.utils.file_search import (
     get_ddl_dml_names_from_pipe_def,
     from_pipeline_to_absolute
 )
-from shift_left.core.flink_statement_model import Statement, StatementResult, StatementInfo
+from shift_left.core.flink_statement_model import Statement, StatementResult, StatementInfo, StatementListCache
 from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
 from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
+STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path: str, 
                            compute_pool_id: str = None, 
@@ -160,38 +163,49 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
     return None
 
 
-        
-_statement_list = None  # cache the statement list loaded to limit the number of call to CC API
+
+
+    
+_statement_list_cache = None  # cache the statement list loaded to limit the number of call to CC API
 def get_statement_list() -> dict[str, StatementInfo]:
     """
     Get the statement list from the CC API - the list is <statement_name, statement_info>
     """
-    global _statement_list
-    if _statement_list == None:
-        _statement_list = {}
-        logger.info("Load the current list of Flink statements from REST API")
-        config = get_config()
-        page_size = config["confluent_cloud"].get("page_size", 100)
-        client = ConfluentCloudClient(config)
-        url=client.build_flink_url_and_auth_header()+"/statements?page_size="+str(page_size)
-        next_page_token = None
-        while True:
-            if next_page_token:
-                resp=client.make_request("GET", next_page_token)
-            else:
-                resp=client.make_request("GET", url)
-            logger.debug("Statement execution result:", resp)
-            if resp and 'data' in resp:
-                for info in resp.get('data'):
-                    statement_info = _map_to_statement_info(info)
-                    _statement_list[info['name']] = statement_info
-            if "metadata" in resp and "next" in resp["metadata"]:
-                next_page_token = resp["metadata"]["next"]
-                if not next_page_token:
+    global _statement_list_cache
+    if _statement_list_cache == None:
+        reload = True
+        if os.path.exists(STATEMENT_LIST_FILE):
+            with open(STATEMENT_LIST_FILE, "r") as f:
+                _statement_list_cache = StatementListCache.model_validate_json(f.read())
+            if _statement_list_cache.get('created_at') and (datetime.now() - datetime.fromisoformat(_statement_list_cache.get('created_at'))).total_seconds() < 4*3600:  
+                reload = False
+        if reload:
+            _statement_list_cache = StatementListCache(created_at=datetime.now().isoformat())
+            logger.info("Load the current list of Flink statements from REST API")
+            config = get_config()
+            page_size = config["confluent_cloud"].get("page_size", 100)
+            client = ConfluentCloudClient(config)
+            url=client.build_flink_url_and_auth_header()+"/statements?page_size="+str(page_size)
+            next_page_token = None
+            while True:
+                if next_page_token:
+                    resp=client.make_request("GET", next_page_token)
+                else:
+                    resp=client.make_request("GET", url)
+                logger.debug("Statement execution result:", resp)
+                if resp and 'data' in resp:
+                    for info in resp.get('data'):
+                        statement_info = _map_to_statement_info(info)
+                        _statement_list_cache.statement_list[info['name']] = statement_info
+                if "metadata" in resp and "next" in resp["metadata"]:
+                    next_page_token = resp["metadata"]["next"]
+                    if not next_page_token:
+                        break
+                else:
                     break
-            else:
-                break
-    return _statement_list
+            _save_statement_list(_statement_list_cache)
+    return _statement_list_cache.statement_list
+
 
 
 def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
@@ -278,6 +292,13 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     return f"{table_name} dropped"
 
 # ------------- private methods -------------
+def _save_statement_list(statement_list: dict[str, StatementInfo]):
+    """
+    Save the statement list to the cache file
+    """
+    with open(STATEMENT_LIST_FILE, "w") as f:
+        json.dump(statement_list, f, indent=4)
+
 def _map_to_statement_info(info: dict) -> StatementInfo:
     if 'properties' in info.get('spec') and info.get('spec').get('properties'):
         catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
@@ -298,14 +319,15 @@ def _map_to_statement_info(info: dict) -> StatementInfo:
 def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):
     for parent in node.parents:
         results= _search_statement_status(parent, statement_list, results, table_inventory, config)
-    ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(node, config['kafka']['cluster_type'])
+    ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(node)
     if dml_statement_name in statement_list:
         status = statement_list[dml_statement_name]
         results[dml_statement_name]=status
     return results
 
+
 def _search_statement_status(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):
-    ddl_statement_name, statement_name = get_ddl_dml_names_from_pipe_def(node, config['kafka']['cluster_type'])
+    ddl_statement_name, statement_name = get_ddl_dml_names_from_pipe_def(node)
     if statement_name in get_statement_list():
         status = get_statement_list()[statement_name]
         results[statement_name]=status

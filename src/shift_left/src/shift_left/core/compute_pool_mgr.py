@@ -3,11 +3,12 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import time
 import os, json
-from pydantic import BaseModel
+from importlib import import_module
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.statement_mgr import get_statement_info
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.flink_compute_pool_model import *
+from shift_left.core.utils.naming_convention import ComputePoolNameModifier
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import ( 
     get_ddl_dml_names_from_table, 
@@ -91,10 +92,12 @@ def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
 
 def search_for_matching_compute_pools(compute_pool_list: ComputePoolList, table_name: str) -> List[ComputePoolInfo]:
     matching_pools = []
-    _table_name = table_name.replace('_', '-')
+    _target_pool_name = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
     for pool in compute_pool_list.pools:
-        if _table_name in pool.name:
+        if _target_pool_name == pool.name:
             matching_pools.append(pool)
+    if len(matching_pools) == 0:
+        logger.info(f"The target pool name {_target_pool_name} does not match any compute pool")
     return matching_pools
 
 def get_compute_pool_with_id(compute_pool_list: ComputePoolList, compute_pool_id: str) -> ComputePoolInfo:
@@ -168,3 +171,19 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
         logger.error(e)
         logger.info("Continue processing to ignore compute pool constraint")
         return True
+
+
+
+
+_compute_pool_name_modifier = None
+def _get_compute_pool_name_modifier():
+    global _compute_pool_name_modifier
+    if not _compute_pool_name_modifier:
+        if get_config().get('app').get('compute_pool_naming_convention_modifier'):
+            class_to_use = get_config().get('app').get('compute_pool_naming_convention_modifier')
+            module_path, class_name = class_to_use.rsplit('.',1)
+            mod = import_module(module_path)
+            _compute_pool_name_modifier = getattr(mod, class_name)()
+        else:
+            _compute_pool_name_modifier = ComputePoolNameModifier()
+    return _compute_pool_name_modifier
