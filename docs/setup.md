@@ -105,13 +105,13 @@ export SRC_FOLDER=$HOME/Code/datawarehouse/models
 
 export CONFIG_FILE=./config.yaml
 # The following variables are used when deploying with the Makefile.
-export CCLOUD_KAFKA_CLUSTER=dev-us-west-2-dedicated
+
 export CCLOUD_ENV_ID=env-xxxx
 export CCLOUD_ENV_NAME=j9r-env
 export CCLOUD_KAFKA_CLUSTER=jxxxxx
 export CLOUD_REGION=us-west-2
 export CLOUD_PROVIDER=aws
-export CCLOUD_CONTEXT=login-jboyer@confluent.io-https://confluent.cloud
+export CCLOUD_CONTEXT=login-<user_id>@<domain>.com-https://confluent.cloud
 export CCLOUD_COMPUTE_POOL_ID=lfcp-xxxx
 ```
 

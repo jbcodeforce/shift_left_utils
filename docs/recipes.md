@@ -201,6 +201,52 @@ shift_left table init int_p3_users $PIPELINES/intermediates --product-name p3
 
 [See also the table naming convention section.](#a-table-name-naming-convention)
 
+### Using Makefile for deployment
+
+During the development of the DDL and DML it may be more efficient to use the confluent CLI to deploy the Flink statements. To make the thing easier a Makefile exists in each table folder to support the deployment during development. Each Confluent Cloud cli are defined in a common makefile.
+
+* To create the Flink dynamic table using the target Flink compute pool do:
+
+  ```sh
+  make create_flink_ddl
+  ```
+
+This action creates the Kafka topic with the name of the table and creates the schema definitions for the key and the value in the Schema Registry of the Confluent Cloud environment. A DDL execution will terminate and the Flink job statement is set to be Completed. The Make tsarget also ask for deleting the DDL Flink statement as we need to keep a unique name for the Flink statement. As a Flink-developer role, you need to be able to delete Flink Statement.
+
+???- info "How it works"
+    Each makefile is reusing targets defined in a common.mk file that is under the $PIPELINES folder. This file uses environment variables so each Developer can have their own compute pool, and work in different environment. [See setup env variables section](./setup.md#environment-variables). See the top of the common.mk file for the usage of those environment variables [the template is here](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/templates/common.mk). 
+
+* Verify the completion of the job using cli:
+
+  ```sh
+  make describe_flink_ddl
+  ```
+
+* For DML deplouyment use: (This job will run forever until stopped or deleted)
+
+  ```sh
+  make create_flink_dml
+  ```
+
+* Verify the running job using cli:
+
+  ```sh
+  make describe_flink_dml
+  ```
+
+* Sometime, developer may need to delete the created topics and schemas, for that the makefile target is:
+
+  ```sh
+  make drop_table_<table_name>
+  ```
+
+* Each Flink Statement is named, so it may be relevant to delete a created statement with the command:
+
+  ```sh
+  make delete_flink_statements
+  ```
+
+
 ### Discover the current source dependencies
 
 When doing a migration project it may be interesting to understand the current SQL statement relationship with the tables it uses.

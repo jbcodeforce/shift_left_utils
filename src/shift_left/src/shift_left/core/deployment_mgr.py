@@ -114,7 +114,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     start_node is the matching statement metadata to be the root of the graph navigation. 
     """
     logger.info(f"Build execution plan for {pipeline_def.table_name}")
-    start_node = pipeline_def.to_node()
+    start_node: FlinkStatementNode = pipeline_def.to_node()
     if not start_time:
         start_time = str(datetime.now())
     start_node.created_at = start_time
