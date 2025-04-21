@@ -48,6 +48,7 @@ class TestDeploymentManager(unittest.TestCase):
     def test_build_execution_plan(self):
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         table_path="/intermediates/aqem/tag_tag_dummy/"
+        #table_path="/facts/aqem/fct_action_item_event/"
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + table_path + PIPELINE_JSON_FILE_NAME)
         config = get_config()
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 

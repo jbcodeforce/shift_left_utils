@@ -176,8 +176,8 @@ def get_statement_list() -> dict[str, StatementInfo]:
         reload = True
         if os.path.exists(STATEMENT_LIST_FILE):
             with open(STATEMENT_LIST_FILE, "r") as f:
-                _statement_list_cache = StatementListCache.model_validate_json(f.read())
-            if _statement_list_cache.get('created_at') and (datetime.now() - datetime.fromisoformat(_statement_list_cache.get('created_at'))).total_seconds() < 4*3600:  
+                _statement_list_cache = StatementListCache.model_validate(json.load(f))
+            if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < 4*3600:  
                 reload = False
         if reload:
             _statement_list_cache = StatementListCache(created_at=datetime.now().isoformat())
@@ -297,7 +297,7 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
     Save the statement list to the cache file
     """
     with open(STATEMENT_LIST_FILE, "w") as f:
-        json.dump(statement_list, f, indent=4)
+        json.dump(statement_list.model_dump(), f, indent=4)
 
 def _map_to_statement_info(info: dict) -> StatementInfo:
     if 'properties' in info.get('spec') and info.get('spec').get('properties'):

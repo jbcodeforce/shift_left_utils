@@ -69,6 +69,22 @@ class TestDeploymentManager(unittest.TestCase):
         assert node_map["b"].upgrade_mode == "Stateless"
         assert node_map["e"].upgrade_mode == "Stateless"
         assert node_map["f"].upgrade_mode == "Stateless"
+        assert node_map["g"].upgrade_mode == "Stateless"
+
+    def test_dfs_search_parents_to_run(self):
+        """Test DFS search parents to run
+        f has 6 parents: d, then z, x, y then  src_y, src_x 
+        """
+        print("test_dfs_search_parents_to_run")
+        pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
+        node_map = dm._build_statement_node_map(pipeline_def.to_node())
+        nodes_to_run = []
+        visited_nodes = set()   
+        dm._dfs_search_parents_to_run(nodes_to_run, node_map["f"], visited_nodes, node_map)
+        assert len(nodes_to_run) == 7
+        for node in nodes_to_run:
+            print(node.table_name, node.to_run, node.to_restart)
+        
         
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')

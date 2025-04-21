@@ -2,10 +2,12 @@ import unittest
 from unittest.mock import patch, MagicMock
 import os
 import pathlib
+import json
 
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import Statement
+from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementListCache
 import  shift_left.core.statement_mgr as statement_mgr 
+
 class TestStatementManager(unittest.TestCase):
 
     @classmethod
@@ -112,6 +114,36 @@ class TestStatementManager(unittest.TestCase):
         mock_delete_statement_if_exists.assert_called_with("drop-fct-order")
 
 
+    def test_get_statement_list_cache(self):
+        statement_list = StatementListCache(created_at='2025-04-20T10:15:02.853006',statement_list={                                                                          
+                                            'info-1': StatementInfo(                     
+                                                        name='info-1',                           
+                                                        status_phase='STOPPED',                                                           
+                                                        status_detail='This statement was stopped manually.',                             
+                                                        sql_content=' ',
+                                                        compute_pool_id='lfcp-0m07j6',                                                    
+                                                        principal='u-1wg0qj',                                                             
+                                                        sql_catalog='development_non-prod',                                            
+                                                        sql_database='stage-us-west-2'                                          
+                                                        ),                                                                                    
+                                            'info-2': StatementInfo(                     
+                                                        name='info-2',                           
+                                                        status_phase='STOPPED',                                                           
+                                                        status_detail='This statement was stopped manually.',                             
+                                                        sql_content='select id\n    , tenantId\n    , sourceTemplateId\n    , createdOnDate\n',
+                                                        compute_pool_id='lfcp-0m07j6',                                                    
+                                                        principal='u-1wg0qj',                                                             
+                                                        sql_catalog='development_non-prod',                                            
+                                                        sql_database='development-us-west-2'                                    
+                                            )}) 
+        assert statement_list
+        str_dump = json.dumps(statement_list.model_dump())
+        print(isinstance(str_dump, str))
+        print(f"statement_list: {str_dump}")
+        statement_list_cache = StatementListCache.model_validate(json.loads(str_dump))
+        assert statement_list_cache
+        assert isinstance(statement_list_cache, StatementListCache)
+        print(f"statement_list_cache: {statement_list_cache}")
 
 if __name__ == '__main__':
     unittest.main()
