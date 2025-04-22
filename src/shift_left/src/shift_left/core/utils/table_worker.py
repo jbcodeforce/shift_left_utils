@@ -12,7 +12,7 @@ class TableWorker():
     """
     Worker to update the content of a sql content, applying some specific logic
     """
-    def update_sql_content(sql_content: str) -> Tuple[bool, str]:
+    def update_sql_content(sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
         return (False, sql_content)
     
      
@@ -20,7 +20,7 @@ class ChangeChangeModeToUpsert(TableWorker):
      """
      Predefined class to change the DDL setting for a change log
      """
-     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
@@ -42,7 +42,7 @@ class ChangePK_FK_to_SID(TableWorker):
      """
      Predefined class to change the DDL setting for a change log
      """
-     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         if '_pk_fk' in sql_content:
@@ -56,7 +56,7 @@ class Change_Concat_to_Concat_WS(TableWorker):
      """
      Predefined class to change the DDL setting for a change log
      """
-     def update_sql_content(sql_content: str)  -> Tuple[bool, str]:
+     def update_sql_content(sql_content: str, string_to_change: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("md5(concat("), re.IGNORECASE)
@@ -70,7 +70,7 @@ class Change_CompressionType(TableWorker):
      """
      Predefined class to change the DDL setting for a 'c
      """
-     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
@@ -86,7 +86,21 @@ class Change_CompressionType(TableWorker):
                     sql_out+=line + "\n"
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
-     
+
+class DefaultStringReplacementInFromClause(TableWorker):
+     """
+     Predefined class to change the DML setting for one string to another in the from clause
+     """
+     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+        updated = False
+        sql_out: str = ""
+        from_statement = re.compile(re.escape("from " + string_to_change_from), re.IGNORECASE)
+        if from_statement.search(sql_content):
+            sql_out=from_statement.sub("from " + string_to_change_to, sql_content)
+            updated = True
+        logging.debug(f"SQL transformed to {sql_out}")
+        return updated, sql_out
+
 class Change_SchemaContext(TableWorker):
      """
      Predefined class to change the DDL setting for the schema-context

@@ -126,7 +126,8 @@ def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(env
 def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folder from where to do the table update. It could be the all pipelines or subfolders.")],
                   ddl: bool = typer.Option(False, "--ddl", help="Focus on DDL processing. Default is only DML"),
                   both_ddl_dml: bool = typer.Option(False, "--both-ddl-dml", help="Run both DDL and DML sql files"),
-                  
+                  string_to_change_from: str = typer.Option(None, "--string-to-change-from", help="String to change in the SQL content"),
+                  string_to_change_to: str = typer.Option(None, "--string-to-change-to", help="String to change in the SQL content"),
                   class_to_use = Annotated[str, typer.Argument(help= "The class to use to do the Statement processing", default="shift_left.core.utils.table_worker.ChangeLocalTimeZone")]):
     """
     Update the tables with SQL code changes defined in external python callback. It will read dml or ddl and apply the updates.
@@ -150,7 +151,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         processed=0
         for file in files_to_process:
             print(f"Assessing file {file}")    
-            updated=update_sql_content_for_file(file, runner_class())
+            updated=update_sql_content_for_file(file, runner_class(), string_to_change_from, string_to_change_to)
             if updated:
                 print(f"-> {file} processed ")
                 processed+=1

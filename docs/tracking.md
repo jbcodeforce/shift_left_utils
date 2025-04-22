@@ -1,5 +1,7 @@
 # Feature tracking
 
+If you want to contribute [see the coding and design chapter](./coding/index.md) to review the components and how to develop this project
+
 ## CLI Commands
 
 {{ read_csv('./tracking.csv') }}

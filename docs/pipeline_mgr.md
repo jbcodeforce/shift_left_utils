@@ -7,6 +7,31 @@ The goals of this chapter is to present the requirements, design, and validation
 
 ## Context
 
+### Statement Evolution
+
+Modifying streaming workloads over time, without serious side effects, is challenging: a workload’s downstream dependency chains run perpetually and expect continuous output. Any Flink DAG code is immutable, therefore a quick deployment strategy is to do not modify Flink process flow. When a SQL statement is started, it reads the source tables from the beginning (or any specified offset) and the operators, defined in the statement, build their state. Source or sink operators use the latest schema version for key and value at the time of deployment. 
+
+The general strategy for [query evolution](https://docs.confluent.io/cloud/current/flink/concepts/schema-statement-evolution.html#query-evolution) is to replace the existing statement and the corresponding tables it maintains with a new statement and new tables. Let take a simple example of a Flink statement joining two tables and with an output table also used by a join within a second statement:
+
+![](./images/stateful_evolution.drawio.png)
+
+The streaming processing has processed all blue records and a new version needs to be applied at a time from which new records processed may have an impact.
+
+The typical change to consider are:
+
+* adding a new column in a select statement
+* removing a field in a select statement
+* adding aggregation dimension or new joins, with full historical records reprocessing,
+
+For each Flink Statement deployment some questions need to be assessed:
+
+* What should be done with the pre-existing output records? 
+* Does the update impact the meaning ot the output? (change the dimensionality of an aggregation)
+* What happens if the new output format breaks compatibility with the old? 
+* How can the old and new data structures be made to work together, and what if they can't?
+
+### Flink Statement interdependancies
+
 Flink statements are inherently interdependent, consuming and joining tables produced by other statements, forming a complex pipeline. Careful deployment is crucial. The following diagram illustrates this interconnectedness for a simple example and outlines a pipeline management strategy.
 
 <figure markdown="span">
@@ -255,17 +280,169 @@ shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 * [ ] For a given table with children, deploy the current table, and for each children redeploy the DML, if the DML is stateful. When stateless, manage the offset and modify the DML to read from the retrieved offset.
 * [x] Support deleting a full pipeline: delete tables not used by other pipeline: the number of children is 1 or all the children are not running.
 
-### Questions
+## Testing plan
 
-The following may be considered:
+As a generic test plan for Flink project we propose to address the following
 
-* does it make sense to have DDL only deployment from a source to sink pipeline?
+### 1. Unit Testing
 
-## Developer's notes
+* SQL Query Testing
 
-The modules to support the management of pipeline is `pipeline_mgr.py` and `deployment_mgr.py`.
+    * Test individual Flink SQL queries in isolation
+    * Test window functions, aggregations, and joins
+    * Verify watermark handling and event time processing
 
-* Testing a Flink deployment see [test - ]
+* User Define Function Testing
+
+    * Test custom user-defined functions
+    * Validate input/output data types
+    * Test error handling and edge cases
+
+### 2. Integration Testing
+
+As Confluent Cloud for Flink is natively integrated with Kafka, the goal of integration testings is more to do isolate from source tables, integrated with Change Data Capture and down to sink to data lakehouse.
+
+* Test end-to-end data flow from source to sink
+* Verify message serialization/deserialization
+* Test different message formats (JSON, Avro, etc.)
+* Validate schema evolution handling
+
+* State Management is relevant for CP Flink or Open-source Flink. For Confluent cloud the state management is transparent for the users. The classical items are:
+
+    * Test state backend operations
+    * Verify checkpointing and savepoint functionality
+    * Test state recovery scenarios
+
+### 3. Performance Testing
+
+* Throughput Testing
+
+    * Measure maximum processing rate (events/second)
+    * Test with different message sizes
+    * Evaluate parallel processing capabilities
+    * Monitor CPU and memory usage
+
+* Latency Testing
+
+    * Measure end-to-end processing latency
+    * Test with different window sizes
+    * Evaluate backpressure handling
+    * Monitor network latency
+
+* Scalability Testing
+
+    * Test horizontal scaling (adding/removing task managers)
+    * Evaluate job manager performance
+    * Test with increasing data volumes
+    * Monitor resource utilization
+
+### 4. Blue/Green Deployment Testing
+
+* Deployment Strategy
+
+    * Test parallel deployment of new version
+    * Verify zero-downtime deployment
+    * Test rollback procedures
+    * Validate state migration between versions
 
 
-For deployment the approach is to build a graph from the table developer want to deploy. The graph includes the parents and then the children. The graph is built reading static information about the relationship between statement, and then go over each statement and assess if for this table the dml is running. For a parent it does nothing
+### 5. Pipeline Management Testing
+
+* Monitoring and Alerting
+
+    * Test metric collection and reporting
+    * Verify alert thresholds
+    * Test failure detection and notification
+    * Validate logging mechanisms
+
+* Operational Testing
+
+    * Test job cancellation and restart
+    * Verify savepoint creation and restoration
+    * Test job scaling operations
+    * Validate backup and recovery procedures
+
+### 6. Confluent Cloud Specific Testing
+
+* Cloud Integration
+
+    * Test connectivity to Confluent Cloud
+    * Verify authentication and authorization
+    * Test network security and encryption
+    * Validate cloud resource management
+
+* Cost Optimization
+
+    * Monitor resource utilization
+    * Test auto-scaling configurations
+    * Evaluate cost-effective configurations
+    * Test resource cleanup procedures
+
+### 7. Security Testing
+
+* Authentication and Authorization
+
+    * Test access control mechanisms
+    * Verify encryption in transit and at rest
+    * Test security configurations
+    * Validate audit logging
+
+### 8. Disaster Recovery Testing
+
+* Failure Scenarios
+
+    * Test node failures
+    * Test network partition scenarios
+    * Test data center failures
+    * Validate recovery procedures
+
+### Test Environment Requirements
+
+* Development Environment
+
+* Staging Environment
+
+    * Dedicated Confluent Cloud environment
+    * Production-like configuration
+    * Monitoring and logging setup
+
+* Production Environment
+
+    * Production Confluent Cloud setup
+    * Production-grade monitoring
+    * Backup and recovery systems
+
+### Test Tools and Frameworks
+
+* Testing Tools
+
+    * Flink Test Harness
+    * Prometheus for metrics
+    * Grafana for visualization
+
+* CI/CD Integration
+
+    * Automated test execution
+    * Test result reporting
+    * Deployment automation
+    * Environment provisioning
+
+### Success Criteria
+
+* Performance Metrics
+
+    * Throughput: > X events/second
+    * Latency: < Y milliseconds
+    * Resource utilization: < Z%
+
+* Reliability Metrics
+
+    * Uptime: > 99.9%
+    * Data consistency: 100%
+    * Recovery time: < X minutes
+
+* Operational Metrics
+
+    * Deployment success rate: 100%
+    * Rollback success rate: 100%
+    * Alert accuracy: > 99%

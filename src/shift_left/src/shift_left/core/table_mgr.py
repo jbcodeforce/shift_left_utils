@@ -237,11 +237,11 @@ def validate_table_cross_products(rootdir: str):
                     print("{:65s} {:s}".format(sql_file, violation))
 
 
-def update_sql_content_for_file(sql_file_name: str, processor: TableWorker) -> bool:
+def update_sql_content_for_file(sql_file_name: str, processor: TableWorker, string_to_change_from: str= None, string_to_change_to: str= None) -> bool:
     """
     """
     sql_content= load_sql_content_from_file(sql_file_name)
-    updated, new_content= processor.update_sql_content(sql_content)
+    updated, new_content= processor.update_sql_content(sql_content, string_to_change_from, string_to_change_to)
     if updated:
         with open(sql_file_name, "w") as f:
             f.write(new_content)
