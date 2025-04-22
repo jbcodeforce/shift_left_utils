@@ -14,6 +14,7 @@ from shift_left.core.table_mgr import (
     validate_table_cross_products,
     search_users_of_table,
     update_sql_content_for_file,
+    update_all_makefiles_in_folder,
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
@@ -97,6 +98,13 @@ def update_makefile(
     update_makefile_in_folder(pipeline_folder_name, table_name)
     print(f"Makefile updated for table {table_name}")
 
+@app.command()
+def update_all_makefiles(
+        folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Folder from where all the Makefile will be updated. If not provided, it will use the $PIPELINES environment variable.")]):
+    """ Update all the Makefiles for all the tables in the given folder. Example: shift_left table update-all-makefiles $PIPELINES/dimensions/product_1
+    """
+    count = update_all_makefiles_in_folder(folder_name)
+    print(f"Updated {count} Makefiles in {folder_name}")
 
 @app.command()
 def find_table_users(table_name: Annotated[str, typer.Argument(help="The name of the table to search ")],

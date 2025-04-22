@@ -175,6 +175,24 @@ def update_makefile_in_folder(pipeline_folder: str, table_name: str):
                     table_folder, 
                     get_config()["kafka"]["cluster_type"])
 
+def update_all_makefiles_in_folder(folder_path: str) -> int:
+    """
+    Update all the Makefiles for all the tables in the pipeline folder
+    """
+    count=0
+    for root, dirs, files in os.walk(folder_path):
+        if 'Makefile' in files or 'sql-scripts' in dirs:
+            table_name=os.path.basename(root)
+            product_name=os.path.dirname(root).split("/")[-1]
+            table_type = get_table_type_from_file_path(root)
+            table_name=get_long_table_name(table_name, product_name, table_type)
+            prefix=get_config()["kafka"]["cluster_type"] + "-" + product_name
+            _create_makefile(table_name, root, prefix)
+            count+=1
+    logging.info(f"Updated {count} Makefiles for tables in {folder_path}")
+    return count
+
+
 def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     """
     When pipeline definitions is present for this table, return the list of children
@@ -278,7 +296,7 @@ def _create_dml_skeleton(table_name: str, out_dir: str, product_name: str):
     
 def _create_makefile(table_name: str, 
                      out_dir: str, 
-                     cluster_type: str):
+                     prefix: str):
     """
     Create a makefile to help deploy Flink statements for the given table name
     When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
@@ -289,7 +307,7 @@ def _create_makefile(table_name: str,
 
     context = {
         'table_name': table_name,
-        'script_pre_kebab': cluster_type
+        'script_pre_kebab': prefix
     }
     rendered_makefile = makefile_template.render(context)
     # Write the rendered Makefile to a file

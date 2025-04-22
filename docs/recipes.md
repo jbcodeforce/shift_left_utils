@@ -203,9 +203,32 @@ shift_left table init int_p3_users $PIPELINES/intermediates --product-name p3
 
 ### Using Makefile for deployment
 
-During the development of the DDL and DML it may be more efficient to use the confluent CLI to deploy the Flink statements. To make the thing easier a Makefile exists in each table folder to support the deployment during development. Each Confluent Cloud cli are defined in a common makefile.
+During the development of the DDL and DML it may be more efficient to use the confluent CLI to deploy the Flink statements. To make the thing easier a Makefile exists in each table folder to support the deployment during development. Each Confluent Cloud cli commands are defined in a common makefile that is used by any Makefile within a 'table' folder. As an example the fact table `fct_order` has a Makefile at the same level of the sql-scripts.
 
-* To create the Flink dynamic table using the target Flink compute pool do:
+```sh
+── fct_order
+    ├── Makefile
+    ├── sql-scripts
+    │   ├── ddl.p1_fct_order.sql
+    │   └── dml.p1_fct_order.sql
+```
+
+The Makefile import the common.mk
+
+```
+include ../../../common.mk
+```
+
+???- warning "Change the relative path"
+    It may be needed to change the relative path to the common.mk file when the number of sub folders from the $PIPELINES is greater or less that 3 levels from the current folder.
+
+* Be sure when starting a new session to have login to Confluent cloud and set the good endpoint:
+
+```sh
+make init
+```
+
+* To create one Flink dynamic table using the target Flink compute pool do:
 
   ```sh
   make create_flink_ddl

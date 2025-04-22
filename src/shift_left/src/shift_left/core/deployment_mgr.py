@@ -83,9 +83,11 @@ def deploy_pipeline_from_table(table_name: str,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
-    build_summary_from_execution_plan(execution_plan)
+    summary = build_summary_from_execution_plan(execution_plan)
+    print(summary)
+
     logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
-    return result
+    return result, summary
 
 def deploy_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, 
                               compute_pool_id: str) -> list[Statement]:
@@ -280,8 +282,10 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
             )
         summary_parts.append(f"--- {len(children)} children to restart")
     
-    return "\n".join(summary_parts)
-
+    summary= "\n".join(summary_parts)
+    with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
+        f.write(summary)
+    return summary
 #
 # ------------------------------------- private APIs  ---------------------------------
 #

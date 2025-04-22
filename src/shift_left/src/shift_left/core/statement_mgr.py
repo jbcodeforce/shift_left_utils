@@ -175,10 +175,15 @@ def get_statement_list() -> dict[str, StatementInfo]:
     if _statement_list_cache == None:
         reload = True
         if os.path.exists(STATEMENT_LIST_FILE):
-            with open(STATEMENT_LIST_FILE, "r") as f:
-                _statement_list_cache = StatementListCache.model_validate(json.load(f))
-            if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < 4*3600:  
-                reload = False
+            try:
+                with open(STATEMENT_LIST_FILE, "r") as f:
+                    _statement_list_cache = StatementListCache.model_validate(json.load(f))
+                if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < 4*3600:  
+                    reload = False
+            except Exception as e:
+                logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
+                reload = True
+                os.remove(STATEMENT_LIST_FILE)
         if reload:
             _statement_list_cache = StatementListCache(created_at=datetime.now().isoformat())
             logger.info("Load the current list of Flink statements from REST API")

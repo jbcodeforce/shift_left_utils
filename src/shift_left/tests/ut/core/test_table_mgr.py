@@ -100,9 +100,6 @@ class TestTableManager(unittest.TestCase):
             print(e)
             self.fail()
 
-
-
-   
     def test_update_make_file(self):
         try:
             tbf, tbn =tm.build_folder_structure_for_table("it2",os.getenv("PIPELINES") + "/intermediates", "p3")
@@ -118,6 +115,14 @@ class TestTableManager(unittest.TestCase):
         except Exception as e:
             print(e)
             self.fail()
+
+    def test_update_all_makefiles_in_folder(self):
+        try:
+            folder_path = os.getenv("PIPELINES") + "/intermediates"
+            count = tm.update_all_makefiles_in_folder(folder_path)
+            assert count > 0
+        except Exception as e:
+            print(e)
 
     def test_search_users_of_table(self):
         try:

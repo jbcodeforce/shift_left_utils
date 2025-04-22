@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- int_table_1
-TABLE_NAME=int_p1_table_2
-SCRIPT_PRE_KEBAB=dev
+# --- int_table_2
+TABLE_NAME=int_table_2
+SCRIPT_PRE_KEBAB=stage-p1
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_int_table_1: create_flink_ddl  create_flink_dml
+create_int_table_2: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_int_table_1: 
+drop_table_int_table_2: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_int_table_1
+delete_data: delete_schemas delete_topic_int_table_2

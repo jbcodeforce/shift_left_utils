@@ -67,4 +67,6 @@ start_flink_shell:
 init: 
 	export CLUSTER_ID=$$(confluent kafka cluster list --environment $(ENV_ID) | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
 	echo $(ENV_ID) $$CLUSTER_ID $(CPOOLID)
+	confluent flink region use --cloud $(CLOUD) --region $(REGION)
+	confluent flink  endpoint use "https://flink.$(REGION).$(CLOUD).private.confluent.cloud"
 

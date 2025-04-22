@@ -131,6 +131,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `search-source-dependencies`: Search the parent for a given table from...
 * `migrate`: Migrate a source SQL Table defined in a...
 * `update-makefile`: Update existing Makefile for a given table...
+* `update-all-makefiles`: Update all the Makefiles for all the...
 * `find-table-users`: Find the Flink Statements, user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
@@ -236,6 +237,24 @@ $ table update-makefile [OPTIONS] TABLE_NAME PIPELINE_FOLDER_NAME
 
 * `--help`: Show this message and exit.
 
+### `table update-all-makefiles`
+
+Update all the Makefiles for all the tables in the given folder. Example: shift_left table update-all-makefiles $PIPELINES/dimensions/product_1
+
+**Usage**:
+
+```console
+$ table update-all-makefiles [OPTIONS] FOLDER_NAME
+```
+
+**Arguments**:
+
+* `FOLDER_NAME`: Folder from where all the Makefile will be updated. If not provided, it will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ### `table find-table-users`
 
 Find the Flink Statements, user of a given table
@@ -291,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 
 * `--ddl`: Focus on DDL processing. Default is only DML
 * `--both-ddl-dml`: Run both DDL and DML sql files
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10662b530&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107e374d0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table run-unit-tests`
