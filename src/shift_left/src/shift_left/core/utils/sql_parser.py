@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import re
-from typing import Set
+from typing import Set, List, Tuple, Dict
 from shift_left.core.utils.app_config import logger
 """
 Dedicated class to parse a SQL statement and extract elements like table name
@@ -116,3 +116,101 @@ class SQLparser:
         else:
             return "Stateless"
     
+    def parse_sql_columns_to_dict(self, sql_content: str) -> Dict[str, Dict[str, any]]:
+        """
+        Parse SQL CREATE TABLE statement and extract column definitions into a dictionary.
+        
+        Args:
+            sql_content (str): The SQL CREATE TABLE statement content
+            
+        Returns:
+            Dict[str, Dict[str, any]]: Dictionary mapping column names to their definition details
+                                     including type, nullability and primary key status
+        """
+        columns = self._parse_sql_columns(sql_content)
+        return {col['name']: col for col in columns}
+    
+    def _parse_sql_columns(self, sql_content: str) -> List[Dict[str, any]]:
+        """
+        Parse SQL CREATE TABLE statement and extract column definitions.
+        
+        Args:
+            sql_content (str): The SQL CREATE TABLE statement content
+            
+        Returns:
+            List[Dict[str, any]]: List of column definitions with name, type, nullability and primary key status
+            
+        Example:
+            >>> sql = '''
+            ... CREATE TABLE IF NOT EXISTS int_aqem_tag_tag_dummy_ut (
+            ...     id                 STRING NOT NULL PRIMARY KEY,
+            ...     tenant_id          STRING NOT NULL,
+            ...     tag_key            STRING,
+            ...     tag_value          STRING,
+            ...     status             STRING
+            ... )
+            ... '''
+            >>> parse_sql_columns(sql)
+            [
+                {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True},
+                {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': False},
+                {'name': 'tag_key', 'type': 'STRING', 'nullable': True, 'primary_key': False},
+                ...
+            ]
+        """
+        # Remove comments and normalize whitespace
+        sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+        sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+        sql_content = ' '.join(sql_content.split())
+        
+        # Extract the column definitions
+        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\w+\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
+        if not match:
+            return []
+        
+        columns_section = match.group(1)
+        
+        # Split into individual column definitions
+        column_defs = [col.strip() for col in columns_section.split(',') if col.strip()]
+        
+        # Extract column details
+        columns = []
+        table_pk = None
+
+        # First find table-level primary key if it exists
+        for col_def in column_defs:
+            if col_def.upper().startswith('PRIMARY KEY'):
+                pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', col_def, re.IGNORECASE)
+                if pk_match:
+                    table_pk = [col.strip('` ') for col in pk_match.group(1).split(',')]
+                break
+
+        for col_def in column_defs:
+            # Skip constraints
+            if col_def.upper().startswith(('PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE', 'CHECK')):
+                continue
+                
+            parts = col_def.split()
+            if len(parts) >= 2:
+                col_name = parts[0].strip('`"[]')
+                col_type = parts[1].upper()
+                
+                col_def = {
+                    'name': col_name,
+                    'type': col_type,
+                    'nullable': 'NOT NULL' not in col_def.upper(),
+                    'primary_key': False
+                }
+                
+                # Check for inline PRIMARY KEY
+                if 'PRIMARY KEY' in col_def.upper():
+                    col_def['primary_key'] = True
+                # Check if column is in table-level PRIMARY KEY
+                elif table_pk and col_name in table_pk:
+                    col_def['primary_key'] = True
+                    
+                columns.append(col_def)
+        
+        return columns
+
+

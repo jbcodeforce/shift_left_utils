@@ -18,7 +18,7 @@ from shift_left.core.table_mgr import (
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
-from shift_left.core.test_mgr import execute_all_tests
+from shift_left.core.test_mgr import execute_all_tests, init_unit_test_for_table
 
 """
 Manage the table entities.
@@ -162,9 +162,19 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 
 
 @app.command()
-def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
-                test_case_name:  Annotated[str, typer.Option(help= "Name of the individual unit test to run. By default it will run all the tests")],
-                compute_pool_id: Annotated[str, typer.Option(envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will create a pool.")]):
+def init_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")]):
+    """
+    Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
+    It is using the table inventory to find the table folder for the given table name.
+    """
+    print("#" * 30 + f" Unit tests initialization for {table_name}")
+    init_unit_test_for_table(table_name)
+    print("#" * 30 + f" Unit tests initialization for {table_name} completed")
+
+@app.command()
+def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+                test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will create a pool.")):
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """

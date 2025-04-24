@@ -162,7 +162,7 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
 
-    print(f"#### Pipeline deployed from {result}")
+    print(f"#### Pipeline deployed ####")
 
 
 @app.command()

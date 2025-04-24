@@ -30,6 +30,12 @@ For each Flink Statement deployment some questions need to be assessed:
 * What happens if the new output format breaks compatibility with the old? 
 * How can the old and new data structures be made to work together, and what if they can't?
 
+Which can be summarized, which statement need to backfill for the earliest or not. 
+
+As illustrated in the [query evolution - basic strategy section], the process is to stop Flink statements to change, create a new table _v2, and once lag is recovered, swap consumers from the old topic to the new one.
+
+![](./images/stateful_evolution_swap.drawio.png)
+
 ### Flink Statement interdependancies
 
 Flink statements are inherently interdependent, consuming and joining tables produced by other statements, forming a complex pipeline. Careful deployment is crucial. The following diagram illustrates this interconnectedness for a simple example and outlines a pipeline management strategy.
@@ -314,6 +320,8 @@ As Confluent Cloud for Flink is natively integrated with Kafka, the goal of inte
     * Test state recovery scenarios
 
 ### 3. Performance Testing
+
+The goal is to assess how long it takes to deploy a complete pipeline with specific approaches:
 
 * Throughput Testing
 

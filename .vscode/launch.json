@@ -25,7 +25,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}/../..",
             "env": {
-                "CONFIG_FILE": "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml",
+                "CONFIG_FILE": "/Users/jerome/.shift_left/config.yaml",
                 "PIPELINES": "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
               },
         },

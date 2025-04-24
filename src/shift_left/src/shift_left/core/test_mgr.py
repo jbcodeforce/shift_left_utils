@@ -2,36 +2,26 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 from pydantic import BaseModel
-from typing import List, Final
+from typing import List, Final, Optional, Dict, Tuple
 import yaml
-import logging, time
+import time
 import os
 from logging.handlers import RotatingFileHandler
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.deployment_mgr import *
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 import shift_left.core.statement_mgr as statement_mgr
+from shift_left.core.utils.file_search import (
+    FlinkTableReference,
+    get_table_ref_from_inventory, 
+    get_or_build_inventory,
+    create_folder_if_not_exist,
+    from_pipeline_to_absolute
+)
+
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
-
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("test_harness")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "test_harness.log")
-file_handler = RotatingFileHandler(
-    log_file_path,
-    maxBytes=1024*1024,  # 1MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
 
 """
 Test manager defines what are test cases and test suites.
@@ -59,12 +49,21 @@ class SLTestDefinition(BaseModel):
     foundations: List[Foundation]
     test_suite: List[SLTestCase]
 
-def log( table_folder,message):
-    with open(f"{table_folder}/tests/result.txt", "a") as f:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"[{timestamp}] {message}\n")
+
 
 # ----------- Public APIs  ------------------------------------------------------------
+def init_unit_test_for_table(table_name: str):
+    """
+    Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
+    """
+    inventory_path = os.path.join(os.getenv("PIPELINES"),)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+    table_folder = table_ref.table_folder_name
+    create_folder_if_not_exist(f"{table_folder}/tests")
+    _add_test_files(table_ref, f"{table_folder}/tests", table_inventory)
+
+
 def execute_one_test(table_folder: str, test_case_name: str):
     """
     Execute a single test case from the test suite definition.
@@ -272,3 +271,97 @@ def _change_table_names_for_test_in_sql_content(sql_file_path: str) -> str:
     for table in table_names:
         sql_content = sql_content.replace(table, f"{table}_ut")
     return sql_content
+
+def _add_test_files(table_ref: FlinkTableReference, tests_folder: str, table_inventory: Dict[str, FlinkTableReference]):
+    """
+    Add the test files to the table folder.
+    """
+    file_path = from_pipeline_to_absolute(table_ref.dml_ref)
+    referenced_table_names = None
+    with open(file_path) as f:
+        sql_content = f.read()
+        parser = SQLparser()
+        referenced_table_names = parser.extract_table_references(sql_content)
+    if not referenced_table_names:
+        logger.error(f"No referenced table names found in the sql_content of {file_path}")
+        raise ValueError(f"No referenced table names found in the sql_content of {file_path}")
+
+    tests_folder_path = from_pipeline_to_absolute(tests_folder)
+    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_ref.table_name, referenced_table_names)
+    table_struct = _process_input_ddl_files(test_definition, tests_folder_path, table_inventory)
+    # Create template files for each test case
+    for test_case in test_definition.test_suite:
+        # Create input files
+        for input_data in test_case.inputs:
+            input_file = os.path.join(tests_folder_path, '..', input_data.sql_file_name)
+            columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
+            with open(input_file, "w") as f:
+                f.write(f"insert into {input_data.table_name}_ut\n({columns_names})\nvalues\n{rows}\n")
+            logger.info(f"Input file {input_file} created")
+
+        # Create output validation files 
+        for output_data in test_case.outputs:
+            output_file = os.path.join(tests_folder_path, '..', output_data.sql_file_name) 
+            with open(output_file, "w") as f:
+                f.write(f"select * from {output_data.table_name}_ut")
+    return test_definition
+
+        
+            
+def _build_save_test_definition_json_file(file_path: str, table_name: str, referenced_table_names: List[str]) -> SLTestDefinition:
+    test_definition :SLTestDefinition = SLTestDefinition(foundations=[], test_suite=[])
+    for table in referenced_table_names:
+        if table not in table_name:
+            foundation_table_name = Foundation(table_name=table, ddl_for_test=f"./tests/ddl_{table}.sql")
+            test_definition.foundations.append(foundation_table_name)
+    for i in range(1, 3):
+        test_case = SLTestCase(name=f"test_{table_name}_{i}", inputs=[], outputs=[])
+        output = SLTestData(table_name=table_name, sql_file_name=f"./tests/validate_{table_name}_{i}.sql")
+        for table in referenced_table_names:
+            if table not in table_name: 
+                input = SLTestData(table_name=table, sql_file_name=f"./tests/insert_{table}_{i}.sql")
+                test_case.inputs.append(input)
+        test_case.outputs.append(output)
+        test_definition.test_suite.append(test_case)
+    
+    with open(f"{file_path}/{TEST_DEFINITION_FILE_NAME}", "w") as f:
+        yaml.dump(test_definition.model_dump(), f, sort_keys=False)
+    logger.info(f"Test definition file {file_path}/{TEST_DEFINITION_FILE_NAME} created")
+    return test_definition
+
+def _process_input_ddl_files(test_definition: SLTestDefinition, 
+                             tests_folder_path: str, 
+                             table_inventory: Dict[str, FlinkTableReference]) -> Dict[str, Dict[str, str]]:
+    # Create DDL files for foundation tables
+    tab_struct = {}
+    for foundation in test_definition.foundations:
+        input_table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[foundation.table_name])
+        ddl_sql_content = f"create table if not exists {foundation.table_name}_ut (\n\n)"
+        file_path = from_pipeline_to_absolute(input_table_ref.ddl_ref)
+        parser = SQLparser()
+        with open(file_path, "r") as f:
+            ddl_sql_content = f.read()
+            columns = parser.parse_sql_columns_to_dict(ddl_sql_content)
+            ddl_sql_content = ddl_sql_content.replace(input_table_ref.table_name, f"{input_table_ref.table_name}_ut")
+            tab_struct[foundation.table_name] = columns
+        ddl_file = os.path.join(tests_folder_path, '..', foundation.ddl_for_test)
+        with open(ddl_file, "w") as f:
+            f.write(ddl_sql_content)
+    return tab_struct
+
+def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
+    columns_names = ""
+    for column in columns:
+        columns_names += f"{column}, "
+    columns_names = columns_names[:-2]
+    rows = ""
+    for values in range(1,6):
+        rows += "("
+        for column in columns:
+            if columns[column] == "BIGINT":
+                rows += f"0, "
+            else:
+                rows += f"'{column}_{values}', "
+        rows = rows[:-2]+ '),\n'
+    rows = rows[:-2]+ ';\n'
+    return columns_names, rows

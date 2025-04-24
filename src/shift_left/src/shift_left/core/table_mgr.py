@@ -7,7 +7,6 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader
 from typing import Optional, Tuple
 
-from shift_left.core.project_manager import create_folder_if_not_exist
 from shift_left.core.pipeline_mgr import ( 
     read_pipeline_definition_from_file, 
     PIPELINE_JSON_FILE_NAME,
@@ -25,6 +24,7 @@ from shift_left.core.utils.file_search import (
     get_table_ref_from_inventory,
     extract_product_name,
     get_table_type_from_file_path,
+    create_folder_if_not_exist,
     build_inventory)
 
 

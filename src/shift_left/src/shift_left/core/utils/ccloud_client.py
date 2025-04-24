@@ -1,6 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+from importlib.metadata import version, PackageNotFoundError
 import time
 import requests
 from urllib.parse import urlparse
@@ -11,6 +12,14 @@ from shift_left.core.utils.app_config import logger
 from shift_left.core.flink_statement_model import *
 from shift_left.core.flink_compute_pool_model import *
 
+class VersionInfo:
+    @staticmethod
+    def get_version():
+        try:
+            return version("shift-left")
+        except PackageNotFoundError:
+            logger.warning("Package 'shift-left' not found, using 'unknown' version")
+            return "unknown"
 
 class ConfluentCloudClient:
     """
@@ -31,9 +40,11 @@ class ConfluentCloudClient:
     
     def make_request(self, method, url, data=None):
         """Make HTTP request to Confluent Cloud API"""
+        version_str = VersionInfo.get_version()
         headers = {
             "Authorization": self.auth_header,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": f"python-shift-left-utils/{version_str}"
         }
         response = None
         logger.debug(f">>> Make request {method} to {url}")

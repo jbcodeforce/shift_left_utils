@@ -30,7 +30,7 @@ The following diagram illustrates the target unit testing environment:
 
 ## Requirements
 
-* [ ] The command is integrated in the shilf-left CLI as:
+* [x] The command is integrated in the shilf-left CLI as:
 
 ```sh
 table unit-test [OPTIONS] TABLE_NAME
@@ -44,7 +44,7 @@ Options:
 --compute-pool-id TEXT: Flink compute pool ID. If not provided, it will create a pool. [env var: CPOOL_ID; required]
 ```
 
-* [ ] Be able to define test. The yaml is defined as
+* [x] Be able to define test suite. The yaml is defined as
 
 ```yaml
 
@@ -74,7 +74,7 @@ test_suite:
     sql_file_name: tests/validate_fct_order_2.sql
 ```
 
-* [ ] Organize tests under the tests folder of the table:
+* [x] Organize tests under the tests folder of the table:
 
 ```sh
 └── fct_order
@@ -95,6 +95,14 @@ test_suite:
         └── validate_fct_order_2.sql
 ```
 
+* [x] Create the above structure and template from the DML sql content at init phase. The command should be:
+
+  ```sh
+  table init-unit-tests table_name
+  ```
+
+  This loads table references and metadata and create content from sql_content.
+  
 * [ ] For each test cases defined do the following on a selected compute pool id
 
     * Execute the foundation sql statements to create the temporary tables for injecting test data (e.g. `tests/ddl_int_table_1.sql`, `tests/ddl_int_table_2.sql`). The name of the tables are changed to add `_ut` at the end to avoid colision with existing topics.

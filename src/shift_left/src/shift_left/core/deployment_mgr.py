@@ -28,8 +28,6 @@ from shift_left.core.flink_statement_model import (
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.file_search import ( 
     PIPELINE_JSON_FILE_NAME,
-    FlinkTableReference,
-    get_table_ref_from_inventory,
     FlinkTablePipelineDefinition,
     get_ddl_dml_names_from_pipe_def,
     read_pipeline_definition_from_file
@@ -75,7 +73,9 @@ def deploy_pipeline_from_table(table_name: str,
                                                         may_start_children=may_start_children, 
                                                         start_time=datetime.now())
     persist_execution_plan(execution_plan)
-    logger.info(f"{build_summary_from_execution_plan(execution_plan)}")
+    summary = build_summary_from_execution_plan(execution_plan)
+    print(summary)
+    logger.info(f"Execute the plan for {table_name}")
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
                             compute_pool_id=compute_pool_id,
@@ -83,8 +83,7 @@ def deploy_pipeline_from_table(table_name: str,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
-    summary = build_summary_from_execution_plan(execution_plan)
-    print(summary)
+    
 
     logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
     return result, summary
@@ -168,7 +167,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                                                         compute_pool_id=compute_pool_id)
           
         #node.parents=set()
-    logger.info("Done with execution plan construction")
+    logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
     logger.debug(execution_plan)
     return execution_plan
     
@@ -176,25 +175,22 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
 def full_pipeline_undeploy_from_table(table_name: str, 
                                inventory_path: str ) -> str:
     """
-    Stop DML statement and drop table
-    Navigate to the parent(s) and continue if there is no children 
+    Stop DML statement and drop tables: look at the parents of the current table 
+    and remove the parent that has one running child. Delete all the children of the current table.
     """
     logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
     start_time = time.perf_counter()
-    table_inventory = table_mgr.get_or_create_inventory(inventory_path)
-    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    if not table_ref:
-        return f"ERROR: Table {table_name} not found in table inventory"
-    pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
     config = get_config()
-    if pipeline_def.children:
-        return f"ERROR: Could not perform a full delete from a non sink table like {table_name}"
-    else:
-        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def)
-        statement_mgr.delete_statement_if_exists(ddl_statement_name)
-        statement_mgr.delete_statement_if_exists(dml_statement_name)
-        statement_mgr.drop_table(table_name, config['flink']['compute_pool_id'])
-        trace = f"{table_name} deleted\n"
+    execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def, 
+                                                        compute_pool_id=config['flink']['compute_pool_id'],
+                                                        dml_only=False,
+                                                        may_start_children=True, 
+                                                        start_time=datetime.now())
+    config = get_config()
+    trace = f"Full pipeline delete from table {table_name}\n"
+    for node in reversed(execution_plan.nodes):
+        # start in 
         r=_delete_not_shared_parent(pipeline_def, trace, config)
         execution_time = time.perf_counter() - start_time
         logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name} with result: {r}")
@@ -253,8 +249,8 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     if parents:
         summary_parts.extend([
             "\n--- Parents impacted ---",
-            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool ID\tAction\tUpgrade Mode",
-            "-" * 115
+            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
+            "-" * 125
         ])
         for node in parents:
             action = "Run" if node.to_run else "Skip"
@@ -262,7 +258,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
                 action= "Restart"
             status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"
             summary_parts.append(
-                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}"
+                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
             )
     
     # Build children section
@@ -270,19 +266,26 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
         summary_parts.extend([
             f"\n--- {len(parents)} parents to run",
             "--- Children to restart ---",
-            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool ID\tAction\tUpgrade Mode",
-            "-" * 115
+            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
+            "-" * 125
         ])
         for node in children:
             action = "Run as parent" if node.to_run else "Restart" if node.to_restart else "Skip"
             status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"
 
             summary_parts.append(
-                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}"
+                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
             )
         summary_parts.append(f"--- {len(children)} children to restart")
     
     summary= "\n".join(summary_parts)
+    summary+="\n---Matching compute pools: " 
+    summary+=f"\nPool ID   \t{_pad_or_truncate('Name',40)}\tCurrent/Max CFU\tFlink Statement"
+    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    for node in execution_plan.nodes:
+        pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
+        if pool:
+            summary+=f"\n{pool.id} \t{_pad_or_truncate(pool.name,40)}\t{_pad_or_truncate(str(pool.current_cfu) + "/" + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
     with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
         f.write(summary)
     return summary
@@ -416,6 +419,7 @@ def _get_and_update_statement_info_for_node(node: FlinkStatementNode) -> FlinkSt
     node.existing_statement_info = statement_mgr.get_statement_status(node.dml_statement_name)
     if node.existing_statement_info.compute_pool_id:
         node.compute_pool_id = node.existing_statement_info.compute_pool_id
+        node.compute_pool_name = node.existing_statement_info.compute_pool_name
     return node 
 
 def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
@@ -453,14 +457,17 @@ def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
         pools= compute_pool_list.pools
     for pool in pools:
         if (pool.name.startswith(get_config().get('kafka').get('cluster_type'))
+            and 'cgibb' not in pool.name   # HACK for now avoid cgibb pool
             and pool.current_cfu < int(get_config().get('flink').get('max_cfu'))):
             node.compute_pool_id = pool.id
+            node.compute_pool_name = pool.name
+            pool.current_cfu+=20  # HACK from now TODO use the actual cfu after deployment
+            logger.info(f"Assign compute pool {node.compute_pool_id} - {pool.name} to {node.table_name}")
             break
-    logger.info(f"Assign compute pool {node.compute_pool_id} to {node.table_name}")
     return node.compute_pool_id
 
 def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> list[Statement]:
-    logger.info("--- Execution Plan  started ---")
+    logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
     statements = []
     for node in plan.nodes:
         logger.info(f"table: '{node.table_name}' on pool: {node.compute_pool_id}")
@@ -474,12 +481,12 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> li
                 statement=_deploy_dml(node, False)
             statements.append(statement)
         else:
-            logger.info(f"No restart or no to_run, it should not be in the execution plan!")
+            logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
     return statements
 
 
 
-def _deploy_ddl_dml(node_to_process: FlinkStatementNode):
+def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     """
     Deploy the DDL and then the DML for the given table to process.
     """
@@ -496,40 +503,39 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode):
                                 node_to_process.compute_pool_id, 
                                 node_to_process.ddl_statement_name)
 
-    _deploy_dml(node_to_process, True)
+    return _deploy_dml(node_to_process, True)
 
 
-def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False):
+def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False)-> Statement:
     logger.info(f"Run {to_process.dml_statement_name} for {to_process.table_name} table")
     if not dml_already_deleted:
         statement_mgr.delete_statement_if_exists(to_process.dml_statement_name)
     
-    statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process.dml_ref, 
+    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process.dml_ref, 
                                     to_process.compute_pool_id, 
                                     to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
- 
+    return statement
 
 
-def _delete_not_shared_parent(current_ref: FlinkTablePipelineDefinition, trace:str, config ) -> str:
-    for parent in current_ref.parents:
+def _delete_not_shared_parent(current_node: FlinkStatementNode, trace:str, config ) -> str:
+    for parent in current_node.parents:
         if len(parent.children) == 1:
             # as the parent is not shared it can be deleted
-            ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(parent)
-            statement_mgr.delete_statement_if_exists(ddl_statement_name)
-            statement_mgr.delete_statement_if_exists(dml_statement_name)
+            statement_mgr.delete_statement_if_exists(parent.ddl_statement_name)
+            statement_mgr.delete_statement_if_exists(parent.dml_statement_name)
             statement_mgr.drop_table(parent.table_name, config['flink']['compute_pool_id'])
             trace+= f"{parent.table_name} deleted\n"
             pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(parent.path + "/" + PIPELINE_JSON_FILE_NAME)
             trace = _delete_not_shared_parent(pipeline_def, trace, config)
         else:
-            trace+=f"{parent.table_name} has more than {current_ref.table_name} as child, so no delete"
-    if len(current_ref.children) == 1:
-        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(current_ref)
+            trace+=f"{parent.table_name} has more than {current_node.table_name} as child, so no delete"
+    if len(current_node.children) == 1:
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_pipe_def(current_node)
         statement_mgr.delete_statement_if_exists(ddl_statement_name)
         statement_mgr.delete_statement_if_exists(dml_statement_name)
-        statement_mgr.drop_table(current_ref.table_name, config['flink']['compute_pool_id'])
-        trace+= f"{current_ref.table_name} deleted\n"
+        statement_mgr.drop_table(current_node.table_name, config['flink']['compute_pool_id'])
+        trace+= f"{current_node.table_name} deleted\n"
     return trace
         
 

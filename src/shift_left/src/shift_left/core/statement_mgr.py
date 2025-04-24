@@ -31,7 +31,7 @@ STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
 def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path: str, 
                            compute_pool_id: str = None, 
                            statement_name: str= None, 
-                           config: dict = None) -> str:
+                           config: dict = None) -> Statement:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool. If the statement fails, propagate the exception to higher level.
@@ -58,12 +58,10 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
             if statement and statement.status:
                 logger.debug(f"Statement: {statement_name} status is: {statement.status.phase}")
                 get_statement_list()[statement_name]=statement.status.phase   # important to avoid doing an api call
-                return { "name": statement_name, "status": "success"}
-            else:
-                return { "name": statement_name, "status": "not_sure"}
+            return statement
     except Exception as e:
         logger.error(e)
-        return { "name": statement_name, "status": "failed"}
+        return None
 
 
 def get_statement_status(statement_name: str) -> StatementInfo:
@@ -178,7 +176,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
             try:
                 with open(STATEMENT_LIST_FILE, "r") as f:
                     _statement_list_cache = StatementListCache.model_validate(json.load(f))
-                if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < 4*3600:  
+                if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < get_config()['app']['cache_ttl']:  
                     reload = False
             except Exception as e:
                 logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
@@ -305,6 +303,9 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
         json.dump(statement_list.model_dump(), f, indent=4)
 
 def _map_to_statement_info(info: dict) -> StatementInfo:
+    """
+    Map the statement info, result of the REST call to the StatementInfo model
+    """
     if 'properties' in info.get('spec') and info.get('spec').get('properties'):
         catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
         database = info.get('spec',{}).get('properties',{}).get('sql.current-database','UNKNOWN')

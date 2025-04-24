@@ -51,14 +51,19 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
 
 
 _compute_pool_list = None
-def get_compute_pool_list(env_id: str, region: str):
+def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePoolList:
     global _compute_pool_list
+    config = get_config()
+    if not env_id:
+        env_id = config['confluent_cloud']['environment_id']
+    if not region:
+        region = config['confluent_cloud']['region']
     if not _compute_pool_list:
         reload = True
         if os.path.exists(COMPUTE_POOL_LIST_FILE):
             with open(COMPUTE_POOL_LIST_FILE, "r") as f:
                 _compute_pool_list = ComputePoolList.model_validate_json(f.read())
-            if _compute_pool_list.created_at and (datetime.now() - datetime.fromisoformat(_compute_pool_list.created_at)).total_seconds() < 4*3600:  
+            if _compute_pool_list.created_at and (datetime.now() - datetime.fromisoformat(_compute_pool_list.created_at)).total_seconds() < config['app']['cache_ttl']:  
                 # keep the list if it was created in the last 60 minutes
                 reload = False
         if reload:

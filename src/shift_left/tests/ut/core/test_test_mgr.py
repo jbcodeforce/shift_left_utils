@@ -84,15 +84,5 @@ class TestTestManager(unittest.TestCase):
         assert len(statement_names) == 3
 
 
-
-    def _test_execute_one_test(self):
-        print("test_execute_one_test")
-        table_folder= os.getenv("PIPELINES") + "/facts/p1/fct_order"
-        compute_pool_id = "compute_pool_id"
-        test_case_name = "test_case_1"
-
-        result = execute_one_test(table_folder, test_case_name)
-        assert result, f"Test case '{test_case_name}' executed successfully"
-
 if __name__ == '__main__':
     unittest.main()

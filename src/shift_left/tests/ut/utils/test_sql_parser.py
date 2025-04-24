@@ -137,5 +137,20 @@ class TestFileSearch(unittest.TestCase):
             upgrade_mode = parser.extract_upgrade_mode(sql_content)
             assert "Stateless"  == upgrade_mode
 
+    def test_extract_columns_from_ddl(self):
+        parser = SQLparser()
+        fname = os.getenv("PIPELINES") + "/intermediates/p1/int_test/sql-scripts/ddl.test.sql"
+        with open(fname, "r") as f:
+            sql_content = f.read()
+            columns = parser.parse_sql_columns_to_dict(sql_content)
+            assert columns
+            assert columns['id'] == 'STRING'    
+            assert columns['tenant_id'] == 'STRING'
+            assert columns['status'] == 'STRING'
+            assert columns['name'] == 'STRING'
+            assert columns['type'] == 'STRING'
+            assert columns['created_by'] == 'STRING'
+            assert columns['created_date'] == 'BIGINT'
+
 if __name__ == '__main__':
     unittest.main()

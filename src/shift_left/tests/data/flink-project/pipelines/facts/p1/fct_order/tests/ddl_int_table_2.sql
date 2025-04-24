@@ -1,4 +1,4 @@
- create table if not exists int_table_2(
+ create table if not exists int_table_2_ut(
     order_id STRING,
     product_id STRING,
     customer_id STRING,
