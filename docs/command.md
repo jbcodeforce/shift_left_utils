@@ -135,7 +135,8 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `find-table-users`: Find the Flink Statements, user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
-* `run-unit-tests`: Run all the unit tests or a specified test...
+* `init-unit-tests`: Initialize the unit test folder and...
+* `run-test-suite`: Run all the unit tests or a specified test...
 
 ### `table init`
 
@@ -310,17 +311,20 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 
 * `--ddl`: Focus on DDL processing. Default is only DML
 * `--both-ddl-dml`: Run both DDL and DML sql files
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107e374d0&gt;]]
+* `--string-to-change-from TEXT`: String to change in the SQL content
+* `--string-to-change-to TEXT`: String to change in the SQL content
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107036cc0&gt;]]
 * `--help`: Show this message and exit.
 
-### `table run-unit-tests`
+### `table init-unit-tests`
 
-Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
+It is using the table inventory to find the table folder for the given table name.
 
 **Usage**:
 
 ```console
-$ table run-unit-tests [OPTIONS] TABLE_NAME
+$ table init-unit-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -329,8 +333,26 @@ $ table run-unit-tests [OPTIONS] TABLE_NAME
 
 **Options**:
 
-* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests  [required]
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [env var: CPOOL_ID; required]
+* `--help`: Show this message and exit.
+
+### `table run-test-suite`
+
+Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+
+**Usage**:
+
+```console
+$ table run-test-suite [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
 ## `pipeline`

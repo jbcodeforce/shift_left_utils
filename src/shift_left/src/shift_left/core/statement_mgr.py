@@ -112,19 +112,6 @@ def post_flink_statement(compute_pool_id: str,
             logger.error(f"Error executing rest call: {e}")
             raise e
                 
-def report_running_flink_statements(table_name: str, inventory_path: str):
-    """
-    Report running flink statements from a table
-    """
-    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    pipeline_def: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-    config = get_config()
-    client = ConfluentCloudClient(config)
-    statement_list = client.get_flink_statement_list()
-    results = {}
-    # TO DO to terminate
-    return results
 
 def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"Enter with {statement_name}")
@@ -155,13 +142,29 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
     client = ConfluentCloudClient(get_config())
     statement = client.get_flink_statement(statement_name)
     if statement and isinstance(statement, Statement):
-        statement_info = _map_to_statement_info(statement.data)
+        statement_info = _map_to_statement_info(statement)
         get_statement_list()[statement_name] = statement_info
         return statement_info
     return None
 
 
+def get_statement_results(self, statement_name: str)-> Statement:
+        client = ConfluentCloudClient(get_config())
+        url = client.build_flink_url_and_auth_header()
+        try:
+            resp=client.make_request("GET",f"{url}/statements/{statement_name}/results")
+            logger.debug(resp)
 
+            if resp["metadata"]["next"]:
+                resp=client.make_request("GET", resp["metadata"]["next"])
+                logger.debug(f"After next called: {resp}")
+                return Statement(**resp)
+            elif resp['results'] and resp['results']['data']:
+                return Statement(**resp)
+
+        except Exception as e:
+            logger.info(f"Error executing GET statement call for {statement_name}: {e}")
+            return None
 
     
 _statement_list_cache = None  # cache the statement list loaded to limit the number of call to CC API
@@ -241,14 +244,13 @@ def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] =
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
-    client = ConfluentCloudClient(config)
     sql_content = f"show create table {table_name};"
     delete_statement_if_exists(statement_name)
     try:
         statement = post_flink_statement(compute_pool_id, statement_name, sql_content)
         if statement and isinstance(statement, Statement) and statement.status.phase in ("RUNNING", "COMPLETED"):
-            get_statement_list()[statement_name] = _map_to_statement_info(statement.data)
-            statement_result = client.get_statement_results(statement_name)
+            get_statement_list()[statement_name] = _map_to_statement_info(statement)
+            statement_result = get_statement_results(statement_name)
             if statement_result and isinstance(statement_result, StatementResult):
                 if statement_result.results and len(statement_result.results.data) > 0:
                     result_str = str(statement_result.results.data[0].row[0])
@@ -302,17 +304,18 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
     with open(STATEMENT_LIST_FILE, "w") as f:
         json.dump(statement_list.model_dump(), f, indent=4)
 
-def _map_to_statement_info(info: dict) -> StatementInfo:
+def _map_to_statement_info(info: Statement) -> StatementInfo:
     """
     Map the statement info, result of the REST call to the StatementInfo model
     """
-    if 'properties' in info.get('spec') and info.get('spec').get('properties'):
-        catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
-        database = info.get('spec',{}).get('properties',{}).get('sql.current-database','UNKNOWN')
-    else:
-        catalog = 'UNKNOWN' 
-        database = 'UNKNOWN'
-    return StatementInfo(name=info['name'],
+    if info and isinstance(info, dict):
+        if 'properties' in info.get('spec') and info.get('spec').get('properties'):
+            catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
+            database = info.get('spec',{}).get('properties',{}).get('sql.current-database','UNKNOWN')
+        else:
+            catalog = 'UNKNOWN' 
+            database = 'UNKNOWN'
+        return StatementInfo(name=info['name'],
                                     status_phase= info.get('status').get('phase', 'UNKNOWN'),
                                     status_detail= info.get('status').get('detail', 'UNKNOWN'),
                                     sql_content= info.get('spec').get('statement', 'UNKNOWN'),
@@ -320,6 +323,17 @@ def _map_to_statement_info(info: dict) -> StatementInfo:
                                     principal= info.get('spec').get('principal', 'UNKNOWN'),
                                     sql_catalog=catalog,
                                     sql_database=database)
+    elif info and isinstance(info, Statement):
+        catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
+        database = info.spec.properties.get('sql.current-database','UNKNOWN')
+        return StatementInfo(name=info.name,
+                             status_phase= info.status.phase,
+                             status_detail= info.status.detail,
+                             sql_content= info.spec.statement,
+                             compute_pool_id= info.spec.compute_pool_id,
+                             principal= info.spec.principal,
+                             sql_catalog=catalog,
+                             sql_database=database)
 
 
 def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):

@@ -153,7 +153,7 @@ class TestTableWorker(unittest.TestCase):
         assert "'kafka.producer.compression.type' = 'snappy'" in sql_out
         print(sql_out)
 
-    def test_sql_content_update_from_env(self):
+    def test_schema_context_update_from_env(self):
         module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
         get_config()['kafka']['cluster_type']='stage'
         mod = import_module(module_path)
@@ -184,22 +184,41 @@ class TestTableWorker(unittest.TestCase):
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
         get_config()['kafka']['cluster_type']='stage'
+        get_config()['kafka']['src_topic_prefix']='replicated'
         sql_in="""
         INSERT INTO src_order
         SELECT 
             id,
             status,
             name,
-            after.is_mx_migrated,
-            op,
-            source.lsn as source_lsn
+            after.is_migrated
         FROM
-            `ap-tag-dev.order`
+            `ap-tag-order-dev.template`
         );
         """
         updated, sql_out= runner_class().update_sql_content(sql_in)
         print(sql_out)
-        assert "ap-tag-stage" in sql_out
+        assert "replicated.stage.ap-tag-order-stage.template" in sql_out
 
+    def test_regex_replace(self):
+        import re
+
+        sql_in="""
+            ap-table-name-dev
+            """
+        sql_out = re.sub( r"^(.*?)(ap-.*?)-(dev)",r"\1clone.stage.\2", sql_in,flags=re.MULTILINE)
+        assert "clone.stage.ap-table-name" in sql_out
+        print(sql_out)
+        sql_in_with_dot="""
+            ap-table-name-dev.suffix
+            """
+        sql_out_with_dot = re.sub( r"^(.*?)(ap-.*?)-(dev)\.",r"\1clone.stage.\2-stage.", sql_in_with_dot,flags=re.MULTILINE)
+        assert "clone.stage.ap-table-name-stage.suffix" in sql_out_with_dot # This assertion will now pass
+        print(sql_out_with_dot)
+
+        sql_out_with_dot_fixed = re.sub( r"^(.*?)(ap-.*?)\.",r"\1clone.stage.\2", sql_in_with_dot,flags=re.MULTILINE)
+        assert "clone.stage.ap-table-name.suffix" not in sql_out_with_dot_fixed
+        assert "clone.stage.ap-table-name" in sql_out_with_dot_fixed
+        print(sql_out_with_dot_fixed)
 if __name__ == '__main__':
     unittest.main()

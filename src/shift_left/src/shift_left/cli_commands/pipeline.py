@@ -14,7 +14,6 @@ import shift_left.core.deployment_mgr as deployment_mgr
 from shift_left.core.deployment_mgr import (
     DeploymentReport,
 )
-from shift_left.core.statement_mgr import report_running_flink_statements
 
 import os
 import sys
@@ -155,7 +154,6 @@ def deploy(table_name:  Annotated[str, typer.Argument(help="The table name conta
     """
     Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
     """
-    print(f"#### Deploy pipeline from table {table_name} in {compute_pool_id}")
     try:
         result: DeploymentReport = deployment_mgr.deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, may_start_children)
     except Exception as e:
@@ -173,12 +171,10 @@ def report_running_statements(table_name:  Annotated[str, typer.Argument(help="T
     """
     print(f"Assess runnning Flink DML part of the pipeline from given table name")
     try:
-        report=report_running_flink_statements(table_name, inventory_path)
-        print(json.dumps(report, indent=3))
+        deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
-
     print(f"Running DMLs done")
 
 @app.command()

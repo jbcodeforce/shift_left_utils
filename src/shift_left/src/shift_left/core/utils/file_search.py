@@ -26,10 +26,10 @@ PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
 
 class InfoNode(BaseModel):
     table_name: Final[str]
-    product_name: Optional[str]
-    type: Optional[str]
-    dml_ref: Optional[str]
-    ddl_ref: Optional[str]
+    product_name: Optional[str]  =  Field(default="common", description="product name of the table.")
+    type: Optional[str] =  Field(default="source", description="type of the table.")
+    dml_ref: Optional[str]  =  Field(default=None   , description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    ddl_ref: Optional[str] =  Field(default=None, description="Type of Flink SQL statement. Could be Stateful or Stateless")
 
 class FlinkTableReference(InfoNode):
     """Reference to a Flink table including its metadata and location information."""
@@ -49,7 +49,7 @@ class FlinkTablePipelineDefinition(InfoNode):
     For source tables, parents will be empty.
     For sink tables, children will be empty.
     """
-    path: str
+    path: str = Field(default="", description="path to the table")
     state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
     parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
     children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")

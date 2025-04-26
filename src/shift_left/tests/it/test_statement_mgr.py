@@ -62,5 +62,6 @@ class TestStatementManager(unittest.TestCase):
         response = sm.drop_table("src_p2_a")
         assert response
 
+
 if __name__ == '__main__':
     unittest.main()

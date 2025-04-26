@@ -40,7 +40,7 @@ def get_topic_list(file_name: str):
     topics = ccloud.list_topics()
     with open(file_name, "w") as f:
             for topic in topics["data"]:
-                f.write(topic["topic_name"]+"\n")
+                f.write(topic['cluster_id'] + "," + topic['topic_name'] + "," + str(topic['partitions_count']) + "\n")
     return topics["data"]
 
 

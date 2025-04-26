@@ -72,6 +72,7 @@ class ConfluentCloudClient:
                     return result
                 else:
                     logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
+                    logger.error(f"The verb: {method} and url was: {url}")
                     return json.loads(response.text)
             else:
                 raise e
@@ -159,18 +160,14 @@ class ConfluentCloudClient:
             logger.error(e)
             return None
 
+
     def build_flink_url_and_auth_header(self):
-        region=self.config["confluent_cloud"]["region"]
-        cloud_provider=self.config["confluent_cloud"]["provider"]
         organization_id=self.config["confluent_cloud"]["organization_id"]
         env_id=self.config["confluent_cloud"]["environment_id"]
         self.api_key = self.config["flink"]["api_key"]
         self.api_secret = self.config["flink"]["api_secret"]
         self.auth_header = self._generate_auth_header()
-        if self.config["confluent_cloud"]["url_scope"].lower() == "private":
-            url=f"https://flink.{region}.{cloud_provider}.private.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
-        else:
-            url=f"https://flink.{region}.{cloud_provider}.confluent.cloud/sql/v1/organizations/{organization_id}/environments/{env_id}"
+        url=f"https://{self.config['flink']['flink_url']}/sql/v1/organizations/{organization_id}/environments/{env_id}"
         return url
 
 
@@ -202,7 +199,35 @@ class ConfluentCloudClient:
             statement_result = Statement.model_validate({"loop_counter": counter, "execution_time": execution_time, "result" : None})
             return statement_result
 
-
+    def get_topic_message_count(self, topic_name: str) -> int:
+        """
+        Get the number of messages in a Kafka topic.
+        
+        Args:
+            topic_name (str): The name of the topic to get message count for
+            
+        Returns:
+            int: The total number of messages in the topic
+        """
+        region=self.config["confluent_cloud"]["region"]
+        cloud_provider=self.config["confluent_cloud"]["provider"]
+        pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
+        cluster_id=self.config["kafka"]["cluster_id"]
+        self.api_key = self.config["kafka"]["api_key"]
+        self.api_secret = self.config["kafka"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
+        url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics/{topic_name}/partitions"
+        response = self.make_request("GET", url)
+        partitions = response["data"]
+        print(f"partitions: {partitions}")
+        total_messages = 0
+        for partition in partitions:
+            partition_id = partition["partition_id"]
+            url = f"{url}/{partition_id}"
+            response = self.make_request("GET", url)
+            print(response)
+            
+        return total_messages
 
     def get_flink_statement(self, statement_name: str)-> Statement | None:
         url = self.build_flink_url_and_auth_header()
@@ -216,23 +241,6 @@ class ConfluentCloudClient:
                     logger.error(f"Error parsing statement response: {resp}")
                     return None
         except Exception as e:
-            logger.info(f"Error executing GET statement call for {statement_name}: {e}")
-            return None
-        
-    def get_statement_results(self, statement_name: str)-> Statement:
-        url = self.build_flink_url_and_auth_header()
-        try:
-            resp=self.make_request("GET",f"{url}/statements/{statement_name}/results")
-            logger.debug(resp)
-
-            if resp["metadata"]["next"]:
-                resp=self.make_request("GET", resp["metadata"]["next"])
-                logger.debug(f"After next called: {resp}")
-                return StatementResult(**resp)
-            elif resp['results'] and resp['results']['data']:
-                return StatementResult(**resp)
-
-        except requests.exceptions.RequestException as e:
             logger.info(f"Error executing GET statement call for {statement_name}: {e}")
             return None
 

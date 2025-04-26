@@ -159,6 +159,7 @@ class FlinkStatementExecutionPlan(BaseModel):
     """
     created_at: datetime = Field(default=None)
     start_table_name: str = Field(default=None)
+    environment_id: str = Field(default=None)
     nodes: List[FlinkStatementNode] = Field(default=[])
 
 

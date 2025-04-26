@@ -18,7 +18,10 @@ from shift_left.core.table_mgr import (
     get_or_create_inventory)
 from shift_left.core.process_src_tables import process_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
-from shift_left.core.test_mgr import execute_all_tests, init_unit_test_for_table
+
+import shift_left.core.table_mgr as table_mgr
+import shift_left.core.test_mgr as test_mgr 
+
 
 """
 Manage the table entities.
@@ -37,7 +40,7 @@ def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],
     `shift_left table init src_table_1 $PIPELINES/sources/p1`
     """
     print("#" * 30 + f" Build Table in {table_path}")
-    table_folder, table_name= build_folder_structure_for_table(table_name, table_path, product_name)
+    table_folder, table_name= table_mgr.build_folder_structure_for_table(table_name, table_path, product_name)
     print(f"Created folder {table_folder} for the table {table_name}")
 
 @app.command()
@@ -46,7 +49,7 @@ def build_inventory(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELI
     Build the table inventory from the PIPELINES path.
     """
     print("#" * 30 + f" Build Inventory in {pipeline_path}")
-    inventory= get_or_create_inventory(pipeline_path)
+    inventory= table_mgr.get_or_create_inventory(pipeline_path)
     print(inventory)
     print(f"--> Table inventory created into {pipeline_path} with {len(inventory)} entries")
 
@@ -168,7 +171,7 @@ def init_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of t
     It is using the table inventory to find the table folder for the given table name.
     """
     print("#" * 30 + f" Unit tests initialization for {table_name}")
-    init_unit_test_for_table(table_name)
+    test_mgr.init_unit_test_for_table(table_name)
     print("#" * 30 + f" Unit tests initialization for {table_name} completed")
 
 @app.command()
@@ -179,5 +182,8 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
     print("#" * 30 + f" Unit tests execution for {table_name}")
-    execute_all_tests(table_name, test_case_name, compute_pool_id)
+    if test_case_name:
+        test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
+    else:
+        test_mgr.execute_all_tests(table_name, compute_pool_id)
     print("#" * 30 + f" Unit tests execution for {table_name} completed")

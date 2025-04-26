@@ -17,7 +17,6 @@ from typing import Optional, List, Any, Set, Tuple, Dict
 
 import shift_left.core.pipeline_mgr as pipeline_mgr 
 import shift_left.core.compute_pool_mgr as compute_pool_mgr 
-import shift_left.core.table_mgr as table_mgr 
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.flink_statement_model import (
     Statement, 
@@ -83,8 +82,6 @@ def deploy_pipeline_from_table(table_name: str,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
-    
-
     logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
     return result, summary
 
@@ -129,6 +126,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
 
     # TODO assess if we need to reload a persisted execution plan
     execution_plan = FlinkStatementExecutionPlan(created_at=start_time,
+                                                 environment_id=get_config()['confluent_cloud']['environment_id'],
                                                  start_table_name=pipeline_def.table_name)
     nodes_to_run = []
     visited_nodes = set()
@@ -161,6 +159,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                         # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
                         #graph=_merge_graphs(graph, _build_table_graph_for_node(node_c))
                         node_c.parents.remove(node)
+                        execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
                         execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
                         node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
                         _assign_compute_pool_id_to_node(node=node_c,
@@ -170,6 +169,22 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
     logger.debug(execution_plan)
     return execution_plan
+    
+def report_running_flink_statements_for_a_table_execution_plan(table_name: str, inventory_path: str) -> str:
+    """
+    Report running flink statements for a table execution plan
+    """
+    config = get_config()
+    pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+    execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def, 
+                                                        compute_pool_id=config['flink']['compute_pool_id'],
+                                                        dml_only=False,
+                                                        may_start_children=True, 
+                                                        start_time=datetime.now())
+    print(f"{_pad_or_truncate('Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}")
+    for node in execution_plan.nodes:
+        if node.existing_statement_info:
+            print(f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}")
     
 
 def full_pipeline_undeploy_from_table(table_name: str, 
@@ -210,8 +225,18 @@ def persist_execution_plan(execution_plan: FlinkStatementExecutionPlan):
     
     # Add nodes with their parent and child references
     for node in execution_plan.nodes:
-        parent_names = [p.table_name for p in node.parents]
-        child_names = [c.table_name for c in node.children]
+        parent_names = []
+        for p in node.parents:
+            if isinstance(p, FlinkStatementNode):
+                parent_names.append(p.table_name)
+            else:
+                parent_names.append(p)
+        child_names = []
+        for c in node.children:
+            if isinstance(c, FlinkStatementNode):
+                child_names.append(c.table_name)
+            else:
+                child_names.append(c)
         node.parents = set(parent_names)
         node.children = set(child_names)
     
@@ -231,14 +256,10 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     Returns:
         A formatted string summarizing the execution plan
     """
-    def _pad_or_truncate(text, length, padding_char=' '):
-        if len(text) > length:
-            return text[:length]
-        else:
-            return text.ljust(length, padding_char)
+
     
     summary_parts = [
-        f"To deploy {execution_plan.start_table_name} the following statements need to be executed in the order\n"
+        f"To deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
     ]
     
     # Separate nodes into parents and children
@@ -285,14 +306,19 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     for node in execution_plan.nodes:
         pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
         if pool:
-            summary+=f"\n{pool.id} \t{_pad_or_truncate(pool.name,40)}\t{_pad_or_truncate(str(pool.current_cfu) + "/" + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
+            summary+=f"\n{pool.id} \t{_pad_or_truncate(pool.name,40)}\t{_pad_or_truncate(str(pool.current_cfu) + '/' + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
     with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
         f.write(summary)
     return summary
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
-
+def _pad_or_truncate(text, length, padding_char=' '):
+    if len(text) > length:
+        return text[:length]
+    else:
+        return text.ljust(length, padding_char)
+        
 def _get_ancestor_subgraph(start_node, node_map)-> Tuple[Dict[str, FlinkStatementNode], 
                                                          Dict[str, List[FlinkStatementNode]]]:
     """Builds a subgraph containing all ancestors of the start node."""

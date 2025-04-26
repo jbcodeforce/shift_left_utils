@@ -8,7 +8,8 @@ import pathlib
 from unittest.mock import patch
 #os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
 #os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/config.yaml"
+os.environ["CONFIG_FILE"] = "/Users/jerome/.shift_left/config.yaml"
+os.environ["PIPELINES"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
 from shift_left.core.utils.file_search import get_or_build_source_file_inventory
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import (
@@ -49,7 +50,8 @@ class TestDeploymentManager(unittest.TestCase):
         inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         #table_path="/intermediates/aqem/tag_tag_dummy/"
         #table_path="/facts/aqem/fct_action_item_event/"
-        table_path="/views/aqem/mv_dim_element_event/"
+        #table_path="/views/aqem/mv_dim_element_event/"
+        table_path="/sources/mx/src_data_capture/"
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + table_path + PIPELINE_JSON_FILE_NAME)
         config = get_config()
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 

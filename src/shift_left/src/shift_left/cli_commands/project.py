@@ -5,11 +5,10 @@ import typer
 from rich import print
 from shift_left.core.utils.app_config import get_config, log_file_path
 from shift_left.core.compute_pool_mgr import get_compute_pool_list
+import shift_left.core.project_manager as project_manager
 from shift_left.core.project_manager import (
-        build_project_structure, 
         DATA_PRODUCT_PROJECT_TYPE, 
-        KIMBALL_PROJECT_TYPE,
-        get_topic_list)
+        KIMBALL_PROJECT_TYPE)
 from typing_extensions import Annotated
 """
 Manage project foundations
@@ -30,7 +29,7 @@ def init(project_name: Annotated[str, typer.Argument(help= "Name of project to c
     ...
     """
     print("#" * 30 + f" Build Project {project_name} in the {project_path} folder with a structure {project_type}")
-    build_project_structure(project_name,project_path, project_type)
+    project_manager.build_project_structure(project_name,project_path, project_type)
     print(f"Project {project_name} created in {project_path}")
 
 #@app.command()
@@ -46,7 +45,8 @@ def list_topics(project_path: Annotated[str, typer.Argument(help="Project path t
         Get the list of topics for the Kafka Cluster define in `config.yaml` and save the list in the `topic_list.txt` file under the given folder. Be sure to have a `conflig.yaml` file setup.
         """
         print("#" * 30 + f" List topic {project_path}")
-        list_of_topics = get_topic_list(project_path + "/topic_list.txt")
+        list_of_topics = project_manager.get_topic_list(project_path + "/topic_list.txt")
+        print(list_of_topics)
         print(f"Topic list saved in {project_path}/topic_list.txt")
 
 @app.command()
@@ -59,7 +59,7 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
         print("#" * 30 + f" List conpute pool {environment_id}")
-        list_of_pools = get_compute_pool_list(environment_id, region)
+        list_of_pools = project_manager.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
 @app.command()

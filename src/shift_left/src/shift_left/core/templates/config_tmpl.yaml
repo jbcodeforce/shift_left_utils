@@ -11,6 +11,7 @@ kafka:
   session.timeout.ms: 5000
   reject_topics_prefixes: ["clone","dim_","src_"]
   cluster_type: dev
+  src_topic_prefix: clone
 registry:
   url: <TO_FILL>
   registry_key_name:   <TO_FILL>
@@ -26,6 +27,7 @@ confluent_cloud:
   page_size: 100
   url_scope: private
 flink:
+  flink_url: flink-doqmp5.us-west-2.aws.glb.confluent.cloud
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
   compute_pool_id: lfcp- <TO_FILL>
@@ -40,6 +42,7 @@ app:
   src_table_name_prefix: src_
   logging: INFO
   products: ["p1", "p2", "p3"]
+  cache_ttl: 1200 # in seconds
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
   dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
   compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier

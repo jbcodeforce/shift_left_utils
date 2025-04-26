@@ -4,7 +4,8 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import json
 import os, pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
+#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
+os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
@@ -85,26 +86,14 @@ class TestConfluentClient(unittest.TestCase):
         status=client.delete_flink_statement(statement_name)
         print(f"\n--- {status}")
 
-    def test_select_statement_with_getting_result(self):
-        print("#"*30 + "\n test_select_statement_with_getting_result\n")
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        statement_name="test-statement"
-        sql_content = "select * from `examples`.`marketplace`.`customers` LIMIT 10;"
-        properties = {'sql.current-catalog' : 'j9r-env' , 'sql.current-database' : 'j9r-kafka'}
-        rep= client.delete_flink_statement(statement_name)
-        try:
-            statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
-            print(f"\n\n---- Statement: {statement}")
-            assert statement
-            statement = client.get_statement_results(statement_name)
-            print(f"--- with result: {statement.model_dump_json(indent=3)}\n\n")
-            for op_row in statement.results.data:
-                print(op_row)
-        except Exception as e:
-            print(e)
-        status=client.delete_flink_statement(statement_name)
-        print(f"\n--- {statement_name} {status}")
+    def test_get_topic_message_count(self):
+        print("#"*30 + "\ntest_get_topic_message_count\n")
+        os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
+        client = ConfluentCloudClient(get_config())
+        topic_name = "src_aqem_tag_tag"
+        message_count = client.get_topic_message_count(topic_name)
+        print(f"Message count for {topic_name}: {message_count}")
+    
 
     def _test_update_statement(self):
         print("Not clear yet how it works")

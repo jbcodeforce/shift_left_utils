@@ -3,13 +3,14 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
+import re
 import pathlib
 from shift_left.core.utils.sql_parser import (
     SQLparser
 )
 
 
-class TestFileSearch(unittest.TestCase):
+class TestSQLParser(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -142,15 +143,207 @@ class TestFileSearch(unittest.TestCase):
         fname = os.getenv("PIPELINES") + "/intermediates/p1/int_test/sql-scripts/ddl.test.sql"
         with open(fname, "r") as f:
             sql_content = f.read()
-            columns = parser.parse_sql_columns_to_dict(sql_content)
+            columns = parser.build_column_metadata_from_sql_content(sql_content)
             assert columns
-            assert columns['id'] == 'STRING'    
-            assert columns['tenant_id'] == 'STRING'
-            assert columns['status'] == 'STRING'
-            assert columns['name'] == 'STRING'
-            assert columns['type'] == 'STRING'
-            assert columns['created_by'] == 'STRING'
-            assert columns['created_date'] == 'BIGINT'
+            assert columns['id'] == {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True}  
+            assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
+            assert columns['status'] == {'name': 'status', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+            assert columns['name'] == {'name': 'name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+            assert columns['type'] == {'name': 'type', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+            assert columns['created_by'] == {'name': 'created_by', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+            assert columns['created_date'] == {'name': 'created_date', 'type': 'BIGINT', 'nullable': True, 'primary_key': False}
+
+    def test_extract_keys(self):
+        sql_statement_multiple = 'PRIMARY KEY(id, name) NOT ENFORCED'
+        match_multiple = re.search(r'PRIMARY KEY\((.*?)\)', sql_statement_multiple, re.IGNORECASE)
+
+        if match_multiple:
+            column_names_str_multiple = match_multiple.group(1)
+            column_names_multiple = [name.strip() for name in column_names_str_multiple.split(',')]
+            print(column_names_multiple)
+        else:
+            print("No primary key found in the statement.")
+        sql_statement = 'id STRING NOT NULL, tenant_id STRING NOT NULL, status STRING, name STRING, `type` STRING, created_by STRING, created_date BIGINT, last_modified_by STRING, PRIMARY KEY(id, tenant_id'
+        result = re.sub(r'^.*PRIMARY KEY\(', '', sql_statement, flags=re.IGNORECASE)
+        print(result)
+
+    def test_extract_table_name_from_insert_into_statement(self):   
+        parser = SQLparser()
+        query="""INSERT INTO aqem_dim_event_element
+        WITH
+            section_detail as (
+                SELECT s.event_section_id, sc.name, s.tenant_id
+                FROM `src_aqem_recordexecution_execution_plan_section` as s
+                INNER JOIN
+                    `src_aqem_recordconfiguration_section` as sc
+                    ON sc.id = s.config_section_id
+                    AND sc.tenant_id = s.tenant_id
+            ),
+            tenant as (
+                SELECT CAST(null AS STRING) as id, t.__db as tenant_id
+                FROM `stage_tenant_dimension` as t
+                where not (t.__op IS NULL OR t.__op = 'd')
+            ),
+            attachment as
+            (
+                SELECT
+                    ae.*,
+                    JSON_VALUE(att.object_state, '$.fileName' ) as filename
+                FROM `int_aqem_recordexecution_element_data_unnest` ae
+                JOIN `src_aqem_recordexecution_attachments` att
+                    ON ae.element_data = att.id AND ae.tenant_id = att.tenant_id
+                where ae.element_type = 'ATTACHMENT'
+            ),
+
+            -- Adjustments made here : Renamed to 'record_link', as to split out LINKS to EVENTS. Changed to INNER JOINs so that this CTE only handles record links.
+            record_link as
+            (
+                SELECT rec.record_number, rec.title, le.id, le.element_data as link_id, le.data_value_id, le.tenant_id
+                FROM `int_aqem_recordexecution_element_data_unnest` le
+                INNER JOIN `src_aqem_recordexecution_record_links` rl
+                    ON le.element_data = rl.id AND le.tenant_id = rl.tenant_id
+                left JOIN `src_aqem_recordexecution_record` rec
+                    ON rec.id = rl.to_record_id AND rec.tenant_id = rl.tenant_id
+                where le.element_type in ('LINK', 'RECORD_LINK')
+            ),
+
+            -- Added a new CTE here, this one handles LINKS to DOCUMENTS, AND also uses an INNER JOIN.
+            document_link as
+            (
+                SELECT dl.document_number, dl.title, le.id, le.element_data as link_id, le.data_value_id, le.tenant_id
+                FROM `int_aqem_recordexecution_element_data_unnest` le
+                left JOIN `src_aqem_recordexecution_document_link` dl
+                    ON le.element_data = dl.id AND le.tenant_id = dl.tenant_id
+                where le.element_type in ('LINK', 'RECORD_LINK')
+            ),
+
+            event_element as (
+                SELECT
+                    MD5(CONCAT_WS(',', ed.id, CAST(ed.data_value_id AS STRING), ed.tenant_id)) AS sid,
+                    ed.parent_id,
+                    ed.table_row_id,
+                    ed.element_name as `name`,
+                    CASE
+                        WHEN ed.element_type = 'ATTACHMENT'
+                            THEN REGEXP_REPLACE(att.filename, '^["\[]|["\]"]$', '')
+                        -- If the Type is LINK, AND the RECORD LINK ID is not null, THEN we populate Element Value with the Record Number AND Title of the destination record.
+                        WHEN (ed.element_type = 'LINK'  OR ed.element_type = 'RECORD_LINK') AND l.link_id is not null
+                            THEN CONCAT(REGEXP_REPLACE(l.record_number, '^["\[]|["\]"]$', ''), ':', REGEXP_REPLACE(l.title, '^["\[]|["\]"]$', ''))
+                        -- If the Type is LINK, AND the DOCUMENT LINK ID is not null, THEN we populate Element Value with the Document Number AND Title of the destination document.
+                        WHEN ed.element_type = 'LINK' AND d.link_id is not null
+                            THEN CONCAT(REGEXP_REPLACE(d.document_number, '^["\[]|["\]"]$', ''), ':', REGEXP_REPLACE(d.title, '^["\[]|["\]"]$', ''))
+                        ELSE ed.element_data 
+                    END AS `value`,
+                    CASE 
+                        WHEN ed.element_type = 'DROPDOWN'
+                            THEN ed.element_data
+                        ELSE null
+                    END AS list_value,
+                    CAST (ed.display_order AS INTEGER) as display_order,
+                    MD5(CONCAT_WS(',', iud.user_id, ed.tenant_id)) AS updated_user_sid,
+                    iud.full_name as updated_full_name,
+                    iud.user_name as updated_user_name,
+                    ed.updated_date,
+                    s.name as event_section_name,
+                    MD5(CONCAT_WS(',', ed.config_element_id, ed.tenant_id)) AS config_element_sid,
+                    ed.id as event_element_id,
+                    ed.tenant_id as tenant_id
+                FROM `int_aqem_recordexecution_element_data_unnest` ed
+                INNER JOIN `int_aqem_aqem_event` as `event`
+                    on `event`.id = ed.record_id
+                    and `event`.tenant_id = ed.tenant_id
+                LEFT JOIN
+                    section_detail as s
+                    ON s.event_section_id = ed.section_id
+                    AND s.tenant_id = ed.tenant_id
+                LEFT JOIN
+                    `int_user_detail_lookup` as iud
+                    ON iud.user_id = ed.user_id
+                    AND iud.tenant_id = ed.tenant_id
+                LEFT JOIN
+                    attachment as att
+                    ON att.id = ed.id
+                    AND att.tenant_id = ed.tenant_id
+                LEFT JOIN
+                    record_link as l
+                    ON l.id = ed.id
+                    and l.link_id = ed.element_data
+                    AND l.tenant_id = ed.tenant_id
+                LEFT JOIN
+                    document_link as d
+                    ON d.id = ed.id
+                    and d.link_id = ed.element_data
+                    AND d.tenant_id = ed.tenant_id
+
+                UNION ALL
+
+                SELECT
+                    MD5(CONCAT_WS(',', dummy_rows.id, dummy_rows.id, dummy_rows.tenant_id)) AS sid,
+                    CAST(NULL AS STRING) as parent_id,
+                    CAST(NULL AS STRING) as table_row_id,
+                    'Missing Event Element Data' as name,
+                    CAST(NULL AS STRING) as `value`,
+                    CAST(NULL AS STRING) as list_value,
+                    CAST(NULL AS INTEGER) as display_order,
+                    CAST(NULL AS STRING) as updated_user_sid,
+                    CAST(NULL AS STRING) as updated_full_name,
+                    CAST(NULL AS STRING) as updated_user_name,
+                    CAST(NULL AS TIMESTAMP_LTZ(3)) as updated_date,
+                    CAST(NULL AS STRING) as event_section_name,
+                    CAST(NULL AS STRING) as config_element_sid,
+                    CAST(NULL AS STRING) as event_element_id,
+                    dummy_rows.tenant_id as tenant_id
+                FROM tenant as dummy_rows
+            )
+
+        SELECT
+            sid,
+            table_row_id,
+            name,
+            `value`,
+            list_value,
+            display_order,
+            updated_user_sid,
+            updated_full_name,
+            updated_user_name,
+            updated_date,
+            event_section_name,
+            config_element_sid,
+            event_element_id,
+            tenant_id
+        FROM event_element
+        """
+        rep=parser.extract_table_references(query)
+        assert rep
+        print(rep)
+
+
+    def test_extract_cte_table(self):   
+        parser = SQLparser()
+        query="""INSERT INTO aqem_dim_event_element
+        WITH
+            section_detail as (
+                SELECT s.event_section_id, sc.name, s.tenant_id
+                FROM `src_aqem_recordexecution_execution_plan_section` as s
+                INNER JOIN
+                    `src_aqem_recordconfiguration_section` as sc
+                    ON sc.id = s.config_section_id
+                    AND sc.tenant_id = s.tenant_id
+            ),
+            attachment as
+            (
+                SELECT
+                    ae.*,
+                    JSON_VALUE(att.object_state, '$.fileName' ) as filename
+                FROM `int_aqem_recordexecution_element_data_unnest` ae
+                JOIN `src_aqem_recordexecution_attachments` att
+                    ON ae.element_data = att.id AND ae.tenant_id = att.tenant_id
+                where ae.element_type = 'ATTACHMENT'
+            )
+        """
+        rep=parser.extract_table_references(query)
+        assert rep
+        print(rep)
 
 if __name__ == '__main__':
     unittest.main()

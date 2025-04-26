@@ -127,15 +127,20 @@ class Change_SchemaContext(TableWorker):
      
 class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
-
+    topic_prefix="clone"
     """
-    Special worker to update schema and src topic name in sql content
+    Special worker to update schema and src topic name in sql content depending of the environment
     """
     dml_replacements = {
         "stage": {
             "adapt": {
-                "search": rf"(ap-.*?)-(dev)(\.)",
-                "replace": rf"\1-{env}\3"
+                # Replaces (ap-.*?)-(dev) with clone.stage.(ap-.*?)
+                # For example: ap-east-1-dev -> clone.stage.ap-east-1 in staging environment  
+                "search": r"^(.*?)(ap-.*?)-(dev)\.",
+                # \1 captures the first group (ap-.*?) from the search pattern
+                # - adds a literal hyphen
+                # {env} adds the environment value (e.g. "stage") {topic_prefix} adds the topic prefix (e.g. "clone")
+                "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
             }
         }
     }
@@ -143,6 +148,8 @@ class ReplaceEnvInSqlContent(TableWorker):
         "stage": {
             "schema-context": {
                 "search": rf"(.flink)-(dev)",
+                # Replaces .flink-dev with .flink-{env} in schema context
+                # For example: .flink-dev -> .flink-stage in staging environment
                 "replace": rf"\1-{env}"
             }
         }
@@ -151,8 +158,9 @@ class ReplaceEnvInSqlContent(TableWorker):
     def __init__(self):
         self.config = get_config()
         self.env = self.config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
+        self.topic_prefix = self.config.get('kafka',{'src_topic_prefix': 'clone'}).get('src_topic_prefix')
         # Update the replacements with the current env
-        self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1-{self.env}\3"
+        self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
 
     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
@@ -167,7 +175,7 @@ class ReplaceEnvInSqlContent(TableWorker):
         else:
             if self.env in self.dml_replacements:
                 for k, v in self.dml_replacements[self.env].items():
-                    sql_content = re.sub(v["search"], v["replace"], sql_content)
+                    sql_content = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
                     updated = True
                     logger.debug(f"{k} , {v} ")
         logger.debug(sql_content)
