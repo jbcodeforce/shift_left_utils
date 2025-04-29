@@ -6,6 +6,7 @@ from rich import print
 from shift_left.core.utils.app_config import get_config, log_file_path
 from shift_left.core.compute_pool_mgr import get_compute_pool_list
 import shift_left.core.statement_mgr as statement_mgr
+import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.project_manager as project_manager
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE, 
@@ -62,7 +63,7 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
         print("#" * 30 + f" List conpute pool {environment_id}")
-        list_of_pools = project_manager.get_compute_pool_list(environment_id, region)
+        list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
 @app.command()

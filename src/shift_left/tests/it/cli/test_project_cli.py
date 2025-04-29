@@ -41,6 +41,11 @@ class TestProjectCLI(unittest.TestCase):
         result = runner.invoke(app, [ "list-topics"])
         print(result.stdout)
 
+    def test_compute_pool_list(self):
+        runner = CliRunner()
+        result = runner.invoke(app, [ "list-compute-pools"])
+        print(result.stdout)
+
     def test_clean_completed_failed_statements(self):
         os.environ["CONFIG_FILE"] =  shift_left_dir +  "/config-stage-flink.yaml"
         runner = CliRunner()
