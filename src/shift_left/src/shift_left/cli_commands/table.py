@@ -109,13 +109,7 @@ def update_all_makefiles(
     count = update_all_makefiles_in_folder(folder_name)
     print(f"Updated {count} Makefiles in {folder_name}")
 
-@app.command()
-def find_table_users(table_name: Annotated[str, typer.Argument(help="The name of the table to search ")],
-                     pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):
-    """ Find the Flink Statements, user of a given table """
-    print("#" * 30 + f" find_table_users for  {table_name}")
-    out=search_users_of_table(table_name, pipeline_path)
-    print(out)
+
 
 @app.command()
 def validate_table_names(pipeline_folder_name: Annotated[str, typer.Argument(envvar=["PIPELINES"],help= "Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.")]):

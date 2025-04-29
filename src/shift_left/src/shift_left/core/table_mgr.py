@@ -199,17 +199,14 @@ def search_users_of_table(table_name: str, pipeline_folder: str) -> str:
     """
     inventory = get_or_build_inventory(pipeline_folder, pipeline_folder, False)
     tab_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
-    if tab_ref is None:
-        logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
+    results =  read_pipeline_definition_from_file(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
+    output=f"## `{table_name}` is referenced in {len(results)} Flink SQL statements:\n"
+    if len(results) == 0:
+        output+="\n\t no table ... yet"
     else:
-        results =  read_pipeline_definition_from_file(tab_ref.table_folder_name+ "/" + PIPELINE_JSON_FILE_NAME).children
-        output=f"## `{table_name}` is referenced in {len(results)} Flink SQL statements:\n"
-        if len(results) == 0:
-            output+="\n\t no table ... yet"
-        else:
-             for t in results:
-                output+=f"\n* `{t.table_name}` with the DML: {t.dml_ref}\n"
-        return output
+        for t in results:
+            output+=f"\n* `{t.table_name}` with the DML: {t.dml_ref}\n"
+    return output
 
 def get_or_create_inventory(pipeline_folder: str):
     """

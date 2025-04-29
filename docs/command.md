@@ -132,7 +132,6 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `migrate`: Migrate a source SQL Table defined in a...
 * `update-makefile`: Update existing Makefile for a given table...
 * `update-all-makefiles`: Update all the Makefiles for all the...
-* `find-table-users`: Find the Flink Statements, user of a given...
 * `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
@@ -256,25 +255,6 @@ $ table update-all-makefiles [OPTIONS] FOLDER_NAME
 
 * `--help`: Show this message and exit.
 
-### `table find-table-users`
-
-Find the Flink Statements, user of a given table
-
-**Usage**:
-
-```console
-$ table find-table-users [OPTIONS] TABLE_NAME PIPELINE_PATH
-```
-
-**Arguments**:
-
-* `TABLE_NAME`: The name of the table to search   [required]
-* `PIPELINE_PATH`: Pipeline folder where all the tables are defined, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
-
-**Options**:
-
-* `--help`: Show this message and exit.
-
 ### `table validate-table-names`
 
 Go over the pipeline folder to assess if table name,  naming convention, and other development best practices are respected.
@@ -313,7 +293,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107036cc0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10671adb0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -453,6 +433,8 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--yaml`: Output the report in YAML format
 * `--json`: Output the report in JSON format
 * `--graph`: Output the report in Graphical tree
+* `--children-only / --no-children-only`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-only]
+* `--parent-only / --no-parent-only`: By default the report includes only parents  [default: parent-only]
 * `--output-file-name TEXT`: Output file name to save the report.
 * `--help`: Show this message and exit.
 

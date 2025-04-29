@@ -133,12 +133,12 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     start_node = _get_and_update_statement_info_for_node(start_node)
     nodes_to_run = _build_topological_sorted_parents(start_node, node_map)
     
-     # All the parents - grandparents... reacheable by DFS from the start_node and need to be executed are in nodes_to_run
+     # All the parents - grandparents... reacheable by DFS from the start_node and need to be executed are in nodes_to_run list
     # Execution plan should start from the source, higher level of the hiearchy. A node may have to restart its children
     # if enforced by the update_children flag or if the children is stateful
     for node in nodes_to_run:
         node.update_children = may_start_children 
-        if node.upgrade_mode == "Stateful":  # as a stateful node, it will recreated the output sink table so consumer will see duplicates.
+        if node.upgrade_mode == "Stateful" and may_start_children:  # as a stateful node, it will recreated the output sink table so consumer will see duplicates.
             node.update_children = True
         if not node.compute_pool_id:
             node.compute_pool_id = _assign_compute_pool_id_to_node(node, compute_pool_id)
@@ -152,12 +152,12 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
             for c in node.children: 
                 if (c not in execution_plan.nodes 
                     and node.update_children 
-                    and c.product_name == node.product_name):
+                    and c.product_name == node.product_name 
+                    and c.product_name == start_node.product_name):
                     node_c = node_map[c.table_name]  # c children may not have grand children or its  parent but node_c will have the static hierachy
                     node_c=_get_and_update_statement_info_for_node(node_c)
-                    if not node_c.to_run:
+                    if node_c.to_restart and may_start_children:
                         # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
-                        #graph=_merge_graphs(graph, _build_table_graph_for_node(node_c))
                         node_c.parents.remove(node)
                         execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
                         execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
@@ -398,7 +398,7 @@ def _topological_sort(current_node: FlinkStatementNode, nodes: Dict[str, FlinkSt
         raise ValueError("Graph has a cycle, cannot perform topological sort.")
 
 
-def _get_descendants_subgraph(start_node, node_map)-> Tuple[Dict[str, FlinkStatementNode], 
+def _get_descendants_subgraph(start_node: FlinkStatementNode, node_map: Dict[str, FlinkStatementNode])-> Tuple[Dict[str, FlinkStatementNode], 
                                                          Dict[str, List[FlinkStatementNode]]]:
     """Builds a subgraph containing all descendants of the start node."""
     descendants = {}
@@ -418,24 +418,24 @@ def _get_descendants_subgraph(start_node, node_map)-> Tuple[Dict[str, FlinkState
     # Include dependencies within the ancestor subgraph
     descendant_dependencies = []
 
-    def _add_parent_dependencies(table_name: str, node_map: dict, new_descendants: dict) -> None:
+    def _add_child_dependencies(table_name: str, node_map: dict, new_descendants: dict) -> None:
         node = node_map[table_name]
         for child in node.children:
             descendant_dependencies.append((table_name, child))
             if child.table_name not in new_descendants:
                 new_descendants[child.table_name] = child
-            _add_parent_dependencies(child.table_name, node_map, new_descendants)
+            _add_child_dependencies(child.table_name, node_map, new_descendants)
 
 
     new_descendants = descendants.copy()
     for table_name in descendants.keys():
-        _add_parent_dependencies(table_name, node_map, new_descendants)
+        _add_child_dependencies(table_name, node_map, new_descendants)
     descendants.update(new_descendants)
     return descendants, descendant_dependencies
 
 
 def _build_topological_sorted_children(current_node: FlinkStatementNode, node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
-    """Performs topological sort on a DAG of the curent node parents"""
+    """Performs topological sort on a DAG of the curent node"""
     nodes, dependencies = _get_descendants_subgraph(current_node, node_map)
     return _topological_sort(current_node, nodes, dependencies)
 

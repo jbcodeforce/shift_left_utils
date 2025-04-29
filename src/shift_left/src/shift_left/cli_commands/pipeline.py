@@ -76,6 +76,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
         to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree"),
+         children_only: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
+        parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
         output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
     """
     Generate a report showing the pipeline hierarchy for a given table using its pipeline_definition.json
@@ -83,7 +85,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path)
+        parent_only = not children_only
+        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path, parent_only, children_only)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -112,7 +115,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
     
     def add_nodes_to_tree(node_data, tree_node):
-        if node_data.parents:
+        # Process parents recursively
+        if parent_only and node_data.parents:
             for parent in node_data.parents:
                 parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
                 # Add file references
@@ -122,7 +126,11 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                     parent_node.add(f"[dim]DDL: {parent.ddl_ref}[/dim]")
                 parent_node.add(f"[dim]Path: {parent.path}[/dim]")
                 parent_node.add(f"[dim]Type: {parent.type}[/dim]")
-        if node_data.children:
+                # Recursively process parents of parents
+                add_nodes_to_tree(parent, parent_node)
+        
+        # Process children recursively
+        if children_only and node_data.children:
             for child in node_data.children:
                 child_node = tree_node.add(f"[green]{child.table_name}[/green]")
                 # Add file references
@@ -132,6 +140,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                     child_node.add(f"[dim]DDL: {child.ddl_ref}[/dim]")
                 child_node.add(f"[dim]Base: {child.path}[/dim]")
                 child_node.add(f"[dim]Type: {child.type}[/dim]")
+                # Recursively process children of children
+                add_nodes_to_tree(child, child_node)
     
     # Add the root node details
     tree.add(f"[dim]DML: {pipeline_def.dml_ref}[/dim]")
@@ -141,7 +151,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     add_nodes_to_tree(pipeline_def, tree)
     
     # Print the tree
-    console.print("\n[bold]Pipeline Hierarchy:[/bold]")
+    console.print(f"\n[bold]Pipeline {'children' if children_only else 'parents'} hierarchy:[/bold]")
     console.print(tree)
 
 @app.command()

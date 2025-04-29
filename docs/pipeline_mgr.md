@@ -306,11 +306,10 @@ As a generic test plan for Flink project we propose to address the following
 
 ### 2. Integration Testing
 
-As Confluent Cloud for Flink is natively integrated with Kafka, the goal of integration testings is more to do isolate from source tables, integrated with Change Data Capture and down to sink to data lakehouse.
+As Confluent Cloud for Flink is natively integrated with Kafka, the goal of integration testings is to isolate tests from the source/ replicated tables,  down to sink to data lakehouse.
 
 * Test end-to-end data flow from source to sink
 * Verify message serialization/deserialization
-* Test different message formats (JSON, Avro, etc.)
 * Validate schema evolution handling
 
 * State Management is relevant for CP Flink or Open-source Flink. For Confluent cloud the state management is transparent for the users. The classical items are:
