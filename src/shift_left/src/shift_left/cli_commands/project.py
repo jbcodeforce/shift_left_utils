@@ -5,11 +5,14 @@ import typer
 from rich import print
 from shift_left.core.utils.app_config import get_config, log_file_path
 from shift_left.core.compute_pool_mgr import get_compute_pool_list
+import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.project_manager as project_manager
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE, 
         KIMBALL_PROJECT_TYPE)
 from typing_extensions import Annotated
+from shift_left.core.flink_statement_model import Statement 
+
 """
 Manage project foundations
 """
@@ -70,3 +73,17 @@ def clear_logs():
        import os
        os.remove(log_file_path)
        print(f"{log_file_path} removed !")
+
+@app.command()
+def clean_completed_failed_statements() -> str:
+        """
+        Delete all statements that are failed and completed
+        """
+        print("#" * 30 + f" Clean statements starting with Worskpace in completed and failed state")
+        statement_list = statement_mgr.get_statement_list().copy()
+        for statement_name in statement_list:
+              statement = statement_list[statement_name]
+              if "workspace" in statement_name and (statement.status_phase == "COMPLETED" or statement.status_phase == "FAILED"):
+                     statement_mgr.delete_statement_if_exists(statement_name)
+                     print(f"delete {statement_name}")
+        return "Completed and failed Workspace statements cleaned"

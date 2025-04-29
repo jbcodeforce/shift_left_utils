@@ -154,16 +154,16 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                     and node.update_children 
                     and c.product_name == node.product_name 
                     and c.product_name == start_node.product_name):
-                    node_c = node_map[c.table_name]  # c children may not have grand children or its  parent but node_c will have the static hierachy
-                    node_c=_get_and_update_statement_info_for_node(node_c)
-                    if node_c.to_restart and may_start_children:
-                        # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
-                        node_c.parents.remove(node)
-                        execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
-                        execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
-                        node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
-                        _assign_compute_pool_id_to_node(node=node_c,
-                                                        compute_pool_id=compute_pool_id)
+                        node_c = node_map[c.table_name]  # c children may not have grand children or its  parent but node_c will have the static hierachy
+                        node_c=_get_and_update_statement_info_for_node(node_c)
+                        if node_c.to_restart and may_start_children:
+                            # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
+                            node_c.parents.remove(node)
+                            execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
+                            execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
+                            node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
+                            _assign_compute_pool_id_to_node(node=node_c,
+                                                            compute_pool_id=compute_pool_id)
           
         #node.parents=set()
     logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")

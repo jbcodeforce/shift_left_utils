@@ -36,6 +36,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
 * `clear-logs`: Clear the CLI logs to start from a white...
+* `clean-completed-failed-statements`: Delete all statements that are failed and...
 
 ### `project init`
 
@@ -106,6 +107,20 @@ Clear the CLI logs to start from a white page.
 
 ```console
 $ project clear-logs [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project clean-completed-failed-statements`
+
+Delete all statements that are failed and completed
+
+**Usage**:
+
+```console
+$ project clean-completed-failed-statements [OPTIONS]
 ```
 
 **Options**:
@@ -293,7 +308,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10671adb0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x105236cc0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`

@@ -2,7 +2,7 @@
 
 ???- info "Version"
     * Created January 2025.
-    * Update: 04/16/2025. 
+    * Update: 04/29/2025. 
 
 This chapter details the standard activities to manage a Confluent Cloud Flink project with the `shift_left` tool when doing a ETL to real-time migration project. The recipes address new project initiative or a migration project from an existing SQL based ETL solution.
 
@@ -203,7 +203,7 @@ shift_left table init int_p3_users $PIPELINES/intermediates --product-name p3
 
 ### Using Makefile for deployment
 
-During the development of the DDL and DML it may be more efficient to use the confluent CLI to deploy the Flink statements. To make the thing easier a Makefile exists in each table folder to support the deployment during development. Each Confluent Cloud cli commands are defined in a common makefile that is used by any Makefile within a 'table' folder. As an example the fact table `fct_order` has a Makefile at the same level of the sql-scripts.
+During the development of the DDL and DML it may be more efficient to use the confluent CLI to deploy the Flink statements. To make the things easier a Makefile exists in each table folder to support the deployment during development. Each Confluent Cloud cli commands are defined in a common makefile that is used by any Makefile within a 'table' folder. As an example the fact table `fct_order` has a Makefile at the same level of the sql-scripts.
 
 ```sh
 ── fct_order
@@ -213,15 +213,14 @@ During the development of the DDL and DML it may be more efficient to use the co
     │   └── dml.p1_fct_order.sql
 ```
 
-The Makefile import the common.mk
+The Makefile import the `common.mk`
 
-```
-include ../../../common.mk
-```
 
 ???- warning "Change the relative path"
     It may be needed to change the relative path to the common.mk file when the number of sub folders from the $PIPELINES is greater or less that 3 levels from the current folder.
 
+* To setup, [install make on Windows](https://learn.microsoft.com/en-us/windows/wsl/install), or for MacOS: `brew install make`
+* Be sure to be on a confluent cli above 4.24. To upgrade: `confluent update`
 * Be sure when starting a new session to have login to Confluent cloud and set the good endpoint:
 
 ```sh

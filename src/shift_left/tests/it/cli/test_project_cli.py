@@ -6,7 +6,7 @@ import pathlib
 import os
 import shutil
 from typer.testing import CliRunner
-
+from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.project import app
 
 class TestProjectCLI(unittest.TestCase):
@@ -40,6 +40,13 @@ class TestProjectCLI(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(app, [ "list-topics"])
         print(result.stdout)
+
+    def test_clean_completed_failed_statements(self):
+        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/config-stage-flink.yaml"
+        runner = CliRunner()
+        result = runner.invoke(app, [ "clean-completed-failed-statements"])
+        print(result)
+        assert "Completed and failed Workspace statements cleaned" in result.stdout
         
 
 if __name__ == '__main__':
