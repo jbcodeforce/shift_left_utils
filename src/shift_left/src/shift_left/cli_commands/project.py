@@ -76,15 +76,15 @@ def clear_logs():
        print(f"{log_file_path} removed !")
 
 @app.command()
-def clean_completed_failed_statements() -> str:
+def clean_completed_failed_statements():
         """
         Delete all statements that are failed and completed
         """
-        print("#" * 30 + f" Clean statements starting with Worskpace in completed and failed state")
+        print("#" * 30 + f" Clean statements starting with Workspace in completed and failed state")
         statement_list = statement_mgr.get_statement_list().copy()
         for statement_name in statement_list:
               statement = statement_list[statement_name]
               if "workspace" in statement_name and (statement.status_phase == "COMPLETED" or statement.status_phase == "FAILED"):
                      statement_mgr.delete_statement_if_exists(statement_name)
                      print(f"delete {statement_name}")
-        return "Completed and failed Workspace statements cleaned"
+        print("Workspace statements cleaned")

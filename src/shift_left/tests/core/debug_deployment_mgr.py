@@ -7,11 +7,8 @@ import time
 import pathlib
 from unittest.mock import patch
 #os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
-#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] = "/Users/jerome/.shift_left/config.yaml"
-os.environ["PIPELINES"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-from shift_left.core.utils.file_search import get_or_build_source_file_inventory
-import shift_left.core.pipeline_mgr as pm
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+os.environ["CONFIG_FILE"] = "/Users/jerome/.shift_left/it-config.yaml"
 from shift_left.core.pipeline_mgr import (
     read_pipeline_definition_from_file,
     FlinkTablePipelineDefinition
@@ -35,15 +32,15 @@ class TestDeploymentManager(unittest.TestCase):
         so it will run ddl, then ddls of all parent recursively.
         As we deploy both DDL and DML, force does not need to be True
         """
-        inventory_path= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-        os.environ["PIPELINES"]=inventory_path
+        os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
         import shift_left.core.deployment_mgr as dm
         config = get_config()
-        #table_path="/intermediates/aqem/int_aqem_tag_tag_dummy/"
-        table_path="/sources/aqem/tag_tag/"
-        result=dm.deploy_pipeline_from_table("src_aqem_tag_tag", inventory_path, config.get('flink').get('compute_pool_id'), False, False)
-        print(result.model_dump_json())
+        table_path="/facts/p1/fct_order/"
+        result, summary=dm.deploy_pipeline_from_table("p1_fct_order", os.getenv("PIPELINES"), config.get('flink').get('compute_pool_id'), False, True)
+        assert summary
+        print(summary)
         assert result
+        print(result.model_dump_json())
 
 
     def test_build_execution_plan(self):
@@ -52,12 +49,14 @@ class TestDeploymentManager(unittest.TestCase):
         #table_path="/facts/aqem/fct_action_item_event/"
         #table_path="/views/aqem/mv_dim_element_event/"
         table_path="/sources/mx/src_data_capture/"
+        inventory_path=  os.environ["PIPELINES"]
+        table_path="/intermediates/p1/int_table_1/"
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + table_path + PIPELINE_JSON_FILE_NAME)
         config = get_config()
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
                                                                 config.get('flink').get('compute_pool_id'), 
                                                                 False, 
-                                                                False,
+                                                                True,
                                                                 start_time = datetime.now())
         
         dm.persist_execution_plan(execution_plan)

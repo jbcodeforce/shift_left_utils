@@ -84,7 +84,6 @@ def execute_one_test(table_name: str, test_case_name: str, compute_pool_id: Opti
     statement_names = _execute_foundation_statements(test_suite_def, table_ref, prefix, compute_pool_id)
     statement_names.extend(_execute_statements_under_test(table_name, table_ref, prefix, compute_pool_id))
 
-    client = ConfluentCloudClient(get_config())
 
     # Parse through test case suite in yaml file, run the test case provided in parameter
     for test_case in test_suite_def.test_suite:
@@ -92,14 +91,8 @@ def execute_one_test(table_name: str, test_case_name: str, compute_pool_id: Opti
             logger.info(f"Running test case: {test_case.name}")
             statement_names.extend(_execute_one_testcase(test_case, table_ref, prefix, compute_pool_id))
             
-
-                 #Drop validation statements and topics
-            drop_validation_statements(client,statement_names)
-            drop_validation_tables(table_folder)
-            print(
-                f"**********************-Validation Test Case Finished-********************** ")
-            return True
-    return False
+    _delete_test_statements(statement_names)
+    print(f"**********************-Validation Test Case Finished-********************** ")
 
 def execute_all_tests(table_name: str, compute_pool_id: Optional[str] = None) -> List[Statement]:
     """
@@ -116,35 +109,23 @@ def execute_all_tests(table_name: str, compute_pool_id: Optional[str] = None) ->
       
     for test_case in test_suite_def.test_suite:
         statements.extend(_execute_one_testcase(test_case, table_ref, prefix, compute_pool_id))
+    _drop_test_tables(test_suite_def, table_name)
     return statements
 
 
 # ----------- Private APIs  ------------------------------------------------------------
 
-def drop_validation_tables(table_folder):
-    ddl_dir = os.path.join(table_folder, SCRIPTS_DIR)
-    ddl_dir1 = os.path.join(table_folder, "tests")
 
-    # Loop through files
-    for directory in [ddl_dir, ddl_dir1]:
-        full_dir = os.path.abspath(directory)
-        for filename in os.listdir(full_dir):
-            if filename.startswith(("ddl.", "ddl_")) and filename.endswith(".sql"):
-                if filename.startswith("ddl."):
-                    table_name = filename[len("ddl."): -len(".sql")] + "_ut"
-                else:
-                    table_name = filename[len("ddl_"): -len(".sql")] + "_ut"
-                statement_mgr.drop_table(table_name)
-                print(f"{table_name} table dropped")
-
-def drop_validation_statements(client,statement_names):
+def _delete_test_statements(statement_names):
     for stmt_name in statement_names:
+        statement_mgr.delete_statement_if_exists(stmt_name)
 
-        if client.get_statement_info(stmt_name):
-            client.delete_flink_statement(stmt_name)
-            print(f"Deleted statement {stmt_name}")
-        else:
-            print(f"Statement {stmt_name} doesn't exist")
+
+def _drop_test_tables(test_suite_def, main_table_name):
+    for foundation in test_suite_def.foundations:
+        statement_mgr.drop_table(foundation.table_name)
+    statement_mgr.drop_table(main_table_name)
+
 
 
 def _execute_flink_test_statement(sql_content: str, statement_name: str, compute_pool_id: Optional[str] = None) -> Statement:

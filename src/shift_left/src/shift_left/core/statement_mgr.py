@@ -126,7 +126,7 @@ def delete_statement_if_exists(statement_name) -> str | None:
             return "deleted"
         return None
     else: # not found in cache, do remote API call
-        logger.info(f"{statement_name} not found in cache, trying REST api call")
+        logger.info(f"{statement_name} not found in cache, trying DELETEREST api call")
         config = get_config()
         client = ConfluentCloudClient(config)
         return client.delete_flink_statement(statement_name)
@@ -290,10 +290,10 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
         result= post_flink_statement(compute_pool_id, 
                                             drop_statement_name, 
                                             sql_content)
-        logger.debug(f"Run drop table {result}")
-        delete_statement_if_exists(drop_statement_name)
     except Exception as e:
         logger.error(f"drop_table {e}")
+    finally:
+        delete_statement_if_exists(drop_statement_name)
     return f"{table_name} dropped"
 
 # ------------- private methods -------------

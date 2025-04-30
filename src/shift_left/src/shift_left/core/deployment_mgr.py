@@ -44,7 +44,7 @@ def deploy_pipeline_from_table(table_name: str,
                                inventory_path: str, 
                                compute_pool_id: str,
                                dml_only: bool = False,
-                               may_start_children: bool = False ) -> DeploymentReport:
+                               may_start_children: bool = False ) -> Tuple[DeploymentReport, str]:
     """
     Given the table name, executes the dml and ddl to deploy a pipeline.
     If the compute pool id is present it will use it. If not it will 
@@ -132,7 +132,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     visited_nodes = set()
     start_node = _get_and_update_statement_info_for_node(start_node)
     nodes_to_run = _build_topological_sorted_parents(start_node, node_map)
-    
+
      # All the parents - grandparents... reacheable by DFS from the start_node and need to be executed are in nodes_to_run list
     # Execution plan should start from the source, higher level of the hiearchy. A node may have to restart its children
     # if enforced by the update_children flag or if the children is stateful
@@ -154,13 +154,15 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                     and node.update_children 
                     and c.product_name == node.product_name 
                     and c.product_name == start_node.product_name):
-                        node_c = node_map[c.table_name]  # c children may not have grand children or its  parent but node_c will have the static hierachy
+                        node_c = node_map[c.table_name]  # c instance may not have grand children or its  ancestors but node_c will have the static hierachy
                         node_c=_get_and_update_statement_info_for_node(node_c)
-                        if node_c.to_restart and may_start_children:
+                        if may_start_children:
                             # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
                             node_c.parents.remove(node)
-                            execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
-                            execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
+                            # execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
+                            # execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
+                            _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(node_c, node_map))
+                            _merge_graphs(execution_plan.nodes, _build_topological_sorted_children(node_c, node_map))
                             node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
                             _assign_compute_pool_id_to_node(node=node_c,
                                                             compute_pool_id=compute_pool_id)
@@ -269,7 +271,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     # Build parent section
     if parents:
         summary_parts.extend([
-            "\n--- Parents impacted ---",
+            "\n--- Ancestors impacted ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
             "-" * 125
         ])
@@ -361,7 +363,7 @@ def _build_topological_sorted_parents(current_node: FlinkStatementNode, node_map
     return _topological_sort(current_node, ancestor_nodes, ancestor_dependencies)
 
 def _topological_sort(current_node: FlinkStatementNode, nodes: Dict[str, FlinkStatementNode], dependencies: Dict[str, List[FlinkStatementNode]])-> List[FlinkStatementNode]:
-    """Performs topological sort on a DAG of the r node parents"""
+    """Performs topological sort on a DAG of the current node parents"""
 
     # compute in_degree for each node as the number of incoming edges. the edges are in the dependencies
     in_degree = {node.table_name: 0 for node in nodes.values()}
@@ -384,8 +386,8 @@ def _topological_sort(current_node: FlinkStatementNode, nodes: Dict[str, FlinkSt
                 node.update_children = current_node.update_children  # inherit the update children flag from children to parent
                 current_node.to_restart = True
         else:
-            node.to_run = False  # already running, so do not need to run
-            node.to_restart = False
+            node.to_run = False  # already running, but may be restarted if node is stateful
+            node.to_restart = (node.upgrade_mode == "Stateful") and current_node.to_restart  
         for tbname, neighbor in dependencies:
             if neighbor.table_name == node.table_name:
                 in_degree[tbname] -= 1
@@ -453,9 +455,9 @@ def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
     It may be possible while navigating to the children that some parent of those children are not part
     of the current graph, so there is a need to merge the graph
     """
-    for table_name in in_graph:
-        if table_name not in in_out_graph:
-            in_out_graph[table_name]=in_graph[table_name]
+    for node in in_graph:
+        if node not in in_out_graph:
+            in_out_graph.append(node)
     return in_out_graph
 
 def _add_non_running_parents(node, execution_plan, node_map):
@@ -496,11 +498,11 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> li
     logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
     statements = []
     for node in plan.nodes:
-        logger.info(f"table: '{node.table_name}' on pool: {node.compute_pool_id}")
+        logger.info(f"processing table: '{node.table_name}'")
         if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
         if node.to_run or node.to_restart:
-            logger.info(f"Execute statement '{node.dml_statement_name}' with dml only: {node.dml_only}")
+            logger.debug(f"Execute statement '{node.dml_statement_name}' with dml only: {node.dml_only}")
             if not node.dml_only:
                 statement=_deploy_ddl_dml(node)
             else:
@@ -517,23 +519,23 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     Deploy the DDL and then the DML for the given table to process.
     """
 
-    logger.debug(f"{node_to_process.table_name} to {node_to_process.compute_pool_id}")
-    if not node_to_process.dml_only:
-        statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
-
+    logger.debug(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement")
     statement_mgr.delete_statement_if_exists(node_to_process.dml_statement_name)
+    statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
-
-    statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process.ddl_ref, 
+    try:
+        statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process.ddl_ref, 
                                 node_to_process.compute_pool_id, 
                                 node_to_process.ddl_statement_name)
-
+    except Exception as e:
+        logger.error(f"Error deploying DDL for {node_to_process.table_name}: {e}")
+        raise e
     return _deploy_dml(node_to_process, True)
 
 
 def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False)-> Statement:
-    logger.info(f"Run {to_process.dml_statement_name} for {to_process.table_name} table")
+    logger.info(f"Run {to_process.dml_statement_name} for {to_process.table_name} table to {to_process.compute_pool_id}")
     if not dml_already_deleted:
         statement_mgr.delete_statement_if_exists(to_process.dml_statement_name)
     

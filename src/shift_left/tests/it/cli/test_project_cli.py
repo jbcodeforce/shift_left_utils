@@ -17,7 +17,7 @@ class TestProjectCLI(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config.yaml")
+        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/it-config.yaml"
 
     @classmethod
     def tearDownClass(cls):
@@ -29,7 +29,7 @@ class TestProjectCLI(unittest.TestCase):
         runner = CliRunner()
         temp_dir = pathlib.Path(__file__).parent /  "../tmp"
         print(temp_dir)
-        result = runner.invoke(app, [ "project_test_via_cli",  str(temp_dir)])
+        result = runner.invoke(app, [ "init", "project_test_via_cli", str(temp_dir)])
         print(result.stdout)
         assert result.exit_code == 0
         assert "Project project_test_via_cli created in " in result.stdout
@@ -38,7 +38,8 @@ class TestProjectCLI(unittest.TestCase):
 
     def test_list_topics(self):
         runner = CliRunner()
-        result = runner.invoke(app, [ "list-topics"])
+        temp_dir = pathlib.Path(__file__).parent /  "../tmp"
+        result = runner.invoke(app, [ "list-topics", str(temp_dir)])
         print(result.stdout)
 
     def test_compute_pool_list(self):
@@ -51,7 +52,7 @@ class TestProjectCLI(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(app, [ "clean-completed-failed-statements"])
         print(result)
-        assert "Completed and failed Workspace statements cleaned" in result.stdout
+        assert "Workspace statements cleaned" in result.stdout
         
 
 if __name__ == '__main__':

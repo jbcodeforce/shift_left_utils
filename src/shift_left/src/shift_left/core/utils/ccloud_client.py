@@ -176,7 +176,7 @@ class ConfluentCloudClient:
         wait to get a non pending state
         """
         timer= self.config['flink'].get("poll_timer", 10)
-        logger.info(f"Start polling response for {statement_name}")
+        logger.info(f"As status is PENDING, start polling response for {statement_name}")
         counter = 0
         try:
             while True:

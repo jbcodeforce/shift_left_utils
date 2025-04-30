@@ -285,7 +285,7 @@ The test should supports debugging and test in Terminal, so all file accesses ar
 Tests are executed in a virtual environment with python 3 and pytest.
 
 ```sh
-uv run pytest -s tests/core/test_table_mgr.py
+uv run pytest -s tests/it/core/test_table_mgr.py
 uv run pytest -s tests/core/test_project_mgr.py
 uv run pytest -s tests/core/test_pipeline_mgr.py
 ```

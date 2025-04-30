@@ -34,7 +34,7 @@ app = typer.Typer()
 @app.command()
 def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],
          table_path: Annotated[str, typer.Argument(help="Folder Path in which the table folder structure will be created.")],
-         product_name: Annotated[str, typer.Option(help="Product name to use for the table. If not provided, it will use the table_path last folder as product name")]):
+         product_name: str = typer.Option(default=None, help="Product name to use for the table. If not provided, it will use the table_path last folder as product name")):
     """
     Build a new table structure under the specified path. For example to add a source table structure use for example the command:
     `shift_left table init src_table_1 $PIPELINES/sources/p1`
@@ -159,7 +159,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 
 
 @app.command()
-def init_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")]):
+def init_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")]):
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
     It is using the table inventory to find the table folder for the given table name.
