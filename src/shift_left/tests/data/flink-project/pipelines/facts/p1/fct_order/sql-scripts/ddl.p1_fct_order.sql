@@ -12,7 +12,10 @@ WITH (
   'key.avro-registry.schema-context' = '.flink-dev',
   'value.avro-registry.schema-context' = '.flink-dev',
   'kafka.cleanup-policy'= 'compact',
-  'kafka.retention.time' = '0',
+  'kafka.retention.time' = '0', 
+'sql.local-time-zone' = 'UTC-0', 
+'sql.local-time-zone' = 'UTC-0', 
+'sql.local-time-zone' = 'UTC-0',
   'scan.bounded.mode' = 'unbounded',
   'scan.startup.mode' = 'earliest-offset',
   'value.fields-include' = 'all'

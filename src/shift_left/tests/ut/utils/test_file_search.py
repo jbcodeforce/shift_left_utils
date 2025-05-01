@@ -7,9 +7,11 @@ from shift_left.core.utils.file_search import (
     get_or_build_source_file_inventory, 
     build_inventory,
     get_table_ref_from_inventory,
+    create_folder_if_not_exist,
     get_ddl_dml_from_folder, 
     from_pipeline_to_absolute,
     from_absolute_to_pipeline,
+    update_pipeline_definition_file,
     SCRIPTS_DIR,
     PIPELINE_JSON_FILE_NAME,
     read_pipeline_definition_from_file,
@@ -22,7 +24,11 @@ from shift_left.core.utils.file_search import (
     get_ddl_dml_names_from_table,
     list_src_sql_files,
     derive_table_type_product_name_from_path,
-    get_ddl_dml_names_from_pipe_def)
+    get_ddl_dml_names_from_pipe_def,
+    _apply_naming_convention,
+    _get_statement_name_modifier,
+    DmlNameModifier
+)
 from shift_left.core.utils.app_config import get_config, logger
 
 import json
@@ -187,6 +193,141 @@ class TestFileSearch(unittest.TestCase):
         assert files["dml.p1_fct_order"]
         assert ".sql" in files["dml.p1_fct_order"]
         print(files)
+
+    def test_create_folder_if_not_exist(self):
+        """Test folder creation functionality"""
+        import tempfile
+        import shutil
+        
+        # Create a temporary directory
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # Test creating a new folder
+            new_folder = os.path.join(temp_dir, "test_folder")
+            result = create_folder_if_not_exist(new_folder)
+            self.assertTrue(os.path.exists(new_folder))
+            self.assertEqual(result, new_folder)
+            
+            # Test with existing folder
+            result = create_folder_if_not_exist(new_folder)
+            self.assertTrue(os.path.exists(new_folder))
+            self.assertEqual(result, new_folder)
+        finally:
+            # Cleanup
+            shutil.rmtree(temp_dir)
+
+    def test_update_pipeline_definition_file(self):
+        """Test updating pipeline definition file"""
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # Create a test pipeline definition
+            test_def = FlinkTablePipelineDefinition(
+                table_name="test_table",
+                product_name="test_product",
+                type="fact",
+                path="test/path",
+                dml_ref="test/dml.sql",
+                ddl_ref="test/ddl.sql"
+            )
+            
+            # Test file creation and update
+            file_path = os.path.join(temp_dir, "pipeline_definition.json")
+            update_pipeline_definition_file(file_path, test_def)
+            
+            # Verify file was created and contains correct data
+            self.assertTrue(os.path.exists(file_path))
+            with open(file_path, 'r') as f:
+                content = json.load(f)
+                self.assertEqual(content['table_name'], "test_table")
+                self.assertEqual(content['product_name'], "test_product")
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_apply_naming_convention(self):
+        """Test naming convention application"""
+        # Create a test node
+        node = FlinkStatementNode(
+            table_name="test_table",
+            product_name="test_product",
+            dml_statement_name="dml-test-table",
+            ddl_statement_name="ddl-test-table"
+        )
+        
+        # Apply naming convention
+        modified_node = _apply_naming_convention(node)
+        
+        # Verify naming convention was applied
+        self.assertNotEqual(modified_node.dml_statement_name, "dml-test-table")
+        self.assertNotEqual(modified_node.ddl_statement_name, "ddl-test-table")
+
+    def test_get_statement_name_modifier(self):
+        """Test statement name modifier retrieval"""
+        # Test default modifier
+        modifier = _get_statement_name_modifier()
+        self.assertIsNotNone(modifier)
+        self.assertIsInstance(modifier, DmlNameModifier)
+
+    def test_table_type_edge_cases(self):
+        """Test edge cases for table type detection"""
+        # Test all possible table types
+        test_cases = [
+            ("/path/to/source/table", "source"),
+            ("/path/to/intermediates/table", "intermediate"),
+            ("/path/to/facts/table", "fact"),
+            ("/path/to/dimensions/table", "dimension"),
+            ("/path/to/stage/table", "intermediate"),
+            ("/path/to/mv/table", "view"),
+            ("/path/to/seed/table", "seed"),
+            ("/path/to/dead_letter/table", "dead_letter"),
+            ("/path/to/unknown/table", "unknown-type")
+        ]
+        
+        for path, expected_type in test_cases:
+            actual_type = get_table_type_from_file_path(path)
+            self.assertEqual(actual_type, expected_type)
+
+    def test_ddl_dml_from_folder_errors(self):
+        """Test error cases for DDL/DML file retrieval"""
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # Test missing DDL file
+            scripts_dir = os.path.join(temp_dir, "sql-scripts")
+            os.makedirs(scripts_dir)
+            with self.assertRaises(Exception) as context:
+                get_ddl_dml_from_folder(temp_dir, "sql-scripts")
+            self.assertTrue("No DDL file found" in str(context.exception))
+            
+            # Test missing DML file
+            ddl_file = os.path.join(scripts_dir, "ddl.test.sql")
+            with open(ddl_file, 'w') as f:
+                f.write("CREATE TABLE test;")
+            with self.assertRaises(Exception) as context:
+                get_ddl_dml_from_folder(temp_dir, "sql-scripts")
+            self.assertTrue("No DML file found" in str(context.exception))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_extract_product_name_edge_cases(self):
+        """Test edge cases for product name extraction"""
+        test_cases = [
+            ("/path/to/facts/product1/table", "product1"),
+            ("/path/to/intermediates/product2/table", "product2"),
+            ("/path/to/sources/product3/table", "product3"),
+            ("/path/to/dimensions/product4/table", "product4"),
+            ("/path/to/views/product5/table", "product5"),
+            ("/path/to/facts/table", ""),  # No product name
+            ("/path/to/unknown/table", "unknown")  # Unknown structure
+        ]
+        
+        for path, expected_product in test_cases:
+            actual_product = extract_product_name(path)
+            self.assertEqual(actual_product, expected_product)
 
 if __name__ == '__main__':
     unittest.main()

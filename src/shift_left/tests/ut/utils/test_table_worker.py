@@ -11,6 +11,7 @@ from shift_left.core.utils.app_config import get_config
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import (
     TableWorker, 
+    ReplaceEnvInSqlContent,
     Change_CompressionType, 
     Change_SchemaContext)
 
@@ -27,10 +28,13 @@ class TestTableWorker(unittest.TestCase):
         print("Test update ddl sql content")
         files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")
         class TestUpdate(TableWorker):
-            def update_sql_content(self, sql_in : str) -> Tuple[bool, str]:
+            def update_sql_content(self, sql_in : str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
                 return True, sql_in.replace(" 'kafka.retention.time' = '0',", " 'kafka.retention.time' = '0', \n'sql.local-time-zone' = 'UTC-0',")
         worker= TestUpdate()
-        updated=tm.update_sql_content_for_file(files["ddl.p1_fct_order"], worker)
+        updated=tm.update_sql_content_for_file(sql_file_name=files["ddl.p1_fct_order"], 
+                                                 processor=worker,
+                                                 string_to_change_from="",
+                                                 string_to_change_to="")
         assert updated
         with open(files["ddl.p1_fct_order"], "r") as f:
             sql_out = f.read()
@@ -43,10 +47,13 @@ class TestTableWorker(unittest.TestCase):
             f.write("insert into t3 select id,b,c from t2;")
 
         class TestUpdate(TableWorker):
-            def update_sql_content(self, sql_in : str) -> Tuple[bool, str]:
+            def update_sql_content(self, sql_in : str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
                 return True, sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
         
-        updated = tm.update_sql_content_for_file("test_file", TestUpdate())
+        updated = tm.update_sql_content_for_file(sql_file_name="test_file", 
+                                                 processor=TestUpdate(),
+                                                 string_to_change_from="t2",
+                                                 string_to_change_to="t2 join t3 on t3.id = t2.id")
         assert updated
         with open("test_file", "r") as f:
             assert f.read() == "insert into t3 select id,b,c from t2 join t3 on t3.id = t2.id;"
@@ -220,5 +227,203 @@ class TestTableWorker(unittest.TestCase):
         assert "clone.stage.ap-table-name.suffix" not in sql_out_with_dot_fixed
         assert "clone.stage.ap-table-name" in sql_out_with_dot_fixed
         print(sql_out_with_dot_fixed)
+
+    def test_change_concat_to_concat_ws(self):
+        """Test changing MD5(CONCAT) to MD5(CONCAT_WS)"""
+        sql_in = """
+        SELECT MD5(CONCAT(id, name, status)) as hash_key
+        FROM table1;
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.Change_Concat_to_Concat_WS".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        updated, sql_out = runner_class.update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "MD5(CONCAT_WS('''" in sql_out
+        
+
+    def test_default_string_replacement_in_from_clause(self):
+        """Test string replacement in FROM clause"""
+        sql_in = """
+        SELECT * FROM table1;
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.DefaultStringReplacementInFromClause".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        updated, sql_out = runner_class().update_sql_content(
+            sql_content=sql_in,
+            string_to_change_from="table1",
+            string_to_change_to="table2"
+        )
+        assert updated
+        assert "FROM table2" in sql_out
+        print(sql_out)
+
+    def test_change_mode_to_upsert_edge_cases(self):
+        """Test edge cases for changing to upsert mode"""
+        # Test with existing changelog.mode but different value
+        sql_in = """
+        CREATE TABLE test_table (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        ) WITH (
+            'changelog.mode' = 'append',
+            'key.format' = 'avro-registry'
+        )
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.ChangeChangeModeToUpsert".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "'changelog.mode' = 'upsert'" in sql_out
+        
+
+        # Test with no WITH clause
+        sql_in = """
+        CREATE TABLE test_table (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        )
+        """
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "WITH (\n   'changelog.mode' = 'upsert'" in sql_out
+
+
+    def test_change_pk_fk_to_sid_edge_cases(self):
+        """Test edge cases for changing PK_FK to SID"""
+        # Test with multiple occurrences
+        sql_in = """
+        CREATE TABLE test_table (
+            id_pk_fk STRING,
+            ref_pk_fk STRING,
+            PRIMARY KEY (id_pk_fk) NOT ENFORCED
+        )
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.ChangePK_FK_to_SID".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        assert updated
+        assert "id_sid" in sql_out
+        assert "ref_sid" in sql_out
+        print(sql_out)
+
+        # Test with no PK_FK
+        sql_in = """
+        CREATE TABLE test_table (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        )
+        """
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        assert not updated
+        assert sql_out == sql_in
+
+    def test_change_compression_type_edge_cases(self):
+        """Test edge cases for changing compression type"""
+        # Test with existing compression type but different value
+        sql_in = """
+        CREATE TABLE test_table_1 (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        ) WITH (
+            'kafka.producer.compression.type' = 'gzip',
+            'key.format' = 'avro-registry'
+        )
+        """
+        module_path, class_name = "shift_left.core.utils.table_worker.Change_CompressionType".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "'kafka.producer.compression.type' = 'snappy'" in sql_out
+
+
+        # Test with no WITH clause and closing parenthesis
+        sql_in = """
+        CREATE TABLE test_table_2 (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        );
+        """
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "WITH (\n        'kafka.producer.compression.type' = 'snappy'" in sql_out
+        assert sql_out.strip().endswith(");")
+
+
+        # Test with no WITH clause and no semicolon
+        sql_in = """
+        CREATE TABLE test_table_3 (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        )
+        """
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "WITH (\n        'kafka.producer.compression.type' = 'snappy'" in sql_out
+        assert sql_out.strip().endswith(");")
+        
+
+    def test_change_schema_context_edge_cases(self):
+        """Test edge cases for changing schema context"""
+        # Test with existing schema context but different value
+        sql_in = """
+        CREATE TABLE test_table (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        ) WITH (
+            'key.avro-registry.schema-context' = '.flink-prod',
+            'value.avro-registry.schema-context' = '.flink-prod',
+            'key.format' = 'avro-registry'
+        )
+        """
+        worker = Change_SchemaContext()
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        assert updated
+        assert "'key.avro-registry.schema-context'='.flink-dev'" in sql_out
+        assert "'value.avro-registry.schema-context'='.flink-dev'" in sql_out
+        print(sql_out)
+
+        # Test with no WITH clause
+        sql_in = """
+        CREATE TABLE test_table (
+            id STRING,
+            PRIMARY KEY (id) NOT ENFORCED
+        )
+        """
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        assert updated
+        assert "WITH (\n   'key.avro-registry.schema-context' = '.flink-dev'" in sql_out
+        print(sql_out)
+
+    def test_replace_env_in_sql_content_errors(self):
+        """Test error cases for environment replacement"""
+        # Test with invalid SQL content
+        sql_in = "INVALID SQL CONTENT"
+        worker = ReplaceEnvInSqlContent()
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        assert not updated
+        assert sql_out == sql_in
+
+        # Test with empty SQL content
+        sql_in = ""
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        assert not updated
+        assert sql_out == sql_in
+
+        # Test with None SQL content
+        sql_in = None
+        with self.assertRaises(AttributeError):
+            worker.update_sql_content(sql_content=sql_in)
+
 if __name__ == '__main__':
     unittest.main()

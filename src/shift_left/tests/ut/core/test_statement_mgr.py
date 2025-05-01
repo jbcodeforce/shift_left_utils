@@ -1,3 +1,7 @@
+""""
+Copyright 2024-2025 Confluent, Inc.
+"""
+
 import unittest
 from unittest.mock import patch, MagicMock
 import os
@@ -14,6 +18,16 @@ class TestStatementManager(unittest.TestCase):
     def setUpClass(cls):
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
     
+    def setUp(self):
+        """Set up test fixtures before each test method."""
+        # Remove cached statement list file if it exists
+        if os.path.exists(statement_mgr.STATEMENT_LIST_FILE):
+            os.remove(statement_mgr.STATEMENT_LIST_FILE)
+        
+        # Reset any cached data in the statement manager
+        statement_mgr._statement_list_cache = None
+        statement_mgr._statement_compute_pool_map = None
+        
     _statement_list = {
         'dev-ddl-src-table-1': StatementInfo(
                 name="dev-ddl-src-table-1",
@@ -40,9 +54,8 @@ class TestStatementManager(unittest.TestCase):
     }
 
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_get_statement_list_with_mock(self, MockConfluentCloudClient):
+    def test_1_get_statement_list_with_mock(self, MockConfluentCloudClient):
         """Test successful retrieval of statement list with mocked ConfluentClient"""
-        os.remove(statement_mgr.STATEMENT_LIST_FILE)
         # Setup mock response data
         mock_response = {
             "data": [
