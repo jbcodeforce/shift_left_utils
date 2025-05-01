@@ -46,7 +46,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
             return pool_id
         else:
             logger.info(f"Build a new compute pool")
-            return_create_compute_pool(pipeline_def.table_name)
+            return _create_compute_pool(pipeline_def.table_name)
 
 
 _compute_pool_list = None
@@ -132,11 +132,11 @@ def _create_compute_pool(table_name: str) -> str:
     config = get_config()
     spec = _build_compute_pool_spec(table_name, config)
     client = ConfluentCloudClient(get_config())
-    result= client.create_compute_pool(client,spec)
+    result= client.create_compute_pool(spec)
     if result:
         pool_id = result['id']
         env_id = config['confluent_cloud']['environment_id']
-        if _verify_compute_pool_provisioned(pool_id, env_id):
+        if _verify_compute_pool_provisioned(client, pool_id, env_id):
             return pool_id
 
 
@@ -181,7 +181,12 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
             (
                 "errors" in pool_info
                 and
-                any(map(lambda e:"status" in e and int(e["status"]) == 404, pool_info["errors"]))
+                # Including 403 because there's a bug in Confluent
+                #  where it returns 403 instead of 404 for missing resources.
+                any(map(
+                    lambda e:"status" in e and int(e["status"]) in [403,404],
+                    pool_info["errors"],
+                ))
             )
         ):
             logger.info(f"Compute Pool not found")

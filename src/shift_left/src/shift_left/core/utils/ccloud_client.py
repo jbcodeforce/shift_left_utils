@@ -107,7 +107,7 @@ class ConfluentCloudClient:
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
         self._set_cloud_auth()
-        url=f"https://{self.cloud_api_endpoint}/compute-pools?spec.region={region}&environment={env_id}&page_size={page_size}"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}&page_size={page_size}"
         logger.info(f"compute pool url= {url}")
         previous_token=None
         while True:
@@ -137,13 +137,13 @@ class ConfluentCloudClient:
     def get_compute_pool_info(self, compute_pool_id: str, env_id: str):
         """Get the info of a compute pool"""
         self._set_cloud_auth()
-        url=f"https://{self.cloud_api_endpoint}/compute-pools/{compute_pool_id}?environment={env_id}"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
 
     def create_compute_pool(self, spec: dict):
         self._set_cloud_auth()
         data={'spec': spec}
-        url=f"https://{self.cloud_api_endpoint}/compute-pools"
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools"
         return self.make_request("POST", url, data)
         
 
