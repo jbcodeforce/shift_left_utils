@@ -57,7 +57,7 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
             logger.debug(f"Statement: {statement_name} -> {statement}")
             if statement and statement.status:
                 logger.debug(f"Statement: {statement_name} status is: {statement.status.phase}")
-                get_statement_list()[statement_name]=statement.status.phase   # important to avoid doing an api call
+                get_statement_list()[statement_name]=statement   # important to avoid doing an api call
             return statement
     except Exception as e:
         logger.error(e)
@@ -77,7 +77,7 @@ def get_statement_status(statement_name: str) -> StatementInfo:
 def post_flink_statement(compute_pool_id: str,  
                              statement_name: str, 
                              sql_content: str,
-                             stopped: bool = False) -> Statement: 
+                             stopped: bool = False) -> Statement:
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -107,7 +107,7 @@ def post_flink_statement(compute_pool_id: str,
                 #raise Exception(response['errors'][0]['detail'])
             elif response["status"]["phase"] == "PENDING":
                 return client.wait_response(url, statement_name, start_time)
-            return  None
+            return  Statement(**response)
         except Exception as e:
             logger.error(f"Error executing rest call: {e}")
             raise e

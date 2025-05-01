@@ -71,6 +71,7 @@ class FlinkTablePipelineDefinition(InfoNode):
                                product_name=self.product_name,
                                dml_statement_name=dml_statement_name,
                                dml_ref=self.dml_ref,
+                               type=self.type,
                                ddl_statement_name=ddl_statement_name,
                                ddl_ref=self.ddl_ref,
                                upgrade_mode=self.state_form
@@ -156,9 +157,9 @@ def get_or_build_inventory(
                         logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                     inventory[ref.table_name] = ref.model_dump()
     logger.info(f"processed {count} files and got {len(inventory)} entries")
-                    
+    sorted_inventory = sorted(inventory.keys())            
     with open(inventory_path, "w") as f:
-        json.dump(inventory, f, indent=4)
+        json.dump(sorted_inventory, f, indent=4)
     logger.info(f"Created inventory file {inventory_path}")
     return inventory
 
@@ -254,7 +255,7 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
     return FlinkTableReference.model_validate(entry)
 
 
-def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTablePipelineDefinition:
+def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTablePipelineDefinition | None:
     """Read pipeline metadata from file.
     
     Args:

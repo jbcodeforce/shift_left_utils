@@ -4,15 +4,15 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import json
 import os, pathlib
-#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-all.yaml")
-os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+#os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
 class TestConfluentClient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config-all.yaml")
+        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config-ccloud.yaml")
 
     def test_get_environment_list(self):
         print("#"*30 + "\ntest_get_environment_list\n")

@@ -10,6 +10,7 @@ The execution plan is used to execute the statements in the correct order.
 The execution plan is used to undeploy a pipeline.
 """
 import time
+import os
 from datetime import datetime
 from pydantic import BaseModel, Field
 from collections import deque
@@ -37,14 +38,15 @@ class DeploymentReport(BaseModel):
     compute_pool_id: Optional[str] =  Field(default=None)
     ddl_dml:  Optional[str] =  Field(default="Both",description="The type of deployment: DML only, or both")
     update_children: Optional[bool] =  Field(default=False)
-    flink_statements_deployed: List[Any]
+    flink_statements_deployed: List[Statement]
 
     
 def deploy_pipeline_from_table(table_name: str, 
                                inventory_path: str, 
                                compute_pool_id: str,
                                dml_only: bool = False,
-                               may_start_children: bool = False ) -> Tuple[DeploymentReport, str]:
+                               may_start_children: bool = False,
+                             force_sources = False ) -> Tuple[DeploymentReport, str]:
     """
     Given the table name, executes the dml and ddl to deploy a pipeline.
     If the compute pool id is present it will use it. If not it will 
@@ -74,11 +76,11 @@ def deploy_pipeline_from_table(table_name: str,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         may_start_children=may_start_children, 
+                                                        force_sources=force_sources,
                                                         start_time=datetime.now())
     persist_execution_plan(execution_plan)
     summary = build_summary_from_execution_plan(execution_plan)
-    print(summary)
-    logger.info(f"Execute the plan for {table_name}")
+    logger.debug(f"Execute the plan: {summary}")
     statements = _execute_plan(execution_plan, compute_pool_id)
     result = DeploymentReport(table_name=table_name, 
                             compute_pool_id=compute_pool_id,
@@ -86,7 +88,7 @@ def deploy_pipeline_from_table(table_name: str,
                             ddl_dml= "DML" if dml_only else "Both",
                             flink_statements_deployed=statements)
     execution_time = time.perf_counter() - start_time
-    logger.info(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
+    logger.debug(f"Done in {execution_time} seconds to deploy pipeline from table {table_name}: {result.model_dump_json(indent=3)}")
     return result, summary
 
 def deploy_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, 
@@ -109,6 +111,7 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                                compute_pool_id: str,
                                dml_only: bool = False,
                                may_start_children: bool = False,
+                               force_sources: bool = False,
                                start_time= None ) -> FlinkStatementExecutionPlan:
     """
     Build an execution plan from the static relationship between Flink Statements
@@ -141,17 +144,21 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
     # Execution plan should start from the source, higher level of the hiearchy. A node may have to restart its children
     # if enforced by the update_children flag or if the children is stateful
     for node in nodes_to_run:
-        node.update_children = may_start_children 
-        if node.upgrade_mode == "Stateful" and may_start_children:  # as a stateful node, it will recreated the output sink table so consumer will see duplicates.
-            node.update_children = True
+        node.update_children = may_start_children
+        if node.type == "source" and node.is_running():
+            node.to_run = force_sources
+        if node.upgrade_mode == "Stateful":  # as a stateful node, it will recreated the output sink table so consumer will see duplicates.
+            node.update_children = may_start_children
         if not node.compute_pool_id:
             node.compute_pool_id = _assign_compute_pool_id_to_node(node, compute_pool_id)
         execution_plan.nodes.append(node)
 
     start_node.to_restart = True
     # Restart all children of each runnable node in the execution plan if they are not yet the part of 
-    # the execution_plan.nodes:
+    # the execution_plan.nodes. The execution_plan.nodes may have added nodes from below by adding parents or children.
     for node in execution_plan.nodes:
+        if node.type == "source" and node.is_running():
+            node.to_run = force_sources
         if node.to_run or node.to_restart:
             for c in node.children: 
                 if (c not in execution_plan.nodes 
@@ -163,8 +170,6 @@ def build_execution_plan_from_any_table(pipeline_def: FlinkTablePipelineDefiniti
                         if may_start_children:
                             # it is possible that node_c have parents that are not running, so we need to know its parent hierarchy
                             node_c.parents.remove(node)
-                            # execution_plan.nodes.extend(_build_topological_sorted_parents(node_c, node_map))
-                            # execution_plan.nodes.extend(_build_topological_sorted_children(node_c, node_map))
                             _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(node_c, node_map))
                             _merge_graphs(execution_plan.nodes, _build_topological_sorted_children(node_c, node_map))
                             node_c.to_restart = True    # TODO be more precise by looking at upgrade mode
@@ -185,13 +190,40 @@ def report_running_flink_statements_for_a_table_execution_plan(table_name: str, 
     execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def, 
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
-                                                        may_start_children=True, 
-                                                        start_time=datetime.now())
-    print(f"{_pad_or_truncate('Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}")
+                                                        may_start_children=False, 
+                                                        start_time=datetime.now(),
+                                                        force_sources=False)
+    report = f"{_pad_or_truncate('Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            print(f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}")
-    
+            report+=f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}\n"
+    return report
+
+def deploy_all_from_directory(directory: str, 
+                              inventory_path: str, 
+                              compute_pool_id: str,
+                              dml_only: bool = False,
+                              may_start_children: bool = False,
+                              force_sources: bool = False) -> str:
+    """
+    Deploy all the pipelines in the directory.
+    """
+    result = ""
+    for table_folder_name in os.listdir(directory):
+        file_path=directory + "/" + table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
+        pipe_def = read_pipeline_definition_from_file(file_path)
+        if pipe_def:
+            logger.info(f"Deploying pipeline from table {table_folder_name}")
+            report, _ = deploy_pipeline_from_table(table_name=table_folder_name,
+                                                          inventory_path=inventory_path,
+                                                          compute_pool_id=compute_pool_id,
+                                                          dml_only=dml_only,
+                                                          may_start_children=may_start_children)
+            result+=summary
+        else:
+            logger.warning(f"Pipeline definition not found for table {table_folder_name}")   
+    return result
+
 
 def full_pipeline_undeploy_from_table(table_name: str, 
                                inventory_path: str ) -> str:
@@ -297,7 +329,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
             "-" * 125
         ])
         for node in children:
-            action = "Run as parent" if node.to_run else "Restart" if node.to_restart else "Skip"
+            action = "To run" if node.to_run else "Restart" if node.to_restart else "Skip"
             status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"
 
             summary_parts.append(
@@ -361,7 +393,8 @@ def _get_ancestor_subgraph(start_node, node_map)-> Tuple[Dict[str, FlinkStatemen
     return ancestors, ancestor_dependencies
 
 
-def _build_topological_sorted_parents(current_node: FlinkStatementNode, node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
+def _build_topological_sorted_parents(current_node: FlinkStatementNode, 
+                                      node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG of the curent node parents"""
     ancestor_nodes, ancestor_dependencies = _get_ancestor_subgraph(current_node, node_map)
     return _topological_sort(current_node, ancestor_nodes, ancestor_dependencies)
@@ -506,7 +539,6 @@ def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
         # At this point, we have no matching compute pools and the configured pools are not valid,
         # so we need to just find one to use.
         if (pool.name.startswith(get_config().get('kafka').get('cluster_type'))
-            and 'cgibb' not in pool.name   # HACK for now avoid cgibb pool
             and pool.current_cfu < int(get_config().get('flink').get('max_cfu'))):
             node.compute_pool_id = pool.id
             node.compute_pool_name = pool.name
@@ -528,6 +560,7 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> li
                 statement=_deploy_ddl_dml(node)
             else:
                 statement=_deploy_dml(node, False)
+            node.existing_statement_info = statement
             statements.append(statement)
         else:
             logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
