@@ -66,6 +66,10 @@ def deploy_pipeline_from_table(table_name: str,
     start_time = time.perf_counter()
     pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
 
+    # If the provided compute pool is not present or valid, first try to get the associated pool, otherwise create a new one
+    if not compute_pool_mgr.is_pool_valid(compute_pool_id):
+        compute_pool_id = compute_pool_mgr.get_or_build_compute_pool(compute_pool_id, pipeline_def)
+
     execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
@@ -472,18 +476,35 @@ def _add_non_running_parents(node, execution_plan, node_map):
 
 def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
     
+    # If the node already has an assigned compute pool, continue using that
     if node.compute_pool_id:  # this may be loaded from the statement info
         return node.compute_pool_id
+
+    # If we supply a specific compute_pool_id, use that if it's valid
+    if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
+        node.compute_pool_id = compute_pool_id
+        return compute_pool_id
+
     compute_pool_list = compute_pool_mgr.get_compute_pool_list(get_config().get('confluent_cloud').get('environment'), 
                                               get_config().get('confluent_cloud').get('region'))
     
     pools=compute_pool_mgr.search_for_matching_compute_pools(compute_pool_list=compute_pool_list,
                                       table_name=node.table_name)
-    if not compute_pool_id:
-        node.compute_pool_id = get_config()['flink']['compute_pool_id']
+    
+    # If we don't have any matching compute pools, we need to find a pool to use
     if not pools:
-        pools= compute_pool_list.pools
+        configured_compute_pool_id = get_config()['flink']['compute_pool_id']
+        # If the config has a valid compute pool, use that one
+        if not compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+            node.compute_pool_id = configured_compute_pool_id
+            return configured_compute_pool_id
+        # Otherwise, grab all available pools as a potential pool list
+        else:
+            pools= compute_pool_list.pools
+
     for pool in pools:
+        # At this point, we have no matching compute pools and the configured pools are not valid,
+        # so we need to just find one to use.
         if (pool.name.startswith(get_config().get('kafka').get('cluster_type'))
             and 'cgibb' not in pool.name   # HACK for now avoid cgibb pool
             and pool.current_cfu < int(get_config().get('flink').get('max_cfu'))):
