@@ -39,16 +39,14 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
         product_name = extract_product_name(pipeline_def.path)
-        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                    config['kafka']['cluster_type'])
+        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name)
         statement = get_statement_info(dml_statement_name)
-        pool_id= statement.spec.compute_pool_id
-        if pool_id:
+        if statement and statement.spec.compute_pool_id:
+            pool_id= statement.spec.compute_pool_id
             return pool_id
         else:
             logger.info(f"Build a new compute pool")
-            pool_spec = _build_compute_pool_spec(pipeline_def.table_name)
-            return _create_compute_pool(pool_spec)
+            return_create_compute_pool(pipeline_def.table_name)
 
 
 _compute_pool_list = None
@@ -177,7 +175,15 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
     """
     try:
         pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
-        if pool_info == None:
+        if (
+            pool_info == None
+            or
+            (
+                "errors" in pool_info
+                and
+                any(map(lambda e:"status" in e and int(e["status"]) == 404, pool_info["errors"]))
+            )
+        ):
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
@@ -188,7 +194,7 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
     except Exception as e:
         logger.error(e)
         logger.info("Continue processing to ignore compute pool constraint")
-        return True
+        return False
 
 
 
