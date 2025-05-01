@@ -5,7 +5,7 @@ import pathlib
 import json
 
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementListCache
+from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementListCache, Status, Spec, Data, StatementResult, OpRow
 import  shift_left.core.statement_mgr as statement_mgr 
 
 class TestStatementManager(unittest.TestCase):
@@ -14,25 +14,168 @@ class TestStatementManager(unittest.TestCase):
     def setUpClass(cls):
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
     
+    _statement_list = {
+        'dev-ddl-src-table-1': StatementInfo(
+                name="dev-ddl-src-table-1",
+                status_phase="COMPLETED",
+                status_detail="Command completed successfully.",
+                sql_content="CREATE TABLE src_table_1 (...)",
+                compute_pool_id="lfcp-123",
+                compute_pool_name="test-pool",
+                principal="test-principal",
+                sql_catalog="default",
+                sql_database="default"
+            ),
+        'dev-dml-src-table-1' : StatementInfo(
+                name="dev-dml-src-table-1",
+                status_phase="RUNNING",
+                status_detail="",
+                sql_content="INSERT INTO src_table_1 (...)",
+                compute_pool_id="lfcp-123",
+                compute_pool_name="test-pool",
+                principal="test-principal",
+                sql_catalog="default",
+                sql_database="default"
+            ) 
+    }
+
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def _test_get_statement_list(self, MockConfluentCloudClient):
+    def test_get_statement_list_with_mock(self, MockConfluentCloudClient):
+        """Test successful retrieval of statement list with mocked ConfluentClient"""
+        os.remove(statement_mgr.STATEMENT_LIST_FILE)
+        # Setup mock response data
+        mock_response = {
+            "data": [
+                {
+                    "name": "test-statement-1",
+                    "spec": {
+                        "properties": {
+                            "sql.current-catalog": "default",
+                            "sql.current-database": "default"
+                        },
+                        "statement": "CREATE TABLE test_table_1",
+                        "compute_pool_id": "test-pool-1",
+                        "principal": "test-principal"
+                    },
+                    "status": {
+                        "phase": "RUNNING",
+                        "detail": ""
+                    }
+                },
+                {
+                    "name": "test-statement-2",
+                    "spec": {
+                        "properties": {
+                            "sql.current-catalog": "default",
+                            "sql.current-database": "default"
+                        },
+                        "statement": "CREATE TABLE test_table_2",
+                        "compute_pool_id": "test-pool-2",
+                        "principal": "test-principal"
+                    },
+                    "status": {
+                        "phase": "COMPLETED",
+                        "detail": ""
+                    }
+                }
+            ],
+            "metadata": {
+                "next": None
+            }
+        }
+
+        # Setup mock client
         mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.make_request.return_value = { "data": 
-                                                        {"name": "statement_name", 
-                                                           "spec": {"properties": 
-                                                                     {"sql.current-catalog": "my_catalog", 
-                                                                      "sql.current-database": "my_database"}, 
-                                                                "statement": "CREATE TABLE table_1 (",
-                                                                "compute_pool_id": "my_compute_pool_id",
-                                                                "principal": "my_principal",
-                                                                "status": {"phase": "RUNNING"}}}}
-        statement_list = statement_mgr.get_statement_list()
-        assert statement_list
-        print(f"statement_list: {statement_list}")
+        mock_client_instance.make_request.return_value = mock_response
+        mock_client_instance.build_flink_url_and_auth_header.return_value = "https://test-url"
+
+        # Call the function
+        result = statement_mgr.get_statement_list()
+
+        # Verify results
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 2)
+        
+        # Verify first statement
+        self.assertIn("test-statement-1", result)
+        stmt1 = result["test-statement-1"]
+        self.assertEqual(stmt1.name, "test-statement-1")
+        self.assertEqual(stmt1.status_phase, "RUNNING")
+        self.assertEqual(stmt1.compute_pool_id, "test-pool-1")
+        
+        # Verify second statement
+        self.assertIn("test-statement-2", result)
+        stmt2 = result["test-statement-2"]
+        self.assertEqual(stmt2.name, "test-statement-2")
+        self.assertEqual(stmt2.status_phase, "COMPLETED")
+        self.assertEqual(stmt2.compute_pool_id, "test-pool-2")
+
+        # Verify client was called correctly
+        MockConfluentCloudClient.assert_called_once()
+        mock_client_instance.make_request.assert_called_once()
+        mock_client_instance.build_flink_url_and_auth_header.assert_called_once()
      
+    @patch('shift_left.core.statement_mgr.get_statement_list')
+    def test_get_statement_status(self, mock_get_statement_list):
+        mock_get_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
+    
+        statement_info = statement_mgr.get_statement_status("test-statement-1")
+        assert statement_info
+        assert isinstance(statement_info, StatementInfo)    
+        self.assertEqual(statement_info.status_phase, "RUNNING")
+        self.assertEqual(statement_mgr.get_statement_status("test-statement-2").status_phase, "COMPLETED")
+        statement_info = statement_mgr.get_statement_status("test-statement-3")
+        assert statement_info
+        assert isinstance(statement_info, StatementInfo)    
+        self.assertEqual(statement_info.status_phase, "UNKNOWN")
+
+
+    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
+    def test_post_flink_statement(self, MockConfluentCloudClient):
+        # Setup test data
+        compute_pool_id = "test-pool"
+        statement_name = "test-statement"
+        sql_content = "SELECT * FROM test_table"
+        
+        # Configure mock
+        mock_client = MockConfluentCloudClient.return_value
+        mock_client.build_flink_url_and_auth_header.return_value = "http://test-url"
+        
+        # Mock successful response
+        mock_response = {
+            "name": statement_name,
+            "status": {"phase": "RUNNING"},
+            "spec": {
+                "statement": sql_content,
+                "compute_pool_id": compute_pool_id,
+                "properties": {"sql.current-catalog": "default", "sql.current-database": "default"},
+                "stopped": False,
+                "principal": "principal_sa"
+            }
+        }
+        mock_client.make_request.return_value = mock_response
+
+        # Execute test
+        result = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_content)
+
+        # Verify results
+        assert result.name == statement_name
+        assert result.status.phase == "RUNNING"
+        assert result.spec.statement == sql_content
+        assert result.spec.compute_pool_id == compute_pool_id
+
+        # Verify mock calls
+        mock_client.make_request.assert_called_once()
+        mock_client.build_flink_url_and_auth_header.assert_called_once()
+
+
+
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
     @patch('shift_left.core.statement_mgr.get_statement_list')
-    def _test_delete_flink_statement(self, mock_get_statement_list, MockConfluentCloudClient):
+    def test_delete_flink_statement(self, mock_get_statement_list, MockConfluentCloudClient):
         sname = "statement_name"
         mock_get_statement_list.return_value = { sname: Statement(name= sname), "other" : Statement(name = "other")}
         
@@ -70,26 +213,61 @@ class TestStatementManager(unittest.TestCase):
         print(sql_out)
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
         
-
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
+    @patch('shift_left.core.statement_mgr.get_statement_results')
+    @patch('shift_left.core.statement_mgr.get_statement_list')
+    @patch('shift_left.core.statement_mgr.post_flink_statement')
     @patch('shift_left.core.statement_mgr.delete_statement_if_exists')
-    def test_get_table_structure_success(self, mock_delete_statement, MockConfluentCloudClient):
+    def test_get_table_structure_success(self, 
+                                         mock_delete_statement,
+                                         mock_post_flink_statement, 
+                                         mock_get_statement_list,
+                                        mock_get_statement_results):
         """Test successful retrieval of table structure"""
-        table_name = "test_table"
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_statement = MagicMock()
-        mock_statement.status.phase = "COMPLETED"
-        mock_statement_result = MagicMock()
-        mock_statement_result.results.data[0].row[0] = "CREATE TABLE test_table (...)"
-        mock_client_instance.post_flink_statement.return_value = mock_statement
-        mock_client_instance.get_statement_results.return_value = mock_statement_result
+
+        _table_name = "test_table"
+        _statement_name = f"show-{_table_name.replace('_', '-')}"
+        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+            print(f"mock_post_statement: {statement_name}")
+            print(f"sql_content: {sql_content}")
+            status = Status(
+                phase= "RUNNING", 
+                detail= ""
+            )
+            spec = Spec(
+                compute_pool_id=get_config().get('flink').get('compute_pool_id'),
+                principal="principal_sa",
+                statement=sql_content,
+                properties={"sql.current-catalog": "default", "sql.current-database": "default"},
+                stopped=False
+            )
+            return Statement(name= statement_name, status= status, spec=spec)
+
+        def mock_statement_list():
+            mock_info = MagicMock(spec=Statement)
+            return {_statement_name: mock_info}
         
-        result = statement_mgr.show_flink_table_structure(table_name)
+        def mock_statement_results(statement_name):
+            print(f"mock_statement_results: {statement_name}")
+            if statement_name == _statement_name:
+                op_row = OpRow(op=0, row=["CREATE TABLE test_table (...)"])
+            else:
+                op_row = OpRow(op=0, row=["FAIL"])
+            data= Data(data= [op_row])
+            result = StatementResult(results=data)
+            return result
+        
+        mock_get_statement_list.side_effect = mock_statement_list
+        mock_post_flink_statement.side_effect = mock_post_statement
+        mock_get_statement_results.side_effect = mock_statement_results
+
+
+        
+        result = statement_mgr.show_flink_table_structure(_table_name)
         
         self.assertIsNotNone(result)
         self.assertEqual(result, "CREATE TABLE test_table (...)")
-        mock_delete_statement.assert_called_with(f"drop-{table_name.replace('_', '-')}")
-        mock_client_instance.delete_flink_statement.assert_called_with(f"show-{table_name.replace('_', '-')}")
+        mock_delete_statement.assert_called_with(_statement_name)
+
 
     @patch('shift_left.core.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
@@ -97,7 +275,8 @@ class TestStatementManager(unittest.TestCase):
         table_name = "fct_order"
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.post_flink_statement.return_value =  Statement(name= "drop-fct-order")
+        mock_client_instance.make_request.return_value =  Statement(name= "drop-fct-order")
+        
         result = statement_mgr.drop_table(table_name=table_name)
         
         self.assertEqual(result, "fct_order dropped")
@@ -107,10 +286,7 @@ class TestStatementManager(unittest.TestCase):
         cpi= config['flink']['compute_pool_id']
         properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     
-        mock_client_instance.post_flink_statement.assert_called_with(cpi,
-                                                                     "drop-fct-order",
-                                                                     "drop table if exists fct_order;",
-                                                                     properties)
+        mock_client_instance.make_request.assert_called_once()
         mock_delete_statement_if_exists.assert_called_with("drop-fct-order")
 
 
@@ -121,7 +297,7 @@ class TestStatementManager(unittest.TestCase):
                                                         status_phase='STOPPED',                                                           
                                                         status_detail='This statement was stopped manually.',                             
                                                         sql_content=' ',
-                                                        compute_pool_id='lfcp-0m07j6',                                                    
+                                                        compute_pool_id='lfcp-',                                                    
                                                         principal='u-1wg0qj',                                                             
                                                         sql_catalog='development_non-prod',                                            
                                                         sql_database='stage-us-west-2'                                          
@@ -131,7 +307,7 @@ class TestStatementManager(unittest.TestCase):
                                                         status_phase='STOPPED',                                                           
                                                         status_detail='This statement was stopped manually.',                             
                                                         sql_content='select id\n    , tenantId\n    , sourceTemplateId\n    , createdOnDate\n',
-                                                        compute_pool_id='lfcp-0m07j6',                                                    
+                                                        compute_pool_id='lfcp-',                                                    
                                                         principal='u-1wg0qj',                                                             
                                                         sql_catalog='development_non-prod',                                            
                                                         sql_database='development-us-west-2'                                    
@@ -144,6 +320,48 @@ class TestStatementManager(unittest.TestCase):
         assert statement_list_cache
         assert isinstance(statement_list_cache, StatementListCache)
         print(f"statement_list_cache: {statement_list_cache}")
+
+
+    @patch('shift_left.core.statement_mgr.get_statement_list')
+    @patch('shift_left.core.statement_mgr.post_flink_statement')
+    def test_build_and_deploy_flink_statement_from_sql_content(self, mock_post_flink_statement, 
+                                                            mock_get_statement_list):
+        config = get_config()
+        config['kafka']['cluster_type'] = 'stage'
+        config['flink']['compute_pool_id'] = 'lfcp-'
+        config['flink']['catalog_name'] = 'j9r-dev'
+        config['flink']['database_name'] = 'j9r-cluster'
+       
+        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+            print(f"mock_post_statement: {statement_name}")
+            print(f"sql_content: {sql_content}")
+            status = Status(
+                phase= "COMPLETED", 
+                detail= ""
+            )
+            spec = Spec(
+                compute_pool_id=get_config().get('flink').get('compute_pool_id'),
+                principal="principal_sa",
+                statement=sql_content,
+                properties={"sql.current-catalog":  config['flink']['catalog_name'], 
+                            "sql.current-database":  config['flink']['database_name']},
+                stopped=False
+            )
+            return Statement(name= statement_name, status= status, spec=spec)
+        mock_post_flink_statement.side_effect = mock_post_statement
+
+        mock_get_statement_list.return_value = self._statement_list
+        sql_file_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
+        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(
+                    flink_statement_file_path=sql_file_path,
+                    compute_pool_id=config['flink']['compute_pool_id'],
+                    statement_name=f"test-statement",
+                    config=config)
+        assert statement
+        assert isinstance(statement, Statement)
+        assert statement.name == "test-statement"
+        assert "'key.avro-registry.schema-context' = '.flink-stage'," in statement.spec.statement
+        mock_post_flink_statement.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

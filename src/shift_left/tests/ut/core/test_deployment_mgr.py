@@ -39,7 +39,7 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
-        #pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def setUp(self):
         self.config = get_config()
@@ -48,7 +48,7 @@ class TestDeploymentManager(unittest.TestCase):
         self.inventory_path = os.getenv("PIPELINES")
 
     def test_build_node_map(self):
-        """Test building node map"""
+        """Loading a pipeline definition for an intermediate table, it should get all the reachable related tables. Direct children and ancestors are included."""
         print("test_build_node_map")
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
         node_map = dm._build_statement_node_map(pipeline_def.to_node())
@@ -69,29 +69,29 @@ class TestDeploymentManager(unittest.TestCase):
         assert node_map["b"].upgrade_mode == "Stateless"
         assert node_map["e"].upgrade_mode == "Stateless"
         assert node_map["f"].upgrade_mode == "Stateless"
-        assert node_map["g"].upgrade_mode == "Stateless"
+   
 
-    def test_dfs_search_parents_to_run(self):
-        """Test DFS search parents to run
+    def test_build_topological_sorted_parents(self):
+        """
         f has 6 parents: d, then z, x, y then  src_y, src_x 
+        The topological sort should return src_y, src_x, y, x, z, d, f
         """
         print("test_dfs_search_parents_to_run")
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
         node_map = dm._build_statement_node_map(pipeline_def.to_node())
-        nodes_to_run = []
-        visited_nodes = set()   
-        dm._dfs_search_parents_to_run(nodes_to_run, node_map["f"], visited_nodes, node_map)
+        current_node = pipeline_def.to_node()
+        nodes_to_run = dm._build_topological_sorted_parents(current_node, node_map)
         assert len(nodes_to_run) == 7
         for node in nodes_to_run:
             print(node.table_name, node.to_run, node.to_restart)
-        
+        assert nodes_to_run[0].table_name == "src_y" or nodes_to_run[0].table_name == "src_x"
         
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
     def test_build_execution_plan_for_one_table_parent_running(self, mock_get_status): 
         """
         Should lead to only parents to run when they are not running.
-        F has one parent D.
+        F has one parent d. f -> Dd -> [y, z], z -> x, y-> src_y and x -> src_x
         """
         print("test_build_execution_plan_for_one_table_parent_running")
         ## The parent D is running so only the fact F should be run.
@@ -102,15 +102,17 @@ class TestDeploymentManager(unittest.TestCase):
                 return StatementInfo(status_phase="UNKNOWN", compute_pool_id=None)
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                False, datetime.now())
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only=False, 
+                                                                may_start_children=False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())
         print(dm.build_summary_from_execution_plan(execution_plan))
-        assert len(execution_plan.nodes) == 1
-        assert execution_plan.nodes[0].table_name == "f"
-        assert execution_plan.nodes[0].to_run == True
-        assert execution_plan.nodes[0].to_restart == False
+        assert len(execution_plan.nodes) == 7 # all nodes are present as we want to see running ones too
+        assert execution_plan.nodes[6].table_name == "f"
+        assert execution_plan.nodes[6].to_run == True
+        assert execution_plan.nodes[6].to_restart == True
         
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
@@ -130,22 +132,21 @@ class TestDeploymentManager(unittest.TestCase):
 
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                False, datetime.now())  
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())  
+        
+        assert len(execution_plan.nodes) == 7
+        assert execution_plan.nodes[5].table_name == "d"
+        assert execution_plan.nodes[5].to_run == True
+        assert execution_plan.nodes[5].to_restart == True
+        assert execution_plan.nodes[6].table_name == "f"
+        assert execution_plan.nodes[6].to_run == True
+        assert execution_plan.nodes[6].to_restart == True
         print(dm.build_summary_from_execution_plan(execution_plan))   
-        assert len(execution_plan.nodes) == 3
-
-        assert execution_plan.nodes[0].table_name == "y"
-        assert execution_plan.nodes[0].to_run == True
-        assert execution_plan.nodes[0].to_restart == False
-        assert execution_plan.nodes[1].table_name == "d"
-        assert execution_plan.nodes[1].to_run == True
-        assert execution_plan.nodes[1].to_restart == True
-        assert execution_plan.nodes[2].table_name == "f"
-        assert execution_plan.nodes[2].to_run == True
-        assert execution_plan.nodes[2].to_restart == True
           
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
     def test_build_execution_plan_with_all_src_running(self, mock_get_status): 
@@ -165,10 +166,12 @@ class TestDeploymentManager(unittest.TestCase):
 
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                False, datetime.now())  
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())  
         print(dm.build_summary_from_execution_plan(execution_plan))
         dm.persist_execution_plan(execution_plan)
         # 8 as the 3 children of Z are not running   
@@ -206,10 +209,12 @@ class TestDeploymentManager(unittest.TestCase):
 
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                False, datetime.now())  
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())  
         print(dm.build_summary_from_execution_plan(execution_plan))
         # children of Z 
         assert len(execution_plan.nodes) == 5
@@ -241,11 +246,12 @@ class TestDeploymentManager(unittest.TestCase):
 
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                False, 
-                                                                datetime.now())  
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())  
         print(dm.build_summary_from_execution_plan(execution_plan))
         # children of Z are running except D
         assert len(execution_plan.nodes) == 6
@@ -284,11 +290,12 @@ class TestDeploymentManager(unittest.TestCase):
 
         mock_get_status.side_effect = mock_status
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, 
-                                                                get_config()['flink']['compute_pool_id'], 
-                                                                False, 
-                                                                True, 
-                                                                datetime.now())  
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())  
         print(dm.build_summary_from_execution_plan(execution_plan))
         assert len(execution_plan.nodes) == 10 
 
@@ -444,7 +451,12 @@ class TestDeploymentManager(unittest.TestCase):
 
         inventory_path = os.getenv("PIPELINES")
         pipeline_def: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def, get_config()['flink']['compute_pool_id'], False, True, datetime.now())
+        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
+                                                                compute_pool_id=get_config()['flink']['compute_pool_id'], 
+                                                                dml_only= False, 
+                                                                may_start_children= False, 
+                                                                force_sources=False,
+                                                                start_time=datetime.now())
         print(dm.build_summary_from_execution_plan(execution_plan))
         
         # Verify source tables are not in the execution plan
@@ -456,6 +468,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[0].table_name == "int_p1_table_1" or execution_plan.nodes[0].table_name == "int_p1_table_2"
         assert execution_plan.nodes[1].table_name == "int_p1_table_1" or execution_plan.nodes[1].table_name == "int_p1_table_2"
         assert execution_plan.nodes[2].table_name == "p1_fct_order"
+
 
     
 

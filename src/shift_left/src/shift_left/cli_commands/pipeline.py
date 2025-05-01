@@ -155,17 +155,39 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console.print(tree)
 
 @app.command()
-def deploy(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
+def deploy(
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
+        table_name:  str =  typer.Option(default= None, help="The table name containing pipeline_definition.json."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_children: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
+        force_sources: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
+        dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.")
         ):
     """
     Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
     """
     try:
-        result: DeploymentReport = deployment_mgr.deploy_pipeline_from_table(table_name, inventory_path, compute_pool_id, dml_only, may_start_children)
+        if dir:
+            result: DeploymentReport = deployment_mgr.deploy_all_from_directory(
+                directory = dir, 
+                inventory_path = inventory_path, 
+                compute_pool_id = compute_pool_id, 
+                dml_only = dml_only, 
+                may_start_children = may_start_children, 
+                force_sources = force_sources)
+        elif table_name:
+            result: DeploymentReport = deployment_mgr.deploy_pipeline_from_table(
+                table_name = table_name, 
+                inventory_path = inventory_path, 
+                compute_pool_id = compute_pool_id, 
+                dml_only = dml_only, 
+                may_start_children = may_start_children, 
+                force_sources = force_sources)
+        else:
+            print(f"[red]Error: either table_name or dir must be provided[/red]")
+            raise typer.Exit(1)
+        print(result)
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -202,7 +224,8 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
-        may_start_children: bool = typer.Option(False, help="The children will not be started by default. They may be started differently according to the fact they are stateful or stateless.")):
+        may_start_children: bool = typer.Option(False, help="The children will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
+        force_sources: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
@@ -213,6 +236,7 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         may_start_children=may_start_children,
+                                                        force_sources=force_sources,
                                                         start_time=datetime.datetime.now())
     deployment_mgr.persist_execution_plan(execution_plan)
     summary=deployment_mgr.build_summary_from_execution_plan(execution_plan)

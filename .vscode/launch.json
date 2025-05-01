@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-all.yaml",
+                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
                 "SRC_FOLDER": "${fileWorkspaceFolder}/../de-datawarehouse/models"
               },
         },
