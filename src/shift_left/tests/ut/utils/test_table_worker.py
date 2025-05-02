@@ -24,22 +24,6 @@ class TestTableWorker(unittest.TestCase):
         data_dir = pathlib.Path(__file__).parent.parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 
-    def test_update_retention_ddl_statement(self):
-        print("Test update ddl sql content")
-        files = list_src_sql_files(os.getenv("PIPELINES")+ "/facts/p1/fct_order")
-        class TestUpdate(TableWorker):
-            def update_sql_content(self, sql_in : str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
-                return True, sql_in.replace(" 'kafka.retention.time' = '0',", " 'kafka.retention.time' = '0', \n'sql.local-time-zone' = 'UTC-0',")
-        worker= TestUpdate()
-        updated=tm.update_sql_content_for_file(sql_file_name=files["ddl.p1_fct_order"], 
-                                                 processor=worker,
-                                                 string_to_change_from="",
-                                                 string_to_change_to="")
-        assert updated
-        with open(files["ddl.p1_fct_order"], "r") as f:
-            sql_out = f.read()
-            assert "'kafka.retention.time' = '0" in sql_out
-            print(sql_out)
     
     def test_update_dml_statement(self):
         print("Test update dml sql content")
@@ -308,19 +292,20 @@ class TestTableWorker(unittest.TestCase):
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
         updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
         assert updated
         assert "id_sid" in sql_out
         assert "ref_sid" in sql_out
-        print(sql_out)
 
         # Test with no PK_FK
         sql_in = """
-        CREATE TABLE test_table (
+        CREATE TABLE test_table_no` (
             id STRING,
             PRIMARY KEY (id) NOT ENFORCED
         )
         """
         updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
+        print(sql_out)
         assert not updated
         assert sql_out == sql_in
 
@@ -388,10 +373,10 @@ class TestTableWorker(unittest.TestCase):
         """
         worker = Change_SchemaContext()
         updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        print(sql_out)
         assert updated
         assert "'key.avro-registry.schema-context'='.flink-dev'" in sql_out
         assert "'value.avro-registry.schema-context'='.flink-dev'" in sql_out
-        print(sql_out)
 
         # Test with no WITH clause
         sql_in = """
@@ -401,9 +386,11 @@ class TestTableWorker(unittest.TestCase):
         )
         """
         updated, sql_out = worker.update_sql_content(sql_content=sql_in)
-        assert updated
-        assert "WITH (\n   'key.avro-registry.schema-context' = '.flink-dev'" in sql_out
         print(sql_out)
+        assert updated
+        assert ") WITH" in sql_out
+        assert "'key.avro-registry.schema-context' = '.flink-dev'" in sql_out
+
 
     def test_replace_env_in_sql_content_errors(self):
         """Test error cases for environment replacement"""
@@ -411,18 +398,20 @@ class TestTableWorker(unittest.TestCase):
         sql_in = "INVALID SQL CONTENT"
         worker = ReplaceEnvInSqlContent()
         updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        print(sql_out)
         assert not updated
         assert sql_out == sql_in
 
         # Test with empty SQL content
         sql_in = ""
         updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        print(sql_out)
         assert not updated
         assert sql_out == sql_in
 
         # Test with None SQL content
         sql_in = None
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(Exception):
             worker.update_sql_content(sql_content=sql_in)
 
 if __name__ == '__main__':

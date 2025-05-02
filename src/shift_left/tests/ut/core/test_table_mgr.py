@@ -152,7 +152,9 @@ class TestTableManager(unittest.TestCase):
         mock_load.return_value = "SELECT * FROM test_table;"
         processor = self.MockTableWorker(True, "SELECT * FROM updated_table;")
         
-        result = tm.update_sql_content_for_file(sql_file, processor)
+        result = tm.update_sql_content_for_file(sql_file_path=sql_file, 
+                                                processor=processor,
+                                                )
         
         self.assertTrue(result)
         mock_file.assert_called_once_with(sql_file, "w")

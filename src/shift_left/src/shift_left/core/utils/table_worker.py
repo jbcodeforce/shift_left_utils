@@ -25,12 +25,18 @@ class ChangeChangeModeToUpsert(TableWorker):
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
         if not 'changelog.mode' in sql_content:
-            sql_out=with_statement.sub("WITH (\n   'changelog.mode' = 'upsert',\n", sql_content)
-            updated = True
+            if not re.search(r"(?i)with\s*\(", sql_content):
+                # Handle case where there's no WITH clause
+                # Replace closing parenthesis with WITH clause
+                sql_out = re.sub(r"\)\s*;?\s*$", ") WITH (\n   'changelog.mode' = 'upsert'\n);", sql_content)
+                updated = True
+            else:
+                sql_out=with_statement.sub("WITH (\n       'changelog.mode' = 'upsert',\n", sql_content)
+                updated = True
         else:
             for line in sql_content.split('\n'):
                 if 'changelog.mode' in line:
-                    sql_out+="   'changelog.mode' = 'upsert',"
+                    sql_out+="   'changelog.mode' = 'upsert',\n"
                     updated = True
                 else:
                     sql_out+=line + "\n"
@@ -40,7 +46,7 @@ class ChangeChangeModeToUpsert(TableWorker):
 
 class ChangePK_FK_to_SID(TableWorker):
      """
-     Predefined class to change the DDL setting for a change log
+     Predefined class to change _PK_FK suffix to _SID
      """
      def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
@@ -48,6 +54,8 @@ class ChangePK_FK_to_SID(TableWorker):
         if '_pk_fk' in sql_content:
             sql_out=sql_content.replace("_pk_fk", "_sid")
             updated = True
+        else:
+            sql_out=sql_content
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
@@ -56,7 +64,7 @@ class Change_Concat_to_Concat_WS(TableWorker):
      """
      Predefined class to change the DDL setting for a change log
      """
-     def update_sql_content(sql_content: str, string_to_change: str= None)  -> Tuple[bool, str]:
+     def update_sql_content(sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(r"md5\(concat\(", re.IGNORECASE)
@@ -103,7 +111,7 @@ class DefaultStringReplacementInFromClause(TableWorker):
         sql_out: str = ""
         from_statement = re.compile(re.escape("from " + string_to_change_from), re.IGNORECASE)
         if from_statement.search(sql_content):
-            sql_out=from_statement.sub("from " + string_to_change_to, sql_content)
+            sql_out=from_statement.sub("FROM " + string_to_change_to, sql_content)
             updated = True
         logging.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
@@ -112,20 +120,26 @@ class Change_SchemaContext(TableWorker):
      """
      Predefined class to change the DDL setting for the schema-context
      """
-     def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
         if not 'key.avro-registry.schema-context' in sql_content:
-            sql_out=with_statement.sub("WITH (\n   'key.avro-registry.schema-context' = '.flink-dev',\n   'value.avro-registry.schema-context' = '.flink-dev',\n", sql_content)
-            updated = True
+            if not re.search(r"(?i)with\s*\(", sql_content):
+                # Handle case where there's no WITH clause
+                # Replace closing parenthesis with WITH clause
+                sql_out = re.sub(r"\)\s*;?\s*$", ") WITH (\n     'key.avro-registry.schema-context' = '.flink-dev',\n   'value.avro-registry.schema-context' = '.flink-dev'\n);", sql_content)
+                updated = True
+            else:
+                sql_out=with_statement.sub("WITH (\n   'key.avro-registry.schema-context' = '.flink-dev',\n   'value.avro-registry.schema-context' = '.flink-dev',\n", sql_content)
+                updated = True
         else:
             for line in sql_content.split('\n'):
                 if 'key.avro-registry.schema-context' in line and not '.flink-dev' in line:
-                    sql_out+="         'key.avro-registry.schema-context'='.flink-dev',"
+                    sql_out+="         'key.avro-registry.schema-context'='.flink-dev',\n"
                     updated = True
-                if 'value.avro-registry.schema-context' in line and not '.flink-dev' in line:
-                    sql_out+="         'value.avro-registry.schema-context'='.flink-dev',"
+                elif 'value.avro-registry.schema-context' in line and not '.flink-dev' in line:
+                    sql_out+="         'value.avro-registry.schema-context'='.flink-dev',\n"
                     updated = True
                 else:
                     sql_out+=line + "\n"
@@ -170,7 +184,7 @@ class ReplaceEnvInSqlContent(TableWorker):
         self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
 
-    def update_sql_content(self, sql_content: str)  -> Tuple[bool, str]:
+    def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         logger.debug(f"{sql_content} in {self.env}")
         updated = False
         if "CREATE TABLE" in sql_content or "create table" in sql_content:
@@ -182,8 +196,9 @@ class ReplaceEnvInSqlContent(TableWorker):
         else:
             if self.env in self.dml_replacements:
                 for k, v in self.dml_replacements[self.env].items():
-                    sql_content = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
-                    updated = True
-                    logger.debug(f"{k} , {v} ")
+                    sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
+                    updated = (sql_out != sql_content)
+                    sql_content=sql_out
+                    logger.info(f"{k} , {v} ")
         logger.debug(sql_content)
         return updated, sql_content

@@ -95,9 +95,11 @@ def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
     with open(STATEMENT_COMPUTE_POOL_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def search_for_matching_compute_pools(compute_pool_list: ComputePoolList, table_name: str) -> List[ComputePoolInfo]:
+def search_for_matching_compute_pools(compute_pool_list: ComputePoolList, 
+                                      table_name: str) -> List[ComputePoolInfo]:
     matching_pools = []
     _target_pool_name = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
+    print(f"Target pool name: {_target_pool_name}")
     for pool in compute_pool_list.pools:
         if _target_pool_name == pool.name:
             matching_pools.append(pool)
