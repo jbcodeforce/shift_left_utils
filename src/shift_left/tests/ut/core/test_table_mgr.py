@@ -141,7 +141,7 @@ class TestTableManager(unittest.TestCase):
             self.update_result = update_result
             self.new_content = new_content
 
-        def update_sql_content(self, content):
+        def update_sql_content(self, content, string_to_change_from, string_to_change_to):
             return self.update_result, self.new_content
 
     @patch('shift_left.core.table_mgr.load_sql_content_from_file')
@@ -152,8 +152,8 @@ class TestTableManager(unittest.TestCase):
         mock_load.return_value = "SELECT * FROM test_table;"
         processor = self.MockTableWorker(True, "SELECT * FROM updated_table;")
         
-        result = tm.update_sql_content_for_file(sql_file_path=sql_file, 
-                                                processor=processor,
+        result = tm.update_sql_content_for_file(sql_file_name=sql_file, 
+                                                processor=processor
                                                 )
         
         self.assertTrue(result)
@@ -161,13 +161,32 @@ class TestTableManager(unittest.TestCase):
         mock_file().write.assert_called_once_with("SELECT * FROM updated_table;")
 
     @patch('shift_left.core.table_mgr.load_sql_content_from_file')
-    def test_update_sql_content_no_update_needed(self, mock_load):
-        """Test when no SQL content update is needed"""
+    @patch('builtins.open', new_callable=unittest.mock.mock_open)
+    def test_update_sql_content_no_update_needed(self, mock_file, mock_load):
+        """Test when no SQL content update is needed.
+        
+        This test verifies that
+        1. The file content is loaded correctly
+        2. The processor correctly identifies no update is needed
+        3. The file is not written to when no update is needed
+        4. The function returns False to indicate no update occurred
+        """
+        # Setup
         sql_file = "test.sql"
-        mock_load.return_value = "SELECT * FROM test_table;"
-        processor = self.MockTableWorker(False, "SELECT * FROM test_table;")
-        result = tm.update_sql_content_for_file(sql_file, processor)
-        self.assertFalse(result)
+        original_content = "SELECT * FROM test_table;"
+        mock_load.return_value = original_content
+        processor = self.MockTableWorker(False, original_content)
+        
+        # Execute
+        result = tm.update_sql_content_for_file(
+            sql_file_name=sql_file,
+            processor=processor
+        )
+        
+        # Verify
+        mock_load.assert_called_once_with(sql_file)
+        mock_file.assert_not_called()  # File should not be opened for writing
+        self.assertFalse(result, "Should return False when no update is needed")
 
     @patch('shift_left.core.table_mgr.load_sql_content_from_file', side_effect=IOError("File not found"))
     def test_update_sql_content_file_error(self, mock_load):

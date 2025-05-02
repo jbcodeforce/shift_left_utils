@@ -5,18 +5,13 @@ import unittest
 import os
 import json 
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../data/flink-project/pipelines")
-import shift_left.core.pipeline_mgr as pm
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.statement_mgr import *
 import shift_left.core.compute_pool_mgr as cpm
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.file_search import (
-    get_ddl_dml_names_from_pipe_def,
-    PIPELINE_JSON_FILE_NAME
-)
 
 class TestPoolManager(unittest.TestCase):
     
@@ -24,18 +19,10 @@ class TestPoolManager(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        cls.data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
+        cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
        
     # ---- Compute pool apis ------------------- 
-    def _test_build_pool_spec(self):
-        config = get_config()
-        result = cpm._build_compute_pool_spec("fct-order", config)
-        assert result
-        assert result['display_name'] == "cp-fct-order"
-        print(result)
 
     def test_verify_pool_state(self):
         """
