@@ -25,7 +25,7 @@ class ChangeChangeModeToUpsert(TableWorker):
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
         if not 'changelog.mode' in sql_content:
-            sql_out=with_statement.sub("WITH (\n   'changelog.mode' = 'upsert',", sql_content)
+            sql_out=with_statement.sub("WITH (\n   'changelog.mode' = 'upsert',\n", sql_content)
             updated = True
         else:
             for line in sql_content.split('\n'):
@@ -59,8 +59,8 @@ class Change_Concat_to_Concat_WS(TableWorker):
      def update_sql_content(sql_content: str, string_to_change: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
-        with_statement = re.compile(re.escape("md5(concat("), re.IGNORECASE)
-        if 'md5(concat(' in sql_content:
+        with_statement = re.compile(r"md5\(concat\(", re.IGNORECASE)
+        if 'md5(concat(' in sql_content.lower():
             sql_out=with_statement.sub("MD5(CONCAT_WS(''',", sql_content)
             updated = True
         logging.debug(f"SQL transformed to {sql_out}")
@@ -68,15 +68,22 @@ class Change_Concat_to_Concat_WS(TableWorker):
      
 class Change_CompressionType(TableWorker):
      """
-     Predefined class to change the DDL setting for a 'c
+     Predefined class to change the compression type
      """
      def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
-        with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
+        
+        with_statement = re.compile(r"(?i)with\s*\(|\)\s*with\s*\(")
         if not 'kafka.producer.compression.type' in sql_content:
-            sql_out=with_statement.sub("WITH (\n        'kafka.producer.compression.type' = 'snappy',", sql_content)
-            updated = True
+            if not re.search(r"(?i)with\s*\(", sql_content):
+                # Handle case where there's no WITH clause
+                # Replace closing parenthesis with WITH clause
+                sql_out = re.sub(r"\)\s*;?\s*$", ") WITH (\n        'kafka.producer.compression.type' = 'snappy');", sql_content)
+                updated = True
+            else:
+                sql_out=with_statement.sub("WITH (\n        'kafka.producer.compression.type' = 'snappy',", sql_content)
+                updated = True
         else:
             for line in sql_content.split('\n'):
                 if "'kafka.producer.compression.type'" in line and not  'snappy' in line:

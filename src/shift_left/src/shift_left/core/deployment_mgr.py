@@ -214,12 +214,12 @@ def deploy_all_from_directory(directory: str,
         pipe_def = read_pipeline_definition_from_file(file_path)
         if pipe_def:
             logger.info(f"Deploying pipeline from table {table_folder_name}")
-            report, _ = deploy_pipeline_from_table(table_name=table_folder_name,
+            report, summary = deploy_pipeline_from_table(table_name=table_folder_name,
                                                           inventory_path=inventory_path,
                                                           compute_pool_id=compute_pool_id,
                                                           dml_only=dml_only,
                                                           may_start_children=may_start_children)
-            result+=summary
+            result+=summary + "\n" + "#"*100 + "\n"
         else:
             logger.warning(f"Pipeline definition not found for table {table_folder_name}")   
     return result

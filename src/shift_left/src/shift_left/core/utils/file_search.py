@@ -157,7 +157,8 @@ def get_or_build_inventory(
                         logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                     inventory[ref.table_name] = ref.model_dump()
     logger.info(f"processed {count} files and got {len(inventory)} entries")
-    sorted_inventory = sorted(inventory.keys())            
+    sorted_inventory_keys = sorted(inventory.keys())            
+    sorted_inventory = {k: inventory[k] for k in sorted_inventory_keys}
     with open(inventory_path, "w") as f:
         json.dump(sorted_inventory, f, indent=4)
     logger.info(f"Created inventory file {inventory_path}")
