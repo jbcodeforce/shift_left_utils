@@ -142,7 +142,7 @@ def _create_compute_pool(table_name: str) -> str:
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec = {}
-    spec['display_name'] = "cp-" + table_name.replace('_','-')
+    spec['display_name'] = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
     spec['cloud'] = config['confluent_cloud']['provider']
     spec['region'] = config['confluent_cloud']['region']
     spec['max_cfu'] =  config['flink']['max_cfu']
