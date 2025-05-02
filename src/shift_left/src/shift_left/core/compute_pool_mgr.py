@@ -28,6 +28,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     """
     config = get_config()
     if not compute_pool_id:
+        # Before using the config compute pool, do we want to get the compute pool associated to the statement?
         compute_pool_id = config['flink']['compute_pool_id']
     logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
 
@@ -38,16 +39,14 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
         product_name = extract_product_name(pipeline_def.path)
-        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name, 
-                                                    config['kafka']['cluster_type'])
+        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name)
         statement = get_statement_info(dml_statement_name)
-        pool_id= statement.spec.compute_pool_id
-        if pool_id:
+        if statement and statement.spec.compute_pool_id:
+            pool_id= statement.spec.compute_pool_id
             return pool_id
         else:
             logger.info(f"Build a new compute pool")
-            pool_spec = _build_compute_pool_spec(pipeline_def.table_name)
-            return _create_compute_pool(pool_spec)
+            return _create_compute_pool(pipeline_def.table_name)
 
 
 _compute_pool_list = None
@@ -111,6 +110,17 @@ def get_compute_pool_with_id(compute_pool_list: ComputePoolList, compute_pool_id
             return pool
     return None
 
+def is_pool_valid(compute_pool_id):
+    """
+    Returns whether the supplied compute pool id is valid
+    """
+    config = get_config()
+    logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
+
+    client = ConfluentCloudClient(config)
+    env_id = config['confluent_cloud']['environment_id']
+    return compute_pool_id and _validate_a_pool(client, compute_pool_id, env_id)
+
 # ------ Private methods ------
 
 
@@ -122,16 +132,17 @@ def _create_compute_pool(table_name: str) -> str:
     config = get_config()
     spec = _build_compute_pool_spec(table_name, config)
     client = ConfluentCloudClient(get_config())
-    result= client.create_compute_pool(client,spec)
+    result= client.create_compute_pool(spec)
     if result:
         pool_id = result['id']
         env_id = config['confluent_cloud']['environment_id']
-        _verify_compute_pool_provisioned(pool_id, env_id)
+        if _verify_compute_pool_provisioned(client, pool_id, env_id):
+            return pool_id
 
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec = {}
-    spec['display_name'] = "cp-" + table_name.replace('_','-')
+    spec['display_name'] = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
     spec['cloud'] = config['confluent_cloud']['provider']
     spec['region'] = config['confluent_cloud']['region']
     spec['max_cfu'] =  config['flink']['max_cfu']
@@ -164,7 +175,20 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
     """
     try:
         pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
-        if pool_info == None:
+        if (
+            pool_info == None
+            or
+            (
+                "errors" in pool_info
+                and
+                # Including 403 because there's a bug in Confluent
+                #  where it returns 403 instead of 404 for missing resources.
+                any(map(
+                    lambda e:"status" in e and int(e["status"]) in [403,404],
+                    pool_info["errors"],
+                ))
+            )
+        ):
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
@@ -175,7 +199,7 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
     except Exception as e:
         logger.error(e)
         logger.info("Continue processing to ignore compute pool constraint")
-        return True
+        return False
 
 
 

@@ -27,9 +27,17 @@ class ConfluentCloudClient:
     """
     def __init__(self, config: dict):
         self.config = config
-        self.api_key = config["confluent_cloud"]["api_key"]
-        self.api_secret = config["confluent_cloud"]["api_secret"]
-        self.cloud_api_endpoint = config["confluent_cloud"]["base_api"]
+        self._set_cloud_auth()
+        
+    def _set_cloud_auth(self):
+        self.api_key = self.config["confluent_cloud"]["api_key"]
+        self.api_secret = self.config["confluent_cloud"]["api_secret"]
+        self.cloud_api_endpoint = self.config["confluent_cloud"]["base_api"]
+        self.auth_header = self._generate_auth_header()
+
+    def _set_kafka_auth(self):
+        self.api_key = self.config["kafka"]["api_key"]
+        self.api_secret = self.config["kafka"]["api_secret"]
         self.auth_header = self._generate_auth_header()
         
     def _generate_auth_header(self):
@@ -57,12 +65,12 @@ class ConfluentCloudClient:
             )
             response.raise_for_status()
             try:
-                    json_response = response.json()
-                    logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
-                    return json_response
+                json_response = response.json()
+                logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
+                return json_response
             except ValueError:
-                    logger.debug(f">>>> Mostly successful {method} request to {url}. \n\tResponse: {response}")
-                    return response.text
+                logger.debug(f">>>> Mostly successful {method} request to {url}. \n\tResponse: {response}")
+                return response.text
         except requests.exceptions.RequestException as e:
             if response is not None:
                 if response.status_code == 404:
@@ -79,6 +87,7 @@ class ConfluentCloudClient:
     
     def get_environment_list(self):
         """Get the list of environments"""
+        self._set_cloud_auth()
         url = f"https://{self.cloud_api_endpoint}/environments?page_size=50"
         try:
             result = self.make_request("GET", url)
@@ -97,6 +106,7 @@ class ConfluentCloudClient:
         compute_pool_list = ComputePoolListResponse()
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
+        self._set_cloud_auth()
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools?spec.region={region}&environment={env_id}&page_size={page_size}"
         logger.info(f"compute pool url= {url}")
         previous_token=None
@@ -126,13 +136,12 @@ class ConfluentCloudClient:
 
     def get_compute_pool_info(self, compute_pool_id: str, env_id: str):
         """Get the info of a compute pool"""
+        self._set_cloud_auth()
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
 
     def create_compute_pool(self, spec: dict):
-        self.api_key = self.config["confluent_cloud"]["api_key"]
-        self.api_secret = self.config["confluent_cloud"]["api_secret"]
-        self.auth_header = self._generate_auth_header()
+        self._set_cloud_auth()
         data={'spec': spec}
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools"
         return self.make_request("POST", url, data)
@@ -147,9 +156,7 @@ class ConfluentCloudClient:
         cloud_provider=self.config["confluent_cloud"]["provider"]
         pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
         cluster_id=self.config["kafka"]["cluster_id"]
-        self.api_key = self.config["kafka"]["api_key"]
-        self.api_secret = self.config["kafka"]["api_secret"]
-        self.auth_header = self._generate_auth_header()
+        self._set_kafka_auth()
         url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
         logger.info(f"List topic from {url}")
         try:
