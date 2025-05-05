@@ -10,10 +10,7 @@ from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.flink_compute_pool_model import *
 from shift_left.core.utils.naming_convention import ComputePoolNameModifier
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.file_search import ( 
-    get_ddl_dml_names_from_table, 
-    extract_product_name
-)
+from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 
 STATEMENT_COMPUTE_POOL_FILE=shift_left_dir + "/pool_assignments.json"
 COMPUTE_POOL_LIST_FILE=shift_left_dir + "/compute_pool_list.json"
@@ -38,11 +35,10 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
         return compute_pool_id
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
-        product_name = extract_product_name(pipeline_def.path)
-        _, dml_statement_name = get_ddl_dml_names_from_table(pipeline_def.table_name)
+        _, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def)
         statement = get_statement_info(dml_statement_name)
-        if statement and statement.spec.compute_pool_id:
-            pool_id= statement.spec.compute_pool_id
+        if statement and statement.compute_pool_id:
+            pool_id= statement.compute_pool_id
             return pool_id
         else:
             logger.info(f"Build a new compute pool")

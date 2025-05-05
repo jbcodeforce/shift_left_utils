@@ -63,8 +63,7 @@ class FlinkTablePipelineDefinition(InfoNode):
         return self.table_name == other.table_name
      
     def to_node(self) -> FlinkStatementNode:
-        dml_statement_name = "dml-" + self.table_name.replace("_", "-")
-        ddl_statement_name = "ddl-" + self.table_name.replace("_", "-")
+        ddl_statement_name, dml_statement_name = get_ddl_dml_names_from_table(self.table_name)
         r = FlinkStatementNode(table_name= self.table_name,
                                path= self.path,
                                created_at=datetime.now(),
@@ -317,7 +316,12 @@ def get_ddl_dml_names_from_table(table_name: str) -> Tuple[str,str]:
     return ddl_n, dml_n
 
 def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition) -> Tuple[str,str]:
-    return get_ddl_dml_names_from_table(to_process.table_name)
+    node = to_process.to_node()
+    ddl_n, dml_n = get_ddl_dml_names_from_table(to_process.table_name)
+    node.ddl_statement_name = ddl_n
+    node.dml_statement_name = dml_n
+    _apply_naming_convention(node)
+    return (node.ddl_statement_name, node.dml_statement_name)
 
 def get_ddl_file_name(folder_path: str) -> str:
     """
