@@ -365,6 +365,8 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
 def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
     dml_n = _get_statement_name_modifier().modify_statement_name(node, node.dml_statement_name, get_config().get('kafka').get('cluster_type'))
     ddl_n = _get_statement_name_modifier().modify_statement_name(node, node.ddl_statement_name, get_config().get('kafka').get('cluster_type'))
+    print(f"ROBBY- New DML Name: {dml_n}")
+    print(f"ROBBY- New DDL Name: {ddl_n}")
     node.dml_statement_name = dml_n
     node.ddl_statement_name = ddl_n
     return node

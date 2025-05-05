@@ -35,7 +35,9 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
         return compute_pool_id
     else:
         logger.info(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
+        print(f"ROBBY- pipeline_def: {pipeline_def}")
         _, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def)
+        print(f"ROBBY- dml_statement_name: {dml_statement_name}")
         statement = get_statement_info(dml_statement_name)
         if statement and statement.spec.compute_pool_id:
             pool_id= statement.spec.compute_pool_id
