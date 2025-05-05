@@ -321,7 +321,7 @@ def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition) ->
     node.ddl_statement_name = ddl_n
     node.dml_statement_name = dml_n
     _apply_naming_convention(node)
-    return (node.ddl_n, node.dml_n)
+    return (node.ddl_statement_name, node.dml_statement_name)
 
 def get_ddl_file_name(folder_path: str) -> str:
     """
@@ -365,8 +365,6 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
 def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
     dml_n = _get_statement_name_modifier().modify_statement_name(node, node.dml_statement_name, get_config().get('kafka').get('cluster_type'))
     ddl_n = _get_statement_name_modifier().modify_statement_name(node, node.ddl_statement_name, get_config().get('kafka').get('cluster_type'))
-    logger.error(f"ROBBY- New DML Name: {dml_n}")
-    logger.error(f"ROBBY- New DDL Name: {ddl_n}")
     node.dml_statement_name = dml_n
     node.ddl_statement_name = ddl_n
     return node
