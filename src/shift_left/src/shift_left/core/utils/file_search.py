@@ -310,7 +310,7 @@ def get_or_build_source_file_inventory(src_path: str) -> Dict[str, str]:
     file_paths.update(list_src_sql_files(f"{src_path}/stage"))
     return file_paths
 
-def get_ddl_dml_names_from_table(table_name: str, ) -> Tuple[str,str]:
+def get_ddl_dml_names_from_table(table_name: str) -> Tuple[str,str]:
     ddl_n = "ddl-" + table_name.replace("_","-")
     dml_n = "dml-" + table_name.replace("_","-")
     return ddl_n, dml_n
