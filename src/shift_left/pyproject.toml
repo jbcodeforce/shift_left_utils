@@ -1,6 +1,6 @@
 [project]
 name = "shift-left"
-version = "0.1.13"
+version = "0.1.14"
 description = "The shift-left CLI to manage you shift-left project"
 authors = [
     {name = "jbcodeforce",email = "jerome.boyer@gmail.com"}
