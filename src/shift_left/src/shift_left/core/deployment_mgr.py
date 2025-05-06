@@ -185,28 +185,36 @@ def build_execution_plan_from_any_table(
             start_table_name=pipeline_def.table_name
         )
 
-        nodes_to_run = []
+        ancestors = []
         visited_nodes = set()
         start_node = _get_and_update_statement_info_for_node(start_node)
-        nodes_to_run = _build_topological_sorted_parents(start_node, node_map)
+        ancestors = _build_topological_sorted_parents(start_node, node_map)
 
         # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
-        # in the same product family as the start_node.
-        for node in nodes_to_run:
-            node.update_children = may_start_children
-            if node.type == "source" and node.is_running():
-                node.to_run = force_sources
-            if node.upgrade_mode == "Stateful":
+        # in the same product family as the start_node. The ancestor list is sorted so first node needs to run first
+        for node in ancestors:
+            node = _get_and_update_statement_info_for_node(node)
+            if node.is_running():
+                if node.type == "source":
+                    node.to_run = force_sources
+                else:
+                    node.to_run = False
+                node.to_restart = False
+            else:
+                node.to_run = True
+                node.to_restart = False
+            if node.to_run and node.upgrade_mode == "Stateful":
                 node.update_children = may_start_children
-            if not node.compute_pool_id:
+            if node.to_run and not node.compute_pool_id:
                 node.compute_pool_id = _assign_compute_pool_id_to_node(node, compute_pool_id)
-            execution_plan.nodes.append(node)
+            if node.product_name == start_node.product_name or node.product_name in ['', 'common', 'stage']:
+                execution_plan.nodes.append(node)       
 
         start_node.to_restart = True
         
-        # Restart all children of each runnable ancestor nodes
+        # When may_start_children, restart all children of each ancestor node that needs to be restarted or run.
         for node in execution_plan.nodes:
-            if node.type == "source" and node.is_running():
+            if node.type == "source" and node.is_running():  # the list of nodes may have been changed so this is needed again.
                 node.to_run = force_sources
             if node.to_run or node.to_restart:
                 for child in node.children:
@@ -215,12 +223,15 @@ def build_execution_plan_from_any_table(
                         child.product_name == start_node.product_name):
                             child_node = node_map[child.table_name]
                             child_node = _get_and_update_statement_info_for_node(child_node)
+                            child_node.to_restart = node.update_children
                             _assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
-                            if may_start_children:
+                            if node.update_children:
                                 child_node.parents.remove(node)  # do not reprocess parent of current child
                                 _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(child_node, node_map))
                                 _merge_graphs(execution_plan.nodes, _build_topological_sorted_children(child_node, node_map))
-                            child_node.to_restart = may_start_children
+                    elif child in execution_plan.nodes and  child.product_name != start_node.product_name:
+                        execution_plan.nodes.remove(child)
+                            
                             
 
         logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
@@ -413,7 +424,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     # Build children section
     if children:
         summary_parts.extend([
-            f"\n--- {len(parents)} parents to run",
+            f"\n--- {len(parents)} parents",
             "--- Children to restart ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
             "-" * 125
@@ -500,8 +511,12 @@ def _build_topological_sorted_parents(current_node: FlinkStatementNode,
     ancestor_nodes, ancestor_dependencies = _get_ancestor_subgraph(current_node, node_map)
     return _topological_sort(current_node, ancestor_nodes, ancestor_dependencies)
 
-def _topological_sort(current_node: FlinkStatementNode, nodes: Dict[str, FlinkStatementNode], dependencies: Dict[str, List[FlinkStatementNode]])-> List[FlinkStatementNode]:
-    """Performs topological sort on a DAG of the current node parents"""
+def _topological_sort(
+    current_node: FlinkStatementNode, 
+    nodes: Dict[str, FlinkStatementNode], 
+    dependencies: Dict[str, List[FlinkStatementNode]]
+)-> List[FlinkStatementNode]:
+    """Performs topological sort on a DAG of the current node ancestors using Kahn Algorithm"""
 
     # compute in_degree for each node as the number of incoming edges. the edges are in the dependencies
     in_degree = {node.table_name: 0 for node in nodes.values()}
@@ -515,17 +530,6 @@ def _topological_sort(current_node: FlinkStatementNode, nodes: Dict[str, FlinkSt
     while queue:
         node = queue.popleft()
         sorted_nodes.append(node)
-        node = _get_and_update_statement_info_for_node(node)
-        if not node.is_running():
-            if not node.to_run:  # navigating from another branch may have already set to run
-                if not node.compute_pool_id:  # no existing compute pool take the one specified as argument
-                    _assign_compute_pool_id_to_node(node, current_node.compute_pool_id)
-                node.to_run = True
-                node.update_children = current_node.update_children  # inherit the update children flag from children to parent
-                current_node.to_restart = True
-        else:
-            node.to_run = False  # already running, but may be restarted if node is stateful
-            node.to_restart = (node.upgrade_mode == "Stateful") and current_node.to_restart  
         for tbname, neighbor in dependencies:
             if neighbor.table_name == node.table_name:
                 in_degree[tbname] -= 1

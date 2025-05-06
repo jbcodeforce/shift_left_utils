@@ -21,13 +21,7 @@ from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.flink_statement_model import (
     Statement, 
-    StatementInfo, 
-    StatementListCache, 
-    Status, 
-    Spec, 
-    Data, 
-    StatementResult, 
-    OpRow
+    StatementInfo
 )
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
@@ -364,8 +358,10 @@ class TestDeploymentManager(unittest.TestCase):
         assert len(execution_plan.nodes) == 12
         for node in execution_plan.nodes:
             print(node.table_name, node.to_run, node.to_restart)
-            assert node.to_run is True
-            #assert node.to_restart is False
+            if node.table_name in ['src_y', 'src_x', 'x', 'y', 'z']:
+                assert node.to_run is True
+            if node.table_name in ['p', 'd', 'c', 'z']:
+                assert node.to_restart is True
 
 
 
