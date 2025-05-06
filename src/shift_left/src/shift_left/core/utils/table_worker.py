@@ -150,7 +150,8 @@ class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"
     """
-    Special worker to update schema and src topic name in sql content depending of the environment
+    Special worker to update schema and src topic name in sql content depending of the environment.
+    
     """
     dml_replacements = {
         "stage": {
@@ -162,6 +163,8 @@ class ReplaceEnvInSqlContent(TableWorker):
                 # - adds a literal hyphen
                 # {env} adds the environment value (e.g. "stage") {topic_prefix} adds the topic prefix (e.g. "clone")
                 "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
+                #"search": r"^(.*){topic_prefix}\.dev\.(ap-.*?)-dev\.(.*)",
+                #"replace": rf".\1{topic_prefix}.{env}.\2-{env}.\3"
             }
         }
     }
@@ -194,11 +197,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                     updated = True
                     logger.debug(f"{k} , {v} ")
         else:
-            if self.env in self.dml_replacements:
-                for k, v in self.dml_replacements[self.env].items():
-                    sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
-                    updated = (sql_out != sql_content)
-                    sql_content=sql_out
-                    logger.info(f"{k} , {v} ")
+            if 'clone.dev' in sql_content:
+                sql_content = sql_content.replace('clone.dev.', '')
+            for k, v in self.dml_replacements[self.env].items():
+                sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
+                updated = (sql_out != sql_content)
+                sql_content=sql_out
+                logger.info(f"{k} , {v} ")
         logger.debug(sql_content)
         return updated, sql_content

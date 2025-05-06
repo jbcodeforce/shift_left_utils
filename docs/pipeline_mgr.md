@@ -222,9 +222,8 @@ The red color highlights what is the goal of the deployment. The white represent
     * Defines the PIPELINES and CONFIG_FILE environment variables
     * Ensure the table inventory is up to date, if not run `shift_left table build-inventory $PIPELINES`
     * If for any reason, the pipeline definitions for the given pipeline needs to be recreated, run: `shift_left pipeline build-metadata fct_order $PIPELINES`
-    * Verify a report works on the fact table: `shift_left pipeline report fct_order $PIPELINES`.  
-    * Deploy the fact table: `shift_left deploy fct_order`
-    * Verify in the Confluent Cloud console the Flink statements running and the topics created.
+    * Deploy the fact table: `shift_left pipeline deploy  --table-name fct_order`
+    * Verify in the Confluent Cloud console the Flink statements running and the topics created, or run the command: `shift_left pipeline report-running-statements --table-name fct_order`.
 
 #### Deploying an intermediate table
 
@@ -270,11 +269,17 @@ The following list presents the requirements to implement for the shift_left dep
 * [x] The expected command to deploy should be as simple as:
 
 ```sh
-shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
+shift_left pipeline deploy [OPTIONS] INVENTORY_PATH
 
-   --compute-pool-id     TEXT  Flink compute pool ID. If not provided, it will create a pool. [default: None]   
-   --dml-only            By default the deployment will do DDL and DML, with this flag it will deploy only DML [default: no-dml-only]                
-   --force               The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml) [default: no-force]
+**Options**:
+
+    * `--table-name TEXT`: The table name containing pipeline_definition.json.
+    * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
+    * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
+    * `--may-start-children / --no-may-start-children`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-children]
+    * `--force-sources / --no-force-sources`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-sources]
+    * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name. 
+
 ```
 
 * [x] Deploy dml - ddl: Given the table name, executes the dml and ddl to deploy a pipeline. If the compute pool id is present it will use it. If not, it will get the existing pool_id from the table already deployed, if none is defined it will create a new pool and assign the pool_id. A deployment may impact children statement depending of the semantic of the current DDL and the children's one.
@@ -282,8 +287,7 @@ shift_left pipeline deploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 * [x] Support deploying only DML, or both DDL and DML (default)
 * [x] Deploying a DDL, means dropping existing table if exists.
 * [x] Deploying a non existing sink means deploying all its parents if not already deployed, up to the sources. This will be the way to deploy a pipeline. In this case deploy first the sources, ddl and dml, except if already running as it means the current table was created by another pipeline. This is recursive.
-* [ ] Deploying an existing sink, means drop the table if the force flag is true, and deploy the DML. If forced flag is false, only deploy dml. When DML is stateful deploy DDL and DML (= forced) 
-* [ ] For a given table with children, deploy the current table, and for each children redeploy the DML, if the DML is stateful. When stateless, manage the offset and modify the DML to read from the retrieved offset.
+* [x] For a given table with children, deploy the current table, and for each children redeploy the DML, if the DML is stateful. When stateless, manage the offset and modify the DML to read from the retrieved offset.
 * [x] Support deleting a full pipeline: delete tables not used by other pipeline: the number of children is 1 or all the children are not running.
 
 ## Testing plan

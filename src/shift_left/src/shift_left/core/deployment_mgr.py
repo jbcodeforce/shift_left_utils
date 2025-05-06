@@ -88,7 +88,7 @@ def deploy_pipeline_from_table(
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
 
         # Validate and get compute pool
-        if not compute_pool_mgr.is_pool_valid(compute_pool_id):
+        if compute_pool_id and not compute_pool_mgr.is_pool_valid(compute_pool_id):
             compute_pool_id = compute_pool_mgr.get_or_build_compute_pool(compute_pool_id, pipeline_def)
 
         execution_plan = build_execution_plan_from_any_table(
@@ -124,8 +124,10 @@ def deploy_pipeline_from_table(
         logger.error(f"Failed to deploy pipeline from table {table_name}: {str(e)}")
         raise
 
-def deploy_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, 
-                              compute_pool_id: str) -> list[Statement]:
+def deploy_from_execution_plan(
+    execution_plan: FlinkStatementExecutionPlan, 
+    compute_pool_id: str
+) -> list[Statement]:
     """
     Execute the statements in the execution plan.
     """
@@ -188,7 +190,8 @@ def build_execution_plan_from_any_table(
         start_node = _get_and_update_statement_info_for_node(start_node)
         nodes_to_run = _build_topological_sorted_parents(start_node, node_map)
 
-        # Process all parents and grandparents reachable by DFS from start_node
+        # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
+        # in the same product family as the start_node.
         for node in nodes_to_run:
             node.update_children = may_start_children
             if node.type == "source" and node.is_running():
@@ -201,7 +204,7 @@ def build_execution_plan_from_any_table(
 
         start_node.to_restart = True
         
-        # Restart all children of each runnable node
+        # Restart all children of each runnable ancestor nodes
         for node in execution_plan.nodes:
             if node.type == "source" and node.is_running():
                 node.to_run = force_sources
@@ -209,18 +212,16 @@ def build_execution_plan_from_any_table(
                 for child in node.children:
                     if (child not in execution_plan.nodes and
                         node.update_children and
-                        child.product_name == node.product_name and
                         child.product_name == start_node.product_name):
-                        
-                        child_node = node_map[child.table_name]
-                        child_node = _get_and_update_statement_info_for_node(child_node)
-                        
-                        if may_start_children:
-                            child_node.parents.remove(node)
-                            _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(child_node, node_map))
-                            _merge_graphs(execution_plan.nodes, _build_topological_sorted_children(child_node, node_map))
-                            child_node.to_restart = True
+                            child_node = node_map[child.table_name]
+                            child_node = _get_and_update_statement_info_for_node(child_node)
                             _assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
+                            if may_start_children:
+                                child_node.parents.remove(node)  # do not reprocess parent of current child
+                                _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(child_node, node_map))
+                                _merge_graphs(execution_plan.nodes, _build_topological_sorted_children(child_node, node_map))
+                            child_node.to_restart = may_start_children
+                            
 
         logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
         logger.debug(execution_plan)
@@ -230,7 +231,10 @@ def build_execution_plan_from_any_table(
         logger.error(f"Failed to build execution plan: {str(e)}")
         raise
 
-def report_running_flink_statements_for_a_table_execution_plan(table_name: str, inventory_path: str) -> str:
+def report_running_flink_statements_for_a_table_execution_plan(
+    table_name: str, 
+    inventory_path: str
+) -> str:
     """
     Report running flink statements for a table execution plan
     """
@@ -242,40 +246,77 @@ def report_running_flink_statements_for_a_table_execution_plan(table_name: str, 
                                                         may_start_children=False, 
                                                         start_time=datetime.now(),
                                                         force_sources=False)
-    report = f"{_pad_or_truncate('Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\n"
-    for node in execution_plan.nodes:
-        if node.existing_statement_info:
-            report+=f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}\n"
-    return report
+    return _build_simple_report(execution_plan)
 
-def deploy_all_from_directory(directory: str, 
-                              inventory_path: str, 
-                              compute_pool_id: str,
-                              dml_only: bool = False,
-                              may_start_children: bool = False,
-                              force_sources: bool = False) -> str:
+def report_running_flink_statements_for_all_from_directory(
+    directory: str, 
+    inventory_path: str, 
+) -> str:
     """
-    Deploy all the pipelines in the directory.
+    Review execution plan for all the pipelines in the directory.
     """
-    result = ""
-    for table_folder_name in os.listdir(directory):
-        file_path=directory + "/" + table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
-        pipe_def = read_pipeline_definition_from_file(file_path)
-        if pipe_def:
-            logger.info(f"Deploying pipeline from table {table_folder_name}")
-            report, summary = deploy_pipeline_from_table(table_name=table_folder_name,
-                                                          inventory_path=inventory_path,
-                                                          compute_pool_id=compute_pool_id,
-                                                          dml_only=dml_only,
-                                                          may_start_children=may_start_children)
-            result+=summary + "\n" + "#"*100 + "\n"
-        else:
-            logger.warning(f"Pipeline definition not found for table {table_folder_name}")   
+    result = "#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+= "\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+= "\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    config = get_config()
+    count=0
+    for root, _, files in os.walk(directory):
+        if PIPELINE_JSON_FILE_NAME in files:
+            file_path=root + "/" + PIPELINE_JSON_FILE_NAME
+            pipeline_def = read_pipeline_definition_from_file(file_path)
+            logger.info(f"Build report of running flink statements for {pipeline_def.table_name}")
+            result+= "#"*40 + f" Table: {pipeline_def.table_name} " + "#"*40 + "\n"
+            execution_plan: FlinkStatementExecutionPlan = build_execution_plan_from_any_table(pipeline_def, 
+                                                        compute_pool_id=config['flink']['compute_pool_id'],
+                                                        dml_only=False,
+                                                        may_start_children=False, 
+                                                        start_time=datetime.now(),
+                                                        force_sources=False)
+            result+= _build_simple_report(execution_plan) + "\n"
+            count+=1
+    result+=f"#"*40 + f" Found {count} tables with running flink statements " + "#"*40 + "\n"
     return result
 
 
-def full_pipeline_undeploy_from_table(table_name: str, 
-                               inventory_path: str ) -> str:
+def deploy_all_from_directory(
+    directory: str, 
+    inventory_path: str, 
+    compute_pool_id: str,
+    dml_only: bool = False,
+    may_start_children: bool = False,
+    force_sources: bool = False
+) -> str:
+    """
+    Deploy all the pipelines in the directory.
+    """
+    result = "#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+= "\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+= "\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    count=0
+    for root, _, files in os.walk(directory):
+        if PIPELINE_JSON_FILE_NAME in files:
+            file_path=root + "/" + PIPELINE_JSON_FILE_NAME
+            pipe_def = read_pipeline_definition_from_file(file_path)
+            logger.info(f"Deploying pipeline from table {pipe_def.table_name}")
+            result+= "#"*40 + f" Deploy table: {pipe_def.table_name} " + "#"*40 + "\n"
+            report, summary = deploy_pipeline_from_table(table_name=pipe_def.table_name,
+                                                        inventory_path=inventory_path,
+                                                        compute_pool_id=compute_pool_id,
+                                                        dml_only=dml_only,
+                                                        may_start_children=may_start_children,
+                                                        force_sources=force_sources)
+            result+=summary + "\n" + "#"*100 + "\n"
+            count+=1
+           
+    result+=f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+    return result
+
+
+
+def full_pipeline_undeploy_from_table(
+    table_name: str, 
+    inventory_path: str
+) -> str:
     """
     Stop DML statement and drop tables: look at the parents of the current table 
     and remove the parent that has one running child. Delete all the children of the current table.
@@ -612,7 +653,7 @@ def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
             node.compute_pool_id = pool.id
             node.compute_pool_name = pool.name
             pool.current_cfu+=MAX_CFU_INCREMENT  # HACK from now TODO use the actual cfu after deployment
-            logger.info(f"Assign compute pool {node.compute_pool_id} - {pool.name} to {node.table_name}")
+            logger.debug(f"Assign compute pool {node.compute_pool_id} - {pool.name} to {node.table_name}")
             break
     return node.compute_pool_id
 
@@ -721,7 +762,7 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
     to reach all parents, and then a BFS to construct the list of reachable children.
     The graph built has no loop.
     """
-    logger.info(f"start build tables static graph for {current_node.table_name}")
+    logger.debug(f"start build tables static graph for {current_node.table_name}")
     visited_nodes = set()
     node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search for table name as key.
     queue = deque()  # Queue for BFS processing of nodes
@@ -774,7 +815,7 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
     while queue:
         current = queue.popleft()
         _search_children_from_current(node_map, current, visited_nodes, current_node.product_name)
-    logger.info(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    logger.debug(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
     logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
 
@@ -787,6 +828,14 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     """
     return node.product_name == current.product_name
 
+
+def _build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
+    report = f"{_pad_or_truncate('Ancestor Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\n"
+    report+=f"-"*130 + "\n"
+    for node in execution_plan.nodes:
+        if node.existing_statement_info:
+            report+=f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}\n"
+    return report
 
 # --- to work on for stateless ---------------
 

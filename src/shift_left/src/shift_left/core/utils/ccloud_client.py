@@ -194,6 +194,9 @@ class ConfluentCloudClient:
                     counter+=1
                     if counter == 6:
                         timer = 30
+                    if counter >= 10:
+                        logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                        raise Exception(f"Done waiting with response= {statement.model_dump_json(indent=3)}")   
                 else:
                     execution_time = time.perf_counter() - start_time
                     statement.loop_counter= counter
@@ -204,7 +207,7 @@ class ConfluentCloudClient:
             logger.error(f">>>> wait_response() error waiting for response {e}")
             execution_time = time.perf_counter() - start_time
             statement_result = Statement.model_validate({"loop_counter": counter, "execution_time": execution_time, "result" : None})
-            return statement_result
+            raise Exception(f"Done waiting with response= {statement_result.model_dump_json(indent=3)}")
 
     def get_topic_message_count(self, topic_name: str) -> int:
         """

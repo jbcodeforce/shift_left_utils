@@ -169,7 +169,7 @@ def deploy(
     """
     try:
         if dir:
-            result: DeploymentReport = deployment_mgr.deploy_all_from_directory(
+            result, summary = deployment_mgr.deploy_all_from_directory(
                 directory = dir, 
                 inventory_path = inventory_path, 
                 compute_pool_id = compute_pool_id, 
@@ -177,7 +177,7 @@ def deploy(
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
         elif table_name:
-            result: DeploymentReport = deployment_mgr.deploy_pipeline_from_table(
+            result, summary = deployment_mgr.deploy_pipeline_from_table(
                 table_name = table_name, 
                 inventory_path = inventory_path, 
                 compute_pool_id = compute_pool_id, 
@@ -187,7 +187,7 @@ def deploy(
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)
-        print(result)
+        print(f"{summary}")
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -196,18 +196,28 @@ def deploy(
 
 
 @app.command()
-def report_running_statements(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json to get child list")],
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
+def report_running_statements(
+        dir: str = typer.Option(None, help="The directory to report the running statements from. If not provided, it will report the running statements from the table name."),
+        table_name: str =  typer.Option(None, help="The table name containing pipeline_definition.json to get child list"),
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
     Assess for a given table, what are the running dmls from its children, using recursively. 
     """
     print(f"Assess runnning Flink DML part of the pipeline from given table name")
     try:
-        deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
+        if table_name:
+            results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
+            results+= deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
+        elif dir:
+            results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, inventory_path)
+        else:
+            print(f"[red]Error: either table_name or dir must be provided[/red]")
+            raise typer.Exit(1)
+        print(results)
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
-    print(f"Running DMLs done")
+    print(f"#"*120)
 
 @app.command()
 def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table name containing pipeline_definition.json, from where the undeploy will run.")],

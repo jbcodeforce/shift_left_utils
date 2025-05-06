@@ -60,8 +60,12 @@ def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> F
     if not table_ref:
         raise Exception(f"Table {table_name} not found. Stop processing")
     return read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-    
-def build_pipeline_definition_from_dml_content(dml_file_name: str, pipeline_path: str) -> FlinkTablePipelineDefinition:
+
+
+def build_pipeline_definition_from_dml_content(
+    dml_file_name: str, 
+    pipeline_path: str
+) -> FlinkTablePipelineDefinition:
     """Build pipeline definition hierarchy starting from given dml file. This is the exposed API
     so entry point of the processing.
     
@@ -76,11 +80,11 @@ def build_pipeline_definition_from_dml_content(dml_file_name: str, pipeline_path
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
     
     table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(dml_file_name, table_inventory)
-    logger.debug(f"Build pipeline for table: {table_name} with parents: {parent_references}")
+    logger.debug(f"Build pipeline for table: {table_name} from {dml_file_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name=table_name,
                                               table_type=None,
                                               state_form=state_form,
-                                              path=None,
+                                              table_folder=None,
                                               dml_file_name=from_absolute_to_pipeline(dml_file_name),
                                               ddl_file_name=None, 
                                               parents=parent_references, 
@@ -233,7 +237,7 @@ def _build_pipeline_definition(
             table_name: str,
             table_type: str,
             state_form: str,
-            path: str,
+            table_folder: str,
             dml_file_name: str,
             ddl_file_name: str,
             parents: Optional[Set[FlinkTablePipelineDefinition]],
@@ -253,18 +257,18 @@ def _build_pipeline_definition(
     logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parents}, children: {children})")
     if not table_type:
         table_type = get_table_type_from_file_path(dml_file_name)
-    directory = os.path.dirname(dml_file_name)
-    if not path:
-        path = os.path.dirname(directory)
+    sql_scripts_directory = os.path.dirname(dml_file_name)
+    if not table_folder:
+        table_folder = os.path.dirname(sql_scripts_directory)
     if not ddl_file_name:
-        ddl_file_name = get_ddl_file_name(directory)
-    product_name = extract_product_name(path)
+        ddl_file_name = get_ddl_file_name(sql_scripts_directory)
+    product_name = extract_product_name(table_folder)
     f = FlinkTablePipelineDefinition.model_validate({
         "table_name": table_name,
         "product_name": product_name,
         "state_form": state_form,
         "type": table_type,
-        "path": path,
+        "path": table_folder,
         "ddl_ref": ddl_file_name,
         #"dml_ref": base_path + "/" + SCRIPTS_DIR + "/" + dml_file_name.split("/")[-1],
         "dml_ref" : dml_file_name,
@@ -288,11 +292,11 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
                 table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, table_inventory)
                 current_node.parents = parent_references   # set of FlinkTablePipelineDefinition
                 current_node.state_form = state_form
+            tmp_node= current_node.model_copy(deep=True)
+            tmp_node.children = set()
+            tmp_node.parents = set()
             for parent in current_node.parents:
-                if not  current_node in parent.children:
-                    tmp_node= current_node.model_copy(deep=True)
-                    tmp_node.children = set()
-                    tmp_node.parents = set()
+                if not  current_node in parent.children: # current is a child of its parents        
                     parent.children.add(tmp_node)
                 _add_node_to_process_if_not_present(parent, nodes_to_process)
             _create_or_merge_pipeline_definition(current_node)
@@ -315,17 +319,12 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
             combined_children = old_definition.children
             combined_parents = old_definition.parents
             for child in current.children:
-                if child in old_definition.children:
-                    #old_definition.children.update(child)
-                    continue
-                else:
-                    combined_children.add(child)
+                # Remove any existing child with same table_name before adding new one
+                combined_children = {c for c in combined_children if c.table_name != child.table_name}
+                combined_children.add(child)
             for parent in current.parents:
-                if parent in old_definition.parents:
-                    #old_definition.parents.update(parent)
-                    continue
-                else:
-                    combined_parents.add(parent)
+                combined_parents = {p for p in combined_parents if p.table_name != parent.table_name}
+                combined_parents.add(parent)
         current.children = combined_children
         current.parents = combined_parents
         with open(pipe_definition_fn, "w") as f:

@@ -157,8 +157,8 @@ class TestFileSearch(unittest.TestCase):
         pipe_def = read_pipeline_definition_from_file( os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
         config = get_config()
         ddl, dml = get_ddl_dml_names_from_pipe_def(pipe_def)
-        assert ddl == "ddl-p1-fct-order"
-        assert dml == "dml-p1-fct-order"
+        assert ddl == "dev-p1-ddl-p1-fct-order"
+        assert dml == "dev-p1-dml-p1-fct-order"
 
     def test_get_ddl_file_name(self):
         fname = get_ddl_file_name(os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts")

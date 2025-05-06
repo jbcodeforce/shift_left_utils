@@ -308,7 +308,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107d3ec30&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10622ec90&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -484,16 +484,17 @@ Assess for a given table, what are the running dmls from its children, using rec
 **Usage**:
 
 ```console
-$ pipeline report-running-statements [OPTIONS] TABLE_NAME INVENTORY_PATH
+$ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 ```
 
 **Arguments**:
 
-* `TABLE_NAME`: The table name containing pipeline_definition.json to get child list  [required]
-* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/master-control/data-platform-flink/pipelines]
 
 **Options**:
 
+* `--dir TEXT`: The directory to report the running statements from. If not provided, it will report the running statements from the table name.
+* `--table-name TEXT`: The table name containing pipeline_definition.json to get child list
 * `--help`: Show this message and exit.
 
 ### `pipeline undeploy`

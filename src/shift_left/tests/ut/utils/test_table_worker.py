@@ -414,5 +414,16 @@ class TestTableWorker(unittest.TestCase):
         with self.assertRaises(Exception):
             worker.update_sql_content(sql_content=sql_in)
 
+    def test_replace_topic_name_in_sql_content(self):
+        """Test clone.dev is replace by clone.stage in sql content"""
+        # Test with invalid SQL content
+        sql_in = "insert into src_order select id, status, name, is_migrated from `clone.dev.ap-tag-order-dev.template`;"
+        worker = ReplaceEnvInSqlContent()
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "replicated.stage.ap-tag-order-stage.template" in sql_out
+
+
 if __name__ == '__main__':
     unittest.main()
