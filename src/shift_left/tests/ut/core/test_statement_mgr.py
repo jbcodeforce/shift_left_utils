@@ -9,7 +9,16 @@ import pathlib
 import json
 
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementListCache, Status, Spec, Data, StatementResult, OpRow
+from shift_left.core.models.flink_statement_model import (
+    Statement, 
+    StatementInfo, 
+    StatementListCache, 
+    Status,
+    Spec, 
+    Data, 
+    StatementResult, 
+    OpRow, 
+    Metadata)
 import  shift_left.core.statement_mgr as statement_mgr 
 
 class TestStatementManager(unittest.TestCase):
@@ -73,6 +82,9 @@ class TestStatementManager(unittest.TestCase):
                     "status": {
                         "phase": "RUNNING",
                         "detail": ""
+                    },
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
                     }
                 },
                 {
@@ -89,6 +101,9 @@ class TestStatementManager(unittest.TestCase):
                     "status": {
                         "phase": "COMPLETED",
                         "detail": ""
+                    },
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
                     }
                 }
             ],
@@ -253,7 +268,15 @@ class TestStatementManager(unittest.TestCase):
                 properties={"sql.current-catalog": "default", "sql.current-database": "default"},
                 stopped=False
             )
-            return Statement(name= statement_name, status= status, spec=spec)
+            metadata = Metadata(
+                created_at="2025-04-20T10:15:02.853006",
+                labels={},
+                resource_version="1",
+                self="https://test-url",
+                uid="test-uid",
+                updated_at="2025-04-20T10:15:02.853006"
+            )
+            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
 
         def mock_statement_list():
             mock_info = MagicMock(spec=Statement)

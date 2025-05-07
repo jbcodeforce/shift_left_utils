@@ -15,7 +15,7 @@ os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "c
 module_path = "./utils"
 sys.path.append(os.path.abspath(module_path))
 
-from shift_left.core.flink_compute_pool_model import (
+from shift_left.core.models.flink_compute_pool_model import (
     ComputePoolResponse,
     ComputePoolList,
     ComputePoolInfo,

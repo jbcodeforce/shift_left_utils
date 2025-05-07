@@ -21,7 +21,7 @@ from shift_left.core.utils.file_search import (
     get_ddl_dml_names_from_pipe_def,
     from_pipeline_to_absolute
 )
-from shift_left.core.flink_statement_model import Statement, StatementResult, StatementInfo, StatementListCache
+from shift_left.core.models.flink_statement_model import Statement, StatementResult, StatementInfo, StatementListCache
 from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
@@ -148,22 +148,22 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
     return None
 
 
-def get_statement_results(self, statement_name: str)-> Statement:
+def get_statement_results(statement_name: str)-> StatementResult:
         client = ConfluentCloudClient(get_config())
         url = client.build_flink_url_and_auth_header()
         try:
             resp=client.make_request("GET",f"{url}/statements/{statement_name}/results")
-            logger.debug(resp)
+            logger.info(resp)
 
             if resp["metadata"]["next"]:
                 resp=client.make_request("GET", resp["metadata"]["next"])
                 logger.debug(f"After next called: {resp}")
-                return Statement(**resp)
+                return StatementResult(**resp)
             elif resp['results'] and resp['results']['data']:
-                return Statement(**resp)
+                return StatementResult(**resp)
 
         except Exception as e:
-            logger.info(f"Error executing GET statement call for {statement_name}: {e}")
+            logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             return None
 
     
@@ -321,6 +321,7 @@ def _map_to_statement_info(info: Statement) -> StatementInfo:
                                     sql_content= info.get('spec').get('statement', 'UNKNOWN'),
                                     compute_pool_id= info.get('spec').get('compute_pool_id'),
                                     principal= info.get('spec').get('principal', 'UNKNOWN'),
+                                    created_at= info.get('metadata').get('created_at', 'UNKNOWN'),
                                     sql_catalog=catalog,
                                     sql_database=database)
     elif info and isinstance(info, Statement):
@@ -332,6 +333,7 @@ def _map_to_statement_info(info: Statement) -> StatementInfo:
                              sql_content= info.spec.statement,
                              compute_pool_id= info.spec.compute_pool_id,
                              principal= info.spec.principal,
+                             created_at= info.metadata.created_at,
                              sql_catalog=catalog,
                              sql_database=database)
 

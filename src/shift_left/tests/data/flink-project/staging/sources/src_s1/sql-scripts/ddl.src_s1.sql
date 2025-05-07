@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS src_s1 (
 
-  -- put here column definitions
+  -- add columns
   PRIMARY KEY(id) NOT ENFORCED
 ) DISTRIBUTED BY HASH(id) INTO 1 BUCKETS
 WITH (

@@ -199,9 +199,10 @@ def deploy(
 def report_running_statements(
         dir: str = typer.Option(None, help="The directory to report the running statements from. If not provided, it will report the running statements from the table name."),
         table_name: str =  typer.Option(None, help="The table name containing pipeline_definition.json to get child list"),
+        product_name: str =  typer.Option(None, help="The product name to report the running statements from."),
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
-    Assess for a given table, what are the running dmls from its children, using recursively. 
+    Assess for a given table, what are the running dmls from its descendants. When the directory is specified, it will report the running statements from all the tables in the directory.
     """
     print(f"Assess runnning Flink DML part of the pipeline from given table name")
     try:
@@ -210,6 +211,8 @@ def report_running_statements(
             results+= deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
         elif dir:
             results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, inventory_path)
+        elif product_name:
+            results= deployment_mgr.report_running_flink_statements_for_all_from_product(product_name, inventory_path)
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)
@@ -241,15 +244,14 @@ def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(h
     and existing Flink Statement running status.
     """
     print(f"Build an execution plan for table {table_name}")
-    pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
-    execution_plan=deployment_mgr.build_execution_plan_from_any_table(pipeline_def=pipeline_def,
+    summary=deployment_mgr.build_execution_plan_from_table_and_persist(table_name=table_name,
+                                                        inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         may_start_children=may_start_children,
                                                         force_sources=force_sources,
                                                         start_time=datetime.datetime.now())
-    deployment_mgr.persist_execution_plan(execution_plan)
-    summary=deployment_mgr.build_summary_from_execution_plan(execution_plan)
+
     print(f"Execution plan built and persisted for table {table_name}")
     print(summary)
     

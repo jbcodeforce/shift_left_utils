@@ -9,7 +9,7 @@ import pathlib
 os.environ["CONFIG_FILE"] =   str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 from shift_left.core.utils.app_config import get_config
-from  shift_left.core.flink_statement_model import *
+from  shift_left.core.models.flink_statement_model import *
 import shift_left.core.statement_mgr as sm
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition, FlinkStatementNode
@@ -117,7 +117,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result)
 
-    def test_deploy_facts_tables(self):
+    def test_6_deploy_facts_tables(self):
         """
         """
         os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
@@ -131,6 +131,13 @@ class TestDeploymentManager(unittest.TestCase):
                                                force_sources=False)
         assert result
         print(result.model_dump_json())
+
+    def test_7_report_running_flink_statements_for_all_from_product(self):
+        os.environ["PIPELINES"]= str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+        result = dm.report_running_flink_statements_for_all_from_product('p1', os.getenv("PIPELINES"))
+        assert result
+        print(result)
+
 
 if __name__ == '__main__':
     unittest.main()

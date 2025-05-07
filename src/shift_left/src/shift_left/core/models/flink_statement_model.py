@@ -24,12 +24,12 @@ class StatementResult(BaseModel):
 
 
 class Metadata(BaseModel):
-    created_at: datetime = Field(..., description="Timestamp when the resource was created")
+    created_at: str = Field(default=None, description="Timestamp when the resource was created")
     labels: Dict[str, str] = Field(default_factory=dict, description="Labels associated with the resource")
-    resource_version: str = Field(..., description="Resource version identifier")
-    self: str = Field(..., description="Self URL of the resource")
-    uid: str = Field(..., description="Unique identifier for the resource")
-    updated_at: datetime = Field(..., description="Timestamp when the resource was last updated")
+    resource_version: str = Field(default=None, description="Resource version identifier")
+    self: str = Field(default=None, description="Self URL of the resource")
+    uid: str = Field(default=None,  description="Unique identifier for the resource")
+    updated_at: str = Field(default=None, description="Timestamp when the resource was last updated")
 
 class Type(BaseModel):
     length: Optional[int] = Field(None, description="Length of the type if applicable")
@@ -94,6 +94,7 @@ class StatementInfo(BaseModel):
     sql_content:  Optional[str] =  Field(default=None, description="Current sql content of the Flink Statement")
     compute_pool_id:   Optional[str] =  Field(default=None, description="Compute pool id hosting the statement")
     compute_pool_name:   Optional[str] =  Field(default=None, description="Compute pool name hosting the statement")
+    created_at:   Optional[str] =  Field(default=None, description="Statement creation date")
     principal:   Optional[str] =  Field(default=None, description="Principal service account")
     sql_catalog:  Optional[str] =  Field(default=None, description="Flink catalog name")
     sql_database:  Optional[str] =  Field(default=None, description="Flink database name")

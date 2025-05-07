@@ -9,8 +9,6 @@ The execution plan is persisted to a JSON file.
 The execution plan is used to execute the statements in the correct order.
 The execution plan is used to undeploy a pipeline.
 """
-from __future__ import annotations
-
 import time
 import os
 from datetime import datetime
@@ -24,10 +22,17 @@ from shift_left.core import (
     compute_pool_mgr,
     statement_mgr
 )
-from shift_left.core.flink_statement_model import (
+from shift_left.core.models.flink_statement_model import (
     Statement,
     FlinkStatementNode,
     FlinkStatementExecutionPlan
+)
+from shift_left.core.utils.report_mgr import (
+    DeploymentReport,
+    TableInfo,
+    TableReport,
+    build_simple_report,
+    build_summary_from_execution_plan
 )
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.file_search import (
@@ -40,23 +45,7 @@ from shift_left.core.utils.file_search import (
 # Constants
 MAX_CFU_INCREMENT: Final[int] = 20
 
-class DeploymentReport(BaseModel):
-    """Report of a pipeline deployment operation.
-    
-    Attributes:
-        table_name: Name of the table being deployed
-        compute_pool_id: ID of the compute pool used
-        ddl_dml: Type of deployment (DML only or both)
-        update_children: Whether to update child pipelines
-        flink_statements_deployed: List of deployed Flink statements
-    """
-    table_name: Optional[str] = None
-    compute_pool_id: Optional[str] = None
-    ddl_dml: str = Field(default="Both", description="Type of deployment: DML only, or both")
-    update_children: bool = Field(default=False)
-    flink_statements_deployed: List[Statement] = Field(default_factory=list)
 
-    
 def deploy_pipeline_from_table(
     table_name: str,
     inventory_path: str,
@@ -102,7 +91,7 @@ def deploy_pipeline_from_table(
         
         persist_execution_plan(execution_plan)
         summary = build_summary_from_execution_plan(execution_plan)
-        logger.debug(f"Execute the plan: {summary}")
+        logger.info(f"Execute the plan before deployment: {summary}")
         
         statements = _execute_plan(execution_plan, compute_pool_id)
         result = DeploymentReport(
@@ -142,6 +131,27 @@ def load_and_deploy_from_execution_plan(execution_plan_file: str,
         execution_plan = FlinkStatementExecutionPlan.model_validate_json(f.read())
     return _execute_plan(execution_plan, compute_pool_id)
 
+def build_execution_plan_from_table_and_persist(
+    table_name: str,
+    inventory_path: str,
+    compute_pool_id: str,
+    dml_only: bool = False,
+    may_start_children: bool = False,
+    force_sources: bool = False,
+    start_time: Optional[datetime] = None
+) -> str:
+    
+    pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+    execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
+                                                        compute_pool_id=compute_pool_id,
+                                                        dml_only=dml_only,
+                                                        may_start_children=may_start_children,
+                                                        force_sources=force_sources,
+                                                        start_time=start_time)
+    persist_execution_plan(execution_plan)
+    summary=build_summary_from_execution_plan(execution_plan)
+    return summary
+
 def build_execution_plan_from_any_table(
     pipeline_def: FlinkTablePipelineDefinition,
     compute_pool_id: str,
@@ -173,7 +183,7 @@ def build_execution_plan_from_any_table(
         start_time = start_time or datetime.now()
         start_node.created_at = start_time
         start_node.dml_only = dml_only
-        _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id)
+        start_node = _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id)
         start_node.update_children = may_start_children
 
         # Build the static graph from the Flink statement relationship
@@ -206,7 +216,7 @@ def build_execution_plan_from_any_table(
             if node.to_run and node.upgrade_mode == "Stateful":
                 node.update_children = may_start_children
             if node.to_run and not node.compute_pool_id:
-                node.compute_pool_id = _assign_compute_pool_id_to_node(node, compute_pool_id)
+                node = _assign_compute_pool_id_to_node(node, compute_pool_id)
             if node.product_name == start_node.product_name or node.product_name in ['', 'common', 'stage']:
                 execution_plan.nodes.append(node)       
 
@@ -224,7 +234,7 @@ def build_execution_plan_from_any_table(
                             child_node = node_map[child.table_name]
                             child_node = _get_and_update_statement_info_for_node(child_node)
                             child_node.to_restart = node.update_children
-                            _assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
+                            child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
                             if node.update_children:
                                 child_node.parents.remove(node)  # do not reprocess parent of current child
                                 _merge_graphs(execution_plan.nodes, _build_topological_sorted_parents(child_node, node_map))
@@ -257,7 +267,7 @@ def report_running_flink_statements_for_a_table_execution_plan(
                                                         may_start_children=False, 
                                                         start_time=datetime.now(),
                                                         force_sources=False)
-    return _build_simple_report(execution_plan)
+    return build_simple_report(execution_plan)
 
 def report_running_flink_statements_for_all_from_directory(
     directory: str, 
@@ -283,10 +293,74 @@ def report_running_flink_statements_for_all_from_directory(
                                                         may_start_children=False, 
                                                         start_time=datetime.now(),
                                                         force_sources=False)
-            result+= _build_simple_report(execution_plan) + "\n"
+            result+= build_simple_report(execution_plan) + "\n"
             count+=1
     result+=f"#"*40 + f" Found {count} tables with running flink statements " + "#"*40 + "\n"
     return result
+
+def report_running_flink_statements_for_all_from_product(
+    product_name: str, 
+    inventory_path: str
+) -> str:
+    """
+    Report running flink statements for all the pipelines in the product.
+    """
+    table_report = TableReport()
+    table_report.product_name = product_name
+    table_report.environment_id = get_config().get('environment_id')
+    table_report.catalog_name = get_config().get('flink').get('catalog_name')
+    table_report.database_name = get_config().get('flink').get('database_name')
+    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    
+    for root, dirs, files in os.walk(inventory_path):
+        if product_name in root:
+            if 'sql-scripts' in dirs:
+                file_path=root + "/" + PIPELINE_JSON_FILE_NAME
+                pipeline_def = read_pipeline_definition_from_file(file_path)
+                if pipeline_def:
+                    node: FlinkStatementNode = pipeline_def.to_node()
+                    node.existing_statement_info = statement_mgr.get_statement_status(node.dml_statement_name)
+                    
+                    table_info = TableInfo()
+                    table_info.table_name = node.table_name
+                    table_info.type = node.type
+                    table_info.upgrade_mode = node.upgrade_mode
+                    table_info.statement_name = node.dml_statement_name
+                    table_info.status = node.existing_statement_info.status_phase
+                    table_info.compute_pool_id = node.existing_statement_info.compute_pool_id
+                    pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, table_info.compute_pool_id)
+                    if pool:
+                        table_info.compute_pool_name = pool.name
+                    else:
+                        table_info.compute_pool_name = "UNKNOWN"
+                    table_info.created_at = node.existing_statement_info.created_at
+                    table_report.tables.append(table_info)
+    table_count=0
+    running_count=0
+    non_running_count=0
+    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at\n"
+    for table in table_report.tables:
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at}\n"
+        if table.status == 'RUNNING':
+            running_count+=1
+        else:
+            non_running_count+=1
+        table_count+=1
+    print(csv_content)
+    print(f"Total tables: {table_count}")
+    print(f"Running tables: {running_count}")
+    print(f"Non running tables: {non_running_count}")
+    with open(f"{shift_left_dir}/{product_name}_report.csv", "w") as f:
+        f.write(csv_content)
+    with open(f"{shift_left_dir}/{product_name}_report.json", "w") as f:
+        f.write(table_report.model_dump_json(indent=4))
+    result=f"#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+=f"\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+=f"\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    result+=csv_content
+    result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
+    result+=f"\tNon running tables: {non_running_count}" + "\n"
+    return result   
 
 
 def deploy_all_from_directory(
@@ -384,90 +458,10 @@ def persist_execution_plan(execution_plan: FlinkStatementExecutionPlan):
         f.write(execution_plan.model_dump_json(indent=2))  # default=str handles datetime serialization
 
 
-
-def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPlan) -> str:
-    """
-    Build a summary of the execution plan showing which statements need to be executed.
-    
-    Args:
-        execution_plan: The execution plan containing nodes to be processed
-        
-    Returns:
-        A formatted string summarizing the execution plan
-    """
-
-    
-    summary_parts = [
-        f"To deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
-    ]
-    
-    # Separate nodes into parents and children
-    parents = [node for node in execution_plan.nodes if (node.to_run or node.is_running()) and not node.to_restart]
-    children = [node for node in execution_plan.nodes if node.to_restart]
-    
-    # Build parent section
-    if parents:
-        summary_parts.extend([
-            "\n--- Ancestors impacted ---",
-            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
-            "-" * 125
-        ])
-        for node in parents:
-            action = "Run" if node.to_run else "Skip"
-            if node.to_restart:
-                action= "Restart"
-            status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"
-            summary_parts.append(
-                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
-            )
-    
-    # Build children section
-    if children:
-        summary_parts.extend([
-            f"\n--- {len(parents)} parents",
-            "--- Children to restart ---",
-            "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
-            "-" * 125
-        ])
-        for node in children:
-            action = "To run" if node.to_run else "Restart" if node.to_restart else "Skip"
-            status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"
-
-            summary_parts.append(
-                f"{_pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
-            )
-        summary_parts.append(f"--- {len(children)} children to restart")
-    
-    summary= "\n".join(summary_parts)
-    summary+="\n---Matching compute pools: " 
-    summary+=f"\nPool ID   \t{_pad_or_truncate('Name',40)}\tCurrent/Max CFU\tFlink Statement"
-    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
-    for node in execution_plan.nodes:
-        pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
-        if pool:
-            summary+=f"\n{pool.id} \t{_pad_or_truncate(pool.name,40)}\t{_pad_or_truncate(str(pool.current_cfu) + '/' + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
-    with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
-        f.write(summary)
-    return summary
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
-def _pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
-    """
-    Pad or truncate text to a specific length.
-    
-    Args:
-        text: Text to pad/truncate
-        length: Target length
-        padding_char: Character to use for padding
-        
-    Returns:
-        Padded or truncated text
-    """
-    if len(text) > length:
-        return text[:length]
-    else:
-        return text.ljust(length, padding_char)
+
         
 def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dict[str, FlinkStatementNode], 
                                                          Dict[str, List[FlinkStatementNode]]]:
@@ -621,16 +615,11 @@ def _add_non_running_parents(node, execution_plan, node_map):
             execution_plan.nodes.insert(idx,node_p)
             node_p.to_run = True
 
-def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
+def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
     
     # If the node already has an assigned compute pool, continue using that
-    if node.compute_pool_id:  # this may be loaded from the statement info
-        return node.compute_pool_id
-
-    # If we supply a specific compute_pool_id, use that if it's valid
-    if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
-        node.compute_pool_id = compute_pool_id
-        return compute_pool_id
+    if node.compute_pool_id and compute_pool_mgr.is_pool_valid(node.compute_pool_id):  # this may be loaded from the statement info
+        return node
 
     compute_pool_list = compute_pool_mgr.get_compute_pool_list(get_config().get('confluent_cloud').get('environment'), 
                                               get_config().get('confluent_cloud').get('region'))
@@ -639,27 +628,26 @@ def _assign_compute_pool_id_to_node(node, compute_pool_id) -> str:
                                       table_name=node.table_name)
     
     # If we don't have any matching compute pools, we need to find a pool to use
-    if not pools:
+    if  not pools:
         configured_compute_pool_id = get_config()['flink']['compute_pool_id']
         # If the config has a valid compute pool, use that one
-        if not compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+        if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
             node.compute_pool_id = configured_compute_pool_id
-            return configured_compute_pool_id
-        # Otherwise, grab all available pools as a potential pool list
         else:
-            pools= compute_pool_list.pools
+            node.compute_pool_id =compute_pool_mgr.create_compute_pool(node.table_name)
+        node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+        return node
+    if len(pools) == 1:
+        node.compute_pool_id = pools[0].id
+        node.compute_pool_name = pools[0].name
+        return node
+    # If we supply a specific compute_pool_id, use that if it's valid
+    if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
+        node.compute_pool_id = compute_pool_id
+        node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+    return node
 
-    for pool in pools:
-        # At this point, we have no matching compute pools and the configured pools are not valid,
-        # so we need to just find one to use.
-        if (pool.name.startswith(get_config().get('kafka').get('cluster_type'))
-            and pool.current_cfu < int(get_config().get('flink').get('max_cfu'))):
-            node.compute_pool_id = pool.id
-            node.compute_pool_name = pool.name
-            pool.current_cfu+=MAX_CFU_INCREMENT  # HACK from now TODO use the actual cfu after deployment
-            logger.debug(f"Assign compute pool {node.compute_pool_id} - {pool.name} to {node.table_name}")
-            break
-    return node.compute_pool_id
+
 
 def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> List[Statement]:
     """Execute statements in the execution plan.
@@ -831,15 +819,6 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     Prevents processing nodes that would create circular dependencies.
     """
     return node.product_name == current.product_name
-
-
-def _build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
-    report = f"{_pad_or_truncate('Ancestor Table Name',50)}\t{_pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\n"
-    report+=f"-"*130 + "\n"
-    for node in execution_plan.nodes:
-        if node.existing_statement_info:
-            report+=f"{_pad_or_truncate(node.table_name, 50)}\t{_pad_or_truncate(node.dml_statement_name, 40)}\t{_pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{_pad_or_truncate(node.compute_pool_id,15)}\n"
-    return report
 
 # --- to work on for stateless ---------------
 

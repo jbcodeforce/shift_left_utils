@@ -15,7 +15,7 @@ from shift_left.core.utils.file_search import (
 )
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
-from  shift_left.core.flink_statement_model import *
+from  shift_left.core.models.flink_statement_model import *
 import shift_left.core.deployment_mgr as dm
 from typing import Union
 
@@ -38,7 +38,7 @@ class TestDeploymentManager(unittest.TestCase):
         print(result.model_dump_json())
 
 
-    def test_build_execution_plan(self):
+    def _test_build_execution_plan(self):
         os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         #table_path="/intermediates/aqem/tag_tag_dummy/"
         #table_path="/facts/aqem/fct_action_item_event/"
@@ -59,6 +59,15 @@ class TestDeploymentManager(unittest.TestCase):
         dm.persist_execution_plan(execution_plan)
         print(dm.build_summary_from_execution_plan(execution_plan))
            
+
+    def test_report_running_flink_statements_for_all_from_product(self):
+        os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        inventory_path=  os.environ["PIPELINES"]
+        table_name="stage_tenant_dimension"
+        pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+        node = pipeline_def.to_node()
+        node = dm._assign_compute_pool_id_to_node(node,None)
+        print(node)
 
         
 

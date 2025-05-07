@@ -9,7 +9,7 @@ import pathlib
 
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import Statement
+from shift_left.core.models.flink_statement_model import Statement
 from shift_left.core.utils.file_search import SCRIPTS_DIR
 
 class TestTableManager(unittest.TestCase):

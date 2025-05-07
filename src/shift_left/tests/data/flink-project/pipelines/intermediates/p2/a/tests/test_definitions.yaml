@@ -1,24 +1,24 @@
 foundations:
-- table_name: src_p2_a
-  ddl_for_test: ./tests/ddl_src_p2_a.sql
 - table_name: src_x
   ddl_for_test: ./tests/ddl_src_x.sql
+- table_name: src_p2_a
+  ddl_for_test: ./tests/ddl_src_p2_a.sql
 test_suite:
 - name: test_a_1
   inputs:
-  - table_name: src_p2_a
-    sql_file_name: ./tests/insert_src_p2_a_1.sql
   - table_name: src_x
     sql_file_name: ./tests/insert_src_x_1.sql
+  - table_name: src_p2_a
+    sql_file_name: ./tests/insert_src_p2_a_1.sql
   outputs:
   - table_name: a
     sql_file_name: ./tests/validate_a_1.sql
 - name: test_a_2
   inputs:
-  - table_name: src_p2_a
-    sql_file_name: ./tests/insert_src_p2_a_2.sql
   - table_name: src_x
     sql_file_name: ./tests/insert_src_x_2.sql
+  - table_name: src_p2_a
+    sql_file_name: ./tests/insert_src_p2_a_2.sql
   outputs:
   - table_name: a
     sql_file_name: ./tests/validate_a_2.sql

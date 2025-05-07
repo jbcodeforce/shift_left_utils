@@ -12,7 +12,7 @@ from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE, 
         KIMBALL_PROJECT_TYPE)
 from typing_extensions import Annotated
-from shift_left.core.flink_statement_model import Statement 
+from shift_left.core.models.flink_statement_model import Statement 
 
 """
 Manage project foundations

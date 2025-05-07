@@ -6,7 +6,7 @@ import os
 import unittest
 from typing import Dict, List, Tuple
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import StatementInfo
+from shift_left.core.models.flink_statement_model import StatementInfo
 from shift_left.core.utils.file_search import (
     read_pipeline_definition_from_file,
     FlinkStatementNode,

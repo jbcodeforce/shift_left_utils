@@ -4,10 +4,11 @@ Copyright 2024-2025 Confluent, Inc.
 import time
 import os, json
 from importlib import import_module
+from typing import Tuple
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.statement_mgr import get_statement_info
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
-from shift_left.core.flink_compute_pool_model import *
+from shift_left.core.models.flink_compute_pool_model import *
 from shift_left.core.utils.naming_convention import ComputePoolNameModifier
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
@@ -16,7 +17,7 @@ STATEMENT_COMPUTE_POOL_FILE=shift_left_dir + "/pool_assignments.json"
 COMPUTE_POOL_LIST_FILE=shift_left_dir + "/compute_pool_list.json"
 
 
-def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition):
+def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition) -> Tuple[str, str]:
     """
     if the compute pool is given, use it, else assess if there is a statement
     for this table already running and reuse the compute pool, if not
@@ -42,7 +43,7 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
             return pool_id
         else:
             logger.info(f"Build a new compute pool")
-            return _create_compute_pool(pipeline_def.table_name)
+            return create_compute_pool(pipeline_def.table_name)
 
 
 _compute_pool_list = None
@@ -94,7 +95,7 @@ def search_for_matching_compute_pools(compute_pool_list: ComputePoolList,
                                       table_name: str) -> List[ComputePoolInfo]:
     matching_pools = []
     _target_pool_name = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
-    print(f"Target pool name: {_target_pool_name}")
+    logger.info(f"Target pool name: {_target_pool_name}")
     for pool in compute_pool_list.pools:
         if _target_pool_name == pool.name:
             matching_pools.append(pool)
@@ -108,6 +109,15 @@ def get_compute_pool_with_id(compute_pool_list: ComputePoolList, compute_pool_id
             return pool
     return None
 
+def get_compute_pool_name(compute_pool_id: str):
+    compute_pool_list = get_compute_pool_list()
+    pool = get_compute_pool_with_id(compute_pool_list, compute_pool_id)
+    if pool:
+        compute_pool_name = pool.name
+    else:
+        compute_pool_name = "UNKNOWN"
+    return compute_pool_name
+
 def is_pool_valid(compute_pool_id):
     """
     Returns whether the supplied compute pool id is valid
@@ -119,14 +129,7 @@ def is_pool_valid(compute_pool_id):
     env_id = config['confluent_cloud']['environment_id']
     return compute_pool_id and _validate_a_pool(client, compute_pool_id, env_id)
 
-# ------ Private methods ------
-
-
-def _save_compute_pool_list(compute_pool_list: ComputePoolList):
-    with open(COMPUTE_POOL_LIST_FILE, "w") as f:
-        json.dump(compute_pool_list.model_dump(), f, indent=4)
-
-def _create_compute_pool(table_name: str) -> str:
+def create_compute_pool(table_name: str) -> Tuple[str, str]:
     config = get_config()
     spec = _build_compute_pool_spec(table_name, config)
     client = ConfluentCloudClient(get_config())
@@ -135,7 +138,15 @@ def _create_compute_pool(table_name: str) -> str:
         pool_id = result['id']
         env_id = config['confluent_cloud']['environment_id']
         if _verify_compute_pool_provisioned(client, pool_id, env_id):
-            return pool_id
+            return pool_id, result['spec']['display_name']
+
+
+# ------ Private methods ------
+
+def _save_compute_pool_list(compute_pool_list: ComputePoolList):
+    with open(COMPUTE_POOL_LIST_FILE, "w") as f:
+        json.dump(compute_pool_list.model_dump(), f, indent=4)
+
 
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:

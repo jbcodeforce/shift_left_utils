@@ -508,5 +508,5 @@ def _validate_pipelines(sqls: dict, rootdir: str) -> dict[str, any]:
 
     return invalids
 
-def get_column_definitions(table_name: str, config) -> tuple[str,str]:
+def get_column_definitions(table_name: str) -> tuple[str,str]:
     return "-- put here column definitions", "-- put here column definitions"

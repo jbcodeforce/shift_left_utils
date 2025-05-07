@@ -9,7 +9,7 @@ from unittest.mock import ANY
 
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../../data/flink-project/pipelines")
-from shift_left.core.flink_statement_model import Statement, StatementResult, Data, OpRow
+from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 import shift_left.core.test_mgr as test_mgr
 
 

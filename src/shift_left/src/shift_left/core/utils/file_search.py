@@ -11,7 +11,7 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
-from shift_left.core.flink_statement_model import FlinkStatementNode
+from shift_left.core.models.flink_statement_model import FlinkStatementNode
 from shift_left.core.utils.naming_convention import DmlNameModifier
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.

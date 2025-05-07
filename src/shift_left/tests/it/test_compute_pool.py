@@ -9,7 +9,7 @@ import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_compute_pool_model import *
+from shift_left.core.models.flink_compute_pool_model import *
 from shift_left.core.compute_pool_mgr import get_compute_pool_list
 
 class TestComputePoolMgr(unittest.TestCase):

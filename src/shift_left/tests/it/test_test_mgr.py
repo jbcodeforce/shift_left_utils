@@ -4,35 +4,27 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 from unittest.mock import patch, MagicMock, call
 import pathlib
+from shift_left.core.utils.app_config import shift_left_dir
 import os
 from unittest.mock import ANY
 
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config-ccloud.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent / "../../data/flink-project/pipelines")
-from shift_left.core.flink_statement_model import Statement
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
 
 
-from shift_left.core.test_mgr import (
 
-    execute_one_test,
-
-)
+import  shift_left.core.test_mgr as test_mgr 
 
 
 class TestTestManager(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data" 
     
     def test_execute_one_test(self):
         print("test_execute_one_test")
-        table_folder= os.getenv("PIPELINES") + "/facts/p1/fct_order"
+        table_name= "p1_fct_order"
         compute_pool_id = "compute_pool_id"
         test_case_name = "test_case_1"
-
-        result = execute_one_test(table_folder, test_case_name)
-        assert result, f"Test case '{test_case_name}' executed successfully"
+        result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
+        assert result
 
 if __name__ == '__main__':
     unittest.main()

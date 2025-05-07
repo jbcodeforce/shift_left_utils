@@ -10,7 +10,7 @@ import os
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.flink_statement_model import Statement
+from shift_left.core.models.flink_statement_model import Statement
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.utils.file_search import (
     FlinkTableReference,
@@ -65,7 +65,10 @@ def init_unit_test_for_table(table_name: str):
     _add_test_files(table_ref, f"{table_folder}/tests", table_inventory)
 
 
-def execute_one_test(table_name: str, test_case_name: str, compute_pool_id: Optional[str] = None):
+def execute_one_test(
+        table_name: str, 
+        test_case_name: str, 
+        compute_pool_id: Optional[str] = None):
     """
     Execute a single test case from the test suite definition.
     
@@ -90,6 +93,7 @@ def execute_one_test(table_name: str, test_case_name: str, compute_pool_id: Opti
         if test_case.name == test_case_name:
             logger.info(f"Running test case: {test_case.name}")
             statement_names.extend(_execute_one_testcase(test_case, table_ref, prefix, compute_pool_id))
+            break
             
     _delete_test_statements(statement_names)
     print(f"**********************-Validation Test Case Finished-********************** ")
@@ -167,10 +171,12 @@ def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, Flin
             raise ValueError(f"No test suite definition found in {table_folder}/tests")
  
 
-def _execute_foundation_statements(test_suite_def: SLTestDefinition, 
-                                   table_ref: FlinkTableReference, 
-                                   prefix: str = 'dev',
-                                   compute_pool_id: Optional[str] = None):
+def _execute_foundation_statements(
+    test_suite_def: SLTestDefinition, 
+    table_ref: FlinkTableReference, 
+    prefix: str = 'dev',
+    compute_pool_id: Optional[str] = None
+) -> List[Statement]:
 
     statement_names = []
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)

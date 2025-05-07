@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 from datetime import datetime
-import time
+from typing import Tuple
 
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
@@ -19,7 +19,7 @@ from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 import shift_left.core.statement_mgr as sm
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
-from shift_left.core.flink_statement_model import (
+from shift_left.core.models.flink_statement_model import (
     Statement, 
     StatementInfo
 )
@@ -27,7 +27,7 @@ from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
     FlinkStatementExecutionPlan
 )
-from shift_left.core.flink_statement_model import Statement, StatementInfo
+from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 
 class TestDeploymentManager(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestDeploymentManager(unittest.TestCase):
     data_dir = None
     TEST_COMPUTE_POOL_ID = "test-pool-123"
     TEST_COMPUTE_POOL_ID_2 = "test-pool-120"
-    
+    TEST_COMPUTE_POOL_ID_3 = "test-pool-121"
     @classmethod
     def setUpClass(cls) -> None:
         """Set up test environment before running tests."""
@@ -67,23 +67,30 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=compute_pool_id
         )
 
-    def _create_mock_compute_pool_list(self) -> ComputePoolList:
+    def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
         """Create a mock ComputePoolList object."""
         pool_1 = ComputePoolInfo(
             id=self.TEST_COMPUTE_POOL_ID,
             name="test-pool",
-            env_id="test-env-123",
+            env_id=env_id,
             max_cfu=100,
             current_cfu=50
         )
         pool_2 = ComputePoolInfo(
             id=self.TEST_COMPUTE_POOL_ID_2,
             name="test-pool-2",
-            env_id="test-env-123",
+            env_id=env_id,
             max_cfu=100,
             current_cfu=50
         )
-        return ComputePoolList(pools=[pool_1, pool_2])
+        pool_3 = ComputePoolInfo(
+            id=self.TEST_COMPUTE_POOL_ID_3,
+            name="dev-p1-fct-order",
+            env_id=env_id,
+            max_cfu=10,
+            current_cfu=0
+        )
+        return ComputePoolList(pools=[pool_1, pool_2, pool_3])
 
     def _create_mock_statement_node(
         self,
@@ -102,9 +109,11 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=compute_pool_id
         )
 
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> None:
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
         """Mock function for assigning compute pool to node."""
         node.compute_pool_id = compute_pool_id
+        node.compute_pool_name = "test-pool"
+        return node
 
     def _mock_get_and_update_node(self, node: FlinkStatementNode) -> Statement:
         """Mock function for getting and updating node statement info."""
@@ -198,7 +207,7 @@ class TestDeploymentManager(unittest.TestCase):
             start_time=datetime.now()
         )
         
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
         assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
         assert execution_plan.nodes[6].table_name == "f"
         assert execution_plan.nodes[6].to_run is True
@@ -240,7 +249,7 @@ class TestDeploymentManager(unittest.TestCase):
             force_sources=False,
             start_time=datetime.now()
         )  
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
         assert len(execution_plan.nodes) == 9
         for node in execution_plan.nodes:
             if node.table_name == "src_b":
@@ -301,7 +310,7 @@ class TestDeploymentManager(unittest.TestCase):
             start_time=datetime.now()
         )  
         
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
         dm.persist_execution_plan(execution_plan)
         # 8 as the 3 children of Z are not running   
         assert len(execution_plan.nodes) == 7
@@ -354,7 +363,7 @@ class TestDeploymentManager(unittest.TestCase):
             start_time=datetime.now()
         )  
         
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
         assert len(execution_plan.nodes) == 12
         for node in execution_plan.nodes:
             print(node.table_name, node.to_run, node.to_restart)
@@ -539,7 +548,7 @@ class TestDeploymentManager(unittest.TestCase):
             force_sources=False,
             start_time=datetime.now()
         )
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
         
         # Verify source tables are in the execution plan with skip action
         for node in execution_plan.nodes:
@@ -552,6 +561,25 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[3].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[5].table_name == "p1_fct_order"
+
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.create_compute_pool')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    def test_create_compute_pool_for_node(self, mock_get_compute_pool_list, mock_create_compute_pool):
+        """Test assigning compute pool id to a node."""
+        print("test_assign_compute_pool_id_to_node")
+
+        def mock_create_compute_pool(table_name: str) -> Tuple[str, str]:
+            return "test-pool-123", "test-pool-name"
+        # Setup
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_create_compute_pool.side_effect = mock_create_compute_pool
+        node = self._create_mock_statement_node("table1")
+        inventory_path = os.getenv("PIPELINES")
+        table_name="p1_fct_order"
+        pipeline_def=  pm.get_pipeline_definition_for_table(table_name, inventory_path)
+        node = pipeline_def.to_node()
+        node = dm._assign_compute_pool_id_to_node(node, None)
+        assert node.compute_pool_id == "test-pool-121"
 
 if __name__ == '__main__':
     unittest.main()

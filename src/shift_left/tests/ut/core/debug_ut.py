@@ -5,9 +5,9 @@ import pathlib
 import json
 
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
+from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
 import  shift_left.core.pipeline_mgr as pipeline_mgr
-from shift_left.core.flink_statement_model import Statement, StatementResult, Data, OpRow
+from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 
 class TestDebugUnitTests(unittest.TestCase):
 

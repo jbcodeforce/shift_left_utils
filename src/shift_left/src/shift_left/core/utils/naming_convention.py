@@ -1,5 +1,5 @@
 
-from shift_left.core.flink_statement_model import FlinkStatementNode
+from shift_left.core.models.flink_statement_model import FlinkStatementNode
 from shift_left.core.utils.app_config import get_config
 
 

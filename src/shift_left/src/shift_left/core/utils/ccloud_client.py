@@ -9,8 +9,8 @@ import json
 from base64 import b64encode
 from typing import List
 from shift_left.core.utils.app_config import logger
-from shift_left.core.flink_statement_model import *
-from shift_left.core.flink_compute_pool_model import *
+from shift_left.core.models.flink_statement_model import *
+from shift_left.core.models.flink_compute_pool_model import *
 
 class VersionInfo:
     @staticmethod
@@ -94,7 +94,7 @@ class ConfluentCloudClient:
             logger.info("Statement execution result: %s", json.dumps(result, indent=2))
             return result
         except requests.exceptions.RequestException as e:
-            logger.info(f"Error executing rest call: {e}")
+            logger.error(f"Error executing rest call: {e}")
             return None
     
     def get_compute_pool_list(self, env_id: str, region: str) -> ComputePoolListResponse:
@@ -161,7 +161,7 @@ class ConfluentCloudClient:
         logger.info(f"List topic from {url}")
         try:
             result= self.make_request("GET", url)
-            logger.info(result)
+            logger.debug(result)
             return result
         except requests.exceptions.RequestException as e:
             logger.error(e)
@@ -201,7 +201,7 @@ class ConfluentCloudClient:
                     execution_time = time.perf_counter() - start_time
                     statement.loop_counter= counter
                     statement.execution_time= execution_time
-                    logger.info(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                    logger.debug(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
                     return statement    
         except Exception as e:
             logger.error(f">>>> wait_response() error waiting for response {e}")
@@ -251,7 +251,7 @@ class ConfluentCloudClient:
                     logger.error(f"Error parsing statement response: {resp}")
                     return None
         except Exception as e:
-            logger.info(f"Error executing GET statement call for {statement_name}: {e}")
+            logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             return None
 
     def delete_flink_statement(self, statement_name: str) -> str:
@@ -278,7 +278,7 @@ class ConfluentCloudClient:
                 time.sleep(timer)
             return "deleted"
         except requests.exceptions.RequestException as e:
-            logger.info(f"Error executing delete statement call for {statement_name}: {e}")
+            logger.error(f"Error executing delete statement call for {statement_name}: {e}")
             return "unknown - mostly not removed"
         
     def update_flink_statement(self, statement_name: str,  statement: Statement, stopped: bool):
