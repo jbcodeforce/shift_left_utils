@@ -9,9 +9,9 @@ class DefaultDmlNameModifier():
     """
     def modify_statement_name(self, node: FlinkStatementNode, statement_name: str, prefix: str) -> str:
         if prefix:
-            return prefix + "-" + statement_name
+            return (prefix + "-" + statement_name)[:64]
         else:
-            return statement_name
+            return statement_name[:64]
 
 class DmlNameModifier(DefaultDmlNameModifier):
     """
@@ -26,14 +26,14 @@ class DmlNameModifier(DefaultDmlNameModifier):
         else:
             if prefix:
                 statement_name = prefix + "-" + statement_name
-        return statement_name
+        return statement_name[:64]
 
 class DefaultComputePoolNameModifier():
     """
     Modifier to change the name of the compute pool
     """
     def modify_compute_pool_name(self, node: FlinkStatementNode, compute_pool_name: str) -> str:
-        return compute_pool_name
+        return compute_pool_name[:64]
 
 class ComputePoolNameModifier(DefaultComputePoolNameModifier):
     """
@@ -42,4 +42,4 @@ class ComputePoolNameModifier(DefaultComputePoolNameModifier):
     def build_compute_pool_name_from_table(self, table_name: str) -> str:
         env = get_config().get('kafka').get('cluster_type')
         pool_name = "-".join([env, table_name.replace("_", "-")]).replace("recordconfiguration", "reccfg").replace("recordexecution", "recexe")
-        return pool_name
+        return pool_name[:64]
