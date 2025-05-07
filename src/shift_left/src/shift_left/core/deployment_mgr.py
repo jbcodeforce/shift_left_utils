@@ -90,7 +90,8 @@ def deploy_pipeline_from_table(
         )
         
         persist_execution_plan(execution_plan)
-        summary = build_summary_from_execution_plan(execution_plan)
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+        summary = build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
         
         statements = _execute_plan(execution_plan, compute_pool_id)
@@ -149,7 +150,8 @@ def build_execution_plan_from_table_and_persist(
                                                         force_sources=force_sources,
                                                         start_time=start_time)
     persist_execution_plan(execution_plan)
-    summary=build_summary_from_execution_plan(execution_plan)
+    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    summary=build_summary_from_execution_plan(execution_plan, compute_pool_list)
     return summary
 
 def build_execution_plan_from_any_table(

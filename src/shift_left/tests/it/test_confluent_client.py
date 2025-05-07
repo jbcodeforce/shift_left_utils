@@ -28,8 +28,8 @@ class TestConfluentClient(unittest.TestCase):
         print("#"*30 + "\ntest_get_compute_pool_list\n")
         client = ConfluentCloudClient(get_config())
         config=get_config()
-        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
-        self.assertGreater(len(pools), 0)
+        pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'), config.get('confluent_cloud').get('region'))
+        self.assertGreater(pools.data, 0)
         print(json.dumps(pools, indent=2))
 
     def test_verify_compute_exist(self):
@@ -86,7 +86,7 @@ class TestConfluentClient(unittest.TestCase):
         status=client.delete_flink_statement(statement_name)
         print(f"\n--- {status}")
 
-    def test_get_topic_message_count(self):
+    def _test_get_topic_message_count(self):
         print("#"*30 + "\ntest_get_topic_message_count\n")
         os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
         client = ConfluentCloudClient(get_config())

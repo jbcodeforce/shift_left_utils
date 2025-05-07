@@ -17,7 +17,7 @@ STATEMENT_COMPUTE_POOL_FILE=shift_left_dir + "/pool_assignments.json"
 COMPUTE_POOL_LIST_FILE=shift_left_dir + "/compute_pool_list.json"
 
 
-def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition) -> Tuple[str, str]:
+def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition) -> str:
     """
     if the compute pool is given, use it, else assess if there is a statement
     for this table already running and reuse the compute pool, if not

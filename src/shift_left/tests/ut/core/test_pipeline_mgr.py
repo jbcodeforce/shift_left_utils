@@ -5,7 +5,7 @@ import unittest
 import os
 import json 
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
     
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
@@ -23,7 +23,7 @@ class TestPipelineManager(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
@@ -58,7 +58,7 @@ class TestPipelineManager(unittest.TestCase):
         """ Need to run this one first"""
         print("test_1_build_pipeline_def_for_fact_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
         result = pm.build_pipeline_definition_from_dml_content(table_path, path)
         assert result
         assert len(result.children) == 0
@@ -78,18 +78,18 @@ class TestPipelineManager(unittest.TestCase):
     def test_build_pipeline_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
         pm.build_pipeline_definition_from_dml_content(table_path, path)
-        result = pm.get_static_pipeline_report_from_table("fct_order", os.getenv("PIPELINES"))
+        result = pm.get_static_pipeline_report_from_table("p1_fct_order", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
 
     def test_walk_the_hierarchy_for_report_from_intermediate_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.fct_order.sql"
+        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
         pm.build_pipeline_definition_from_dml_content(table_path, path)
-        result = pm.get_static_pipeline_report_from_table("int_table_1", os.getenv("PIPELINES"))
+        result = pm.get_static_pipeline_report_from_table("int_p1_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
     

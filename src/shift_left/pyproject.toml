@@ -20,6 +20,7 @@ dependencies = [
     # "confluent_flink_table_api_python_plugin>=1.20.48"
     "requests>=2.32.3",
     "pydantic-yaml>=1.4.0",
+    "toml>=0.10.2",
 ]
 
 

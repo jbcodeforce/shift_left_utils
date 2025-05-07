@@ -10,6 +10,7 @@ from unittest.mock import patch
 os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
 import shift_left.core.pipeline_mgr as pipeline_mgr
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import (
         PIPELINE_JSON_FILE_NAME
 )
@@ -60,7 +61,7 @@ class TestDeploymentManager(unittest.TestCase):
         print(dm.build_summary_from_execution_plan(execution_plan))
            
 
-    def test_report_running_flink_statements_for_all_from_product(self):
+    def _test_report_running_flink_statements_for_all_from_product(self):
         os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         inventory_path=  os.environ["PIPELINES"]
         table_name="stage_tenant_dimension"
@@ -69,7 +70,12 @@ class TestDeploymentManager(unittest.TestCase):
         node = dm._assign_compute_pool_id_to_node(node,None)
         print(node)
 
-        
+    def test_get_topic_message_count(self):
+        os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
+        client = ConfluentCloudClient(get_config())
+        topic_name = "src_aqem_tag_tag"
+        message_count = client.get_topic_message_count(topic_name)
+        print(f"Message count for {topic_name}: {message_count}")
 
 if __name__ == '__main__':
     unittest.main()

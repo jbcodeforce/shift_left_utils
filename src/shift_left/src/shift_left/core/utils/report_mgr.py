@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from shift_left.core.models.flink_statement_model import Statement, FlinkStatementExecutionPlan
-from shift_left.core.models.flink_compute_pool_model import ComputePoolInfo
+from shift_left.core.models.flink_compute_pool_model import ComputePoolInfo, ComputePoolList
 from shift_left.core.compute_pool_mgr import get_compute_pool_with_id
 from shift_left.core.utils.app_config import shift_left_dir
 from pydantic import Field
@@ -66,7 +66,7 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
 
 
 
-def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, compute_pool_list: List[ComputePoolInfo]) -> str:
+def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, compute_pool_list: ComputePoolList) -> str:
     """
     Build a summary of the execution plan showing which statements need to be executed.
     
