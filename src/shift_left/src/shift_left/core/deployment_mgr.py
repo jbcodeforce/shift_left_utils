@@ -74,11 +74,8 @@ def deploy_pipeline_from_table(
     start_time = time.perf_counter()
     
     try:
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
-
-        # Validate and get compute pool
-        if compute_pool_id and not compute_pool_mgr.is_pool_valid(compute_pool_id):
-            compute_pool_id = compute_pool_mgr.get_or_build_compute_pool(compute_pool_id, pipeline_def)
 
         execution_plan = build_execution_plan_from_any_table(
             pipeline_def=pipeline_def,
@@ -90,7 +87,7 @@ def deploy_pipeline_from_table(
         )
         
         persist_execution_plan(execution_plan)
-        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+        
         summary = build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
         
@@ -185,6 +182,7 @@ def build_execution_plan_from_any_table(
         start_time = start_time or datetime.now()
         start_node.created_at = start_time
         start_node.dml_only = dml_only
+        start_node.compute_pool_id = compute_pool_id
         start_node = _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id)
         start_node.update_children = may_start_children
 
@@ -309,7 +307,7 @@ def report_running_flink_statements_for_all_from_product(
     """
     table_report = TableReport()
     table_report.product_name = product_name
-    table_report.environment_id = get_config().get('environment_id')
+    table_report.environment_id = get_config().get('confluent_cloud').get('environment_id')
     table_report.catalog_name = get_config().get('flink').get('catalog_name')
     table_report.database_name = get_config().get('flink').get('database_name')
     compute_pool_list = compute_pool_mgr.get_compute_pool_list()

@@ -10,6 +10,7 @@ from unittest.mock import patch
 os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
 import shift_left.core.pipeline_mgr as pipeline_mgr
+import shift_left.core.compute_pool_mgr as compute_pool_mgr
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import (
         PIPELINE_JSON_FILE_NAME
@@ -41,24 +42,19 @@ class TestDeploymentManager(unittest.TestCase):
 
     def _test_build_execution_plan(self):
         os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-        #table_path="/intermediates/aqem/tag_tag_dummy/"
-        #table_path="/facts/aqem/fct_action_item_event/"
-        #table_path="/views/aqem/mv_dim_element_event/"
-        #table_path="/sources/mx/src_data_capture/"
         inventory_path=  os.environ["PIPELINES"]
-        #table_path="/intermediates/p1/int_table_1/"
-        table_name="aqem_dim_event_action_item"
+        table_name="src_master_template"
         pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
         config = get_config()
         execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
-                                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
+                                                                compute_pool_id="lfcp-gyjd2v", 
                                                                 dml_only=False, 
                                                                 may_start_children=False,
                                                                 force_sources=False,
                                                                 start_time = datetime.now())
         
         dm.persist_execution_plan(execution_plan)
-        print(dm.build_summary_from_execution_plan(execution_plan))
+        print(dm.build_summary_from_execution_plan(execution_plan, compute_pool_mgr.get_compute_pool_list()))
            
 
     def _test_report_running_flink_statements_for_all_from_product(self):

@@ -32,8 +32,10 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
 
     client = ConfluentCloudClient(config)
     env_id = config['confluent_cloud']['environment_id']
-    if compute_pool_id and _validate_a_pool(client, compute_pool_id, env_id):
-        return compute_pool_id
+    if compute_pool_id:
+        validated, pool_name = _validate_a_pool(client, compute_pool_id, env_id)
+        if validated:
+            return compute_pool_id, pool_name
     else:
         logger.debug(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
         _, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def)
@@ -178,7 +180,7 @@ def _get_pool_usage(pool_info: dict) -> float:
     max = pool_info['spec']['max_cfu']
     return (current / max)
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id: str) -> bool:
+def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id: str) -> Tuple[bool, str]:
     """
     Validate a pool exist and with enough resources
     """
@@ -204,7 +206,7 @@ def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id:
         ratio = _get_pool_usage(pool_info) 
         if ratio >= 0.7:
             raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
-        return pool_info['status']['phase'] == "PROVISIONED"
+        return pool_info['status']['phase'] == "PROVISIONED", pool_info['spec']['display_name']
     except Exception as e:
         logger.error(e)
         logger.info("Continue processing to ignore compute pool constraint")

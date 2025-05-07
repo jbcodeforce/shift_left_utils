@@ -32,15 +32,14 @@ app.add_typer(project.app, name="project")
 app.add_typer(table.app, name="table")
 app.add_typer(pipeline.app, name="pipeline")
 
-__version__ = toml.load(open("pyproject.toml"))["project"]["version"]
-
+#__version__ = toml.load(open("pyproject.toml"))["project"]["version"]
+"""
 @app.callback()
 def version_callback(version: bool = typer.Option(False, "--version", help="Show version and exit", is_eager=True)):
-    """Show version and exit"""
     if version:
         typer.echo(f"shift-left version: {__version__}")
         raise typer.Exit()
-
+"""
 
 if __name__ == "__main__":
     """"

@@ -41,6 +41,7 @@ See the following recipes to support the management of those elements:
 * [Validate best practices](#validate-naming-convention-and-best-practices)
 * [Test harness](./test_harness.md)
 * [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
+* [Validate running statements]()
 
 ### Deployment centric use cases
 
@@ -71,7 +72,7 @@ To use the CLI be sure to follow the [setup instructions.](./setup.md)
 
 ### The config.yaml file
 
-The `config.yaml` file is important to set up and is referenced with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables)
+The `config.yaml` file is important to set up and is referenced with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables). This file should be setup per Confluent Cloud environment.
 
 ## Project related tasks
 
@@ -452,6 +453,16 @@ shift_left table update-tables $PIPELINES  --ddl --class-to-use shift_left.core.
         return updated, new_content
     ```
 
+### Specific task to update all Makefiles
+
+During the life of a project it may be relevant to add specific Make target, change naming convention,... therefore there is a need to be able to change all the Makefile within a `pipelines` folder. The command is simple and will take the updated template as source and apply specific tuning per table folder:
+
+```sh
+shift_left table update-all-makefiles $PIPELINES
+```
+
+As of now the template is in the source folder: `shift_left_utils/src/shift_left/src/shift_left/core/templates/makefile_ddl_dml_tmpl.jinja`.
+
 ### Migrate SQL tables from source to staging
 
 As presented in the [introduction](./index.md/#shift_left-tooling), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
@@ -659,13 +670,13 @@ The tool will keep existing file and merge content.
 Delete all the `pipeline_definition.json` files from a given folder. The command walk down the folder tree to find table folder.
 
 ```sh
-shift_left pipeline delete-metadata $PIPELINES
+shift_left pipeline delete-all-metadata $PIPELINES
 ```
 
 Only the facts tables:
 
 ```sh
-shift_left pipeline delete-metadata $PIPELINES/facts
+shift_left pipeline delete-all-metadata $PIPELINES/facts
 ```
 
 ### Define pipeline definitions for all the tables within a folder hierarchy
@@ -675,7 +686,7 @@ It may be relevant to update all the metadata definitions within a given folder.
 * For facts or dimensions
 
 ```sh
-shift_left pipeline delete-metadata $PIPELINES/facts
+shift_left pipeline delete-all-metadata $PIPELINES/facts
 #
 shift_left pipeline build-all-metadata $PIPELINES/facts
 ```
@@ -683,14 +694,40 @@ shift_left pipeline build-all-metadata $PIPELINES/facts
 * For all pipelines
 
 ```sh
-shift_left pipeline delete-metadata $PIPELINES
+shift_left pipeline delete-all-metadata $PIPELINES
 #
 shift_left pipeline build-all-metadata $PIPELINES
 # same as env variable will be used
 shift_left pipeline build-all-metadata
 ```
 
-### Build pipeline reports 
+### Build pipeline static reports 
+
+A static report is built by looking at the SQL content of the DML Flink statement and build list of parents of each table. The build-all-metadata may update t he meta-data file children part as other table consumes current table. As an example if `Table A` has zero children, but 6 parents the first version of its `pipeline_definition.json` will include only its 6 parents. When building `Table B` dependencies, as it uses `Table A`, then the `Table A` children will have the Table B as child:
+
+```yaml
+{
+   "table_name": "table_a",
+   "product_name": "p1",
+   ....
+    "children": [
+            {
+               "table_name": "table_b",
+               "product_name": "p1",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p1/table_b/sql-scripts/dml.int_p1_table_b.sql",
+               "ddl_ref": "pipelines/intermediates/p1/table_b/sql-scripts/ddl.int_p1_table_b.sql",
+               "path": "pipelines/intermediates/aqem/table_b",
+               "state_form": "Stateful",
+               "parents": [],
+               "children": []
+            }
+         ]
+```
+
+To avoid having too much data the parents and children lists of those added child are empty.
+
+Once those metadata files are created a lot of things can be done, and specially understand the static relationship between statements.
 
 * Get a report from one sink table to n sources: 
 
@@ -708,7 +745,27 @@ shift_left pipeline report src_table
 
 The same approach works for intermediate tables.
 
+The tool supports different output:
 
+* A very minimalist graph view
+
+```sh
+shift_left pipeline report fct_table --graph
+```
+
+* json extract
+
+
+```sh
+shift_left pipeline report fct_table --json
+```
+
+* yaml
+
+
+```sh
+shift_left pipeline report fct_table --yaml
+```
 
 ### Assess a Flink Statement execution plan
 
@@ -717,7 +774,7 @@ The execution plan is a hierarchical Flink statement hierarchy enriched with cur
 Here is a basic command for an intermediate table:
 
 ```sh
-shift_left pipeline build-execution-plan-from-table int_table_2 --compute-pool-id  lfcp-123456 --dml-only --force
+shift_left pipeline build-execution-plan-from-table int_table_2 
 ```
 
 It will take into account the following parameters in the config.yaml:
@@ -744,6 +801,32 @@ It will take into account the following parameters in the config.yaml:
     shift_left pipeline --help
     ```
 
+### Accessing running statements
+
+The execution plan helps to get valuable information and reports can be built from there:
+
+* Get the current Flink statement running in the environment specified in the config.yaml under: `confluent_cloud.environment_id` for a given table
+
+```sh
+# Get help
+shift_left pipeline report-running-statements  --help
+# Running Flink Statements
+shift_left pipeline report-running-statements --table-name fct_order
+```
+
+The list will include all the ancestors of the current table with the statement name, comput pool id and statement running status.
+
+* The report can be used to get all the statements for a given product. This will generate two files under the $HOME/.shift_left folder: csv and json files.
+
+```sh
+shift_left pipeline report-running-statements --product-name p1
+```
+
+* Finally the report can be run from the content of a folder, which basically addresses the use case to look at intermediates or facts for a given product or cross products:
+
+```sh
+shift_left pipeline report-running-statements --dir $PIPELINES/facts/p1
+```
 
 ### Pipeline Deployment
 

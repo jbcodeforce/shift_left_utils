@@ -145,37 +145,6 @@ class ConfluentCloudClient:
         data={'spec': spec}
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools"
         return self.make_request("POST", url, data)
-        
-
-    def list_topics(self):
-        """List the topics in the environment 
-        example of url https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics \
- 
-        """
-        region=self.config["confluent_cloud"]["region"]
-        cloud_provider=self.config["confluent_cloud"]["provider"]
-        pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
-        cluster_id=self.config["kafka"]["cluster_id"]
-        self._set_kafka_auth()
-        url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
-        logger.info(f"List topic from {url}")
-        try:
-            result= self.make_request("GET", url)
-            logger.debug(result)
-            return result
-        except requests.exceptions.RequestException as e:
-            logger.error(e)
-            return None
-
-
-    def build_flink_url_and_auth_header(self):
-        organization_id=self.config["confluent_cloud"]["organization_id"]
-        env_id=self.config["confluent_cloud"]["environment_id"]
-        self.api_key = self.config["flink"]["api_key"]
-        self.api_secret = self.config["flink"]["api_secret"]
-        self.auth_header = self._generate_auth_header()
-        url=f"https://{self.config['flink']['flink_url']}/sql/v1/organizations/{organization_id}/environments/{env_id}"
-        return url
 
 
     def wait_response(self, url: str, statement_name: str, start_time ) -> StatementResult:
@@ -209,6 +178,22 @@ class ConfluentCloudClient:
             statement_result = Statement.model_validate({"loop_counter": counter, "execution_time": execution_time, "result" : None})
             raise Exception(f"Done waiting with response= {statement_result.model_dump_json(indent=3)}")
 
+    # ---- Topic related methods ----
+    def _build_confluent_cloud_url(self) -> str:
+        region=self.config["confluent_cloud"]["region"]
+        cloud_provider=self.config["confluent_cloud"]["provider"]
+        pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
+        cluster_id=self.config["kafka"]["cluster_id"]
+        self.api_key = self.config["kafka"]["api_key"]
+        self.api_secret = self.config["kafka"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
+        glb_name=self.config["confluent_cloud"]["glb_name"]
+        if glb_name:
+            url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.{glb_name}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
+        else:
+            url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
+        return url
+    
     def get_topic_message_count(self, topic_name: str) -> int:
         """
         Get the number of messages in a Kafka topic.
@@ -219,14 +204,8 @@ class ConfluentCloudClient:
         Returns:
             int: The total number of messages in the topic
         """
-        region=self.config["confluent_cloud"]["region"]
-        cloud_provider=self.config["confluent_cloud"]["provider"]
-        pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
-        cluster_id=self.config["kafka"]["cluster_id"]
-        self.api_key = self.config["kafka"]["api_key"]
-        self.api_secret = self.config["kafka"]["api_secret"]
-        self.auth_header = self._generate_auth_header()
-        url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics/{topic_name}/partitions"
+        url=self._build_confluent_cloud_url()
+        url=f"{url}/{topic_name}/partitions"
         response = self.make_request("GET", url)
         partitions = response["data"]
         print(f"partitions: {partitions}")
@@ -235,10 +214,36 @@ class ConfluentCloudClient:
             partition_id = partition["partition_id"]
             url = f"{url}/{partition_id}"
             response = self.make_request("GET", url)
-            print(response)
+            logger.debug(response)
             
         return total_messages
 
+    def list_topics(self):
+        """List the topics in the environment 
+        example of url https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics \
+ 
+        """
+        url=self._build_confluent_cloud_url()
+        logger.info(f"List topic from {url}")
+        try:
+            result= self.make_request("GET", url)
+            logger.debug(result)
+            return result
+        except requests.exceptions.RequestException as e:
+            logger.error(e)
+            return None
+        
+
+    # ---- Flink related methods ----
+    def build_flink_url_and_auth_header(self):
+        organization_id=self.config["confluent_cloud"]["organization_id"]
+        env_id=self.config["confluent_cloud"]["environment_id"]
+        self.api_key = self.config["flink"]["api_key"]
+        self.api_secret = self.config["flink"]["api_secret"]
+        self.auth_header = self._generate_auth_header()
+        url=f"https://{self.config['flink']['flink_url']}/sql/v1/organizations/{organization_id}/environments/{env_id}"
+        return url
+    
     def get_flink_statement(self, statement_name: str)-> Statement | None:
         url = self.build_flink_url_and_auth_header()
         try:
@@ -300,5 +305,10 @@ class ConfluentCloudClient:
             return rep
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing rest call: {e}")
+
+    # ---- Metrics related methods ----
+    def get_metrics(self, view: str, qtype: str, query: str) -> dict:
+        url=f"https://api.telemetry.confluent.cloud/v2/metrics/{view}/{qtype}"
+        return self.make_request("POST", url, data=query)
      
 
