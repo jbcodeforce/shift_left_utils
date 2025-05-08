@@ -415,11 +415,12 @@ def full_pipeline_undeploy_from_table(
     config = get_config()
     trace = f"Full pipeline delete from table {table_name}\n"
     for node in reversed(execution_plan.nodes):
-        # start in 
-        r=_delete_not_shared_parent(pipeline_def, trace, config)
-        execution_time = time.perf_counter() - start_time
-        logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name} with result: {r}")
-        return r
+        statement_mgr.delete_statement_if_exists(node.dml_statement_name)
+        rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
+        trace+=f"Dropped table {node.table_name} with result: {rep}\n"
+    execution_time = time.perf_counter() - start_time
+    logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
+    return trace
 
 
 
@@ -722,6 +723,7 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
                                     to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
     return statement
+
 
 
 def _delete_not_shared_parent(current_node: FlinkStatementNode, trace:str, config ) -> str:

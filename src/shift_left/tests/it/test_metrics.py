@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
-
+import pathlib
 import os
 #os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
@@ -31,19 +31,25 @@ def get_topic_message_count(topic_name) -> int:
     """
     try:
         config = get_config()
-        c={"bootstrap.servers": config["kafka"]["bootstrap.servers"],
+        kafka_config={"bootstrap.servers": config["kafka"]["bootstrap.servers"],
            "group.id": "grp_test",
            "enable.auto.commit": False,
            "auto.offset.reset": "latest",
            "security.protocol": config["kafka"]["security.protocol"],
-           "sasl.mechanisms": config["kafka"]["sasl.mechanisms"],
+           "sasl.mechanism": config["kafka"]["sasl.mechanism"],
            "sasl.username": config["kafka"]["sasl.username"],
            "sasl.password": config["kafka"]["sasl.password"],
-           "client.id": config["kafka"]["client.id"],
+           "receive.message.max.bytes": 2500000,
+           #"client.id": config["kafka"]["client.id"],
            "session.timeout.ms": config["kafka"]["session.timeout.ms"]
            }
+        print(kafka_config)
+        admin_client = AdminClient(kafka_config)
+        metadata = admin_client.list_topics(timeout=10)
+        topics = list(metadata.topics.keys())
+
         consumer = Consumer(
-            c
+            kafka_config
         )
 
         metadata = consumer.list_topics(topic=topic_name)
@@ -117,13 +123,13 @@ class TestConfluentMetrics(unittest.TestCase):
         print(retention_size)
         assert retention_size > 0
 
-    def _test_get_message_count(self):
+    def test_get_message_count(self):
         table_name = "src_aqem_recordconfiguration_form_element"
         config = get_config()
         message_count = get_topic_message_count( table_name)
         print(message_count)
 
-    def test_get_pending_records(self):
+    def _test_get_pending_records(self):
         statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
         compute_pool_id = "lfcp-1o07pz"
         pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
