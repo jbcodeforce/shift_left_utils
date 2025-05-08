@@ -6,6 +6,15 @@ from shift_left.core.compute_pool_mgr import get_compute_pool_with_id
 from shift_left.core.utils.app_config import shift_left_dir
 from pydantic import Field
 
+class StatementBasicInfo(BaseModel):
+    name: str
+    environment_id: str 
+    created_at: str
+    uid: str
+    compute_pool_id: str
+    status: str
+    execution_time: float
+
 class DeploymentReport(BaseModel):
     """Report of a pipeline deployment operation.
     
@@ -17,10 +26,9 @@ class DeploymentReport(BaseModel):
         flink_statements_deployed: List of deployed Flink statements
     """
     table_name: Optional[str] = None
-    compute_pool_id: Optional[str] = None
-    ddl_dml: str = Field(default="Both", description="Type of deployment: DML only, or both")
+    dml_name: str = Field(default="Both", description="Type of deployment: DML only, or both")
     update_children: bool = Field(default=False)
-    flink_statements_deployed: List[Statement] = Field(default_factory=list)
+    flink_statements_deployed: List[StatementBasicInfo] = Field(default_factory=list)
 
 class TableInfo(BaseModel):
     table_name: str = ""
@@ -31,7 +39,9 @@ class TableInfo(BaseModel):
     created_at: str = ""
     compute_pool_id: str = ""
     compute_pool_name: str = ""
-
+    retention_size: int = 0
+    message_count: int = 0
+    pending_records: int = 0
 class TableReport(BaseModel):
     product_name: str = ""
     environment_id: str = ""
@@ -129,3 +139,26 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
         f.write(summary)
     return summary
+
+
+def build_deployment_report(
+    table_name: str, 
+    dml_ref: str, 
+    may_start_children: bool, 
+    statements: List[Statement]) -> DeploymentReport:
+    report = DeploymentReport(table_name=table_name, dml_name=dml_ref, update_children=may_start_children)
+    for statement in statements:
+        if statement:
+            report.flink_statements_deployed.append(_build_statement_basic_info(statement))
+    return report
+
+def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
+    return StatementBasicInfo(
+        name=statement.name,
+        environment_id=statement.environment_id,
+        created_at=statement.metadata.created_at,
+        uid=statement.metadata.uid,
+        compute_pool_id=statement.spec.compute_pool_id,
+        status=statement.status.phase,
+        execution_time=statement.execution_time
+    )

@@ -1,6 +1,6 @@
 [project]
 name = "shift-left"
-version = "0.1.14"
+version = "0.1.15"
 description = "The shift-left CLI to manage you shift-left project"
 authors = [
     {name = "jbcodeforce",email = "jerome.boyer@gmail.com"}
@@ -21,6 +21,7 @@ dependencies = [
     "requests>=2.32.3",
     "pydantic-yaml>=1.4.0",
     "toml>=0.10.2",
+    "confluent-kafka>=2.10.0",
 ]
 
 

@@ -199,10 +199,11 @@ class ReplaceEnvInSqlContent(TableWorker):
         else:
             if 'clone.dev' in sql_content:
                 sql_content = sql_content.replace('clone.dev.', '')
-            for k, v in self.dml_replacements[self.env].items():
-                sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
-                updated = (sql_out != sql_content)
-                sql_content=sql_out
-                logger.debug(f"{k} , {v} ")
+            if self.env in self.dml_replacements:
+                for k, v in self.dml_replacements[self.env].items():
+                    sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
+                    updated = (sql_out != sql_content)
+                    sql_content=sql_out
+                    logger.debug(f"{k} , {v} ")
         logger.debug(sql_content)
         return updated, sql_content

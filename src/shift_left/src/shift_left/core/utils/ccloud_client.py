@@ -163,9 +163,15 @@ class ConfluentCloudClient:
                     counter+=1
                     if counter == 6:
                         timer = 30
-                    if counter >= 10:
+                    if counter >= 15:
                         logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
-                        raise Exception(f"Done waiting with response= {statement.model_dump_json(indent=3)}")   
+                        error_statement = Statement.model_validate({"name": statement_name, 
+                                                                    "spec": statement.spec,
+                                                                    "status": {"phase": "FAILED", "detail": "Done waiting with response"},
+                                                                    "loop_counter": counter, 
+                                                                    "execution_time": execution_time, 
+                                                                    "result" : None})
+                        raise Exception(f"Done waiting with response= {error_statement.model_dump_json(indent=3)}")   
                 else:
                     execution_time = time.perf_counter() - start_time
                     statement.loop_counter= counter
@@ -309,6 +315,24 @@ class ConfluentCloudClient:
     # ---- Metrics related methods ----
     def get_metrics(self, view: str, qtype: str, query: str) -> dict:
         url=f"https://api.telemetry.confluent.cloud/v2/metrics/{view}/{qtype}"
-        return self.make_request("POST", url, data=query)
+        version_str = VersionInfo.get_version()
+        headers = {
+            "Authorization": self.auth_header,
+            "Content-Type": "application/json",
+            "User-Agent": f"python-shift-left-utils/{version_str}"
+        }
+        response = None
+        try:
+            response = requests.request(
+                method="POST",
+                url=url,
+                headers=headers,
+                data=query
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error executing rest call: {e}")
+            return None
      
 

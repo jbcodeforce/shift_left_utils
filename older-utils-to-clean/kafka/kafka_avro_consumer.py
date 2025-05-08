@@ -2,20 +2,8 @@ from confluent_kafka import Consumer, KafkaError, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 
-from app_config import read_config
-import os, argparse
-import json
-import coloredlogs, logging
-coloredlogs.install()
 
 CONFIG_FILE="config.yaml"
-
-parser = argparse.ArgumentParser(
-    prog=os.path.basename(__file__),
-    description='Generate records for testing given a schema subject in a schema registry'
-)
-
-parser.add_argument('-t', '--topic_name', required=True, help="The name of the topic to write message to")
 
 
 def prepare_consumer(config):
@@ -54,11 +42,3 @@ def process_messages(consumer, topic_name):
         # Close down consumer to commit final offsets.
         consumer.close()
 
-if __name__ == "__main__":
-    """
-    Load the data.json file, and sent each row as record to the kafka topic
-    """
-    args = parser.parse_args()
-    config=read_config(CONFIG_FILE)
-    consumer = prepare_consumer(config)
-    process_messages(consumer,args.topic_name)

@@ -2,58 +2,133 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
-from shift_left.core.utils.ccloud_client import ConfluentCloudClient
+
+import os
+#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
 from shift_left.core.utils.app_config import get_config
-from datetime import datetime
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
+from datetime import datetime, timedelta
+import json
+import shift_left.core.metric_mgr as metric_mgr 
+from confluent_kafka import Consumer, KafkaError, TopicPartition
+from confluent_kafka.admin import AdminClient
 
+import os, argparse
+import json
+
+
+def get_topic_message_count(topic_name) -> int:
+    """
+    Gets the approximate number of messages in a Kafka topic.
+
+    Args:
+        bootstrap_servers (str or list): Comma-separated string or list of Kafka broker addresses (e.g., 'localhost:9092').
+        topic_name (str): The name of the Kafka topic.
+
+    Returns:
+        int: The approximate total number of messages in the topic, or None if an error occurs.
+    """
+    try:
+        config = get_config()
+        c={"bootstrap.servers": config["kafka"]["bootstrap.servers"],
+           "group.id": "grp_test",
+           "enable.auto.commit": False,
+           "auto.offset.reset": "latest",
+           "security.protocol": config["kafka"]["security.protocol"],
+           "sasl.mechanisms": config["kafka"]["sasl.mechanisms"],
+           "sasl.username": config["kafka"]["sasl.username"],
+           "sasl.password": config["kafka"]["sasl.password"],
+           "client.id": config["kafka"]["client.id"],
+           "session.timeout.ms": config["kafka"]["session.timeout.ms"]
+           }
+        consumer = Consumer(
+            c
+        )
+
+        metadata = consumer.list_topics(topic=topic_name)
+        if topic_name not in metadata.topics:
+            print(f"Topic '{topic_name}' not found.")
+            return None
+
+        total_messages = 0
+        for partition_info in metadata.topics[topic_name].partitions.values():
+            tp = TopicPartition(topic_name, partition_info.id)
+            low, high = consumer.get_watermark_offsets(tp)
+            total_messages += high
+
+        consumer.close()
+        return total_messages
+
+    except KafkaError as e:
+        print(f"Kafka error: {e}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+        
 class TestConfluentMetrics(unittest.TestCase):
-    def setUp(self):
-        self.config = get_config()
-        self.client = ConfluentCloudClient(self.config)
 
-    def test_get_metric_kafka_topic(self):
+    
+
+    
+    def _test_get_metric_kafka_topic(self):
         view="cloud"
         qtype="query"
-        cluster_id = self.config["kafka"]["cluster_id"]
-        topic_name = "src_master_template"
-        query = {
-            "group_by": [
-                "metric.topic"
-            ],
-            "aggregations": [
-                {
-                "metric": "io.confluent.kafka.server/retained_bytes",
-                "agg": "SUM"
-                }
-            ],
-            "filter": {
-                "op": "AND",
-                "filters": [
-                    {
-                        "field": "resource.kafka.id",
-                        "op": "EQ",
-                        "value": cluster_id
+        topic_name = "src_aqem_recordconfiguration_form_element"
+        q1= {"aggregations":[
+                {"metric":"io.confluent.kafka.server/retained_bytes"}
+                ],
+            "filter":{"op":"OR",
+                      "filters":[{"field":"resource.kafka.id","op":"EQ","value":"lkc-1j51r6"},
+                                 {"field":"resource.kafka.id","op":"EQ","value":"lkc-3dx5pj"}]
                     },
-                    {
-                        "filter": {
-                            "field": "metric.topic",
+            "granularity":"PT1H",
+            "intervals":["2025-02-18T15:36:00+05:30/2025-02-18T16:36:00+05:30"],
+            "limit":1000,
+            "group_by":["resource.kafka.id"],
+            "format":"GROUPED"
+            }
+        now_minus_1_hour = datetime.now() - timedelta(hours=1)
+        now= datetime.now()
+        interval = f"{now_minus_1_hour.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+        query = {"aggregations": [{"metric": "io.confluent.kafka.server/retained_bytes"}],  
+                "filter": { "field": "resource.kafka.id",
                             "op": "EQ",
-                            "value": topic_name
-                        }
-                    }
-                ]
-            },
-            "group_by": [
-                "metric.topic"
-            ],
-            "granularity": "PT30M",
-            "intervals": [
-               "now-1m"
-            ],
-            "limit": 2
+                            "value": "v"
+                 },
+                "group_by": ["metric.topic"],
+                "granularity": "PT1M",
+                "intervals": [interval],
+                "limit": 10,
+                "format": "GROUPED"
         }
-        metrics = self.client.get_metrics(view, qtype, query)
-        print(metrics)
+
+
+    def _test_get_retention_size(self):
+        table_name = "src_aqem_recordconfiguration_form_element"
+        retention_size = metric_mgr.get_retention_size(table_name)
+        print(retention_size)
+        assert retention_size > 0
+    
+    def _test_get_total_message(self):
+        table_name = "src_aqem_recordconfiguration_form_element"
+        retention_size = metric_mgr.get_total_amount_of_messages(table_name)
+        print(retention_size)
+        assert retention_size > 0
+
+    def _test_get_message_count(self):
+        table_name = "src_aqem_recordconfiguration_form_element"
+        config = get_config()
+        message_count = get_topic_message_count( table_name)
+        print(message_count)
+
+    def test_get_pending_records(self):
+        statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
+        compute_pool_id = "lfcp-1o07pz"
+        pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
+        print(pending_records)
+        assert pending_records >= 0
 
 if __name__ == '__main__':
     unittest.main()

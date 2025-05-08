@@ -223,17 +223,6 @@ class TestSQLParser(unittest.TestCase):
                     ed.parent_id,
                     ed.table_row_id,
                     ed.element_name as `name`,
-                    CASE
-                        WHEN ed.element_type = 'ATTACHMENT'
-                            THEN REGEXP_REPLACE(att.filename, '^["\[]|["\]"]$', '')
-                        -- If the Type is LINK, AND the RECORD LINK ID is not null, THEN we populate Element Value with the Record Number AND Title of the destination record.
-                        WHEN (ed.element_type = 'LINK'  OR ed.element_type = 'RECORD_LINK') AND l.link_id is not null
-                            THEN CONCAT(REGEXP_REPLACE(l.record_number, '^["\[]|["\]"]$', ''), ':', REGEXP_REPLACE(l.title, '^["\[]|["\]"]$', ''))
-                        -- If the Type is LINK, AND the DOCUMENT LINK ID is not null, THEN we populate Element Value with the Document Number AND Title of the destination document.
-                        WHEN ed.element_type = 'LINK' AND d.link_id is not null
-                            THEN CONCAT(REGEXP_REPLACE(d.document_number, '^["\[]|["\]"]$', ''), ':', REGEXP_REPLACE(d.title, '^["\[]|["\]"]$', ''))
-                        ELSE ed.element_data 
-                    END AS `value`,
                     CASE 
                         WHEN ed.element_type = 'DROPDOWN'
                             THEN ed.element_data

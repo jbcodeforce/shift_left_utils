@@ -40,11 +40,10 @@ class TestDeploymentManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up test environment before running tests."""
-        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "./data"
-        os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
+        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
-        #pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def setUp(self) -> None:
         """Set up test case before each test."""

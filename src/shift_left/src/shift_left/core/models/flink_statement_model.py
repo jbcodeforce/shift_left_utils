@@ -111,7 +111,7 @@ class FlinkStatementNode(BaseModel):
     """
     # -- static information
     table_name: str
-    product_name: Optional[str]
+    product_name: Optional[str] = Field(default=None, description="Data Product name")
     type: Optional[str] = Field(default=None, description="Type of the node")
     path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
     created_at: Optional[datetime] = Field(default=None)

@@ -27,12 +27,14 @@ from shift_left.core.models.flink_statement_model import (
     FlinkStatementNode,
     FlinkStatementExecutionPlan
 )
+import shift_left.core.metric_mgr as metrics_mgr
 from shift_left.core.utils.report_mgr import (
     DeploymentReport,
     TableInfo,
     TableReport,
     build_simple_report,
-    build_summary_from_execution_plan
+    build_summary_from_execution_plan,
+    build_deployment_report
 )
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.file_search import (
@@ -92,13 +94,7 @@ def deploy_pipeline_from_table(
         logger.info(f"Execute the plan before deployment: {summary}")
         
         statements = _execute_plan(execution_plan, compute_pool_id)
-        result = DeploymentReport(
-            table_name=table_name,
-            compute_pool_id=compute_pool_id,
-            update_children=may_start_children,
-            ddl_dml="DML" if dml_only else "Both",
-            flink_statements_deployed=statements
-        )
+        result = build_deployment_report(table_name, pipeline_def.dml_ref, may_start_children, statements)
         
         execution_time = time.perf_counter() - start_time
         logger.debug(
@@ -334,22 +330,23 @@ def report_running_flink_statements_for_all_from_product(
                     else:
                         table_info.compute_pool_name = "UNKNOWN"
                     table_info.created_at = node.existing_statement_info.created_at
+                    if table_info.status == "RUNNING":
+                        table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
+                        table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name)
+                        table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
                     table_report.tables.append(table_info)
     table_count=0
     running_count=0
     non_running_count=0
-    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at\n"
+    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records\n"
     for table in table_report.tables:
-        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at}\n"
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at},{table.retention_size},{table.message_count},{table.pending_records}\n"
         if table.status == 'RUNNING':
             running_count+=1
         else:
             non_running_count+=1
         table_count+=1
-    print(csv_content)
-    print(f"Total tables: {table_count}")
-    print(f"Running tables: {running_count}")
-    print(f"Non running tables: {non_running_count}")
+
     with open(f"{shift_left_dir}/{product_name}_report.csv", "w") as f:
         f.write(csv_content)
     with open(f"{shift_left_dir}/{product_name}_report.json", "w") as f:

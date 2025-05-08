@@ -3,12 +3,12 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
-import time
-import pathlib
-from unittest.mock import patch
+
 #os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+#os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-dev.yaml"
+#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+os.environ["PIPELINES"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
 import shift_left.core.pipeline_mgr as pipeline_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
@@ -23,19 +23,20 @@ from typing import Union
 
 
 
-class TestDeploymentManager(unittest.TestCase):
+class DebugDeploymentManager(unittest.TestCase):
        
-    def _test_something(self):
+    def test_deplo(self):
         """
         """
-        os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
         import shift_left.core.deployment_mgr as dm
         config = get_config()
-        result = dm.deploy_all_from_directory(os.getenv("PIPELINES") + "/facts/p2",
-                                               os.getenv("PIPELINES"), 
-                                               config.get('flink').get('compute_pool_id'), 
-                                               False, 
-                                               True)
+        table_name = "int_qx_infocard_helper_get_full_result"
+        result = dm.deploy_pipeline_from_table(table_name=table_name,
+                                               inventory_path=os.getenv("PIPELINES"), 
+                                               compute_pool_id=config.get('flink').get('compute_pool_id'), 
+                                               dml_only=False, 
+                                               may_start_children=True,
+                                               force_sources=False)
         assert result
         print(result.model_dump_json())
 
@@ -66,7 +67,7 @@ class TestDeploymentManager(unittest.TestCase):
         node = dm._assign_compute_pool_id_to_node(node,None)
         print(node)
 
-    def test_get_topic_message_count(self):
+    def _test_get_topic_message_count(self):
         os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
         client = ConfluentCloudClient(get_config())
         topic_name = "src_aqem_tag_tag"
