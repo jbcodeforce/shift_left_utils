@@ -92,7 +92,7 @@ def post_flink_statement(compute_pool_id: str,
                 "spec": {
                     "statement": sql_content,
                     "properties": properties,
-                    "compute_pool_id":  compute_pool_id,
+                    "compute_pool_id": compute_pool_id if isinstance(compute_pool_id, str) else compute_pool_id[0],
                     "stopped": stopped
                 }
             }

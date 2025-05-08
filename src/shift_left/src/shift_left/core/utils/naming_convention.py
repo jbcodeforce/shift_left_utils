@@ -9,9 +9,9 @@ class DefaultDmlNameModifier():
     """
     def modify_statement_name(self, node: FlinkStatementNode, statement_name: str, prefix: str) -> str:
         if prefix:
-            return (prefix + "-" + statement_name)[:64]
+            return prefix + "-" + statement_name
         else:
-            return statement_name[:64]
+            return statement_name
 
 class DmlNameModifier(DefaultDmlNameModifier):
     """
@@ -26,7 +26,7 @@ class DmlNameModifier(DefaultDmlNameModifier):
         else:
             if prefix:
                 statement_name = prefix + "-" + statement_name
-        return statement_name[:64]
+        return statement_name
 
 class DefaultComputePoolNameModifier():
     """
