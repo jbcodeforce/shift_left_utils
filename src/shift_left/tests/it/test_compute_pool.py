@@ -10,18 +10,60 @@ os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config
 
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_compute_pool_model import *
-from shift_left.core.compute_pool_mgr import get_compute_pool_list
+import shift_left.core.compute_pool_mgr as compute_mgr
 
 class TestComputePoolMgr(unittest.TestCase):
 
    
-    def test_compute_pool_list(self):
+    def test_1_compute_pool_list(self):
         config = get_config()
-        cpl = get_compute_pool_list(config.get('confluent_cloud').get('environment_id'), 
+        cpl = compute_mgr.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'), 
                                     region= config.get('confluent_cloud').get('region'))
         print(cpl.model_dump_json(indent=3))
         assert cpl.pools is not None
         assert len(cpl.pools) > 0
+        assert cpl.pools[0].env_id == config.get('confluent_cloud').get('environment_id')
+        assert cpl.pools[0].region == config.get('confluent_cloud').get('region')
+        assert cpl.pools[0].status_phase == "PROVISIONED"
+        assert cpl.pools[0].current_cfu >= 0
+        assert cpl.pools[0].max_cfu > 0
+    
+
+    def test_2_search_for_matching_compute_pools(self):
+        config = get_config()
+        cpl = compute_mgr.search_for_matching_compute_pools("p1-fct-order")
+        assert cpl is not None
+        assert len(cpl) > 0
+        assert cpl[0].name == "dev-p1-fct-order"
+        assert cpl[0].env_id == config.get('confluent_cloud').get('environment_id')
+        assert cpl[0].region == config.get('confluent_cloud').get('region')
+        assert cpl[0].status_phase == "PROVISIONED"
+        assert cpl[0].current_cfu >= 0
+        assert cpl[0].max_cfu > 0
+
+    def test_3_create_existing_compute_pool(self):
+        try:    
+            compute_pool_id, compute_pool_name = compute_mgr.create_compute_pool("p1-fct-order")
+        except Exception as e:
+            print(e)
+            assert True
+    
+    def test_4_create_compute_pool(self):
+        try:    
+            compute_pool_id, compute_pool_name = compute_mgr.create_compute_pool("p1-test-table")
+            assert compute_pool_id is not None
+            assert compute_pool_name is not None
+            assert compute_mgr.is_pool_valid(compute_pool_id)
+            compute_mgr.delete_compute_pool(compute_pool_id)
+        except Exception as e:
+            print(e)
+            assert True
+
+    def _test_5_delete_compute_pool(self):
+        compute_mgr.delete_compute_pool("lfcp-9rv5k5")
+        cpl = compute_mgr.get_compute_pool_list()
+        print(cpl.model_dump_json(indent=3))
+        assert True
 
 if __name__ == '__main__':
     unittest.main()

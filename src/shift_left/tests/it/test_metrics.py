@@ -13,8 +13,8 @@ import json
 import shift_left.core.metric_mgr as metric_mgr 
 from confluent_kafka import Consumer, KafkaError, TopicPartition
 from confluent_kafka.admin import AdminClient
-
-import os, argparse
+import socket
+import os
 import json
 
 
@@ -39,20 +39,20 @@ def get_topic_message_count(topic_name) -> int:
            "sasl.mechanism": config["kafka"]["sasl.mechanism"],
            "sasl.username": config["kafka"]["sasl.username"],
            "sasl.password": config["kafka"]["sasl.password"],
-           "receive.message.max.bytes": 2500000,
            #"client.id": config["kafka"]["client.id"],
+           "receive.message.max.bytes": 1213486160,
            "session.timeout.ms": config["kafka"]["session.timeout.ms"]
            }
         print(kafka_config)
-        admin_client = AdminClient(kafka_config)
-        metadata = admin_client.list_topics(timeout=10)
-        topics = list(metadata.topics.keys())
+        #admin_client = AdminClient(kafka_config)
+        #metadata = admin_client.list_topics(timeout=10)
+        #topics = list(metadata.topics.keys())
 
         consumer = Consumer(
             kafka_config
         )
 
-        metadata = consumer.list_topics(topic=topic_name)
+        metadata = consumer.list_topics(timeout=10)
         if topic_name not in metadata.topics:
             print(f"Topic '{topic_name}' not found.")
             return None
@@ -77,6 +77,20 @@ class TestConfluentMetrics(unittest.TestCase):
 
     
 
+    def _test_socket_connection(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        config = get_config()
+        kafka_cluster_host=config["kafka"]["bootstrap.servers"].split(":")[0]
+        kafka_cluster_port=int(config["kafka"]["bootstrap.servers"].split(":")[1])
+        print(f"Checking connection to {kafka_cluster_host}:{kafka_cluster_port}")
+        sock.settimeout(10)  # 10 second timeout
+        result = sock.connect_ex((kafka_cluster_host,kafka_cluster_port))
+        assert result == 0
+        if result == 0:
+            print ("Port is open")
+        else:
+            print ("Port is not open")
+        sock.close()    
     
     def _test_get_metric_kafka_topic(self):
         view="cloud"

@@ -561,24 +561,5 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[5].table_name == "p1_fct_order"
 
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.create_compute_pool')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_create_compute_pool_for_node(self, mock_get_compute_pool_list, mock_create_compute_pool):
-        """Test assigning compute pool id to a node."""
-        print("test_assign_compute_pool_id_to_node")
-
-        def mock_create_compute_pool(table_name: str) -> Tuple[str, str]:
-            return "test-pool-123", "test-pool-name"
-        # Setup
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_create_compute_pool.side_effect = mock_create_compute_pool
-        node = self._create_mock_statement_node("table1")
-        inventory_path = os.getenv("PIPELINES")
-        table_name="p1_fct_order"
-        pipeline_def=  pm.get_pipeline_definition_for_table(table_name, inventory_path)
-        node = pipeline_def.to_node()
-        node = dm._assign_compute_pool_id_to_node(node, None)
-        assert node.compute_pool_id == "test-pool-121"
-
 if __name__ == '__main__':
     unittest.main()

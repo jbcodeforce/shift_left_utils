@@ -5,7 +5,7 @@ kafka:
   api_key: <kafka-api-key>
   api_secret: <kafka-api-key_secret>
   security.protocol: SASL_SSL
-  sasl.mechanisms: PLAIN
+  sasl.mechanism: PLAIN
   sasl.username:  <TO_FILL>
   sasl.password:  <TO_FILL>
   session.timeout.ms: 5000

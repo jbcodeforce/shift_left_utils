@@ -119,7 +119,7 @@ def deploy_from_execution_plan(
 def load_and_deploy_from_execution_plan(execution_plan_file: str, 
                               compute_pool_id: str) -> list[Statement]:
     """
-    Execute the statements in the execution plan.
+    Execute the statements in the execution plan loaded from a file.
     """
     with open(execution_plan_file, "r") as f:
         execution_plan = FlinkStatementExecutionPlan.model_validate_json(f.read())
@@ -134,7 +134,7 @@ def build_execution_plan_from_table_and_persist(
     force_sources: bool = False,
     start_time: Optional[datetime] = None
 ) -> str:
-    
+    statement_mgr.reset_statement_list()
     pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
     execution_plan=build_execution_plan_from_any_table(pipeline_def=pipeline_def,
                                                         compute_pool_id=compute_pool_id,
@@ -193,13 +193,13 @@ def build_execution_plan_from_any_table(
 
         ancestors = []
         visited_nodes = set()
-        start_node = _get_and_update_statement_info_for_node(start_node)
+        start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
         ancestors = _build_topological_sorted_parents(start_node, node_map)
 
         # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
         # in the same product family as the start_node. The ancestor list is sorted so first node needs to run first
         for node in ancestors:
-            node = _get_and_update_statement_info_for_node(node)
+            node = _get_and_update_statement_info_compute_pool_id_for_node(node)
             if node.is_running():
                 if node.type == "source":
                     node.to_run = force_sources
@@ -214,6 +214,7 @@ def build_execution_plan_from_any_table(
             if node.to_run and not node.compute_pool_id:
                 node = _assign_compute_pool_id_to_node(node, compute_pool_id)
             if node.product_name == start_node.product_name or node.product_name in ['', 'common', 'stage']:
+                # keep all the nodes that are in the same product family as the start node even running ones
                 execution_plan.nodes.append(node)       
 
         start_node.to_restart = True
@@ -227,9 +228,10 @@ def build_execution_plan_from_any_table(
                     if (child not in execution_plan.nodes and
                         node.update_children and
                         child.product_name == start_node.product_name):
+                            # child nodes in the same product and when user wants to update children
                             child_node = node_map[child.table_name]
-                            child_node = _get_and_update_statement_info_for_node(child_node)
-                            child_node.to_restart = node.update_children
+                            child_node = _get_and_update_statement_info_compute_pool_id_for_node(child_node)
+                            child_node.to_restart = True
                             child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
                             if node.update_children:
                                 child_node.parents.remove(node)  # do not reprocess parent of current child
@@ -577,7 +579,7 @@ def _build_topological_sorted_children(current_node: FlinkStatementNode, node_ma
 
 
 
-def _get_and_update_statement_info_for_node(node: FlinkStatementNode) -> FlinkStatementNode:
+def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatementNode) -> FlinkStatementNode:
     """
     Update node with current statement info.
     
@@ -585,7 +587,8 @@ def _get_and_update_statement_info_for_node(node: FlinkStatementNode) -> FlinkSt
         node: Node to update
         
     Returns:
-        Updated node
+        Updated node with existing_statement_info field getting the retrieved statement info
+        and compute_pool_id and compute_pool_name fields getting the values from the statement info
     """
     node.existing_statement_info = statement_mgr.get_statement_status(node.dml_statement_name)
     if node.existing_statement_info.compute_pool_id:
@@ -606,7 +609,7 @@ def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
 def _add_non_running_parents(node, execution_plan, node_map):
     for p in node.parents:
         node_p = node_map[p.table_name]
-        node_p = _get_and_update_statement_info_for_node(node_p)
+        node_p = _get_and_update_statement_info_compute_pool_id_for_node(node_p)
         if not node_p.is_running() and not node_p.to_run and node_p not in execution_plan:
             # position the parent before the node to be sure it is started before it
             idx=execution_plan.nodes.index(node)
@@ -614,34 +617,45 @@ def _add_non_running_parents(node, execution_plan, node_map):
             node_p.to_run = True
 
 def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
-    
+    """
+    Assign a compute pool id to a node. Node may already have an assigned compute pool id from a running statement or becasuse it
+    is set as argument of the command line. If this is an ancestor or a child of a running node, it may be possible there is no running 
+    statement for that node so not compute pool id is set. In this case we need to find a compute pool to use.
+    """
     # If the node already has an assigned compute pool, continue using that
     if node.compute_pool_id and compute_pool_mgr.is_pool_valid(node.compute_pool_id):  # this may be loaded from the statement info
-        return node
-
-    compute_pool_list = compute_pool_mgr.get_compute_pool_list(get_config().get('confluent_cloud').get('environment'), 
-                                              get_config().get('confluent_cloud').get('region'))
-    
-    pools=compute_pool_mgr.search_for_matching_compute_pools(compute_pool_list=compute_pool_list,
-                                      table_name=node.table_name)
-    
-    # If we don't have any matching compute pools, we need to find a pool to use
-    if  not pools:
-        configured_compute_pool_id = get_config()['flink']['compute_pool_id']
-        # If the config has a valid compute pool, use that one
-        if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
-            node.compute_pool_id = configured_compute_pool_id
-        else:
-            node.compute_pool_id =compute_pool_mgr.create_compute_pool(node.table_name)
         node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
         return node
-    if len(pools) == 1:
-        node.compute_pool_id = pools[0].id
-        node.compute_pool_name = pools[0].name
+    # get the list of compute pools available in the environment that match the table name
+    pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
+    
+    # If we don't have any matching compute pools, we need to find a pool to use
+    if  not pools or len(pools) == 0:
+        if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
+            node.compute_pool_id = compute_pool_id
+            node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+        else:
+            configured_compute_pool_id = get_config()['flink']['compute_pool_id']
+            if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+                node.compute_pool_id = configured_compute_pool_id
+                node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+            else:
+                node.compute_pool_id, node.compute_pool_name =compute_pool_mgr.create_compute_pool(node.table_name)
         return node
-    # If we supply a specific compute_pool_id, use that if it's valid
-    if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
-        node.compute_pool_id = compute_pool_id
+    if len(pools) == 1:
+        if pools[0].current_cfu / pools[0].max_cfu < .7:
+            node.compute_pool_id = pools[0].id
+            node.compute_pool_name = pools[0].name  
+        else:
+            configured_compute_pool_id = get_config()['flink']['compute_pool_id']
+            if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+                node.compute_pool_id = configured_compute_pool_id
+                node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+        return node
+    # let use the configured compute pool id if it is valid
+    configured_compute_pool_id = get_config()['flink']['compute_pool_id']
+    if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+        node.compute_pool_id = configured_compute_pool_id
         node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
     return node
 
@@ -818,6 +832,7 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     Prevents processing nodes that would create circular dependencies.
     """
     return node.product_name == current.product_name
+
 
 # --- to work on for stateless ---------------
 

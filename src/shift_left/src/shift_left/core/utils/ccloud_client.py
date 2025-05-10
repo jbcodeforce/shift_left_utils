@@ -134,8 +134,10 @@ class ConfluentCloudClient:
         return compute_pool_list
         
 
-    def get_compute_pool_info(self, compute_pool_id: str, env_id: str):
+    def get_compute_pool_info(self, compute_pool_id: str, env_id: str = None):
         """Get the info of a compute pool"""
+        if not env_id:
+            env_id=self.config["confluent_cloud"]["environment_id"]
         self._set_cloud_auth()
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
         return self.make_request("GET", url)
@@ -146,6 +148,12 @@ class ConfluentCloudClient:
         url=f"https://api.confluent.cloud/fcpm/v2/compute-pools"
         return self.make_request("POST", url, data)
 
+    def delete_compute_pool(self, compute_pool_id: str, env_id: str = None):
+        if not env_id:
+            env_id=self.config["confluent_cloud"]["environment_id"]
+        self._set_cloud_auth()
+        url=f"https://api.confluent.cloud/fcpm/v2/compute-pools/{compute_pool_id}?environment={env_id}"
+        return self.make_request("DELETE", url)
 
     def wait_response(self, url: str, statement_name: str, start_time ) -> StatementResult:
         """

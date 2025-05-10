@@ -1,8 +1,8 @@
 CLI Command, Code, UT, IT, Documentation, Recipe
-project init, Y, , , Y, Y
-project list-topics, Y, , ,Y,Y
+project init, Y, Y ,NA , Y, Y
+project list-topics, Y,Y,NA ,Y,Y
 project list-compute-pools, Y, , ,Y,N
-project clear-logs, Y, , ,Y,N
+project clear-logs, Y,, ,Y,N
 project update-makefiles, N, , , N, N
 table init, Y, , , Y, Y
 table build-inventory, Y, , ,Y,N 

@@ -5,7 +5,6 @@ import yaml
 import os
 from functools import lru_cache
 import logging
-import logging
 from logging.handlers import RotatingFileHandler
 
 _config = None
@@ -31,6 +30,7 @@ def get_config() -> dict[str, str] | None:
 shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left') 
 log_dir = os.path.join(shift_left_dir, 'logs')
 logger = logging.getLogger("shift_left")
+logger.propagate = False  # Prevent propagation to root logger
 os.makedirs(log_dir, exist_ok=True)
 logger.setLevel(get_config()["app"]["logging"])
 log_file_path = os.path.join(log_dir, "shift_left_cli.log")
