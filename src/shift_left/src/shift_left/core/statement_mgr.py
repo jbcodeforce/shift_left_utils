@@ -216,7 +216,8 @@ def get_statement_list() -> dict[str, StatementInfo]:
 def reset_statement_list():
     global _statement_list_cache
     _statement_list_cache = None
-    os.remove(STATEMENT_LIST_FILE)
+    if os.path.exists(STATEMENT_LIST_FILE):
+        os.remove(STATEMENT_LIST_FILE)
 
 def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
     """

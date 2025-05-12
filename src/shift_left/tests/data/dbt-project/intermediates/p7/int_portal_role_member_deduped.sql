@@ -1,0 +1,1 @@
+{{ dedup(ref('src_portal_role_member'), 'role_id, member_id') }}

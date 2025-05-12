@@ -359,12 +359,13 @@ def _visit_parents(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipe
         FlinkTablePipelineDefinition containing parents information as FlinkTablePipelineDefinition
     """
     parents = set()
-    logger.info(f"parent of -> {current_node.table_name}")
+    
     for parent in current_node.parents:
         parent_info = _get_statement_hierarchy_from_table_ref(parent)
         rep = _visit_parents(parent_info)
         parents.add(rep)
     current_node.parents = parents
+    logger.info(f"The parents of {current_node.table_name} are {'\n* '.join([p.table_name for p in parents])}")
     return current_node
 
 def _visit_children(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipelineDefinition:
