@@ -103,6 +103,10 @@ def build_all_pipeline_definitions(pipeline_path: str):
     count += _process_one_sink_folder(views_path, pipeline_path, count)
     views_path = Path(pipeline_path) / "intermediates"
     count += _process_one_sink_folder(views_path, pipeline_path, count)
+    views_path = Path(pipeline_path) / "stage"
+    count += _process_one_sink_folder(views_path, pipeline_path, count)
+    views_path = Path(pipeline_path) / "sources"
+    count += _process_one_sink_folder(views_path, pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
 
     
@@ -202,7 +206,7 @@ def _build_pipeline_definitions_from_sql_content(
                         with open(table_dml_ref, "r") as g:
                             _sql_content = g.read()
                             dependent_state_form = parser.extract_upgrade_mode(_sql_content)
-                    logger.info(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
+                    logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
                     dependencies.add(_build_pipeline_definition(
                         table_name, 
                         table_ref.type,
@@ -286,7 +290,7 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logger.info(f"\n\n... processing the node {current_node}")
+        logger.info(f"{current_node}")
         if not current_node.table_name in processed_nodes:
             if not current_node.parents:
                 table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, table_inventory)
