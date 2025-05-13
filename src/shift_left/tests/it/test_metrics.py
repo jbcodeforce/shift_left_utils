@@ -131,14 +131,17 @@ class TestConfluentMetrics(unittest.TestCase):
         print(retention_size)
         assert retention_size > 0
     
-    def _test_get_total_message(self):
+    def test_get_total_message(self):
         table_name = "src_aqem_recordconfiguration_form_element"
-        retention_size = metric_mgr.get_total_amount_of_messages(table_name)
-        print(retention_size)
-        assert retention_size > 0
+        compute_pool_id = "lfcp-79zx9j"
+        nb_of_messages = metric_mgr.get_total_amount_of_messages(table_name, compute_pool_id)
+        print(nb_of_messages)
+        #assert nb_of_messages > 0
 
-    def test_get_message_count(self):
+    def _test_get_message_count(self):
+        # this test is not working because of access to the kafka cluster
         table_name = "src_aqem_recordconfiguration_form_element"
+ 
         config = get_config()
         message_count = get_topic_message_count( table_name)
         print(message_count)

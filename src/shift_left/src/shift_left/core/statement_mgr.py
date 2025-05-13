@@ -70,7 +70,9 @@ def get_statement_status(statement_name: str) -> StatementInfo:
         return statement_list[statement_name]
     statement_info = StatementInfo(name=statement_name,
                                    status_phase="UNKNOWN",
-                                   status_detail="Statement not found int the existing deployed Statements"
+                                   status_detail="Statement not found int the existing deployed Statements",
+                                   compute_pool_id=None,
+                                   compute_pool_name=None
                                 )
     return statement_info  
 

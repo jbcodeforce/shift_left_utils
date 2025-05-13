@@ -338,3 +338,9 @@ uv tool install shift_left@dist/shift_left-0.1.4-py3-none-any.whl
 # under the shift_left_utils/src/shift_left folder
  uv run typer src/shift_left/cli.py utils docs --output ../../docs/command.md
 ```
+
+* Recompile a requirements.txt for pip users:
+
+```sh
+uv pip compile pyproject.toml -o requirements.txt
+```

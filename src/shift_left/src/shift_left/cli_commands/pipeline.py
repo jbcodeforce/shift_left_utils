@@ -167,8 +167,10 @@ def deploy(
     """
     Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
     """
+
     try:
         if dir:
+            print(f"Deploy all statements from directory {dir}")
             result, summary = deployment_mgr.deploy_all_from_directory(
                 directory = dir, 
                 inventory_path = inventory_path, 
@@ -177,6 +179,7 @@ def deploy(
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
         elif table_name:
+            print(f"Deploy pipeline from table {table_name}")
             result, summary = deployment_mgr.deploy_pipeline_from_table(
                 table_name = table_name, 
                 inventory_path = inventory_path, 

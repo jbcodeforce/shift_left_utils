@@ -2,29 +2,10 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import typer
-import os
-import toml
 from shift_left.cli_commands import project, table, pipeline
-import logging
-from logging.handlers import RotatingFileHandler
-from shift_left.core.utils.app_config import get_config
 
-log_dir = os.path.join(os.getcwd(), 'logs')
-logger = logging.getLogger("shift_left")
-os.makedirs(log_dir, exist_ok=True)
-logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "shift_left.log")
-file_handler = RotatingFileHandler(
-    log_file_path, 
-    maxBytes=1024*1024*4,  # 4MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(get_config()["app"]["logging"])
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
-logger.addHandler(file_handler)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-logger.addHandler(console_handler)
+
+
 
 
 app = typer.Typer(no_args_is_help=True)

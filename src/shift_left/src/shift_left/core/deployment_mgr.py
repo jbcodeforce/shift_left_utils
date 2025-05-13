@@ -92,6 +92,7 @@ def deploy_pipeline_from_table(
         
         summary = build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
+        print(f"Execute the plan before deployment: {summary}")
         
         statements = _execute_plan(execution_plan, compute_pool_id)
         result = build_deployment_report(table_name, pipeline_def.dml_ref, may_start_children, statements)
@@ -213,8 +214,9 @@ def build_execution_plan_from_any_table(
                 node.update_children = may_start_children
             if node.to_run and not node.compute_pool_id:
                 node = _assign_compute_pool_id_to_node(node, compute_pool_id)
-            if node.product_name == start_node.product_name or node.product_name in ['', 'common', 'stage']:
-                # keep all the nodes that are in the same product family as the start node even running ones
+            if node.product_name == start_node.product_name or node.product_name in ['', 'common', 'stage', 'mx']:
+            # (keep all the nodes that are in the same product family as the start node even running ones)
+            # 05/12: remove previous tests as some tables need parents from other product families
                 execution_plan.nodes.append(node)       
 
         start_node.to_restart = True
@@ -680,7 +682,6 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> Li
     try:
         for node in plan.nodes:
             logger.info(f"Processing table: '{node.table_name}'")
-            
             if not node.compute_pool_id:
                 node.compute_pool_id = compute_pool_id
                 
