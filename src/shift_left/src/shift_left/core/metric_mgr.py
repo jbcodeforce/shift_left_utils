@@ -74,11 +74,10 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
                                 ]},
                     "granularity":"PT1M",
                     "intervals":[interval],
-                    "limit":1000,
-                    "group_by":["metric.table_name"],
-                    "format":"GROUPED"}
+                    "limit":1000}
 
     metrics = ccloud_client.get_metrics(view, qtype, json.dumps(query))
+    logger.info(f"metrics: {metrics}")
     sum= 0
     for metric in metrics["data"]:
         for point in metric["points"]:

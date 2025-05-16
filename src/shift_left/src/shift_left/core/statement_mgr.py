@@ -168,10 +168,7 @@ def get_statement_results(statement_name: str)-> StatementResult:
             if resp["metadata"]["next"]:
                 resp=client.make_request("GET", resp["metadata"]["next"])
                 logger.debug(f"After next called: {resp}")
-                return StatementResult(**resp)
-            elif resp['results'] and resp['results']['data']:
-                return StatementResult(**resp)
-
+            return StatementResult(**resp)
         except Exception as e:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             return None
