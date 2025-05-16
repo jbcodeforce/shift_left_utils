@@ -6,6 +6,7 @@ Shift Left Utils is a comprehensive pipeline management system designed to handl
 ## Core Components
 
 ### 1. Pipeline Management
+
 - **Pipeline Definition**: Each pipeline is defined through a JSON configuration file that specifies:
   - Table relationships (parents and children)
   - DDL and DML statements

@@ -56,7 +56,7 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
                                             sql_out)
             logger.debug(f"Statement: {statement_name} -> {statement}")
             if statement and statement.status:
-                logger.debug(f"Statement: {statement_name} status is: {statement.status.phase}")
+                logger.info(f"Statement: {statement_name} status is: {statement.status.phase}")
                 get_statement_list()[statement_name]=statement   # important to avoid doing an api call
             return statement
     except Exception as e:
@@ -64,7 +64,7 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
         return None
 
 
-def get_statement_status(statement_name: str) -> StatementInfo:
+def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
     statement_list = get_statement_list()
     if statement_list and statement_name in statement_list:
         return statement_list[statement_name]
@@ -75,6 +75,14 @@ def get_statement_status(statement_name: str) -> StatementInfo:
                                    compute_pool_name=None
                                 )
     return statement_info  
+
+def get_statement(statement_name: str) -> StatementInfo:
+    config = get_config()
+    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+    client = ConfluentCloudClient(config)
+    url = client.build_flink_url_and_auth_header()
+    response = client.make_request("GET", url + "/statements/" + statement_name)
+    return Statement(**response)
 
 def post_flink_statement(compute_pool_id: str,  
                              statement_name: str, 

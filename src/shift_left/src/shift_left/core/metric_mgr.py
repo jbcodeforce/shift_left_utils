@@ -12,6 +12,7 @@ def get_retention_size(table_name: str) -> int:
     """
     Get the retention size of a table using the REST API metrics endpoint.
     """
+    logger.info(f"Getting retention size for table {table_name}")
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     view="cloud"
@@ -42,7 +43,7 @@ def get_retention_size(table_name: str) -> int:
         return 0
 
 
-def get_total_amount_of_messages(table_name: str, compute_pool_id: str) -> int:
+def get_total_amount_of_messages(table_name: str, compute_pool_id: str= None) -> int:
     """
     Get the total amount of messages in a table using a Flink statement to count the messages. This will be a COUNT(*) FROM <table_name>
     by getting result for a certain time, until the difference between result is below a threshold.
@@ -53,7 +54,7 @@ def get_total_amount_of_messages(table_name: str, compute_pool_id: str) -> int:
     statement_name = f"cnt-rcds-{table_name.replace('_', '-')}"
     result = statement_mgr.post_flink_statement(compute_pool_id=compute_pool_id, statement_name=statement_name, sql_content=statement)
     if result:
-        result = statement_mgr.get_statement_results(compute_pool_id, statement_name)
+        result = statement_mgr.get_statement_results(statement_name)
         print(f"result: {result}")
     return result
 

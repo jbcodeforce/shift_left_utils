@@ -150,12 +150,12 @@ class TestStatementManager(unittest.TestCase):
             "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
         }
     
-        statement_info = statement_mgr.get_statement_status("test-statement-1")
+        statement_info = statement_mgr.get_statement_status_with_cache("test-statement-1")
         assert statement_info
         assert isinstance(statement_info, StatementInfo)    
         self.assertEqual(statement_info.status_phase, "RUNNING")
-        self.assertEqual(statement_mgr.get_statement_status("test-statement-2").status_phase, "COMPLETED")
-        statement_info = statement_mgr.get_statement_status("test-statement-3")
+        self.assertEqual(statement_mgr.get_statement_status_with_cache("test-statement-2").status_phase, "COMPLETED")
+        statement_info = statement_mgr.get_statement_status_with_cache("test-statement-3")
         assert statement_info
         assert isinstance(statement_info, StatementInfo)    
         self.assertEqual(statement_info.status_phase, "UNKNOWN")

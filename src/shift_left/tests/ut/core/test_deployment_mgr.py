@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 from datetime import datetime
+import uuid
 from typing import Tuple
 
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
@@ -27,6 +28,7 @@ from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
     FlinkStatementExecutionPlan
 )
+from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 
@@ -408,7 +410,6 @@ class TestDeploymentManager(unittest.TestCase):
         self.assertEqual(result.table_name, self.table_name)
         self.assertEqual(result.compute_pool_id, self.compute_pool_id)
 
-    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
     @patch('shift_left.core.deployment_mgr.get_table_ref_from_inventory')
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr.delete_statement_if_exists')
@@ -418,14 +419,13 @@ class TestDeploymentManager(unittest.TestCase):
         mock_drop,
         mock_delete,
         mock_read,
-        mock_get_ref,
-        mock_inventory
+        mock_get_table_ref,
     ) -> None:
         """Test successful pipeline undeployment."""
         print("test_full_pipeline_undeploy_from_table_success")
         # Setup mocks
         mock_table_ref = MagicMock()
-        mock_get_ref.return_value = mock_table_ref
+        mock_get_table_ref.return_value = mock_table_ref
         
         mock_pipeline = MagicMock(spec=FlinkTablePipelineDefinition)
         mock_pipeline.children = set()  # No children means it's a sink table
@@ -442,17 +442,16 @@ class TestDeploymentManager(unittest.TestCase):
         mock_delete.assert_called()
         mock_drop.assert_called_with(self.table_name, self.config['flink']['compute_pool_id'])
 
-    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
-    @patch('shift_left.core.deployment_mgr.get_table_ref_from_inventory')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_pipeline_definition_for_table')
     def _test_full_pipeline_undeploy_from_table_not_found(
         self,
-        mock_get_ref,
-        mock_inventory
-    ) -> None:
+        mock_drop_table,
+        mock_get_def    ) -> None:
         """Test undeployment when table is not found."""
         print("test_full_pipeline_undeploy_from_table_not_found")
         # Setup mocks
-        mock_get_ref.return_value = None
+        mock_get_def.return_value = None
 
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
@@ -560,6 +559,38 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[3].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[5].table_name == "p1_fct_order"
+
+    @patch('shift_left.core.deployment_mgr.deploy_pipeline_from_table')
+    def test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table) -> None:
+        """Test deploying pipeline from product."""
+        print("test_deploy_pipeline_from_product")
+        def _mock_deploy_pipeline_from_table(table_name: str, 
+                                             inventory_path: str, 
+                                             compute_pool_id: str, 
+                                             dml_only: bool, 
+                                             may_start_children: bool, 
+                                             force_sources: bool) -> Tuple[DeploymentReport, str]:
+            statement = StatementBasicInfo(name="dml-" + table_name, 
+                                           environment_id="dev", 
+                                           compute_pool_id=compute_pool_id,
+                                           created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                           uid=uuid.uuid4().hex,
+                                           execution_time=0,
+                                           status="COMPLETED")
+            return DeploymentReport(table_name=table_name, 
+                                    dml_name="Both", 
+                                    update_children=may_start_children, 
+                                    flink_statements_deployed=[statement],
+                                    ), f"deployed {table_name}"
+        mock_deploy_pipeline_from_table.side_effect = _mock_deploy_pipeline_from_table
+        reports, summary = dm.deploy_pipeline_from_product(
+            product_name="p1",
+            inventory_path=self.inventory_path,
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID
+        )
+        print(summary)
+        for report in reports:
+            print(report)
 
 if __name__ == '__main__':
     unittest.main()

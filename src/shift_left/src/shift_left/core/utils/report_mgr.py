@@ -13,7 +13,8 @@ class StatementBasicInfo(BaseModel):
     uid: str
     compute_pool_id: str
     status: str
-    execution_time: float
+    start_time: float = 0
+    execution_time: float =0
 
 class DeploymentReport(BaseModel):
     """Report of a pipeline deployment operation.
@@ -28,6 +29,8 @@ class DeploymentReport(BaseModel):
     table_name: Optional[str] = None
     dml_name: str = Field(default="Both", description="Type of deployment: DML only, or both")
     update_children: bool = Field(default=False)
+    start_time: float = 0
+    execution_time: float = 0
     flink_statements_deployed: List[StatementBasicInfo] = Field(default_factory=list)
 
 class TableInfo(BaseModel):
@@ -61,17 +64,20 @@ def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
     Returns:
         Padded or truncated text
     """
-    if len(text) > length:
-        return text[:length]
+    if isinstance(text, str):
+        if len(text) > length:
+            return text[:length]
+        else:
+            return text.ljust(length, padding_char)
     else:
-        return text.ljust(length, padding_char)
+        return str(text).ljust(length, padding_char)    
     
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
-    report = f"{pad_or_truncate('Ancestor Table Name',50)}\t{pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\n"
-    report+=f"-"*130 + "\n"
+    report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\t{'Created At':<16}\n"
+    report+=f"-"*145 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            report+=f"{pad_or_truncate(node.table_name, 50)}\t{pad_or_truncate(node.dml_statement_name, 40)}\t{pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{pad_or_truncate(node.compute_pool_id,15)}\n"
+            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)}\t{pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at,16)}\n"
     return report
 
 

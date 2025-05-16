@@ -134,7 +134,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     def test_7_report_running_flink_statements_for_all_from_product(self):
         os.environ["PIPELINES"]= str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
-        result = dm.report_running_flink_statements_for_all_from_product('p1', os.getenv("PIPELINES"))
+        result = dm.report_running_flink_statements_for_a_product('p1', os.getenv("PIPELINES"))
         assert result
         print(result)
 

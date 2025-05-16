@@ -11,9 +11,6 @@ import shift_left.core.pipeline_mgr as pipeline_mgr
 
 from typing_extensions import Annotated
 import shift_left.core.deployment_mgr as deployment_mgr
-from shift_left.core.deployment_mgr import (
-    DeploymentReport,
-)
 
 import os
 import sys
@@ -43,7 +40,7 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
         print(f"[red]Error: the first parameter needs to be a dml sql file[/red]")
         raise typer.Exit(1)
 
-    print(f"Build pipeline from sink table {dml_file_name}")
+    print(f"Build pipeline from table {dml_file_name}")
     if pipeline_path and pipeline_path != os.getenv("PIPELINES"):
         print(f"Using pipeline path {pipeline_path}")
         os.environ["PIPELINES"] = pipeline_path
@@ -158,6 +155,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 def deploy(
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         table_name:  str =  typer.Option(default= None, help="The table name containing pipeline_definition.json."),
+        product_name: str =  typer.Option(None, help="The product name to deploy."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_children: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
@@ -187,10 +185,20 @@ def deploy(
                 dml_only = dml_only, 
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
+        elif product_name:
+            print(f"Deploy pipeline from product {product_name}")
+            result, summary = deployment_mgr.deploy_pipeline_from_product(
+                product_name = product_name, 
+                inventory_path = inventory_path, 
+                compute_pool_id = compute_pool_id, 
+                dml_only = dml_only, 
+                may_start_children = may_start_children, 
+                force_sources = force_sources)
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)
         print(f"{summary}")
+        print(f"{result.model_dump_json(indent=3)}")
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -215,7 +223,7 @@ def report_running_statements(
         elif dir:
             results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, inventory_path)
         elif product_name:
-            results= deployment_mgr.report_running_flink_statements_for_all_from_product(product_name, inventory_path)
+            results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, inventory_path)
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)

@@ -125,13 +125,15 @@ class TestConfluentMetrics(unittest.TestCase):
         }
 
 
-    def _test_get_retention_size(self):
+    def test_get_retention_size(self):
+        print("test_get_retention_size")
         table_name = "src_aqem_recordconfiguration_form_element"
         retention_size = metric_mgr.get_retention_size(table_name)
-        print(retention_size)
+        print(f"retention_size: {retention_size}")
         assert retention_size > 0
     
     def test_get_total_message(self):
+        print("test_get_total_message")
         table_name = "src_aqem_recordconfiguration_form_element"
         compute_pool_id = "lfcp-79zx9j"
         nb_of_messages = metric_mgr.get_total_amount_of_messages(table_name, compute_pool_id)
@@ -139,18 +141,19 @@ class TestConfluentMetrics(unittest.TestCase):
         #assert nb_of_messages > 0
 
     def _test_get_message_count(self):
-        # this test is not working because of access to the kafka cluster
+        print("test_get_message_count")
         table_name = "src_aqem_recordconfiguration_form_element"
  
         config = get_config()
         message_count = get_topic_message_count( table_name)
-        print(message_count)
+        print(f"message_count: {message_count}")
 
-    def _test_get_pending_records(self):
+    def test_get_pending_records(self):
+        print("test_get_pending_records")
         statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
         compute_pool_id = "lfcp-1o07pz"
         pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
-        print(pending_records)
+        print(f"pending_records: {pending_records}")
         assert pending_records >= 0
 
 if __name__ == '__main__':

@@ -308,7 +308,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x13543ebd0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x111bc8d40&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -470,6 +470,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 **Options**:
 
 * `--table-name TEXT`: The table name containing pipeline_definition.json.
+* `--product-name TEXT`: The product name to deploy.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-children / --no-may-start-children`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-children]
