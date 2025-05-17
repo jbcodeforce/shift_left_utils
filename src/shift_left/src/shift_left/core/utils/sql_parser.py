@@ -144,18 +144,24 @@ class SQLparser:
                 ...
             ]
         """
-        # Remove comments and normalize whitespace
+        # Remove comments and normalize whitespace, remove `
         sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
         sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+        sql_content = re.sub(r'`', '', sql_content, flags=re.DOTALL)
+        sql_content = re.sub(r'VARCHAR\(.*?\)', 'STRING', sql_content, flags=re.MULTILINE)
         sql_content = ' '.join(sql_content.split())
         
         # Extract the column definitions
-        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\w+\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
+        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\w+)\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
         if not match:
             return []
-        
+
         columns_section = match.group(1)
-        prim_keys = re.sub(r'^.*PRIMARY KEY\(','', columns_section, re.IGNORECASE)
+        # Extract primary key columns from CONSTRAINT PRIMARY KEY or PRIMARY KEY clause
+        prim_key_pattern = r'(?:CONSTRAINT\s+(?:PRIMARY\s+)?)?PRIMARY\s+KEY\s*\((.*?)\)'
+        prim_key_match = re.search(prim_key_pattern, sql_content, re.IGNORECASE)
+        prim_keys = prim_key_match.group(1) if prim_key_match else ''
+        
         # Split into individual column definitions
         column_defs = [col.strip() for col in columns_section.split(',') if col.strip()]
         
@@ -163,7 +169,7 @@ class SQLparser:
         columns = {}
         for col_def in column_defs:
             # Skip constraints
-            if col_def.upper().startswith(('PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE', 'CHECK')):
+            if col_def.upper().startswith(('PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE', 'CHECK', 'CONSTRAINT')):
                 continue
                 
             parts = col_def.split()

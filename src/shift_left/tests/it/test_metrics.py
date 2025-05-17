@@ -77,7 +77,7 @@ class TestConfluentMetrics(unittest.TestCase):
 
     
 
-    def _test_socket_connection(self):
+    def test_socket_connection(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         config = get_config()
         kafka_cluster_host=config["kafka"]["bootstrap.servers"].split(":")[0]
@@ -133,20 +133,12 @@ class TestConfluentMetrics(unittest.TestCase):
         assert retention_size > 0
     
     def test_get_total_message(self):
-        print("test_get_total_message")
+        print("test_get_total_messages")
         table_name = "src_aqem_recordconfiguration_form_element"
         compute_pool_id = "lfcp-79zx9j"
         nb_of_messages = metric_mgr.get_total_amount_of_messages(table_name, compute_pool_id)
         print(nb_of_messages)
-        #assert nb_of_messages > 0
-
-    def _test_get_message_count(self):
-        print("test_get_message_count")
-        table_name = "src_aqem_recordconfiguration_form_element"
- 
-        config = get_config()
-        message_count = get_topic_message_count( table_name)
-        print(f"message_count: {message_count}")
+        assert nb_of_messages >= 0
 
     def test_get_pending_records(self):
         print("test_get_pending_records")
@@ -155,6 +147,14 @@ class TestConfluentMetrics(unittest.TestCase):
         pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
         print(f"pending_records: {pending_records}")
         assert pending_records >= 0
+
+    def test_get_output_records(self):
+        print("test_get_output_records")
+        statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
+        compute_pool_id = "lfcp-1o07pz"
+        output_records = metric_mgr.get_output_records(statement_name, compute_pool_id)
+        print(f"output_records: {output_records}")
+        assert output_records >= 0
 
 if __name__ == '__main__':
     unittest.main()

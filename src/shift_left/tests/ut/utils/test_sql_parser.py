@@ -334,5 +334,53 @@ class TestSQLParser(unittest.TestCase):
         assert rep
         print(rep)
 
+    def test_build_column_metadata_from_sql_content(self):
+        parser = SQLparser()
+        query="""CREATE TABLE IF NOT EXISTS user_role (
+            id STRING NOT NULL,
+            tenant_id STRING NOT NULL,
+            name STRING,
+            type STRING,
+            created_by STRING,
+            created_date BIGINT,
+            last_modified_by STRING,
+            last_modified_date BIGINT,
+            PRIMARY KEY(id, tenant_id) NOT ENFORCED
+        ) 
+        """
+        columns = parser.build_column_metadata_from_sql_content(query)
+        assert columns
+        assert columns['id'] == {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
+        assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
+        assert columns['name'] == {'name': 'name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['type'] == {'name': 'type', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        print(columns)
+
+    def test_build_columns_from_sql_content_quoted_column_names(self):
+        parser = SQLparser()
+        query="""CREATE TABLE IF NOT EXISTS  `identity_metadata` (
+            `id` VARCHAR(2147483647) NOT NULL,
+            `key` VARCHAR(2147483647) NOT NULL,
+            `value` VARCHAR(2147483647) NOT NULL,
+            `tenant_id` VARCHAR(2147483647) NOT NULL,
+            `description` VARCHAR(2147483647),
+            `parent_id` VARCHAR(2147483647),
+            `hierarchy` VARCHAR(2147483647),
+            `op` VARCHAR(2147483647) NOT NULL,
+            `source_lsn` BIGINT,
+            CONSTRAINT `PRIMARY` PRIMARY KEY (`id`, `tenant_id`) NOT ENFORCED
+            )
+        """
+        columns = parser.build_column_metadata_from_sql_content(query)
+        assert columns
+        print(columns)
+        assert columns['id'] == {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
+        assert columns['key'] == {'name': 'key', 'type': 'STRING', 'nullable': False, 'primary_key': False}
+        assert columns['value'] == {'name': 'value', 'type': 'STRING', 'nullable': False, 'primary_key': False}
+        assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
+        assert columns['description'] == {'name': 'description', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['parent_id'] == {'name': 'parent_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['hierarchy'] == {'name': 'hierarchy', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        
 if __name__ == '__main__':
     unittest.main()

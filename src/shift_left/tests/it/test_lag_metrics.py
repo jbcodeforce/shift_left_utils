@@ -86,11 +86,13 @@ def test_metrics_scenario():
     #_create_output_table(compute_pool_id, output_table_name)
     
     print("Generate 100k messages to input topic")
+    nb_of_times = 100
     import threading
-    thread_input = threading.Thread(target=__generate_messages, args=(input_table_name, 1000, compute_pool_id, 100))
-    thread_output = threading.Thread(target=_run_flink_statement, args=(compute_pool_id, input_table_name, output_table_name))
-    thread_input.start()
+    thread_input = threading.Thread(target=__generate_messages, args=(input_table_name, 1000, compute_pool_id, nb_of_times))
+    thread_output = threading.Thread(target=_run_flink_statement, args=(compute_pool_id, input_table_name, output_table_name, nb_of_times))
     thread_output.start()
+    thread_input.start()
+
     thread_input.join()
     thread_output.join()
 
@@ -129,23 +131,26 @@ def __generate_messages(input_table_name: str, num_messages: int, compute_pool_i
         print(f"Insert {num_messages} messages {t+1} times")
 
 
-def _run_flink_statement(compute_pool_id: str, input_table_name: str, output_table_name: str):
+def _run_flink_statement(compute_pool_id: str, input_table_name: str, output_table_name: str, nb_of_times: int):
     sql_statement = f"insert into {output_table_name} SELECT id, COUNT(*) as total_count FROM {input_table_name} GROUP BY id;" 
     statement_name = f"run-flink-statement"
     #statement_name = "stage-aqem-dml-int-aqem-latest-element-revision"
+    print(f"Run flink statement {statement_name}")
     statement_mgr.delete_statement_if_exists(statement_name)
+    
     statement = statement_mgr.post_flink_statement(statement_name=statement_name, 
                                            sql_content=sql_statement, 
                                            compute_pool_id=compute_pool_id)
-    statement = statement_mgr.get_statement(statement_name)
     count = 0
     print(statement.model_dump_json(indent=2))
-    while statement and statement.status.phase == "RUNNING" and count < 20:
 
-        print("Pull to get the lag metrics")
+    print("Pull to get the lag metrics")
+    while statement and statement.status.phase == "RUNNING" and count < nb_of_times:
+
         pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
         print(f"Pending records: {pending_records}")
-
+        output_records = metric_mgr.get_output_records(statement_name, compute_pool_id)
+        print(f"Output records: {output_records}")
         statement_result = statement_mgr.get_statement_results(statement.name)
         if statement_result and isinstance(statement_result, StatementResult):
             if statement_result.results and statement_result.results.data:

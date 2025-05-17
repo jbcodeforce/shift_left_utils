@@ -62,7 +62,9 @@ def init_unit_test_for_table(table_name: str):
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     table_folder = table_ref.table_folder_name
     create_folder_if_not_exist(f"{table_folder}/tests")
-    _add_test_files(table_ref, f"{table_folder}/tests", table_inventory)
+    _add_test_files(table_ref=table_ref, 
+                    tests_folder=f"{table_folder}/tests", 
+                    table_inventory=table_inventory)
 
 
 def execute_one_test(
@@ -279,9 +281,11 @@ def _poll_response(statement: Statement, test_case_name: str):
         print(f"VALIDATION FAILED for {test_case_name}")
         print( f"====================================VALIDATION FAILED for {test_case_name}====================================")
            
-def _add_test_files(table_ref: FlinkTableReference, tests_folder: str, table_inventory: Dict[str, FlinkTableReference]):
+def _add_test_files(table_ref: FlinkTableReference, 
+                    tests_folder: str, 
+                    table_inventory: Dict[str, FlinkTableReference]):
     """
-    Add the test files to the table folder.
+    Add the test files to the table/tests folder by looking at the referenced tables in the DML SQL content.
     """
     file_path = from_pipeline_to_absolute(table_ref.dml_ref)
     referenced_table_names = None
@@ -362,7 +366,7 @@ def _process_foundation_ddl_from_test_definitions(test_definition: SLTestDefinit
 
 def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
     """
-    Returns a string of all columns names separated bu ',' so it can be used
+    Returns a string of all columns names separated by ',' so it can be used
     in the insert statement and a string of 5 rows of data sample.
     """
     columns_names = ""

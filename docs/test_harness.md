@@ -3,14 +3,14 @@
 ???- info "Version"
     Created Mars 21- 2025 
 
-The goals of this chapter is to present the requirements and design of this test tool, which in included as a command in the `shift-left` CLI.
+The goals of this chapter is to present the requirements and design of this test tool, which is included as a command in the `shift-left` CLI.
 
 ## Context
 
 
 We should differentiate two types of testing: Flink statement developer testing, like unit / component tests, and integration tests with other tables and with real data streams.
 
-The objectives of a test harness for developer and system integration is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud (or Flink managed service) and therefore to address the following needs:
+The objectives of a test harness for developer and system testers, is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud and therefore address the following needs:
 
 1. be able to deploy a flink statement (the ones we want to focus on are DMLs, or CTAS)
 1. be able to generate test data from schema registry or table definition - and with developer being able to tune test data for each test cases.
@@ -33,7 +33,9 @@ The following diagram illustrates the target unit testing environment:
 * [x] The command is integrated in the shilf-left CLI as:
 
 ```sh
-table unit-test [OPTIONS] TABLE_NAME
+table init-unit-test [OPTIONS] TABLE_NAME
+or
+table run-test-suite [OPTIONS] TABLE_NAME
 
 Arguments:
 
@@ -44,7 +46,7 @@ Options:
 --compute-pool-id TEXT: Flink compute pool ID. If not provided, it will create a pool. [env var: CPOOL_ID; required]
 ```
 
-* [x] Be able to define test suite. The yaml is defined as
+* [x] Be able to define test suite. The yaml is defined as below and created automatically by the `shift_left table init-unit-tests` command.
 
 ```yaml
 
@@ -74,7 +76,7 @@ test_suite:
     sql_file_name: tests/validate_fct_order_2.sql
 ```
 
-* [x] Organize tests under the tests folder of the table:
+* [x] Organize tests under the tests folder of the table: (Created automatically with `shift_left table init-unit-tests`)
 
 ```sh
 └── fct_order
@@ -101,7 +103,7 @@ test_suite:
   table init-unit-tests table_name
   ```
 
-  This loads table references and metadata and create content from sql_content.
+  This command needs the inventory and loads table references and metadata and then creates content from the DML SQL content.
   
 * [ ] For each test cases defined do the following on a selected compute pool id
 
@@ -113,4 +115,14 @@ test_suite:
 * [ ] When test suite is done teardown the temporary tables.
 
 ## Usage/Demonstration
+
+* Verify the ddl and dml of the table are created, then run
+
+```sh
+table init-unit-tests table_name
+```
+
+* In the table folder under the pipelines look at the created file under the tests folder. For each table, input to the dml under test, there will be a ddl script file created with the `_ut` suffix so the unit test will not be in conflict with existing tables in the same environment. The DDL definition match the input table definition.
+
+
 

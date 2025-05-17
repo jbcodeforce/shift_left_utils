@@ -10,7 +10,7 @@ class MetadataResult(BaseModel):
     next: Optional[str]
 
 class OpRow(BaseModel):
-    op: Optional[int] =  Field(default=None, description="the row number")
+    op: Optional[int] =  Field(default=None, description="the operation type: 0: insert, 1: -U, 2: +U, 3: delete")
     row: List[Any]
 
 class Data(BaseModel):

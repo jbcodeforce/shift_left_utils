@@ -9,19 +9,12 @@ from shift_left.core.models.flink_statement_model import Statement, StatementInf
 import  shift_left.core.pipeline_mgr as pipeline_mgr
 from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 import shift_left.core.deployment_mgr as deployment_mgr
+import shift_left.core.test_mgr as test_mgr
+from shift_left.core.utils.file_search import build_inventory
+
 class TestDebugUnitTests(unittest.TestCase):
 
-    def _test_build_pipeline_definition_from_dml_content(self):
-        pipe_path ="/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-        os.environ["PIPELINES"]=pipe_path
-        dml_path = pipe_path + "/facts/aqem/fct_event_step_element/sql-scripts/dml.aqem_fct_event_step_element.sql"
-        pipeline_def = pipeline_mgr.build_pipeline_definition_from_dml_content(
-            dml_path,
-            pipeline_path=pipe_path
-        )
-        print(pipeline_def.model_dump_json())
-
-    def test_deploy_pipeline_from_product(self):
+    def _test_deploy_pipeline_from_product(self):
         pipe_path ="/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         os.environ["PIPELINES"]=pipe_path
         product_name = "aqem"
@@ -37,5 +30,24 @@ class TestDebugUnitTests(unittest.TestCase):
         print(result)
         print(summary)
 
+    def test_init_unit_tests(self):
+        pipe_path ="/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        os.environ["PIPELINES"]=pipe_path
+        table_name = "aqem_dim_role"
+        test_definition, table_ref = test_mgr._load_test_suite_definition(table_name)
+        tests_folder_path = os.path.join(os.getenv("PIPELINES"), "dimensions", "aqem", "dim_role", "tests")
+        table_inventory = build_inventory(os.getenv("PIPELINES"))
+        table_struct = test_mgr._process_foundation_ddl_from_test_definitions(test_definition, 
+                                                               tests_folder_path, 
+                                                               table_inventory)
+        print(table_struct)
+        for table in table_struct:
+            cname, rows= test_mgr._build_data_sample(table_struct[table])
+            print(cname)
+            print(rows)
+
+"""
+'CREATE TABLE IF NOT EXISTS identity_metadata ( id VARCHAR(2147483647) NOT NULL, key VARCHAR(2147483647) NOT NULL, value VARCHAR(2147483647) NOT NULL, tenant_id VARCHAR(2147483647) NOT NULL, description VARCHAR(2147483647), parent_id VARCHAR(2147483647), hierarchy VARCHAR(2147483647), op VARCHAR(2147483647) NOT NULL, source_lsn BIGINT, CONSTRAINT PRIMARY PRIMARY KEY (id, tenant_id) NOT ENFORCED )'
+"""
 if __name__ == '__main__':
     unittest.main()

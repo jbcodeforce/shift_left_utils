@@ -173,6 +173,12 @@ def get_statement_results(statement_name: str)-> StatementResult:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             return None
 
+def get_next_statement_results(next_token_page: str) -> StatementResult:
+    config = get_config()
+    client = ConfluentCloudClient(config)
+    url = client.build_flink_url_and_auth_header()  # need that to build the header
+    resp=client.make_request("GET", next_token_page)
+    return StatementResult(**resp)
     
 _statement_list_cache = None  # cache the statement list loaded to limit the number of call to CC API
 def get_statement_list() -> dict[str, StatementInfo]:

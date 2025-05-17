@@ -7,7 +7,7 @@ from shift_left.core.utils.app_config import get_config, logger
 import json
 from datetime import datetime, timedelta
 import shift_left.core.statement_mgr as statement_mgr
-
+from shift_left.core.models.flink_statement_model import StatementResult
 def get_retention_size(table_name: str) -> int:
     """
     Get the retention size of a table using the REST API metrics endpoint.
@@ -50,23 +50,42 @@ def get_total_amount_of_messages(table_name: str, compute_pool_id: str= None) ->
     """
     if not compute_pool_id:
         compute_pool_id = get_config()["flink"]["compute_pool_id"]
+    result = 0
     statement = f"SELECT COUNT(*) as nb_records FROM {table_name}"
     statement_name = f"cnt-rcds-{table_name.replace('_', '-')}"
-    result = statement_mgr.post_flink_statement(compute_pool_id=compute_pool_id, statement_name=statement_name, sql_content=statement)
-    if result:
-        result = statement_mgr.get_statement_results(statement_name)
-        print(f"result: {result}")
+    statement_mgr.delete_statement_if_exists(statement_name)
+    statement = statement_mgr.post_flink_statement(compute_pool_id=compute_pool_id, statement_name=statement_name, sql_content=statement)
+    if statement and statement.status.phase == "RUNNING":
+        statement_result = statement_mgr.get_statement_results(statement_name)
+        if statement_result and isinstance(statement_result, StatementResult):
+            result = _process_results(statement_result, result) 
+            while statement_result.metadata.next:
+                statement_result = statement_mgr.get_next_statement_results(statement_result.metadata.next)
+                result = _process_results(statement_result, result)
+    statement_mgr.delete_statement_if_exists(statement_name)
     return result
 
+def _process_results(statement_result: StatementResult, result: int) -> int:
+    previous_result = result
+    if statement_result.results and statement_result.results.data:
+        for op_row in statement_result.results.data:
+            if op_row.op == 0 or op_row.op == 2:
+                result += int(op_row.row[0])
+                previous_result = result
+            elif op_row.op == 1 or op_row.op == 3:
+                result -= int(op_row.row[0])
+    if previous_result > result:
+        result = previous_result
+    return result
 
 def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     view="cloud"
     qtype="query"
-    now_minus_1_hour = datetime.now() - timedelta(hours=1)
+    now_minus_1_minute = datetime.now() - timedelta(minutes=1)
     now= datetime.now()
-    interval = f"{now_minus_1_hour.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+    interval = f"{now_minus_1_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
     query= {"aggregations":[{"metric":"io.confluent.flink/pending_records"}],
           "filter": {"op":"AND",
                      "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
@@ -85,3 +104,28 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
         if len(metric["points"]) > 0:
             sum = round(sum/len(metric["points"]))
     return sum
+
+def get_output_records(statement_name: str, compute_pool_id: str) -> int:
+    config = get_config()
+    ccloud_client = ConfluentCloudClient(config)
+    view="cloud"
+    qtype="query"
+    now_minus_10_minute = datetime.now() - timedelta(minutes=10)
+    now= datetime.now()
+    interval = f"{now_minus_10_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+    print(f"interval: {interval}")
+    query= {"aggregations":[{"metric":"io.confluent.flink/num_records_out"}],
+          "filter": {"op":"AND",
+                     "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
+                                {"field":"resource.flink_statement.name","op":"EQ","value": statement_name}
+                                ]},
+          "granularity":"PT1M",
+          "intervals":[interval],
+          "limit":1000}
+    metrics = ccloud_client.get_metrics(view, qtype, json.dumps(query))
+    logger.info(f"metrics: {metrics}")
+    sum= 0
+    for metric in metrics["data"]:
+        print(f"metric: {metric}")
+        sum += metric["value"]
+    return sum  
