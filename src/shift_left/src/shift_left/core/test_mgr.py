@@ -313,9 +313,15 @@ def _add_test_files(table_ref: FlinkTableReference,
 
         # Create output validation files 
         for output_data in test_case.outputs:
-            output_file = os.path.join(tests_folder_path, '..', output_data.sql_file_name) 
+            output_file = os.path.join(tests_folder_path, '..', output_data.sql_file_name)
+            sql_content = "with result_table as (\n"
+            sql_content += f"   select * from {output_data.table_name}_ut\n"
+            sql_content += f"   where id != NULL\n"
+            sql_content += f"   --- and ... add more validations here\n"
+            sql_content += ")\n"
+            sql_content += f"SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END as result from result_table"
             with open(output_file, "w") as f:
-                f.write(f"select * from {output_data.table_name}_ut")
+                f.write(sql_content)
     return test_definition
 
         

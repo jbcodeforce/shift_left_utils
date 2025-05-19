@@ -18,11 +18,21 @@ import  shift_left.core.test_mgr as test_mgr
 
 class TestTestManager(unittest.TestCase):
     
-    def test_execute_one_test(self):
+    def _test_execute_one_test(self):
         print("test_execute_one_test")
         table_name= "p1_fct_order"
         compute_pool_id = "compute_pool_id"
         test_case_name = "test_case_1"
+        result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
+        assert result
+
+    def _test_execute_one_test(self):
+        os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
+        os.environ["PIPELINES"] = "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        print("test_execute_one_test")
+        table_name= "aqem_dim_role"
+        compute_pool_id = "compute_pool_id"
+        test_case_name = "test_aqem_dim_role_1"
         result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
         assert result
 

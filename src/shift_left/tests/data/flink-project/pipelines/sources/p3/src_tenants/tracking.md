@@ -1,4 +1,4 @@
-## Fact Table: p7_fct_user_role
+## Fact Table: src_p3_tenants
 
 Status date:
 

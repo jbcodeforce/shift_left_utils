@@ -14,10 +14,8 @@ os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "dat
 
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
-import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
-import shift_left.core.statement_mgr as sm
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.models.flink_statement_model import (
@@ -174,7 +172,7 @@ class TestDeploymentManager(unittest.TestCase):
             print(node.table_name, node.to_run, node.to_restart)
         assert nodes_to_run[0].table_name in ("src_y", "src_x")
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     def test_build_execution_plan_for_one_table_parent_running(
         self,
@@ -216,7 +214,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     def test_build_execution_plan_for_one_table_parent_not_running(
         self,
         mock_get_status,
@@ -271,7 +269,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     def test_build_execution_plan_with_all_src_running(
         self,
         mock_get_status,
@@ -330,7 +328,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     def test_build_execution_plan_for_intermediate_table_including_children(
         self,
         mock_get_status, 
@@ -377,7 +375,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
     @patch('shift_left.core.deployment_mgr._deploy_dml')
-    @patch('shift_left.core.deployment_mgr._get_statement_status')
+    @patch('shift_left.core.deployment_mgr._get_statement')
     def _test_deploy_pipeline_from_table_success(
         self,
         mock_get_status,
@@ -515,7 +513,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     def test_execution_plan_with_src_running(
         self, 
         mock_get_status, 
@@ -528,7 +526,7 @@ class TestDeploymentManager(unittest.TestCase):
         def mock_status(statement_name: str) -> StatementInfo:
             print(f"mock_status: {statement_name}")
             if statement_name.startswith("dev-dml-src-") or statement_name.startswith("dev-p1-dml-src-"):
-                return self._create_mock_statement_info(status_phase="RUNNING")
+                return self._create_mock_statement_info(name=statement_name, status_phase="RUNNING")
             return self._create_mock_statement_info()
             
         mock_get_status.side_effect = mock_status
@@ -552,13 +550,16 @@ class TestDeploymentManager(unittest.TestCase):
         for node in execution_plan.nodes:
             if node.table_name.startswith("src_"):
                 assert not node.to_restart and not node.to_run, \
-                    f"Source table {node.table_name} should not be in execution plan"
+                    f"Source table {node.table_name} should not be restarted or run"
             
         # Verify the expected intermediate and fact tables are present
         assert len(execution_plan.nodes) == 6
         assert execution_plan.nodes[3].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[5].table_name == "p1_fct_order"
+
+
+
 
     @patch('shift_left.core.deployment_mgr.deploy_pipeline_from_table')
     def test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table) -> None:

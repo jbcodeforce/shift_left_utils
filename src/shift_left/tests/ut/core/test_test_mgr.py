@@ -6,11 +6,12 @@ import pathlib
 import unittest
 from unittest.mock import patch, MagicMock, ANY
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 import shift_left.core.test_mgr as test_mgr
+from shift_left.core.utils.file_search import build_inventory
 from shift_left.core.test_mgr import (
     SLTestDefinition,
     SLTestCase,
@@ -25,6 +26,7 @@ class TestTestManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"
+        build_inventory(os.getenv("PIPELINES"))
 
     def test_should_load_test_definition(self):
         """Test loading of test definition."""
@@ -178,6 +180,19 @@ class TestTestManager(unittest.TestCase):
         for statement in statements:
             print(f"statement: {statement.name} {statement.status}")
 
+    def test_statement_with_quoted_table_name(self):
+        table_name = "int_p3_user_role"
+        test_definition, table_ref = test_mgr._load_test_suite_definition(table_name)
+        tests_folder_path = os.path.join(os.getenv("PIPELINES"), "intermediates", "p3", "user_role", "tests")
+        table_inventory = build_inventory(os.getenv("PIPELINES"))
+        table_struct = test_mgr._process_foundation_ddl_from_test_definitions(test_definition, 
+                                                               tests_folder_path, 
+                                                               table_inventory)
+        print(table_struct)
+        for table in table_struct:
+            cname, rows= test_mgr._build_data_sample(table_struct[table])
+            print(cname)
+            print(rows)
 
 if __name__ == '__main__':
     unittest.main()

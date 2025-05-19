@@ -3,14 +3,11 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import pathlib
-from importlib import import_module 
 import os
-from typing import Tuple
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.naming_convention import DmlNameModifier, ComputePoolNameModifier
 from shift_left.core.models.flink_statement_model import FlinkStatementNode
 
-from shift_left.core.utils.file_search import list_src_sql_files
 
 class TestNamingConvention(unittest.TestCase):
 

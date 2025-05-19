@@ -16,23 +16,6 @@ import json
 import re
 
 
-def _test_get_table_info():
-    os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
-    os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-    inventory_path=  os.environ["PIPELINES"]
-    config = get_config()
-    compute_pool_id = config["flink"]["compute_pool_id"]
-    table_name = "int_aqem_recordexecution_element_data_unnest"
-    sql = "show create table " + table_name
-    statement_name = "test-show-table"
-    statement_mgr.delete_statement_if_exists(statement_name)
-    statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name,sql)
-    print(statement.model_dump_json(indent=3))
-    results = statement_mgr.get_statement_results(statement_name)
-    print(results.model_dump_json(indent=3))
-    sql_content=results.results.data[0].row[0]
-    print(f"Primary key columns: {_get_primary_key_columns(sql_content)}")
-    print(f"Distributed by columns: {_get_distributed_by_columns(sql_content)}")
 
 def _get_primary_key_columns(sql_content: str) -> List[str]:
     pk_pattern = r"PRIMARY KEY\((.*?)\)"
@@ -49,12 +32,3 @@ def _get_distributed_by_columns(sql_content: str) -> List[str]:
         return [col.strip('`') for col in distributed_by_match.group(1).split(',')]
     return []
 
-def test_process_results():
-    table_name = "int_aqem_recordexecution_element_data_unnest"
-    inventory_path=  os.environ["PIPELINES"]
-    pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
-    ddl_file_path = from_pipeline_to_absolute(pipeline_def.ddl_ref)
-    sql_content=table_mgr.load_sql_content_from_file(ddl_file_path)
-    print(sql_content)
-    print(_get_primary_key_columns(sql_content))
-    print(_get_distributed_by_columns(sql_content))

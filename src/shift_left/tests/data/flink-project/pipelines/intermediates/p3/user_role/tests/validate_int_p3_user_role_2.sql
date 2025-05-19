@@ -1,5 +1,5 @@
 with result_table as (
-   select * from e_ut
+   select * from int_p3_user_role_ut
    where id != NULL
    --- and ... add more validations here
 )

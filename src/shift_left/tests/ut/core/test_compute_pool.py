@@ -9,7 +9,7 @@ import sys
 import os
 import pathlib
 from typing import List, Dict, Any
-
+from unittest.mock import patch, MagicMock
 # Order of the following code is important to make the tests working
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 module_path = "./utils"
@@ -190,7 +190,8 @@ class TestComputePoolMgr(unittest.TestCase):
         self.assertEqual(compute_pool_list.data[0].id, "lfcp-xxxx")
         self.assertEqual(compute_pool_list.data[1].id, "lfcp-xvrvmz")
 
-    def test_search_for_matching_compute_pool(self) -> None:
+    @patch('shift_left.core.compute_pool_mgr.get_compute_pool_list')
+    def test_search_for_matching_compute_pool(self, mock_get_compute_pool_list) -> None:
         """Test search functionality for matching compute pools."""
         compute_pool_list = ComputePoolList()
         for idx in range(40):
@@ -205,9 +206,10 @@ class TestComputePoolMgr(unittest.TestCase):
                     current_cfu=1
                 )
             )
+        mock_get_compute_pool_list.return_value = compute_pool_list
         self.assertEqual(len(compute_pool_list.pools), 40)
         
-        matching_pools = cpm.search_for_matching_compute_pools(compute_pool_list, "mv-config-3")
+        matching_pools = cpm.search_for_matching_compute_pools("mv-config-3")
         self.assertIsNotNone(matching_pools)
         self.assertGreaterEqual(len(matching_pools), 1)            
         specific_pool = cpm.get_compute_pool_with_id(compute_pool_list, "lfcp-ab3")

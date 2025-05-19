@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- p7_fct_user_role
-TABLE_NAME=p7_fct_user_role
+# --- src_p3_roles
+TABLE_NAME=src_p3_roles
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_p7_fct_user_role: create_flink_ddl  create_flink_dml
+create_src_p3_roles: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_p7_fct_user_role: 
+drop_table_src_p3_roles: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_p7_fct_user_role
+delete_data: delete_schemas delete_topic_src_p3_roles

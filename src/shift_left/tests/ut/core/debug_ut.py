@@ -30,24 +30,6 @@ class TestDebugUnitTests(unittest.TestCase):
         print(result)
         print(summary)
 
-    def test_init_unit_tests(self):
-        pipe_path ="/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-        os.environ["PIPELINES"]=pipe_path
-        table_name = "aqem_dim_role"
-        test_definition, table_ref = test_mgr._load_test_suite_definition(table_name)
-        tests_folder_path = os.path.join(os.getenv("PIPELINES"), "dimensions", "aqem", "dim_role", "tests")
-        table_inventory = build_inventory(os.getenv("PIPELINES"))
-        table_struct = test_mgr._process_foundation_ddl_from_test_definitions(test_definition, 
-                                                               tests_folder_path, 
-                                                               table_inventory)
-        print(table_struct)
-        for table in table_struct:
-            cname, rows= test_mgr._build_data_sample(table_struct[table])
-            print(cname)
-            print(rows)
 
-"""
-'CREATE TABLE IF NOT EXISTS identity_metadata ( id VARCHAR(2147483647) NOT NULL, key VARCHAR(2147483647) NOT NULL, value VARCHAR(2147483647) NOT NULL, tenant_id VARCHAR(2147483647) NOT NULL, description VARCHAR(2147483647), parent_id VARCHAR(2147483647), hierarchy VARCHAR(2147483647), op VARCHAR(2147483647) NOT NULL, source_lsn BIGINT, CONSTRAINT PRIMARY PRIMARY KEY (id, tenant_id) NOT ENFORCED )'
-"""
 if __name__ == '__main__':
     unittest.main()
