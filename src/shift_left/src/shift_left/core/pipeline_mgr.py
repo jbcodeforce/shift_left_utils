@@ -110,7 +110,12 @@ def build_all_pipeline_definitions(pipeline_path: str):
     logger.info(f"Total number of pipeline definitions created: {count}")
 
     
-def get_static_pipeline_report_from_table(table_name: str, inventory_path: str, parent_only: bool = True, children_only: bool = False) -> PipelineReport:
+def get_static_pipeline_report_from_table(
+        table_name: str, 
+        inventory_path: str,
+        parent_only: bool = True, 
+        children_only: bool = False
+) -> PipelineReport:
     """
     Walk the static hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
     The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
@@ -369,7 +374,7 @@ def _visit_parents(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipe
         rep = _visit_parents(parent_info)
         parents.add(rep)
     current_node.parents = parents
-    logger.info(f"The parents of {current_node.table_name} are {'\n* '.join([p.table_name for p in parents])}")
+    logger.info(f"The parents of {current_node.table_name} are {', '.join([p.table_name for p in parents])}")
     return current_node
 
 def _visit_children(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipelineDefinition:

@@ -54,6 +54,14 @@ class TestPipelineManager(unittest.TestCase):
         pm.build_all_pipeline_definitions( os.getenv("PIPELINES"))
         assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + pm.PIPELINE_JSON_FILE_NAME)
 
+    def test_visit_parents(self):
+        print("test_visit_parents")
+        path= os.getenv("PIPELINES")
+        table_path=path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME
+        pipeline_def: FlinkTablePipelineDefinition = pm.read_pipeline_definition_from_file(table_path)
+        assert pipeline_def
+        pm._visit_parents(pipeline_def)
+        print(pipeline_def.model_dump_json(indent=3))
     def test_1_build_pipeline_def_for_fact_table(self):
         """ Need to run this one first"""
         print("test_1_build_pipeline_def_for_fact_table")
