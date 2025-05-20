@@ -11,9 +11,9 @@ import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.metric_mgr as metric_mgr
 import time
-from shift_left.core.models.flink_statement_model import StatementResult
+from shift_left.core.models.flink_statement_model import StatementResult, Statement
 
-def __create_table(compute_pool_id: str, table_name: str, definition: str):
+def __create_table(compute_pool_id: str, table_name: str, definition: str) -> Statement:
    
     statement= statement_mgr.post_flink_statement(statement_name=f"st-{table_name.replace('_', '-')}", 
                                        sql_content=definition, 

@@ -17,7 +17,7 @@ class TestSQLParser(unittest.TestCase):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
 
-    def test_get_table_from_select(self):
+    def test_upgrade_mode_get_table_from_select(self):
         parser = SQLparser()
         query="""
         SELECT * FROM table1
@@ -27,7 +27,7 @@ class TestSQLParser(unittest.TestCase):
         assert "table1" in rep
         assert "Stateless" in parser.extract_upgrade_mode(query)
 
-    def test_get_tables_from_join(self):
+    def test_upgrade_mode_get_tables_from_join(self):
         parser = SQLparser()
         query= """
         SELECT a.*, b.name 
@@ -40,7 +40,7 @@ class TestSQLParser(unittest.TestCase):
         assert "table2" in rep
         assert "Stateful" in parser.extract_upgrade_mode(query)
 
-    def test_get_tables_from_inner_join(self):
+    def test_upgrade_mode_get_tables_from_inner_join(self):
         parser = SQLparser()
         query= """
         SELECT * 
@@ -55,7 +55,7 @@ class TestSQLParser(unittest.TestCase):
         assert "table3" in rep
         assert "Stateful" in parser.extract_upgrade_mode(query)
 
-    def test_get_tables_from_right_join(self):
+    def test_upgrade_mode_get_tables_from_right_join(self):
         parser = SQLparser()
         query=  """
         SELECT * 
@@ -71,7 +71,7 @@ class TestSQLParser(unittest.TestCase):
         assert "Stateful" in parser.extract_upgrade_mode(query)
 
         
-    def test_get_tables_without_ctes(self):
+    def test_upgrade_mode_get_tables_without_ctes(self):
         parser = SQLparser()
         query= """
         WITH cte1 AS (
@@ -97,7 +97,7 @@ class TestSQLParser(unittest.TestCase):
         assert "Stateful" in parser.extract_upgrade_mode(query)
     
 
-    def test_get_tables_without_ctes(self):
+    def test_upgrade_mode_get_tables_without_ctes(self):
         parser = SQLparser()
         query="""
             -- a comment
@@ -111,7 +111,7 @@ class TestSQLParser(unittest.TestCase):
         print(rep)
         assert "Stateless" in parser.extract_upgrade_mode(query)
 
-    def test_extract_table_name_from_insert(self):
+    def test_upgrade_mode_extract_table_name_from_insert(self):
         parser = SQLparser()
         query="INSERT INTO mytablename\nSELECT a,b,c\nFROM src_table"
         rep=parser.extract_table_references(query)
@@ -121,7 +121,7 @@ class TestSQLParser(unittest.TestCase):
         assert "Stateless" in parser.extract_upgrade_mode(query)
 
 
-    def test_sql_content_order(self):
+    def test_upgrade_mode_sql_content_order(self):
         fname = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
         with open(fname, "r") as f:
             sql_content = f.read()
@@ -130,13 +130,22 @@ class TestSQLParser(unittest.TestCase):
             assert len(referenced_table_names) == 3
             assert "Stateful" in parser.extract_upgrade_mode(sql_content)
 
-    def test_stateless_from_dml_ref(self):
+    def test_upgrade_mode_stateless_from_dml_ref(self):
         parser = SQLparser()
         fname = os.getenv("PIPELINES") + "/sources/p2/src_a/sql-scripts/dml.src_p2_a.sql"
         with open(fname, "r") as f:
             sql_content = f.read()
             upgrade_mode = parser.extract_upgrade_mode(sql_content)
             assert "Stateless"  == upgrade_mode
+
+    def test_upgrade_mode_cross_join_unnest(self):
+        parser = SQLparser()
+        query="""
+        SELECT order_id, product_name
+        FROM Orders 
+            CROSS JOIN UNNEST(product_names) AS t(product_name)
+        """
+        assert "Stateless" in parser.extract_upgrade_mode(query)
 
     def test_extract_columns_from_ddl(self):
         parser = SQLparser()

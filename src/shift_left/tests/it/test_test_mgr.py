@@ -36,5 +36,15 @@ class TestTestManager(unittest.TestCase):
         result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
         assert result
 
+    def test_get_topic_list(self):
+        table_exist = test_mgr._table_exists("products")
+        print(f"table_exist: {table_exist}")
+        assert test_mgr._topic_list
+        assert table_exist
+        table_exist = test_mgr._table_exists("p1_fct_order")
+        print(f"table_exist: {table_exist}")
+        assert not table_exist
+
+        
 if __name__ == '__main__':
     unittest.main()

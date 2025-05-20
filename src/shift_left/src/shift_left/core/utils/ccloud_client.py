@@ -201,7 +201,7 @@ class ConfluentCloudClient:
         self.api_key = self.config["kafka"]["api_key"]
         self.api_secret = self.config["kafka"]["api_secret"]
         self.auth_header = self._generate_auth_header()
-        glb_name=self.config["confluent_cloud"]["glb_name"]
+        glb_name=self.config.get("confluent_cloud").get("glb_name", None)
         if glb_name:
             url=f"https://{pkafka_cluster}.{region}.{cloud_provider}.{glb_name}.confluent.cloud/kafka/v3/clusters/{cluster_id}/topics"
         else:

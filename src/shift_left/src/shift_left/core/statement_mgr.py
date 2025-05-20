@@ -21,7 +21,13 @@ from shift_left.core.utils.file_search import (
     get_ddl_dml_names_from_pipe_def,
     from_pipeline_to_absolute
 )
-from shift_left.core.models.flink_statement_model import Statement, StatementResult, StatementInfo, StatementListCache
+from shift_left.core.models.flink_statement_model import (
+    Statement, 
+    StatementResult, 
+    StatementInfo, 
+    StatementListCache,
+    StatementError
+)
 from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
@@ -76,12 +82,14 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
                                 )
     return statement_info  
 
-def get_statement(statement_name: str) -> StatementInfo:
+def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
     properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     client = ConfluentCloudClient(config)
     url = client.build_flink_url_and_auth_header()
     response = client.make_request("GET", url + "/statements/" + statement_name)
+    if response.get('errors'):
+        return StatementError(**response)
     return Statement(**response)
 
 def post_flink_statement(compute_pool_id: str,  

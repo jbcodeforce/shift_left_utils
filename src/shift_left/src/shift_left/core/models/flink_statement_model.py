@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any, Set
 
 class MetadataResult(BaseModel):
     self_ref:  Optional[str] =  Field(alias="self", default=None)
-    next: Optional[str]
+    next: Optional[str] = None
 
 class OpRow(BaseModel):
     op: Optional[int] =  Field(default=None, description="the operation type: 0: insert, 1: -U, 2: +U, 3: delete")
@@ -83,6 +83,14 @@ class Statement(BaseModel):
         if not isinstance(other, Statement):
             return NotImplemented
         return self.name == other.name
+
+class ErrorData(BaseModel):
+    id: str = Field(default=None)
+    status: str = Field(default=None)
+    detail: str = Field(default=None)
+
+class StatementError(BaseModel):
+    errors: List[ErrorData] = Field(default=[])
 
 class StatementInfo(BaseModel):
     """

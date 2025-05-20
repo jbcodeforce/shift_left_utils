@@ -107,14 +107,29 @@ class SQLparser:
         
     def extract_upgrade_mode(self, sql_content) -> str:
         """
-        Extract the upgrade mode from the sql_content. Stateful is when the dml uses joins and
-        other stateful operators.
+        Extract the upgrade mode from the sql_content by analyzing it line by line.
+        - CROSS JOIN UNNEST and CROSS JOIN LATERAL are considered stateless
+        - Other JOINs and stateful operations make the query stateful
         """
-        sql_content=self._normalize_sql(sql_content)
-        if re.search(r'\b(JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|GROUP BY, TUMBLE)\s+', sql_content, re.IGNORECASE):
-            return "Stateful"
-        else:
-            return "Stateless"
+        # Split into lines and normalize each line
+        lines = sql_content.split('\n')
+        has_stateful_operation = False
+        
+        for line in lines:
+            # Normalize the current line
+            normalized_line = self._normalize_sql(line)
+            
+            # Skip empty lines
+            if not normalized_line:
+                continue
+                
+            # Check for other stateful operations
+            if re.search(r'\b(JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|GROUP BY|TUMBLE|OVER|MATCH_RECOGNIZE)\s+', normalized_line, re.IGNORECASE):
+                if not re.search(r'\bCROSS\s+JOIN\s+(?:UNNEST|LATERAL)\b', normalized_line, re.IGNORECASE):
+                    # Check for CROSS JOIN UNNEST or CROSS JOIN LATERAL
+                    has_stateful_operation = True
+                
+        return "Stateful" if has_stateful_operation else "Stateless"
     
     def build_column_metadata_from_sql_content(self, sql_content: str) -> Dict[str, Dict]:
         """
