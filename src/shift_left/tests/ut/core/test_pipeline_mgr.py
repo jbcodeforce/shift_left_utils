@@ -62,6 +62,7 @@ class TestPipelineManager(unittest.TestCase):
         assert pipeline_def
         pm._visit_parents(pipeline_def)
         print(pipeline_def.model_dump_json(indent=3))
+        
     def test_1_build_pipeline_def_for_fact_table(self):
         """ Need to run this one first"""
         print("test_1_build_pipeline_def_for_fact_table")
