@@ -235,7 +235,7 @@ class TestStatementManager(unittest.TestCase):
         """
         get_config().get('app')['sql_content_modifier']='shift_left.core.utils.table_worker.ReplaceEnvInSqlContent'
         get_config()['kafka']['cluster_type'] = 'stage'
-        transformer = statement_mgr._get_or_build_sql_content_transformer()
+        transformer = statement_mgr.get_or_build_sql_content_transformer()
         assert transformer
         _, sql_out=transformer.update_sql_content(sql_in)
         print(sql_out)

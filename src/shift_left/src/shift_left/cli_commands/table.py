@@ -177,6 +177,7 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
     """
     print("#" * 30 + f" Unit tests execution for {table_name}")
     if test_case_name:
+        print(f"Running test case {test_case_name} for table {table_name} on compute pool {compute_pool_id}")
         test_result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
         # review this
         test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, 

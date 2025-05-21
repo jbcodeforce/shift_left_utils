@@ -54,7 +54,7 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
     try:
         with open(full_file_path, "r") as f:
             sql_content = f.read()
-            transformer = _get_or_build_sql_content_transformer()
+            transformer = get_or_build_sql_content_transformer()
             _, sql_out= transformer.update_sql_content(sql_content)
 
             statement= post_flink_statement(compute_pool_id, 
@@ -110,7 +110,7 @@ def post_flink_statement(compute_pool_id: str,
                 "spec": {
                     "statement": sql_content,
                     "properties": properties,
-                    "compute_pool_id": compute_pool_id if isinstance(compute_pool_id, str) else compute_pool_id[0],
+                    "compute_pool_id": compute_pool_id,
                     "stopped": stopped
                 }
             }
@@ -308,7 +308,7 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
-    logger.debug(f"Run drop table {table_name}")
+    logger.info(f"Run drop table {table_name}")
     sql_content = f"drop table if exists {table_name};"
     drop_statement_name = "drop-" + table_name.replace('_','-')
     try:
@@ -321,6 +321,20 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     finally:
         delete_statement_if_exists(drop_statement_name)
     return f"{table_name} dropped"
+
+_runner_class = None
+def get_or_build_sql_content_transformer():
+    global _runner_class
+    if not _runner_class:
+        if get_config().get('app').get('sql_content_modifier'):
+        
+            class_to_use = get_config().get('app').get('sql_content_modifier')
+            module_path, class_name = class_to_use.rsplit('.',1)
+            mod = import_module(module_path)
+            _runner_class = getattr(mod, class_name)()
+        else:
+            _runner_class = ReplaceEnvInSqlContent()
+    return _runner_class
 
 # ------------- private methods -------------
 def _save_statement_list(statement_list: dict[str, StatementInfo]):
@@ -384,16 +398,3 @@ def _search_statement_status(node: FlinkTablePipelineDefinition, statement_list,
         results = _update_results_from_node(pipeline_def, statement_list, results, table_inventory, config)
     return results
 
-_runner_class = None
-def _get_or_build_sql_content_transformer():
-    global _runner_class
-    if not _runner_class:
-        if get_config().get('app').get('sql_content_modifier'):
-        
-            class_to_use = get_config().get('app').get('sql_content_modifier')
-            module_path, class_name = class_to_use.rsplit('.',1)
-            mod = import_module(module_path)
-            _runner_class = getattr(mod, class_name)()
-        else:
-            _runner_class = ReplaceEnvInSqlContent()
-    return _runner_class

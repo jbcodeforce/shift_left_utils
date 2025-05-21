@@ -105,18 +105,18 @@ test_suite:
 
   This command needs the inventory and loads table references and metadata and then creates content from the DML SQL content.
   
-* [ ] For each test cases defined do the following on a selected compute pool id
+* [x] For each test cases defined do the following on a selected compute pool id
 
     * Execute the foundation sql statements to create the temporary tables for injecting test data (e.g. `tests/ddl_int_table_1.sql`, `tests/ddl_int_table_2.sql`). The name of the tables are changed to add `_ut` at the end to avoid colision with existing topics.
     * Deploy the target flink deployment to test, by loading the sql content from the file (e.g. `sql-scripts/dml.fct_order.sql`) but modifying the table names dynamically (e.g.  `int_table_1` becoming `int_table_1_ut`). 
     * Execute the inputs SQL statements to inject the data to the different source tables.
     * Execute the validation SQL statement to validate the expected results
 
-* [ ] When test suite is done teardown the temporary tables.
+* [x] When test suite is done teardown the temporary tables.
 
 ## Usage/Demonstration
 
-* Verify the ddl and dml of the table are created, then run
+* Verify the ddl and dml of the table are created under `sql-scripts`, then run the following command:
 
 ```sh
 table init-unit-tests table_name

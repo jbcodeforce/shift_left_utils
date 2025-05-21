@@ -1,30 +1,38 @@
 foundations:
-- table_name: src_p3_tenants
-  ddl_for_test: ./tests/ddl_src_p3_tenants.sql
-- table_name: src_p3_users
-  ddl_for_test: ./tests/ddl_src_p3_users.sql
 - table_name: src_p3_roles
   ddl_for_test: ./tests/ddl_src_p3_roles.sql
+- table_name: src_p3_users
+  ddl_for_test: ./tests/ddl_src_p3_users.sql
+- table_name: src_p3_tenants
+  ddl_for_test: ./tests/ddl_src_p3_tenants.sql
 test_suite:
 - name: test_int_p3_user_role_1
   inputs:
-  - table_name: src_p3_tenants
-    sql_file_name: ./tests/insert_src_p3_tenants_1.sql
-  - table_name: src_p3_users
-    sql_file_name: ./tests/insert_src_p3_users_1.sql
   - table_name: src_p3_roles
-    sql_file_name: ./tests/insert_src_p3_roles_1.sql
+    file_name: ./tests/insert_src_p3_roles_1.sql
+    file_type: sql
+  - table_name: src_p3_users
+    file_name: ./tests/insert_src_p3_users_1.sql
+    file_type: sql
+  - table_name: src_p3_tenants
+    file_name: ./tests/insert_src_p3_tenants_1.sql
+    file_type: sql
   outputs:
   - table_name: int_p3_user_role
-    sql_file_name: ./tests/validate_int_p3_user_role_1.sql
+    file_name: ./tests/validate_int_p3_user_role_1.sql
+    file_type: sql
 - name: test_int_p3_user_role_2
   inputs:
-  - table_name: src_p3_tenants
-    sql_file_name: ./tests/insert_src_p3_tenants_2.sql
-  - table_name: src_p3_users
-    sql_file_name: ./tests/insert_src_p3_users_2.sql
   - table_name: src_p3_roles
-    sql_file_name: ./tests/insert_src_p3_roles_2.sql
+    file_name: ./tests/insert_src_p3_roles_2.csv
+    file_type: csv
+  - table_name: src_p3_users
+    file_name: ./tests/insert_src_p3_users_2.csv
+    file_type: csv
+  - table_name: src_p3_tenants
+    file_name: ./tests/insert_src_p3_tenants_2.csv
+    file_type: csv
   outputs:
   - table_name: int_p3_user_role
-    sql_file_name: ./tests/validate_int_p3_user_role_2.sql
+    file_name: ./tests/validate_int_p3_user_role_2.sql
+    file_type: sql

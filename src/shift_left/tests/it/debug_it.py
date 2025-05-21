@@ -23,10 +23,20 @@ class TestDebugIntegrationTests(unittest.TestCase):
         print(nb_of_messages)
         assert nb_of_messages >= 0
 
-    def test_running_test_suite(self):
+    def _test_running_one_sql_test_case(self):
         table_name = "aqem_dim_role"
         test_case="test_aqem_dim_role_1"
-        test_mgr.execute_one_test(table_name=table_name, test_case_name=test_case)
+        test_result = test_mgr.execute_one_test(table_name=table_name, test_case_name=test_case)
+        assert test_result is not None
+        print(f"test_result: {test_result.model_dump_json(indent=3)}")
+
+    def test_delete_test_artifacts(self):
+        config = get_config()
+        table_name = "aqem_dim_role"
+        compute_pool_id = config["flink"]["compute_pool_id"]
+        test_mgr.delete_test_artifacts(table_name=table_name, 
+                                       compute_pool_id=compute_pool_id,
+                                       test_suite_result=None)
 
 if __name__ == '__main__':
     unittest.main()
