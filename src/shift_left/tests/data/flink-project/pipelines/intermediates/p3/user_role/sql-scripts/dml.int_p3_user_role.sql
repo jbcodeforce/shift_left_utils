@@ -17,6 +17,4 @@ WITH
         from src_p3_roles
         left join users u on src_p3_roles.role_id = u.role_id
     )
-SELECT 
-*
-FROM roles
+SELECT * FROM roles;

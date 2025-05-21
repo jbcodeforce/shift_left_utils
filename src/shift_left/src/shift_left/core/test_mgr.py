@@ -128,7 +128,6 @@ def execute_all_tests(table_name: str,
     """
     Execute all test cases defined in the test suite definition for a given table.
     """
-    print(f"**********************-Starting Validation Test Case-********************** ")
     
     test_suite_def, table_ref, prefix, test_result = _init_test_foundation(table_name, "", compute_pool_id)
  
@@ -299,7 +298,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
         parser = SQLparser()
         table_names = parser.extract_table_references(sql_content)
         for table in table_names:
-            print(f"table: {table}")
+            logger.info(f"table: {table}")
             sql_content = sql_content.replace(table, f"{table}_ut")
         return sql_content
 
@@ -381,6 +380,8 @@ def _execute_test_validation(test_case: SLTestCase,
     result_text = ""
     for output_step in test_case.outputs:
         sql_path = os.path.join(table_ref.table_folder_name, output_step.file_name)
+        statement_name = _build_statement_name(output_step.table_name, prefix)
+        statement_mgr.delete_statement_if_exists(statement_name)
         statement = _load_sql_execute_statement(table_name=output_step.table_name,
                                     sql_path=sql_path,
                                     prefix=prefix,
@@ -402,14 +403,14 @@ def _poll_response(statement: Statement) -> str:
             resp = statement_mgr.get_statement_results(statement.name)
             # Check if results and data are non-empty
             if resp and resp.results and resp.results.data:
-                print(f"Received results on poll {poll}")
-                print(resp.results.data)
+                logger.info(f"Received results on poll {poll}")
+                logger.info(resp.results.data)
                 break
             elif resp:
-                print(f"Attempt {poll}: Empty results, retrying in {retry_delay}s...")
+                logger.info(f"Attempt {poll}: Empty results, retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
         except Exception as e:
-            print(f"Attempt {poll} failed with error: {e}")
+            logger.info(f"Attempt {poll} failed with error: {e}")
             #time.sleep(retry_delay)
             break
 
@@ -417,7 +418,7 @@ def _poll_response(statement: Statement) -> str:
     final_row= 'FAIL'
     if resp and resp.results and resp.results.data:
         final_row = resp.results.data[0].row[0]
-        print(f"Final Result : {final_row}")
+        logger.info(f"Final Result : {final_row}")
     return final_row
 
 def _add_test_files(table_ref: FlinkTableReference, 
@@ -432,6 +433,8 @@ def _add_test_files(table_ref: FlinkTableReference,
         sql_content = f.read()
         parser = SQLparser()
         referenced_table_names = parser.extract_table_references(sql_content)
+        # keep as print for user feedback
+        print(f"From the DML under test the referenced table names are: {referenced_table_names}")
     if not referenced_table_names:
         logger.error(f"No referenced table names found in the sql_content of {file_path}")
         raise ValueError(f"No referenced table names found in the sql_content of {file_path}")
@@ -458,6 +461,7 @@ def _add_test_files(table_ref: FlinkTableReference,
                     f.write(columns_names+"\n")
                     f.write(rows)
                 logger.info(f"Input file {input_file} created")
+                print(f"Input file {input_file} created")
 
         # Create output validation files 
         for output_data in test_case.outputs:

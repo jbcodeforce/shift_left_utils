@@ -205,3 +205,24 @@ def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the ta
         test_suite_result = None
     test_mgr.delete_test_artifacts(table_name, compute_pool_id, test_suite_result)
     print("#" * 30 + f" Unit tests deletion for {table_name} completed")
+
+@app.command()
+def explain(table_name: str=  typer.Option(None,help= "Name of the table to get Flink execution plan explanations from."),
+            dir: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),
+            compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+    """
+    Get the Flink execution plan explanations for a given table.
+    """
+    
+    if table_name:
+        print("#" * 30 + f" Flink execution plan explanations for {table_name}")
+        table_mgr.explain_table(table_name=table_name, compute_pool_id=compute_pool_id)
+        print("#" * 30 + f" Flink execution plan explanations for {table_name} completed")
+    elif dir:
+        print("#" * 30 + f" Flink execution plan explanations for {dir}")
+        table_mgr.explain_tables_in_dir(dir=dir, compute_pool_id=compute_pool_id)
+        print("#" * 30 + f" Flink execution plan explanations for {dir} completed")
+    else:
+        print("[red]Error: table or dir needs to be provided.[/red]")
+        exit(1)
+    

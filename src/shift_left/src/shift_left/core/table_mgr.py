@@ -253,6 +253,17 @@ def load_sql_content_from_file(sql_file_name) -> str:
         return f.read()
 
 
+def explain_table(table_name: str, compute_pool_id: str):
+    """
+    Explain the table using the Flink CLI. Run explain select.
+    """
+    pass
+
+def explain_tables_in_dir(dir: str, compute_pool_id: str):
+    """
+    Explain the tables in the directory using the Flink CLI
+    """
+    pass
 
 # --------- Private APIs ---------------
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
