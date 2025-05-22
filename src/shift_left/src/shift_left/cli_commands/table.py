@@ -208,20 +208,25 @@ def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the ta
 
 @app.command()
 def explain(table_name: str=  typer.Option(None,help= "Name of the table to get Flink execution plan explanations from."),
-            dir: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),
-            compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+            product_name: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),
+            compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
+            persist_report: bool = typer.Option(False, "--persist-report", help="Persist the report in the shift_left_dir folder.")):
     """
     Get the Flink execution plan explanations for a given table.
     """
     
     if table_name:
         print("#" * 30 + f" Flink execution plan explanations for {table_name}")
-        table_mgr.explain_table(table_name=table_name, compute_pool_id=compute_pool_id)
+        table_report=table_mgr.explain_table(table_name=table_name, compute_pool_id=compute_pool_id, persist_report=persist_report)
+        print(f"Table: {table_report['table_name']}")
+        print("-"*50)
+        print(table_report['trace'])
         print("#" * 30 + f" Flink execution plan explanations for {table_name} completed")
-    elif dir:
-        print("#" * 30 + f" Flink execution plan explanations for {dir}")
-        table_mgr.explain_tables_in_dir(dir=dir, compute_pool_id=compute_pool_id)
-        print("#" * 30 + f" Flink execution plan explanations for {dir} completed")
+    elif product_name:
+        print("#" * 30 + f" Flink execution plan explanations for the product: {product_name}")
+        tables_report=table_mgr.explain_tables_for_product(product_name=product_name, compute_pool_id=compute_pool_id, persist_report=persist_report)
+        print(tables_report)
+        print("#" * 30 + f" Flink execution plan explanations for the product {product_name} completed")
     else:
         print("[red]Error: table or dir needs to be provided.[/red]")
         exit(1)

@@ -176,7 +176,9 @@ def deploy(
                 dml_only = dml_only, 
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
+            print(f"{result}")
         elif table_name:
+            print("#"*50)
             print(f"Deploy pipeline from table {table_name}")
             result, summary = deployment_mgr.deploy_pipeline_from_table(
                 table_name = table_name, 
@@ -185,6 +187,7 @@ def deploy(
                 dml_only = dml_only, 
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
+            print(f"{result.model_dump_json(indent=3)}")
         elif product_name:
             print(f"Deploy pipeline from product {product_name}")
             result, summary = deployment_mgr.deploy_pipeline_from_product(
@@ -194,11 +197,11 @@ def deploy(
                 dml_only = dml_only, 
                 may_start_children = may_start_children, 
                 force_sources = force_sources)
+            print(f"{result}")
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)
         print(f"{summary}")
-        print(f"{result.model_dump_json(indent=3)}")
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)
@@ -221,7 +224,8 @@ def report_running_statements(
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
             results+= deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
         elif dir:
-            results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, inventory_path)
+            results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, 
+                                                                                           inventory_path)
         elif product_name:
             results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, inventory_path)
         else:

@@ -61,9 +61,9 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
                                             statement_name, 
                                             sql_out)
             logger.debug(f"Statement: {statement_name} -> {statement}")
-            if statement and statement.status:
+            if statement and isinstance(statement, Statement) and statement.status:
                 logger.info(f"Statement: {statement_name} status is: {statement.status.phase}")
-                get_statement_list()[statement_name]=statement   # important to avoid doing an api call
+                get_statement_list()[statement_name]=_map_to_statement_info(statement)   # important to avoid doing an api call
             return statement
     except Exception as e:
         logger.error(e)
@@ -135,7 +135,7 @@ def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"Enter with {statement_name}")
     statement_list = get_statement_list()
     if statement_name in statement_list:
-        logger.info(f"{statement_name} in the cached statement list")
+        logger.info(f"{statement_name} in the cached statement list, delete it")
         config = get_config()
         client = ConfluentCloudClient(config)
         result = client.delete_flink_statement(statement_name)
@@ -388,7 +388,9 @@ def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list
     return results
 
 
-def _search_statement_status(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):
+def _search_statement_status(node: FlinkTablePipelineDefinition, 
+                             statement_list, results, 
+                             table_inventory, config: dict):
     ddl_statement_name, statement_name = get_ddl_dml_names_from_pipe_def(node)
     if statement_name in get_statement_list():
         status = get_statement_list()[statement_name]

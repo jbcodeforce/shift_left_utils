@@ -3,13 +3,12 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 import subprocess
-import logging
 import shutil
 import importlib.resources 
 from typing import Tuple, List
 from shift_left.core.utils.file_search import create_folder_if_not_exist
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, logger
 
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
@@ -19,7 +18,7 @@ TMPL_FOLDER="templates"
 def build_project_structure(project_name: str, 
                             project_path: str, 
                             project_type: str):
-    logging.info(f"build_project_structure({project_name}, {project_path}, {project_type}")
+    logger.info(f"build_project_structure({project_name}, {project_path}, {project_type}")
     project_folder=os.path.join(project_path, project_name)
     create_folder_if_not_exist(project_folder)
     create_folder_if_not_exist(os.path.join(project_folder, "pipelines"))
@@ -48,11 +47,11 @@ def get_topic_list(file_name: str):
 # --- Private APIs ---
 
 def _initialize_git_repo(project_folder: str):
-    logging.info(f"_initialize_git_repo({project_folder})")
+    logger.info(f"_initialize_git_repo({project_folder})")
     try:
         subprocess.run(["git", "init"], check=True, cwd=project_folder)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to initialize git repository in {project_folder}: {e}")
+        logger.error(f"Failed to initialize git repository in {project_folder}: {e}")
 
 def _define_dp_structure(pipeline_folder: str):
     data_folder=pipeline_folder + "/data_product_1"
@@ -69,7 +68,7 @@ def _define_kimball_structure(pipeline_folder: str):
     create_folder_if_not_exist(pipeline_folder + "/sources")
 
 def _add_important_files(project_folder: str):    
-    logging.info(f"add_important_files({project_folder}")
+    logger.info(f"add_important_files({project_folder}")
     for file in ["common.mk", "config_tmpl.yaml"]:
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
         shutil.copyfile(template_path, os.path.join(project_folder, "pipelines", file))

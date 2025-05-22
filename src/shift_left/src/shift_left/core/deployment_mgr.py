@@ -25,7 +25,8 @@ from shift_left.core import (
 from shift_left.core.models.flink_statement_model import (
     Statement,
     FlinkStatementNode,
-    FlinkStatementExecutionPlan
+    FlinkStatementExecutionPlan,
+    StatementInfo
 )
 import shift_left.core.metric_mgr as metrics_mgr
 from shift_left.core.utils.report_mgr import (
@@ -39,9 +40,11 @@ from shift_left.core.utils.report_mgr import (
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.file_search import (
     PIPELINE_JSON_FILE_NAME,
+    FlinkTableReference,
     FlinkTablePipelineDefinition,
     get_ddl_dml_names_from_pipe_def,
-    read_pipeline_definition_from_file
+    read_pipeline_definition_from_file,
+    get_or_build_inventory
 )
 
 # Constants
@@ -103,10 +106,11 @@ def deploy_pipeline_from_table(
             f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
             f"{result.model_dump_json(indent=3)}"
         )
+        print(report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path))
         return result, summary
         
     except Exception as e:
-        logger.error(f"Failed to deploy pipeline from table {table_name}: {str(e)}")
+        logger.error(f"Failed to deploy pipeline from table {table_name} error is: {str(e)}")
         raise
 
 def deploy_pipeline_from_product(
@@ -137,6 +141,41 @@ def deploy_pipeline_from_product(
                 global_summary += summary + "\n" + "#"*100 + "\n"
                 print(f"{summary}")
     return reports, global_summary
+
+def deploy_all_from_directory(
+    directory: str, 
+    inventory_path: str, 
+    compute_pool_id: str,
+    dml_only: bool = False,
+    may_start_children: bool = False,
+    force_sources: bool = False
+) -> Tuple[List[DeploymentReport], str]:
+    """
+    Deploy all the pipelines within a directory tree.
+    """
+    result = "#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+= "\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+= "\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    count=0
+    reports = []
+    for root, _, files in os.walk(directory):
+        if PIPELINE_JSON_FILE_NAME in files:
+            file_path=root + "/" + PIPELINE_JSON_FILE_NAME
+            pipe_def = read_pipeline_definition_from_file(file_path)
+            logger.info(f"Deploying pipeline from table {pipe_def.table_name}")
+            result+= "#"*40 + f" Deploy table: {pipe_def.table_name} " + "#"*40 + "\n"
+            report, summary = deploy_pipeline_from_table(table_name=pipe_def.table_name,
+                                                        inventory_path=inventory_path,
+                                                        compute_pool_id=compute_pool_id,
+                                                        dml_only=dml_only,
+                                                        may_start_children=may_start_children,
+                                                        force_sources=force_sources)
+            reports.append(report)
+            result+=summary + "\n" + "#"*100 + "\n"
+            count+=1
+           
+    result+=f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+    return reports, result
 
 
 def deploy_from_execution_plan(
@@ -224,7 +263,6 @@ def build_execution_plan_from_any_table(
         )
 
         ancestors = []
-        visited_nodes = set()
         start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
         ancestors = _build_topological_sorted_parents(start_node, node_map)
 
@@ -254,7 +292,8 @@ def build_execution_plan_from_any_table(
         
         # When may_start_children, restart all children of each ancestor node that needs to be restarted or run.
         for node in execution_plan.nodes:
-            if node.type == "source" and node.is_running():  # the list of nodes may have been changed so this is needed again.
+            if node.type == "source" and node.is_running():  
+                # the list of nodes may have been changed by getting new parents from previously processed children so this is needed again.
                 node.to_run = force_sources
             if node.to_run or node.to_restart:
                 for child in node.children:
@@ -280,7 +319,7 @@ def build_execution_plan_from_any_table(
         return execution_plan
         
     except Exception as e:
-        logger.error(f"Failed to build execution plan: {str(e)}")
+        logger.error(f"Failed to build execution plan. Error is : {str(e)}")
         raise
 
 def report_running_flink_statements_for_a_table_execution_plan(
@@ -302,7 +341,7 @@ def report_running_flink_statements_for_a_table_execution_plan(
 
 def report_running_flink_statements_for_all_from_directory(
     directory: str, 
-    inventory_path: str, 
+    inventory_path: str
 ) -> str:
     """
     Review execution plans for all the pipelines in the directory.
@@ -342,34 +381,34 @@ def report_running_flink_statements_for_a_product(
     table_report.catalog_name = get_config().get('flink').get('catalog_name')
     table_report.database_name = get_config().get('flink').get('database_name')
     compute_pool_list = compute_pool_mgr.get_compute_pool_list()
-    
-    for root, dirs, files in os.walk(inventory_path):
-        if product_name in root:
-            if 'sql-scripts' in dirs:
-                file_path=root + "/" + PIPELINE_JSON_FILE_NAME
-                pipeline_def = read_pipeline_definition_from_file(file_path)
-                if pipeline_def:
-                    node: FlinkStatementNode = pipeline_def.to_node()
-                    node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
-                    
-                    table_info = TableInfo()
-                    table_info.table_name = node.table_name
-                    table_info.type = node.type
-                    table_info.upgrade_mode = node.upgrade_mode
-                    table_info.statement_name = node.dml_statement_name
-                    table_info.status = node.existing_statement_info.status_phase
-                    table_info.compute_pool_id = node.existing_statement_info.compute_pool_id
-                    pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, table_info.compute_pool_id)
-                    if pool:
-                        table_info.compute_pool_name = pool.name
-                    else:
-                        table_info.compute_pool_name = "UNKNOWN"
-                    table_info.created_at = node.existing_statement_info.created_at
-                    if table_info.status == "RUNNING":
-                        table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
-                        table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
-                        table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
-                    table_report.tables.append(table_info)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    for table_name, table_ref_dict in table_inventory.items():
+        table_ref = FlinkTableReference(**table_ref_dict)
+        if table_ref.product_name == product_name:
+            file_path=table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
+            pipeline_def = read_pipeline_definition_from_file(file_path)
+            if pipeline_def:
+                node: FlinkStatementNode = pipeline_def.to_node()
+                node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
+                
+                table_info = TableInfo()
+                table_info.table_name = node.table_name
+                table_info.type = node.type
+                table_info.upgrade_mode = node.upgrade_mode
+                table_info.statement_name = node.dml_statement_name
+                table_info.status = node.existing_statement_info.status_phase
+                table_info.compute_pool_id = node.existing_statement_info.compute_pool_id
+                pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, table_info.compute_pool_id)
+                if pool:
+                    table_info.compute_pool_name = pool.name
+                else:
+                    table_info.compute_pool_name = "UNKNOWN"
+                table_info.created_at = node.existing_statement_info.created_at
+                if table_info.status == "RUNNING":
+                    table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
+                    #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
+                    #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
+                table_report.tables.append(table_info)
     table_count=0
     running_count=0
     non_running_count=0
@@ -395,38 +434,7 @@ def report_running_flink_statements_for_a_product(
     return result   
 
 
-def deploy_all_from_directory(
-    directory: str, 
-    inventory_path: str, 
-    compute_pool_id: str,
-    dml_only: bool = False,
-    may_start_children: bool = False,
-    force_sources: bool = False
-) -> str:
-    """
-    Deploy all the pipelines in the directory.
-    """
-    result = "#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
-    result+= "\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
-    result+= "\tDatabase: " + get_config()['flink']['database_name'] + "\n"
-    count=0
-    for root, _, files in os.walk(directory):
-        if PIPELINE_JSON_FILE_NAME in files:
-            file_path=root + "/" + PIPELINE_JSON_FILE_NAME
-            pipe_def = read_pipeline_definition_from_file(file_path)
-            logger.info(f"Deploying pipeline from table {pipe_def.table_name}")
-            result+= "#"*40 + f" Deploy table: {pipe_def.table_name} " + "#"*40 + "\n"
-            report, summary = deploy_pipeline_from_table(table_name=pipe_def.table_name,
-                                                        inventory_path=inventory_path,
-                                                        compute_pool_id=compute_pool_id,
-                                                        dml_only=dml_only,
-                                                        may_start_children=may_start_children,
-                                                        force_sources=force_sources)
-            result+=summary + "\n" + "#"*100 + "\n"
-            count+=1
-           
-    result+=f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
-    return result
+
 
 
 
@@ -624,10 +632,12 @@ def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatement
         and compute_pool_id and compute_pool_name fields getting the values from the statement info
     """
     node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
-    if node.existing_statement_info.compute_pool_id:
+    if isinstance(node.existing_statement_info, StatementInfo) and node.existing_statement_info.compute_pool_id:
         node.compute_pool_id = node.existing_statement_info.compute_pool_id
         node.compute_pool_name = node.existing_statement_info.compute_pool_name
         node.created_at = node.existing_statement_info.created_at
+    else:
+        logger.error(f"Statement {node.existing_statement_info} is not a StatementInfo")
     return node 
 
 def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
@@ -656,6 +666,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     is set as argument of the command line. If this is an ancestor or a child of a running node, it may be possible there is no running 
     statement for that node so not compute pool id is set. In this case we need to find a compute pool to use.
     """
+    logger.info(f"Assign compute pool id to node {node.table_name}, backup pool is {compute_pool_id}")
     # If the node already has an assigned compute pool, continue using that
     if node.compute_pool_id and compute_pool_mgr.is_pool_valid(node.compute_pool_id):  # this may be loaded from the statement info
         node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
@@ -714,11 +725,12 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> Li
     
     try:
         for node in plan.nodes:
-            logger.info(f"Processing table: '{node.table_name}'")
             if not node.compute_pool_id:
                 node.compute_pool_id = compute_pool_id
                 
             if node.to_run or node.to_restart:
+                logger.info(f"Deploy table: '{node.table_name}'")
+                print(f"Deploy table: '{node.table_name}' using Flink: {node.dml_statement_name}")
                 logger.debug(f"Execute statement '{node.dml_statement_name}' with dml only: {node.dml_only}")
                 try:
                     if not node.dml_only:

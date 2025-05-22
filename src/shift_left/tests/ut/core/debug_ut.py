@@ -3,77 +3,42 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-
-from shift_left.core.utils.app_config import get_config
+#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
+os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
+os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+        
+from shift_left.core.utils.app_config import get_config, shift_left_dir
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
 import  shift_left.core.pipeline_mgr as pipeline_mgr
 from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.test_mgr as test_mgr
+import shift_left.core.table_mgr as table_mgr
 from shift_left.core.utils.file_search import build_inventory
-
+import json
 class TestDebugUnitTests(unittest.TestCase):
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    @patch('shift_left.core.test_mgr._table_exists')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
-    @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_execute_csv_inputs(self, 
-                                mock_post_flink_statement, 
-                                mock_get_statement_info, 
-                                mock_table_exists, 
-                                mock_get_statement):
-        
-        def _mock_post_statement(compute_pool_id, statement_name, sql_content):
-            print(f"mock_post_statement: {statement_name}")
-            print(f"sql_content: {sql_content}")
-            if "dml" in statement_name or "ins" in statement_name:
-                return Statement(name=statement_name, status={"phase": "RUNNING"})
-            else:
-                return Statement(name=statement_name, status={"phase": "UNKNOWN"})
-
-        def _mock_running_statement_info(statement_name):
-            print(f"mock_statement_info: {statement_name}")
-            return StatementInfo(name=statement_name, status_phase="RUNNING")
-
-        def _mock_table_exists(table_name):
-            print(f"mock_table_exists: {table_name}")
-            return True
-        
-        def _mock_get_statement(statement_name):
-            print(f"mock_get_statement: {statement_name}")
-            if "ins" in statement_name:
-                return None
-            return Statement(name=statement_name, status={"phase": "RUNNING"})
-
-        mock_get_statement_info.side_effect = _mock_running_statement_info
-        mock_post_flink_statement.side_effect = _mock_post_statement
-        mock_table_exists.side_effect = _mock_table_exists
-        mock_get_statement.side_effect = _mock_get_statement
-
-        pipeline_folder = os.getenv("PIPELINES")
-        table_name = "int_p3_user_role"
-        test_case_name = "test_int_p3_user_role_2"
-        compute_pool_id = "dev_pool_id"
-        test_suite_def, table_ref, prefix, test_result= test_mgr._init_test_foundation(table_name, 
-                                                                                       test_case_name, 
-                                                                                       compute_pool_id)
-        print(f"test_suite_def: {test_suite_def.test_suite[1]}")
-        test_case = test_suite_def.test_suite[1]
-        
-        statements = test_mgr._execute_test_inputs(test_case=test_case,
-                                                      table_ref=table_ref,
-                                                      prefix="dev-ins",
-                                                      compute_pool_id=compute_pool_id)
-        assert len(statements) == 3
-        assert statements[0].name == "dev-ins-src-p3-roles-ut"
-        assert statements[0].status["phase"] == "RUNNING"
-        print(f"statement: {statements[0]}")
         
 
+    def _test_explain_table(self):
+        result = """== Physical Plan ==\n\nStreamSink [20]\n  +- StreamUnion [19]\n    +- StreamUnion [17]\n    :  +- StreamUnion [15]\n    :  :  +- StreamCalc [13]\n    :  :  :  +- StreamJoin [12]\n    :  :  :    +- StreamExchange [5]\n    :  :  :    :  +- StreamChangelogNormalize [4]\n    :  :  :    :    +- StreamExchange [3]\n    :  :  :    :      +- StreamCalc [2]\n    :  :  :    :        +- StreamTableSourceScan [1]\n    :  :  :    +- StreamExchange [11]\n    :  :  :      +- StreamCalc [10]\n    :  :  :        +- StreamChangelogNormalize [9]\n    :  :  :          +- StreamExchange [8]\n    :  :  :            +- StreamCalc [7]\n    :  :  :              +- StreamTableSourceScan [6]\n    :  :  +- StreamCalc [14]\n    :  :    +- (reused) [9]\n    :  +- StreamCalc [16]\n    :    +- (reused) [9]\n    +- StreamCalc [18]\n      +- (reused) [9]\n\n== Physical Details ==\n\n[1] StreamTableSourceScan\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`src_identity_metadata`\nPrimary key: (id,tenant_id)\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\nState size: low\nStartup mode: earliest-offset\n\n[2] StreamCalc\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\n\n[3] StreamExchange\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\n\n[4] StreamChangelogNormalize\nChangelog mode: retract\nUpsert key: (id,tenant_id)\nState size: medium\nState TTL: never\n\n[5] StreamExchange\nChangelog mode: retract\nUpsert key: (id,tenant_id)\n\n[6] StreamTableSourceScan\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`stage_tenant_dimension`\nPrimary key: (tenant_id)\nChangelog mode: upsert\nUpsert key: (tenant_id)\nState size: low\nStartup mode: earliest-offset\n\n[7] StreamCalc\nChangelog mode: upsert\nUpsert key: (tenant_id)\n\n[8] StreamExchange\nChangelog mode: upsert\nUpsert key: (tenant_id)\n\n[9] StreamChangelogNormalize\nChangelog mode: retract\nUpsert key: (tenant_id)\nState size: medium\nState TTL: never\n\n[10] StreamCalc\nChangelog mode: retract\n\n[11] StreamExchange\nChangelog mode: retract\n\n[12] StreamJoin\nChangelog mode: retract\nState size: medium\nState TTL: never\n\n[13] StreamCalc\nChangelog mode: retract\n\n[14] StreamCalc\nChangelog mode: retract\n\n[15] StreamUnion\nChangelog mode: retract\n\n[16] StreamCalc\nChangelog mode: retract\n\n[17] StreamUnion\nChangelog mode: retract\n\n[18] StreamCalc\nChangelog mode: retract\n\n[19] StreamUnion\nChangelog mode: retract\n\n[20] StreamSink\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`aqem_dim_role`\nPrimary key: (sid)\nChangelog mode: upsert\nState size: high\nState TTL: never\n\n== Warnings ==\n\n1. For StreamSink [20]: The primary key does not match the upsert key derived from the query. If the primary key and upsert key don't match, the system needs to add a state-intensive operation for correction. Please revisit the query (upsert key: null) or the table declaration for `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`aqem_dim_role` (primary key: [sid]). For more information, see https://cnfl.io/primary_vs_upsert_key.\n2. Entire statement: Your query includes one or more highly state-intensive operators but does not set a time-to-live (TTL) value, which means that the system potentially needs to store an infinite amount of state. This can result in a DEGRADED statement and higher CFU consumption. If possible, change your query to use a different operator, or set a time-to-live (TTL) value. For more information, see https://cnfl.io/high_state_intensive_operators.\n'"""
+        print(result)
+
+    def _test_explain_tables_for_product(self):
+      table_mgr.explain_table(table_name="aqem_dim_role", compute_pool_id="lfcp-0725o5")
     
+    
+    def test_statis_parsing_of_explain_table(self):
+        explain_reports = []
+        for root, dirs, files in os.walk(shift_left_dir):
+            for file in files:
+                if file.endswith("_explain_report.json"):
+                    report_path = os.path.join(root, file)
+                    print(f"Found explain report: {report_path}")
+                    with open(report_path, 'r') as f:
+                        explain_reports.append(json.load(f))
+                    print(f"--> {table_mgr._summarize_trace(explain_reports[-1]['trace'])}")
+        
 
 if __name__ == '__main__':
     unittest.main()

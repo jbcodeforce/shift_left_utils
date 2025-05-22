@@ -13,6 +13,7 @@ class StatementBasicInfo(BaseModel):
     uid: str
     compute_pool_id: str
     status: str
+    status_details: str
     start_time: float = 0
     execution_time: float =0
 
@@ -95,7 +96,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
 
     
     summary_parts = [
-        f"To deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
+        f"\nTo deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
     ]
     
     # Separate nodes into parents and children
@@ -137,7 +138,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     
     summary= "\n".join(summary_parts)
     summary+="\n---Matching compute pools: " 
-    summary+=f"\nPool ID   \t{pad_or_truncate('Name',40)}\tCurrent/Max CFU\tFlink Statement"
+    summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 125
     for node in execution_plan.nodes:
         pool = get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
         if pool:
@@ -159,6 +160,10 @@ def build_deployment_report(
     return report
 
 def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
+    if statement.status and statement.status.detail:
+        status_detail = statement.status.detail
+    else:
+        status_detail = ""
     return StatementBasicInfo(
         name=statement.name,
         environment_id=statement.environment_id,
@@ -166,5 +171,6 @@ def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
         uid=statement.metadata.uid,
         compute_pool_id=statement.spec.compute_pool_id,
         status=statement.status.phase,
+        status_details=status_detail,
         execution_time=statement.execution_time
     )

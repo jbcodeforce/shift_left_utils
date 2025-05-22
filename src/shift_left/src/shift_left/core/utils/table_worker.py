@@ -3,7 +3,6 @@ Copyright 2024-2025 Confluent, Inc.
 
 Interface definition to support modifying SQL code to multiple sql statements.
 """
-import logging
 from typing import Tuple
 import re
 from shift_left.core.utils.app_config import logger, get_config
@@ -40,7 +39,7 @@ class ChangeChangeModeToUpsert(TableWorker):
                     updated = True
                 else:
                     sql_out+=line + "\n"
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
 
@@ -56,7 +55,7 @@ class ChangePK_FK_to_SID(TableWorker):
             updated = True
         else:
             sql_out=sql_content
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
 
@@ -71,7 +70,7 @@ class Change_Concat_to_Concat_WS(TableWorker):
         if 'md5(concat(' in sql_content.lower():
             sql_out=with_statement.sub("MD5(CONCAT_WS(''',", sql_content)
             updated = True
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
 class Change_CompressionType(TableWorker):
@@ -99,7 +98,7 @@ class Change_CompressionType(TableWorker):
                     updated = True
                 else:
                     sql_out+=line + "\n"
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
 
 class DefaultStringReplacementInFromClause(TableWorker):
@@ -113,7 +112,7 @@ class DefaultStringReplacementInFromClause(TableWorker):
         if from_statement.search(sql_content):
             sql_out=from_statement.sub("FROM " + string_to_change_to, sql_content)
             updated = True
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
 
 class Change_SchemaContext(TableWorker):
@@ -143,7 +142,7 @@ class Change_SchemaContext(TableWorker):
                     updated = True
                 else:
                     sql_out+=line + "\n"
-        logging.debug(f"SQL transformed to {sql_out}")
+        logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
      
 class ReplaceEnvInSqlContent(TableWorker):
@@ -197,8 +196,11 @@ class ReplaceEnvInSqlContent(TableWorker):
                     updated = True
                     logger.debug(f"{k} , {v} ")
         else:
-            if 'clone.dev' in sql_content:
+            if 'clone.dev' in sql_content and self.env != 'dev':
+                # the sql content by default may use clone.dev. as the source topic prefix
+                # we need to remove the clone.dev. part when not on dev environment
                 sql_content = sql_content.replace('clone.dev.', '')
+                updated = True
             if self.env in self.dml_replacements:
                 for k, v in self.dml_replacements[self.env].items():
                     sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)

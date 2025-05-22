@@ -28,11 +28,11 @@ def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipe
     if not compute_pool_id:
         # Before using the config compute pool, do we want to get the compute pool associated to the statement?
         compute_pool_id = config['flink']['compute_pool_id']
-    logger.debug(f"Validate the {compute_pool_id} exists and has enough resources")
+    logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
 
-    client = ConfluentCloudClient(config)
-    env_id = config['confluent_cloud']['environment_id']
     if compute_pool_id:
+        client = ConfluentCloudClient(config)
+        env_id = config['confluent_cloud']['environment_id']
         validated, pool_name = _validate_a_pool(client, compute_pool_id, env_id)
         if validated:
             return compute_pool_id, pool_name
@@ -205,7 +205,10 @@ def _verify_compute_pool_provisioned(client, pool_id: str, env_id: str) -> bool:
 
 
 
-def _validate_a_pool(client: ConfluentCloudClient, compute_pool_id: str, env_id: str) -> Tuple[bool, str]:
+def _validate_a_pool(client: ConfluentCloudClient, 
+                     compute_pool_id: str, 
+                     env_id: str
+) -> Tuple[bool, str]:
     """
     Validate a pool exist and with enough resources
     """

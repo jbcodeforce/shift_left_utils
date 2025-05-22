@@ -1,7 +1,6 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-import logging
 import os, re, json
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
@@ -11,11 +10,11 @@ from shift_left.core.pipeline_mgr import (
     read_pipeline_definition_from_file, 
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME)
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.table_worker import TableWorker
 from shift_left.core.utils.sql_parser import SQLparser
 import shift_left.core.statement_mgr as statement_mgr
-
+from shift_left.core.models.flink_statement_model import Statement, StatementResult
 from shift_left.core.utils.file_search import (
     FlinkTableReference, 
     get_or_build_source_file_inventory, 
@@ -25,6 +24,7 @@ from shift_left.core.utils.file_search import (
     extract_product_name,
     get_table_type_from_file_path,
     create_folder_if_not_exist,
+    from_pipeline_to_absolute,
     build_inventory)
 
 
@@ -57,7 +57,7 @@ def build_folder_structure_for_table(table_folder_name: str,
     * `target_path/product_name/table_name/tests`: for test harness content
     * `target_path/product_name/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
-    logging.info(f"Create folder {table_folder_name} in {target_path}")
+    logger.info(f"Create folder {table_folder_name} in {target_path}")
     config = get_config()
     table_type = get_table_type_from_file_path(target_path)
     if not product_name:
@@ -76,14 +76,14 @@ def build_folder_structure_for_table(table_folder_name: str,
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder, product_name)
     _create_dml_skeleton(internal_table_name, table_folder, product_name)
-    logging.debug(f"Created folder {table_folder} for the table {table_folder_name}")
+    logger.debug(f"Created folder {table_folder} for the table {table_folder_name}")
     return table_folder, internal_table_name
 
 def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_folder: str) -> str:
     """
     Search from the source project the dependencies for a given table.
     """
-    logging.info(f"Search source dependencies for table {sql_file_name} in {src_project_folder}")
+    logger.info(f"Search source dependencies for table {sql_file_name} in {src_project_folder}")
     with open(sql_file_name, "r") as f:
         sql_content = f.read()
         parser = SQLparser()
@@ -96,7 +96,7 @@ def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_fol
             dependencies = []
             for table in table_names:
                 if not table in all_src_files:
-                    logging.error(f"Table {table} not found in the source project")
+                    logger.error(f"Table {table} not found in the source project")
                     continue
                 dependencies.append({"table": table, "src_dbt": all_src_files[table]})
             return dependencies
@@ -167,7 +167,7 @@ def get_long_table_name(table_name: str, product_name: str, table_type: str) -> 
 def update_makefile_in_folder(pipeline_folder: str, table_name: str):
     inventory = get_or_build_inventory(pipeline_folder, pipeline_folder, False)
     if table_name not in inventory:
-        logging.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
+        logger.error(f"Table {table_name} not found in the pipeline inventory {pipeline_folder}")
         return
     existing_path = inventory[table_name]["table_folder_name"]
     table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
@@ -189,7 +189,7 @@ def update_all_makefiles_in_folder(folder_path: str) -> int:
             prefix=get_config()["kafka"]["cluster_type"] + "-" + product_name
             _create_makefile(table_name, root, prefix)
             count+=1
-    logging.info(f"Updated {count} Makefiles for tables in {folder_path}")
+    logger.info(f"Updated {count} Makefiles for tables in {folder_path}")
     return count
 
 
@@ -253,19 +253,71 @@ def load_sql_content_from_file(sql_file_name) -> str:
         return f.read()
 
 
-def explain_table(table_name: str, compute_pool_id: str):
+def explain_table(table_name: str, compute_pool_id: str, persist_report: bool = True) -> dict:
     """
     Explain the table using the Flink CLI. Run explain select.
     """
-    pass
+    inventory_path = os.getenv("PIPELINES")
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+    explain_report= _get_flink_execution_plan_explanation(table_ref, compute_pool_id, persist_report=persist_report)
+    return explain_report
 
-def explain_tables_in_dir(dir: str, compute_pool_id: str):
+def explain_tables_for_product(product_name: str, compute_pool_id: str, persist_report: bool = False) -> dict:
     """
     Explain the tables in the directory using the Flink CLI
     """
-    pass
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id = config["flink"]["compute_pool_id"]
+    inventory_path = os.getenv("PIPELINES")
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    product_tables_report = {}
+    for table_name, table_ref_dict in table_inventory.items():
+        table_ref = FlinkTableReference(**table_ref_dict)
+        if table_ref.product_name == product_name:
+            print(f"Process {table_ref.table_name} of {table_ref.product_name}")
+            explain_report = _get_flink_execution_plan_explanation(table_ref, compute_pool_id, persist_report=persist_report)
+            product_tables_report[table_ref.table_name] = explain_report['trace']
+            print(f"--> {_summarize_trace(explain_report['trace'])}")
+    return product_tables_report
+
 
 # --------- Private APIs ---------------
+
+def _get_flink_execution_plan_explanation(table_ref: FlinkTableReference, compute_pool_id: str, persist_report: bool = False) -> dict:
+    config = get_config()
+    if not compute_pool_id:
+        compute_pool_id = config["flink"]["compute_pool_id"]
+    dml_file = from_pipeline_to_absolute(table_ref.dml_ref)
+    if not dml_file:
+        logger.error(f"No DML file found for table {table_ref.table_name}")
+        return
+    explay_query = "EXPLAIN " + load_sql_content_from_file(dml_file)
+    transformer = statement_mgr.get_or_build_sql_content_transformer()
+    _, sql_out= transformer.update_sql_content(explay_query)
+    statement_name = f"explain-{config['kafka']['cluster_type']}-{table_ref.table_name.replace('_', '-')}"
+    statement_mgr.delete_statement_if_exists(statement_name)
+    result = statement_mgr.post_flink_statement(sql_content=sql_out, 
+                                          statement_name=statement_name,
+                                          compute_pool_id=compute_pool_id)
+    explain_report= {'table_name': table_ref.table_name, 'trace': ''}
+    if result and isinstance(result, Statement):
+        if result.status.phase == "FAILED":
+            logger.error(f"Failed to explain table {table_ref.table_name} error: {result.status.detail}")
+            explain_report['trace']=result.status.detail             
+        else:
+            statement_results = statement_mgr.get_statement_results(statement_name)
+            if statement_results and isinstance(statement_results, StatementResult) and statement_results.results.data:
+                explain_report['trace']=statement_results.results.data[0].row[0]
+                if persist_report:
+                    with open(f"{shift_left_dir}/{table_ref.table_name}_explain_report.json", "w") as f:
+                        f.write(json.dumps(explain_report))
+            else:
+                logger.error(f"Failed to get statement results: {statement_results}")
+
+    return explain_report
+
 def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     tracking_tmpl = env.get_template(f"tracking_tmpl.jinja")
@@ -312,7 +364,7 @@ def _create_makefile(table_name: str,
     Create a makefile to help deploy Flink statements for the given table name
     When the dml folder is called dedup the ddl should include a table name that is `_raw` suffix.
     """
-    logging.debug(f"Create makefile for {table_name} in {out_dir}")
+    logger.debug(f"Create makefile for {table_name} in {out_dir}")
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     makefile_template = env.get_template(f"makefile_ddl_dml_tmpl.jinja")
 
@@ -521,3 +573,21 @@ def _validate_pipelines(sqls: dict, rootdir: str) -> dict[str, any]:
 
 def get_column_definitions(table_name: str) -> tuple[str,str]:
     return "-- put here column definitions", "-- put here column definitions"
+
+def _summarize_trace(trace: str) -> str:
+    if not trace:
+        return ""
+    lines = trace.split('\n')
+    summary = ""
+    for idx, line in enumerate(lines):
+        if "The primary key does not match the upsert key derived from the query" in line:
+            return line
+        if "SQL validation failed" in line:
+            summary += line
+            summary += lines[idx+1]
+            summary += lines[idx+2]
+            return summary
+    if not "ERROR" in trace or not "Warning" in trace:
+        return ""
+    return trace
+    

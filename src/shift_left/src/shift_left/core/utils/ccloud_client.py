@@ -55,7 +55,7 @@ class ConfluentCloudClient:
             "User-Agent": f"python-shift-left-utils/{version_str}"
         }
         response = None
-        logger.debug(f">>> Make request {method} to {url}")
+        logger.info(f">>> Make request {method} to {url}")
         try:
             response = requests.request(
                 method=method,
@@ -286,13 +286,15 @@ class ConfluentCloudClient:
             while True:
                 statement = self.get_flink_statement(statement_name)
                 if statement and statement.status and statement.status.phase in ("FAILED", "FAILING", "DELETED"):
+                    logger.info(f"Statement {statement_name} is {statement.status.phase}, break")
                     break
                 else:
-                    logger.debug(statement)
+                    logger.debug(f"Statement {statement_name} is {statement.status.phase}, continue")
                     counter+=1
                     if counter == 6:
                         timer = 30
                     if counter == 10:
+                        logger.error(f"Statement {statement_name} is still running after {counter} times")
                         return "failed to delete"
                 time.sleep(timer)
             return "deleted"

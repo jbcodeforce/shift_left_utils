@@ -151,6 +151,8 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
 * `run-test-suite`: Run all the unit tests or a specified test...
+* `delete-tests`: Delete the unit tests for a given table.
+* `explain`: Get the Flink execution plan explanations...
 
 ### `table init`
 
@@ -308,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x111bc8d40&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1092ca360&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -347,7 +349,44 @@ $ table run-test-suite [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.  [env var: CPOOL_ID]
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table delete-tests`
+
+Delete the unit tests for a given table.
+
+**Usage**:
+
+```console
+$ table delete-tests [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table explain`
+
+Get the Flink execution plan explanations for a given table.
+
+**Usage**:
+
+```console
+$ table explain [OPTIONS]
+```
+
+**Options**:
+
+* `--table-name TEXT`: Name of the table to get Flink execution plan explanations from.
+* `--product-name TEXT`: The directory to run the explain on each tables found within this directory. table or dir needs to be provided.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--persist-report`: Persist the report in the shift_left_dir folder.
 * `--help`: Show this message and exit.
 
 ## `pipeline`
