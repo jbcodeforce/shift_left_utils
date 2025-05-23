@@ -35,7 +35,7 @@ llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
 
-translator_template = """
+translator_prompt_template = """
 you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
 Translate the following DML SQL batch script into Apache Flink SQL for real-time processing.
 Replace dbt utility functions with equivalent Flink SQL functions.
@@ -101,7 +101,6 @@ Finish the statement with the following declaration:
   'kafka.producer.compression.type' = 'snappy',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
-   'sql.local-time-zone' = 'UTC',
    'value.fields-include' = 'all'
 )
 
@@ -154,7 +153,7 @@ def define_flink_sql_agent():
         change the sql_input string to the matching flink sql statement, and keep in state.flink_sql
         """
         print(f"\n--- Start translator AI Agent ---")
-        prompt = ChatPromptTemplate.from_template(translator_template) 
+        prompt = ChatPromptTemplate.from_template(translator_prompt_template) 
         chain = prompt | model 
         llm_out = chain.invoke(state)
         flink_sql = remove_noise_in_sql(llm_out)
