@@ -315,6 +315,13 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
         result= post_flink_statement(compute_pool_id, 
                                             drop_statement_name, 
                                             sql_content)
+        if result and isinstance(result, Statement) and result.status.phase not in ("COMPLETED", "FAILED"):
+            while result.status.phase not in ["COMPLETED", "FAILED"]:
+                time.sleep(1)
+                result = get_statement(drop_statement_name)
+                logger.debug(f"Drop table status is: {result.status.phase}")
+            if result.status.phase == "FAILED":
+                raise Exception(f"Drop table {table_name} failed")
     except Exception as e:
         logger.error(f"drop_table {e}")
     finally:

@@ -170,7 +170,7 @@ class ReplaceEnvInSqlContent(TableWorker):
         "dev": {
             "adapt": {
                 "search": r"\s*select\s+\*\s+from\s+final\s*;?",
-                "replace": rf"SELECT * FROM final WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})"
+                "replace": rf"SELECT * FROM final WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = '{product_name}')"
             }
         }
     }

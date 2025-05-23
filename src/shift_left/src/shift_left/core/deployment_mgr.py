@@ -804,7 +804,7 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
         while statement.status.phase not in ["COMPLETED"]:
             time.sleep(1)
             statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
-            logger.info(f"DDL deployment status is: {statement.status.phase}")
+            logger.debug(f"DDL deployment status is: {statement.status.phase}")
     except Exception as e:
         logger.error(f"Error deploying DDL for {node_to_process.table_name}: {e}")
         raise e
