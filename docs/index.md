@@ -1,8 +1,13 @@
 # Shift Left tools and practices
 
 ???- info "Versions"
-    Created 12/2024
-    Updated 02/23: new pipeline helper functions to support sink to source pipeline metadata creation or source to sink.
+    * Created 12/2024
+    * Updated 02/23: new pipeline helper functions to support sink to source pipeline metadata creation or source to sink.
+    * Update 05/22: New features, and explanation in recipes for better manage Large Flink project.
+
+Recognizing the increasing need for real-time data processing, driven by demands for immediate insights and responsive applications (ultimately benefiting the end customer), this initiative tackles the challenging task of migrating traditional batch pipelines to modern, stream-based architectures using Apache Flink. 
+
+The approach, supported that the tools in this repository, centers around the data engineer, and Site Reliability Engineers as the "customers". By providing intelligent tooling, leveraging the power of Large Language Models and AI Agents, we aim to significantly reduce the friction and time associated with this complex refactoring. The utilities within this repository, focusing on SQL translation and Flink project organization aligned with Kimball's dimensional modeling principles, directly address the pain points of migrating and managing real-time data pipelines. This customer-centric innovation empowers data engineers to efficiently build robust and scalable real-time solutions, ultimately leading to faster delivery of data-driven value and enhanced experiences for the end users consuming the processed data.
 
 ## Introduction
 
@@ -42,7 +47,6 @@ At the system context level, for the tools of this repository, we can see the fo
 1. Finally pipeline deployment help to automate, and pace the deployment of a given pipeline.
 
 ## Shift_left tooling
-
 
 The following diagram illustrates the development environment which, mainly, uses two docker container containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
 
@@ -119,3 +123,18 @@ When migrating to real-time processing, using Confluent Cloud and Flink compute 
 The name of the table matches the name of the topic and the table schema maps to the topic-value schema. 
 
 Adopt the naming convention from the change data capture, like Debezium for the topic. Any naming convention based on the environment like dev, staging, or production, will impact any DML statements. In Confluent Cloud the environment groups one to many Kafka clusters and multiple Flink compute pools. The topic name can be the same between Kafka cluster so the same DML statement can be used in different conpute pool.
+
+## Navigate the documentation
+
+As a developer of this project read:
+
+[:material-source-branch: the contribution article](./contributing.md){ .md-button }
+[:material-map-marker-star-outline: Code structure and development practices](./coding/index.md){ .md-button }
+
+As a Data engineers read:
+
+[:material-database-marker: The recipe for data engineers and the corresponding referenced practices](./recipes.md#data-engineer-centric-use-cases){ .md-button }
+
+As Site Reliable engineers read:
+
+[:material-sitemap: The recipe for SRE and the corresponding referenced practices](./recipes.md#deployment-centric-use-cases-for-sres){ .md-button }

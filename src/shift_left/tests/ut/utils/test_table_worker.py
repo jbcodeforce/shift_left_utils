@@ -424,6 +424,55 @@ class TestTableWorker(unittest.TestCase):
         assert updated
         assert "replicated.stage.ap-tag-order-stage.template" in sql_out
 
+    def test_change_data_limit_where_condition(self):
+        """Test change data limit where condition"""
+        sql_content = """
+        INSERT INTO src_aqem_identity_user_detail_metadata
+        with final as (
+            SELECT 
+                COALESCE(IF(op = 'd', before.user_detail_id, after.user_detail_id), 'NULL') as `user_detail_id`,
+                COALESCE(IF(op = 'd', before.metadata_id, after.metadata_id), 'NULL') as metadata_id,
+                op,
+                tenant_id,
+                source.lsn as source_lsn
+            FROM `ap-.user_detail_metadata`
+        )
+        SELECT   *    FROM final
+        """
+        print("\nshould change the content as it is a dev environment, there is the expected column to filter on and it is a source table")
+        transformer = ReplaceEnvInSqlContent()
+        updated, sql_out= transformer.update_sql_content(sql_content, "tenant_id", "p4")
+        assert " WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = p4" in sql_out
+        assert updated
+        print(sql_out)
+        print("should change the content as it is a dev environment, there is the expected column to filter on, it is a source table, just other case to assess pattern matching works.")
+        sql_content_2=sql_content.replace("INSERT INTO", "insert into")
+        updated, sql_out= transformer.update_sql_content(sql_content_2, "tenant_id", "p4")
+        assert "WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = p4" in sql_out
+        assert updated
+        print("should not change the content as it is a dev environment, there is the expected column to filter on but it is not a source table")
+        sql_content_3=sql_content.replace("src_", "int_")
+        updated, sql_out= transformer.update_sql_content(sql_content_3, "tenant_id", "p4")
+        assert "SELECT   *    FROM final" in sql_out
+        assert not " WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = p4" in sql_out
+        assert not updated
+        print("should not change the content as it is a dev environment, there is not the expected column to filter on")
+        sql_content_4=sql_content.replace("tenant_id", "user_id")
+        updated, sql_out= transformer.update_sql_content(sql_content_4, "tenant_id", "p4")
+        assert "SELECT   *    FROM final" in sql_out
+        assert not "WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = p4" in sql_out
+        assert not updated
+        print("should not change the content as it is a stage environment")
+        # NOT A dev environment no changes.
+        config = get_config()
+        config['kafka']['cluster_type'] = "stage"
+        transformer = ReplaceEnvInSqlContent()
+        updated, sql_out= transformer.update_sql_content(sql_content, "tenant_id", "p4")
+        assert not updated
+        assert not "WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = p4" in sql_out
+     
+       
+
 
 if __name__ == '__main__':
     unittest.main()

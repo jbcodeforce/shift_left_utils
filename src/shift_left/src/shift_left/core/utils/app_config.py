@@ -6,10 +6,17 @@ import os
 from functools import lru_cache
 import logging
 from logging.handlers import RotatingFileHandler
+import datetime
+import random
+import string
 
 _config = None
 
-
+def generate_session_id() -> str:
+    """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
+    date_str = datetime.datetime.now().strftime("%m-%d-%y")
+    random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+    return f"{date_str}-{random_str}"
 
 @lru_cache
 def get_config() -> dict[str, str] | None:
@@ -29,11 +36,14 @@ def get_config() -> dict[str, str] | None:
 
 shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left') 
 log_dir = os.path.join(shift_left_dir, 'logs')
+session_id = generate_session_id()
+session_log_dir = os.path.join(log_dir, session_id)
+
 logger = logging.getLogger("shift_left")
 logger.propagate = False  # Prevent propagation to root logger
-os.makedirs(log_dir, exist_ok=True)
+os.makedirs(session_log_dir, exist_ok=True)
 logger.setLevel(get_config()["app"]["logging"])
-log_file_path = os.path.join(log_dir, "shift_left_cli.log")
+log_file_path = os.path.join(session_log_dir, "shift_left_cli.log")
 file_handler = RotatingFileHandler(
     log_file_path, 
     maxBytes=10*1024*1024,  # 10MB
@@ -42,6 +52,9 @@ file_handler = RotatingFileHandler(
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
+print("-" * 80)
+print(f"| SHIFT_LEFT SESSION LOGS FOLDER: {session_log_dir} |")
+print("-" * 80)
 #console_handler = logging.StreamHandler()
 #console_handler.setLevel(logging.INFO)
 #logger.addHandler(console_handler)

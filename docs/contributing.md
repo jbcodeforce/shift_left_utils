@@ -1,4 +1,4 @@
-# Contributing to this repository
+# Contribute to this repository
 
 This chapter addresses how to support the development of this open source project.
 
@@ -319,28 +319,29 @@ Use the following settings for vscode based IDE
 ### Build
 
 * To install the tool locally with uv and to support hot code update 
+    ```sh
+    uv tool install . -e  
+    ```
 
-```sh
-uv tool install . -e  
-```
+* Rebuild the CLI as a wheel packaging: 
+    ```sh
+    uv build .
+    ``` 
+    under the src/shift_left project.
 
-* Rebuild the CLI as a wheel packaging: `uv build .` under the src/shift_left project.
 * Deploy the CLI from the wheel: 1/ first the last wheel number and then 2/ execute the commands like:
-
-```sh
-uv tool uninstall shift_left
-uv tool install shift_left@dist/shift_left-0.1.4-py3-none-any.whl
-```
+    ```sh
+    uv tool uninstall shift_left
+    uv tool install shift_left@dist/shift_left-0.1.19-py3-none-any.whl
+    ```
 
 * To Build the [Command.md](./command.md) documentation from the code run:
-
-```sh
-# under the shift_left_utils/src/shift_left folder
-uv run typer src/shift_left/cli.py utils docs --output ../../docs/command.md
-```
+    ```sh
+    # under the shift_left_utils/src/shift_left folder
+    uv run typer src/shift_left/cli.py utils docs --output ../../docs/command.md
+    ```
 
 * Recompile a requirements.txt for pip users:
-
-```sh
-uv pip compile pyproject.toml -o requirements.txt
-```
+    ```sh
+    uv pip compile pyproject.toml -o requirements.txt
+    ```

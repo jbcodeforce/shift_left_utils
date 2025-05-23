@@ -1,0 +1,58 @@
+{
+   "table_name": "y",
+   "product_name": "p2",
+   "type": "intermediate",
+   "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
+   "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
+   "path": "pipelines/intermediates/p2/y",
+   "state_form": "Stateless",
+   "parents": [
+      {
+         "table_name": "src_y",
+         "product_name": "p2",
+         "type": "source",
+         "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
+         "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
+         "path": "pipelines/sources/p2/src_y",
+         "state_form": "Stateless",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "y",
+               "product_name": "p2",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
+               "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
+               "path": "pipelines/intermediates/p2/y",
+               "state_form": "Stateless",
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": [
+      {
+         "table_name": "d",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+         "path": "pipelines/intermediates/p2/d",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": []
+      },
+      {
+         "table_name": "z",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+         "path": "pipelines/intermediates/p2/z",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": []
+      }
+   ]
+}

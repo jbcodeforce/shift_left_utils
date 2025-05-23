@@ -46,4 +46,5 @@ app:
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
   dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
   compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
+  data_limit_column_name_to_select_from: tenant_id
  

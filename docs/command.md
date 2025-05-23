@@ -151,7 +151,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
 * `run-test-suite`: Run all the unit tests or a specified test...
-* `delete-tests`: Delete the unit tests for a given table.
+* `delete-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
 ### `table init`
@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1092ca360&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1060c65a0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -354,7 +354,7 @@ $ table run-test-suite [OPTIONS] TABLE_NAME
 
 ### `table delete-tests`
 
-Delete the unit tests for a given table.
+Delete the Flink statements and kafka topics used for unit tests for a given table.
 
 **Usage**:
 
@@ -373,7 +373,7 @@ $ table delete-tests [OPTIONS] TABLE_NAME
 
 ### `table explain`
 
-Get the Flink execution plan explanations for a given table.
+Get the Flink execution plan explanations for a given table or a group of table using the product name.
 
 **Usage**:
 
@@ -403,18 +403,19 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `build-metadata`: Build a pipeline by reading the Flink dml...
+* `build-metadata`: Build a pipeline definition metadata by...
 * `delete-all-metadata`: Delete all pipeline definition json files...
 * `build-all-metadata`: Go to the hierarchy of folders for...
-* `report`: Generate a report showing the pipeline...
-* `deploy`: Deploy a pipeline from a given table name,...
+* `report`: Generate a report showing the static...
+* `deploy`: Deploy a pipeline from a given table name...
+* `deploy-source-only`: Deploy only the source tables for a given...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `build-execution-plan-from-table`: From a given table, this command goes all...
 
 ### `pipeline build-metadata`
 
-Build a pipeline by reading the Flink dml SQL content: add or update each table in the pipeline.
+Build a pipeline definition metadata by reading the Flink dml SQL content for the given dml file.
 
 **Usage**:
 
@@ -451,7 +452,7 @@ $ pipeline delete-all-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
 
 ### `pipeline build-all-metadata`
 
-Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recurring walk through
+Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recursing walk through
 
 **Usage**:
 
@@ -469,7 +470,7 @@ $ pipeline build-all-metadata [OPTIONS] PIPELINE_PATH
 
 ### `pipeline report`
 
-Generate a report showing the pipeline hierarchy for a given table using its pipeline_definition.json
+Generate a report showing the static pipeline hierarchy for a given table using its pipeline_definition.json
 
 **Usage**:
 
@@ -494,7 +495,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 ### `pipeline deploy`
 
-Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
+Deploy a pipeline from a given table name , product name or a directory.
 
 **Usage**:
 
@@ -515,6 +516,25 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--may-start-children / --no-may-start-children`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-children]
 * `--force-sources / --no-force-sources`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-sources]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
+* `--help`: Show this message and exit.
+
+### `pipeline deploy-source-only`
+
+Deploy only the source tables for a given product name. This will run in parallel, drop existing tables.
+
+**Usage**:
+
+```console
+$ pipeline deploy-source-only [OPTIONS] PRODUCT_NAME
+```
+
+**Arguments**:
+
+* `PRODUCT_NAME`: The product name to deploy the source tables from.  [required]
+
+**Options**:
+
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--help`: Show this message and exit.
 
 ### `pipeline report-running-statements`

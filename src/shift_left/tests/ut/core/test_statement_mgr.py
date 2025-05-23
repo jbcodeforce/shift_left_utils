@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import (
     Statement, 
@@ -17,15 +17,12 @@ from shift_left.core.models.flink_statement_model import (
     Spec, 
     Data, 
     StatementResult, 
+    FlinkStatementNode,
     OpRow, 
     Metadata)
 import  shift_left.core.statement_mgr as statement_mgr 
 
 class TestStatementManager(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
     
     def setUp(self):
         """Set up test fixtures before each test method."""
@@ -368,31 +365,45 @@ class TestStatementManager(unittest.TestCase):
         config['flink']['catalog_name'] = 'j9r-dev'
         config['flink']['database_name'] = 'j9r-cluster'
        
-        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+        def mock_post_statement(compute_pool_id, statement_name, sql_content) -> Statement:
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
             status = Status(
                 phase= "COMPLETED", 
                 detail= ""
             )
+            metadata = Metadata(
+                created_at="2025-04-20T10:15:02.853006",
+                labels={},
+                resource_version="1",
+                self="https://test-url",
+                uid="test-uid",
+                updated_at="2025-04-20T10:15:02.853006"
+            )
             spec = Spec(
-                compute_pool_id=get_config().get('flink').get('compute_pool_id'),
+                compute_pool_id=compute_pool_id,
                 principal="principal_sa",
                 statement=sql_content,
                 properties={"sql.current-catalog":  config['flink']['catalog_name'], 
                             "sql.current-database":  config['flink']['database_name']},
                 stopped=False
             )
-            return Statement(name= statement_name, status= status, spec=spec)
+            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
+        
         mock_post_flink_statement.side_effect = mock_post_statement
-
         mock_get_statement_list.return_value = self._statement_list
+
         sql_file_path = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
-        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(
+        node_to_process = FlinkStatementNode(
+            table_name="fct_order",
+            ddl_ref=sql_file_path,
+            ddl_statement_name="test-statement",
+            compute_pool_id=config['flink']['compute_pool_id'],
+            product_name="p1"
+        )
+        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process,
                     flink_statement_file_path=sql_file_path,
-                    compute_pool_id=config['flink']['compute_pool_id'],
-                    statement_name=f"test-statement",
-                    config=config)
+                    statement_name=f"test-statement")
         assert statement
         assert isinstance(statement, Statement)
         assert statement.name == "test-statement"

@@ -2,7 +2,7 @@
 
 ???- info "Version"
     * Created January 2025.
-    * Update: 04/29/2025. 
+    * Update: 05/22/2025. 
 
 This chapter details the standard activities to manage a Confluent Cloud Flink project with the `shift_left` tool when doing a ETL to real-time migration project. The recipes address new project initiative or a migration project from an existing SQL based ETL solution.
 
@@ -15,35 +15,39 @@ The audience for the recipes chapter are the Data Engineers and the SREs.
 
 ## Tool context
 
-The shift_left CLI may help to support different Data Engineers and SREs activities. For that, the tool will build and use a set of different components. The figures below groups what the different components are for different use cases.
+The `shift_left` CLI may help to support different Data Engineers and SREs activities. For that, the tool will build and use a set of different components. The figures below groups what the different components are for different use cases.
 
-The major constructs managed by the tools are:
+The major development activity constructs managed by the tools are:
 
-* Project, with the structure of the different folders
-* Table with the structure of a **table folder structure**, with sql-scripts, makefile and tests
-* **Table inventory** to keep an up to date inventory of table, with the references to the ddl and dml. Tables not in the inventory do not exist.
-* **Pipeline definition**: metadata about a table and its parents and / or children. Sink tables have only parents, source tables have only children.
-* **Flink SQL statements** for DDL and DML
-* For complex DML it may make sense to have dedicated **test definitions**
+* Flink Project, with the structure of the different folders.
+* Flink Table with the structure of a **table folder structure**, with sql-scripts, makefile and tests.
+* **Flink table inventory** to keep an up to date inventory of table, with the references to the ddl and dml. Tables not in the inventory do not exist.
+* **Flink Statement pipeline definition**: metadata about a table and its parents and / or children. Sink tables have only parents, source tables have only children.
+* **Flink SQL statement** for DDL and DML.
+* For complex DML it may make sense to have dedicated **test definitions**.
 
-### Developer centric use cases
+### Data engineer centric use cases
 
-Developers are responsible to develop the Flink SQL statements and potentially the tests. 
+Developers/ Data Engineers are responsible to develop the Flink SQL statements and the validation tests. 
 
 ![](./images/dev_comp.drawio.png)
 
-The table folder structure, table inventory and pipeline_definitions are generated and managed by tools. No human edit is needed and event discouraged.
+The table folder structure, table inventory and pipeline_definitions are generated and managed by tools. No human edit is needed and even discouraged.
 
-See the following recipes to support the management of those elements:
+See the following **recipes** to support the management of those elements:
 
-* [Create a Flink project](#create-a-flink-project-structure)
-* [Create table folder structure](#add-a-table-structure-to-the-flink-project)
-* [Validate best practices](#validate-naming-convention-and-best-practices)
-* [Test harness](./test_harness.md)
-* [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
-* [Validate running statements]()
+[:material-table-of-contents: Create a Flink project](#create-a-flink-project-structure){ .md-button }
+[:material-table: Add table folder structure](#add-a-table-structure-to-the-flink-project){ .md-button }
 
-### Deployment centric use cases
+[:material-traffic-light: Validate development best practices](#validate-naming-convention-and-best-practices){ .md-button }
+[:material-ab-testing: Use the Test harness](./test_harness.md/#usage--recipe){ .md-button }
+[:material-semantic-web: Understanding Flink semantic](){ .md-button }
+[Validate running statements](){ .md-button }
+
+[Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship){ .md-button }
+[Deploy a pipeline](){ .md-button }
+
+### Deployment centric use cases for SREs
 
 For pipeline deployment, there are very important elements that keep the deployment consistent, most of them are described above, but the execution plan is interesting tool to assess, once a pipeline is defined, how it can be deployed depending if SREs deploy from the source, the sink or an intermediate. (See [pipeline managmeent section](pipeline_mgr.md))
 
@@ -51,11 +55,12 @@ For pipeline deployment, there are very important elements that keep the deploym
 
 The involved recipes are:
 
-* [Table inventory](#build-an-inventory-of-all-the-flink-sql-ddl-and-dml-statements-with-table-name-as-key)
-* [Build dependency metadata](#build-structured-pipeline-metadata-and-walk-through)
-* [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship)
-* [Review the current execution plan from a Flink statement](#assess-a-flink-statement-execution-plan)
-* [Deploy a Flink Statement taking into consideration its execution plan](#pipeline-deployment)
+[:material-bookshelf: Build Table inventory](#build-table-inventory){ .md-button }
+[:material-sitemap: Build dependency metadata](#build-structured-pipeline-metadata-and-walk-through){ .md-button }
+[Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship){ .md-button }
+
+[Review the current execution plan from a Flink statement](#assess-a-flink-statement-execution-plan){ .md-button }
+[Deploy a Flink Statement taking into consideration its execution plan](#pipeline-deployment){ .md-button }
 
 ### Migration use cases
 
@@ -67,12 +72,14 @@ This use case applies only when the source project is available and based on dbt
 
 ## Setup
 
-To use the CLI be sure to follow the [setup instructions.](./setup.md)
-
+To use the CLI, be sure to follow the [setup instructions.](./setup.md)
 
 ### The config.yaml file
 
-The `config.yaml` file is important to set up and is referenced with the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables). This file should be setup per Confluent Cloud environment.
+The `config.yaml` file is crucial to set up and is using by the tool via the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables). This file should be setup per Confluent Cloud environment.
+
+???- example "Practices"
+    Define one config.yaml per environment (dev, stage, prod) and save them in the `$HOME/.shift_left` folder.
 
 ## Project related tasks
 
@@ -155,7 +162,7 @@ On a day to day basis Data Engineer may need to add a table and the SQL statemen
 
 ### Add a table structure to the Flink project
 
-* Get help for the shift_left table management CLI
+* Get help for the `shift_left` table management CLI
 
 ```sh
 shift_left table --help
@@ -315,8 +322,8 @@ Some standard reported violations:
 | `key.avro-registry.schema-context` NOT FOUND | `.flink-dev` or `.flink-stage` | Needed for 2 clusters 1 Schema Registry setup ... dev & stage |
 | `value.avro-registry.schema-context` NOT FOUND | `.flink-dev` or `.flink-stage` | Needed for 2 clusters 1 Schema Registry setup ... dev & stage |
 | MISSING pipeline definition | pipeline_definition.json is missing | Refer to GIT repo directory structure [standards](#create-a-flink-project-structure)|
-| INVALID pipeline ddl_ref | `ddl_ref` path in `pipeline_definition.json` doesnt exist |  Run the shift_left utils tool to resolve |
-| INVALID pipeline dml_ref | `dml_ref` path in `pipeline_definition.json` doesnt exist |  Run the shift_left utils tool to resolve |
+| INVALID pipeline ddl_ref | `ddl_ref` path in `pipeline_definition.json` doesnt exist |  Run the `shift_left` utils tool to resolve |
+| INVALID pipeline dml_ref | `dml_ref` path in `pipeline_definition.json` doesnt exist |  Run the `shift_left` utils tool to resolve |
 | INVALID pipeline table_name | `table_name` in `pipeline_definition.json` is invalid  | Due to a bug in the past the tool may write `No-Table`. Investigate and resolve |
 
 #### A table name naming convention
@@ -349,7 +356,8 @@ The folder name may be used as a table name in a lot of commands. The following 
 
 When the DML is created with the FROM, JOINS,... it is possible to use the tool to get the hierarchy of parents and build the pipeline_definition.json file for a table. It is strongly recommended to use sink tables, like `dimensions, facts or views` dml statements.
 
-1. It is important that table inventory is up to date. See [this section](#build-an-inventory-of-all-the-flink-sql-ddl-and-dml-statements-with-table-name-as-key)
+1. It is important that table inventory is up to date. See [this section](#build-table-inventory)
+
 1. Run the command to update the current pipeline definition metadata and update the parents ones, recursively.
 
 ```sh
@@ -413,6 +421,20 @@ This will build the `pipeline_definition.json`.
     ],
     "children": []
     }
+    ```
+
+### Understand Flink Statement Physical Plan
+
+The [Flink statement physical plan](https://docs.confluent.io/cloud/current/flink/reference/statements/explain.html#understanding-the-output) shows how Flink executes your query and it is available via the console wit the "EXPLAIN" keyword. When a project includes a lot of Flink statements it makes sense to automate the discovery of potential issues, as part of a quality assurance process. Shift left tools propose two reports: 1/ at the table level, as a Data engineer will get from the console, and 2/ at the data product level to get a full assessment of all the Flink statements classified within a product.
+
+* Execute `explain` on one table, using a specific compute pool id, and persist the report under the $HOME/.shift_left folder. If the compute-pool-id is not specified it will use the default one in the config.yaml:
+    ```sh
+    shift_left table explain --table-name <tablename> --compute-pool-id <compute-pool-id>
+    ```
+
+* Execute for all the tables within a product, forcing keeping the reports for each table.
+    ```sh
+    shift_left table explain --product-name <productname> --compute-pool-id <compute-pool-id> --persist-report
     ```
 
 ### Update tables content recursively
@@ -571,7 +593,7 @@ shift_left table build-inventory $PIPELINES
         }
         ```
 
-The `inventory.json` file is saved under the $PIPELINES folder and it is used intensively by the shift_left cli.
+The `inventory.json` file is saved under the $PIPELINES folder and it is used intensively by the `shift_left` cli.
 
 ???- warning "Update the inventory"
     Each time a new table is added or renamed, it is recommended to run this command. It can even be integrated in a CI pipeline.
@@ -594,7 +616,7 @@ The project folder structure for a table looks like in the following convention:
 
 The `pipeline_definition.json` is persisted under the `<table_name>` folder. 
 
-The tool needs to get an up-to-date inventory, see [previous section to build it](#build-an-inventory-of-flink-sql-ddl-and-dml-statements).
+The tool needs to get an up-to-date inventory, see [previous section to build it](#build-table-inventory).
 
 * Build all the `pipeline_definition.json` from a given sink by specifying the **DML** file path:
 

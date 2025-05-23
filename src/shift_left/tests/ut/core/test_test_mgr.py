@@ -401,7 +401,6 @@ class TestTestManager(unittest.TestCase):
         mock_table_exists.side_effect = _mock_table_exists
         mock_get_statement.side_effect = _mock_get_statement
 
-        pipeline_folder = os.getenv("PIPELINES")
         table_name = "int_p3_user_role"
         test_case_name = "test_int_p3_user_role_2"
         compute_pool_id = "dev_pool_id"

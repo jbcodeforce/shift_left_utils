@@ -195,7 +195,7 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
 def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                  compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
-    Delete the unit tests for a given table.
+    Delete the Flink statements and kafka topics used for unit tests for a given table.
     """
     print("#" * 30 + f" Unit tests deletion for {table_name}")
     if os.path.exists(f"{shift_left_dir}/{table_name}-test-suite-result.json"):
@@ -212,7 +212,7 @@ def explain(table_name: str=  typer.Option(None,help= "Name of the table to get 
             compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
             persist_report: bool = typer.Option(False, "--persist-report", help="Persist the report in the shift_left_dir folder.")):
     """
-    Get the Flink execution plan explanations for a given table.
+    Get the Flink execution plan explanations for a given table or a group of table using the product name.
     """
     
     if table_name:

@@ -148,9 +148,10 @@ class Change_SchemaContext(TableWorker):
 class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"
+    product_name="p1"
     """
     Special worker to update schema and src topic name in sql content depending of the environment.
-    
+    It also supports adding logic to filter out records for source topics depending on the environment.
     """
     dml_replacements = {
         "stage": {
@@ -164,6 +165,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
                 #"search": r"^(.*){topic_prefix}\.dev\.(ap-.*?)-dev\.(.*)",
                 #"replace": rf".\1{topic_prefix}.{env}.\2-{env}.\3"
+            }
+        },
+        "dev": {
+            "adapt": {
+                "search": r"\s*select\s+\*\s+from\s+final\s*;?",
+                "replace": rf"SELECT * FROM final WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})"
             }
         }
     }
@@ -185,8 +192,10 @@ class ReplaceEnvInSqlContent(TableWorker):
         # Update the replacements with the current env
         self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
+        self.insert_into_src=r"\s*INSERT\s+INTO\s+src_"
 
-    def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+
+    def update_sql_content(self, sql_content: str, column_to_search: str= None, product_name: str= None)  -> Tuple[bool, str]:
         logger.debug(f"{sql_content} in {self.env}")
         updated = False
         if "CREATE TABLE" in sql_content or "create table" in sql_content:
@@ -201,9 +210,16 @@ class ReplaceEnvInSqlContent(TableWorker):
                 # we need to remove the clone.dev. part when not on dev environment
                 sql_content = sql_content.replace('clone.dev.', '')
                 updated = True
+            if self.env == 'dev' and re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
+                replace_str=self.dml_replacements["dev"]["adapt"]["replace"].replace(self.product_name,product_name)
+                self.dml_replacements["dev"]["adapt"]["replace"]=replace_str
+                sql_out = re.sub(self.dml_replacements["dev"]["adapt"]["search"], replace_str, sql_content, flags=re.IGNORECASE)
+                updated = (sql_out != sql_content)
+                sql_content=sql_out
+                return updated, sql_content
             if self.env in self.dml_replacements:
                 for k, v in self.dml_replacements[self.env].items():
-                    sql_out = re.sub(v["search"], v["replace"], sql_content,flags=re.MULTILINE)
+                    sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
                     updated = (sql_out != sql_content)
                     sql_content=sql_out
                     logger.debug(f"{k} , {v} ")

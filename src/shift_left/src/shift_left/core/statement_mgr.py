@@ -26,7 +26,8 @@ from shift_left.core.models.flink_statement_model import (
     StatementResult, 
     StatementInfo, 
     StatementListCache,
-    StatementError
+    StatementError,
+    FlinkStatementNode
 )
 from shift_left.core.utils.file_search import (
     FlinkTableReference
@@ -34,19 +35,16 @@ from shift_left.core.utils.file_search import (
 from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
 STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
 
-def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path: str, 
-                           compute_pool_id: str = None, 
-                           statement_name: str= None, 
-                           config: dict = None) -> Statement:
+def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
+                                                      flink_statement_file_path: str = None,
+                                                      statement_name: str = None
+) -> Statement:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool. If the statement fails, propagate the exception to higher level.
     """
-    
-    if not config:
-        config = get_config()
-    if not compute_pool_id:
-        compute_pool_id=config['flink']['compute_pool_id']
+    config = get_config()
+    compute_pool_id = flinkStatement_to_process.compute_pool_id or config['flink']['compute_pool_id']
     if not statement_name:
         statement_name = (config['kafka']['cluster_type'] + "-" + os.path.basename(flink_statement_file_path).replace('.sql','')).replace('_','-').replace('.','-')
     logger.info(f"{statement_name} with content: {flink_statement_file_path} deploy to {compute_pool_id}")
@@ -54,8 +52,9 @@ def build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path:
     try:
         with open(full_file_path, "r") as f:
             sql_content = f.read()
+            column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
             transformer = get_or_build_sql_content_transformer()
-            _, sql_out= transformer.update_sql_content(sql_content)
+            _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
 
             statement= post_flink_statement(compute_pool_id, 
                                             statement_name, 

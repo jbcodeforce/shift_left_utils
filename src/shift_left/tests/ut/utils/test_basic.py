@@ -11,10 +11,12 @@ import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.table_mgr as table_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 from shift_left.core.utils.file_search import from_pipeline_to_absolute
+import pathlib
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
 import json
 import re
-
 
 
 def _get_primary_key_columns(sql_content: str) -> List[str]:
@@ -32,3 +34,4 @@ def _get_distributed_by_columns(sql_content: str) -> List[str]:
         return [col.strip('`') for col in distributed_by_match.group(1).split(',')]
     return []
 
+    

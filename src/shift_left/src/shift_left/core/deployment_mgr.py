@@ -11,6 +11,7 @@ The execution plan is used to undeploy a pipeline.
 """
 import time
 import os
+import multiprocessing
 from datetime import datetime
 from collections import deque
 from typing import Optional, List, Any, Set, Tuple, Dict, Final
@@ -177,6 +178,39 @@ def deploy_all_from_directory(
     result+=f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
     return reports, result
 
+def deploy_source_only(product_name: str, compute_pool_id: str) -> Tuple[List[DeploymentReport], str]:
+    """
+    Deploy only the source tables for a given product name. This will run in parallel, drop existing tables. 
+    """
+    inventory_path = os.getenv("PIPELINES")
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    if not compute_pool_id:
+        compute_pool_id = get_config()['flink']['compute_pool_id']
+    product_tables_report = {}
+    for table_name, table_ref_dict in table_inventory.items():
+        table_ref = FlinkTableReference(**table_ref_dict)
+        if table_ref.product_name == product_name and table_ref.type == "source":
+            pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_ref.table_name, inventory_path)
+            execution_plan = build_execution_plan_from_any_table(
+                                pipeline_def=pipeline_def,
+                                compute_pool_id=compute_pool_id,
+                                dml_only=False,
+                                may_start_children=False,
+                                force_sources=True,
+                                start_time=datetime.now()
+                            )
+            nodes_to_run = len([node for node in execution_plan.nodes if node.to_run])
+            num_cores = multiprocessing.cpu_count()
+            print(f"Number of available CPU cores: {num_cores}")
+            num_processes = min(num_cores, 4)
+            print(f"Process {table_ref.table_name} of {table_ref.product_name} with {nodes_to_run} nodes to run on {num_processes} cores")
+            for node in execution_plan.nodes:
+                if node.to_run:
+                    print(f"Deploying {node.table_name} of {node.product_name} with {node.compute_pool_id} compute pool")
+
+def _deploy_worker():
+    pass
 
 def deploy_from_execution_plan(
     execution_plan: FlinkStatementExecutionPlan, 
@@ -764,10 +798,9 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
     try:
-        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(flink_statement_file_path=node_to_process.ddl_ref, 
-                                                                        compute_pool_id=node_to_process.compute_pool_id, 
-                                                                        statement_name=node_to_process.ddl_statement_name)
-        
+        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
+                                                                                node_to_process.ddl_ref, 
+                                                                                node_to_process.ddl_statement_name)
         while statement.status.phase not in ["COMPLETED"]:
             time.sleep(1)
             statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
@@ -783,9 +816,9 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
     if not dml_already_deleted:
         statement_mgr.delete_statement_if_exists(to_process.dml_statement_name)
     
-    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process.dml_ref, 
-                                    to_process.compute_pool_id, 
-                                    to_process.dml_statement_name)
+    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process, 
+                                                                                to_process.dml_ref, 
+                                                                                to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
     return statement
 

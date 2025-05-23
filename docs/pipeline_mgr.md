@@ -1,7 +1,7 @@
 # Pipeline Management
 
 ???- info "Version"
-    Created Mars 21- 2025 - Update 4/19/25
+    Created Mars 21- 2025 - Update 5/22/25
 
 The goals of this chapter is to present the requirements, design, and validation of the pipeline management tools.
 
@@ -207,7 +207,7 @@ table th:nth-of-type(2) {
 
 #### Deploying a fact table
 
-During development, Flink SQL developers use the makefile: see [this recipe](./recipes.md/#developer-centric-use-cases) to deploy statement. While preparing for staging or integration tests, it may be relevant to deploy a full pipeline from a sink table. For example SREs want to deploy the sink `fct_order` table. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, tables and topics have messages. Before deploying the `fct_order dml`, the tool needs to assess what are the current parents table running. If there are missing tables, the tool needs to deploy those, taking into consideration parents of parents. For example, for the `int_table_1` which is not created, the tool needs first to run the DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC), thne run the `int_table_1` DDL and DML, to finally deploy the `fct_order` DDL and DML. 
+During development, Flink SQL developers use the makefile: see [this recipe](./recipes.md/#data-engineer-centric-use-cases) to deploy statement. While preparing for staging or integration tests, it may be relevant to deploy a full pipeline from a sink table. For example SREs want to deploy the sink `fct_order` table. To make the DML running successfuly, as it joins two tables, both tables need to be created. So the tool needs to walk up the hierarchy to deploy parents, up to the source. The white colored topic and Flink statements are currently running, tables and topics have messages. Before deploying the `fct_order dml`, the tool needs to assess what are the current parents table running. If there are missing tables, the tool needs to deploy those, taking into consideration parents of parents. For example, for the `int_table_1` which is not created, the tool needs first to run the DDL `src_table_1` and any `DML for src_table_1`. (in the test the dml of the sources are just inserting records, but in real project, those DMLs may consume from an existing Kafka topic created via CDC), thne run the `int_table_1` DDL and DML, to finally deploy the `fct_order` DDL and DML. 
 
 <figure markdown="span">
 ![](./images/flink_pipeline_1.drawio.png)

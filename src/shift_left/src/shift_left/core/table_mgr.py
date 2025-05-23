@@ -293,9 +293,9 @@ def _get_flink_execution_plan_explanation(table_ref: FlinkTableReference, comput
     if not dml_file:
         logger.error(f"No DML file found for table {table_ref.table_name}")
         return
-    explay_query = "EXPLAIN " + load_sql_content_from_file(dml_file)
+    explain_query = "EXPLAIN " + load_sql_content_from_file(dml_file)
     transformer = statement_mgr.get_or_build_sql_content_transformer()
-    _, sql_out= transformer.update_sql_content(explay_query)
+    _, sql_out= transformer.update_sql_content(explain_query)
     statement_name = f"explain-{config['kafka']['cluster_type']}-{table_ref.table_name.replace('_', '-')}"
     statement_mgr.delete_statement_if_exists(statement_name)
     result = statement_mgr.post_flink_statement(sql_content=sql_out, 

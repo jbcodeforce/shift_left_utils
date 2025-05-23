@@ -218,7 +218,8 @@ def _drop_test_tables(test_suite_def, main_table_name):
 def _execute_flink_test_statement(
         sql_content: str, 
         statement_name: str, 
-        compute_pool_id: Optional[str] = None
+        compute_pool_id: Optional[str] = None,
+        product_name: Optional[str] = None  
 ) -> Statement:
     """
     Execute the Flink statement and return the statement object.
@@ -227,8 +228,10 @@ def _execute_flink_test_statement(
     statement = statement_mgr.get_statement(statement_name)
     if  isinstance(statement, StatementError) or not statement:
         try:
+            config = get_config()
+            column_name_to_select_from = config['app']['data_limit_column_name_to_select_from']
             transformer = statement_mgr.get_or_build_sql_content_transformer()
-            _, sql_out= transformer.update_sql_content(sql_content)
+            _, sql_out= transformer.update_sql_content(sql_content, column_name_to_select_from, product_name)
             post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             logger.debug(f"Executed flink test statement table {post_statement}")
             return post_statement
@@ -364,9 +367,10 @@ def _execute_test_inputs(test_case: SLTestCase,
             headers, rows = _red_csv_file(sql_path)
             sql = _transform_csv_to_sql(input_step.table_name, headers, rows)
             statement_name = _build_statement_name(input_step.table_name, prefix)
-            statement = _execute_flink_test_statement(sql, 
-                                                      statement_name, 
-                                                      compute_pool_id)
+            statement = _execute_flink_test_statement(sql_content=sql, 
+                                                      statement_name=statement_name,
+                                                      product_name=table_ref.product_name,
+                                                      compute_pool_id=compute_pool_id)
         if statement:
             statements.append(statement)
     return statements

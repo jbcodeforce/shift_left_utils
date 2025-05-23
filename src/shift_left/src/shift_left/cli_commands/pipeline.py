@@ -1,25 +1,21 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+import os
+import networkx as nx
+import matplotlib.pyplot as plt
+from pydantic_yaml import to_yaml_str
 import typer
-import json
 import datetime
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
+from typing_extensions import Annotated
+import shift_left.core.utils.app_config as app_config
+import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 
-from typing_extensions import Annotated
-import shift_left.core.deployment_mgr as deployment_mgr
 
-import os
-import sys
-import logging
-import networkx as nx
-import matplotlib.pyplot as plt
-from pydantic_yaml import to_yaml_str
-
-logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 """
 Manage a pipeline entity:
 - build the inventory of tables
@@ -34,7 +30,7 @@ app = typer.Typer(no_args_is_help=True)
 def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The path to the DML file. e.g. $PIPELINES/table-name/sql-scripts/dml.table-name.sql")], 
              pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
-    Build a pipeline by reading the Flink dml SQL content: add or update each table in the pipeline.
+    Build a pipeline definition metadata by reading the Flink dml SQL content for the given dml file.
     """
     if not dml_file_name.endswith(".sql"):
         print(f"[red]Error: the first parameter needs to be a dml sql file[/red]")
@@ -60,9 +56,9 @@ def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argumen
 @app.command()
 def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
-    Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recurring walk through
+    Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recursing walk through
     """
-    print(f"Build all pipeline definitions for dimension, fact tables in {pipeline_path}")
+    print(f"Build all pipeline definitions for all tables in {pipeline_path}")
     pipeline_mgr.build_all_pipeline_definitions(pipeline_path)
     print("Done")
     
@@ -77,7 +73,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
         parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
         output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
     """
-    Generate a report showing the pipeline hierarchy for a given table using its pipeline_definition.json
+    Generate a report showing the static pipeline hierarchy for a given table using its pipeline_definition.json
     """
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
@@ -163,7 +159,7 @@ def deploy(
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.")
         ):
     """
-    Deploy a pipeline from a given table name, an inventory path and the compute pool id to use. If not pool is given, it uses the config.yaml content.
+    Deploy a pipeline from a given table name , product name or a directory.
     """
 
     try:
@@ -208,6 +204,16 @@ def deploy(
 
     print(f"#### Pipeline deployed ####")
 
+@app.command()
+def deploy_source_only( product_name: str =  typer.Argument(help="The product name to deploy the source tables from."),
+                        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),):
+    """
+    Deploy only the source tables for a given product name. This will run in parallel, drop existing tables. 
+    """
+    print(f"Deploy only the source tables for product: {product_name}")
+    result, summary = deployment_mgr.deploy_source_only(product_name, compute_pool_id)
+    print(f"{result}")
+    print(f"{summary}")
 
 @app.command()
 def report_running_statements(

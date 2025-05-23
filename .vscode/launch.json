@@ -13,8 +13,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
-                "SRC_FOLDER": "${fileWorkspaceFolder}/../de-datawarehouse/models"
+                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
               },
         },
         {
@@ -40,6 +39,16 @@
 
                 "PYTHONPATH": "${fileDirname}/utils"
               }
-        }
+        },  {
+            "name": "Python IT Debugger: current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "env": {
+                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml"
+              },
+        },
     ]
 }

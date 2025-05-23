@@ -577,7 +577,8 @@ class TestDeploymentManager(unittest.TestCase):
                                            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                            uid=uuid.uuid4().hex,
                                            execution_time=0,
-                                           status="COMPLETED")
+                                           status="COMPLETED",
+                                           status_details="")
             return DeploymentReport(table_name=table_name, 
                                     dml_name="Both", 
                                     update_children=may_start_children, 
