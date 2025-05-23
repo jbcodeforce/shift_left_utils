@@ -59,6 +59,16 @@ class TestStatementManager(unittest.TestCase):
             ) 
     }
 
+    def _create_mock_statement(
+        self, 
+        name: str = "statement_name",
+        status_phase: str = "UNKNOWN"
+    ) -> Statement:
+        """Create a mock Statement object."""
+        status = Status(phase=status_phase)
+        Statement(name=name, status=status)
+        return Statement(name=name, status_phase=status_phase)
+
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
     def test_1_get_statement_list_with_mock(self, MockConfluentCloudClient):
         """Test successful retrieval of statement list with mocked ConfluentClient"""
@@ -304,11 +314,17 @@ class TestStatementManager(unittest.TestCase):
 
     @patch('shift_left.core.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_drop_table(self, MockConfluentCloudClient, mock_delete_statement_if_exists):
+    @patch('shift_left.core.statement_mgr.get_statement')
+    def test_drop_table(self, 
+                        mock_get_statement, 
+                        MockConfluentCloudClient, 
+                        mock_delete_statement_if_exists):
+        print(f"test_drop_table should send drop table statement")
         table_name = "fct_order"
+
+        mock_get_statement.side_effect = self._create_mock_statement(name= "drop-fct-order", status_phase= "COMPLETED")
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.make_request.return_value =  Statement(name= "drop-fct-order")
         
         result = statement_mgr.drop_table(table_name=table_name)
         

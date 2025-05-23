@@ -20,7 +20,8 @@ from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.models.flink_statement_model import (
     Statement, 
-    StatementInfo
+    StatementInfo,
+    Status
 )
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
@@ -65,6 +66,16 @@ class TestDeploymentManager(unittest.TestCase):
             status_phase=status_phase,
             compute_pool_id=compute_pool_id
         )
+    
+    def _create_mock_statement(
+        self, 
+        name: str = "statement_name",
+        status_phase: str = "UNKNOWN"
+    ) -> Statement:
+        """Create a mock Statement object."""
+        status = Status(phase=status_phase)
+        Statement(name=name, status=status)
+        return Statement(name=name, status_phase=status_phase)
 
     def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
         """Create a mock ComputePoolList object."""
@@ -331,7 +342,7 @@ class TestDeploymentManager(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     def test_build_execution_plan_for_intermediate_table_including_children(
         self,
-        mock_get_status, 
+        mock_get_statement, 
         mock_assign_compute_pool_id,
         mock_get_compute_pool_list
     ) -> None:
@@ -346,7 +357,7 @@ class TestDeploymentManager(unittest.TestCase):
             print(f"mock_status: {statement_name}")
             return self._create_mock_statement_info()
             
-        mock_get_status.side_effect = mock_status
+        mock_get_statement.side_effect = mock_status
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 

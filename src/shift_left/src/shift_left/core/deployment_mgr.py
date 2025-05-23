@@ -164,7 +164,9 @@ def deploy_all_from_directory(
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipe_def = read_pipeline_definition_from_file(file_path)
             logger.info(f"Deploying pipeline from table {pipe_def.table_name}")
-            result+= "#"*40 + f" Deploy table: {pipe_def.table_name} " + "#"*40 + "\n"
+            if os.path.exists(statement_mgr.STATEMENT_LIST_FILE):
+                os.remove(statement_mgr.STATEMENT_LIST_FILE)
+            result+= "#"*40 + f"Deploy pipeline from table: {pipe_def.table_name} " + "#"*40 + "\n"
             report, summary = deploy_pipeline_from_table(table_name=pipe_def.table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
