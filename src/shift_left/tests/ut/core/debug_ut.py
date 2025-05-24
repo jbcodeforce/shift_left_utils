@@ -9,9 +9,16 @@ os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
 os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         
 from shift_left.core.utils.app_config import get_config, shift_left_dir
-from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
+from shift_left.core.models.flink_statement_model import ( 
+    Statement, 
+    StatementInfo, 
+    StatementListCache, 
+    Spec, 
+    Status,
+    FlinkStatementNode
+)
 import  shift_left.core.pipeline_mgr as pipeline_mgr
-from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
+
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.test_mgr as test_mgr
 import shift_left.core.table_mgr as table_mgr
@@ -28,7 +35,7 @@ class TestDebugUnitTests(unittest.TestCase):
       table_mgr.explain_table(table_name="aqem_dim_role", compute_pool_id="lfcp-0725o5")
     
     
-    def test_statis_parsing_of_explain_table(self):
+    def _test_statis_parsing_of_explain_table(self):
         explain_reports = []
         for root, dirs, files in os.walk(shift_left_dir):
             for file in files:
@@ -38,7 +45,41 @@ class TestDebugUnitTests(unittest.TestCase):
                     with open(report_path, 'r') as f:
                         explain_reports.append(json.load(f))
                     print(f"--> {table_mgr._summarize_trace(explain_reports[-1]['trace'])}")
+    
+    def test_build_ancestor_sorted_graph(self):
+        node_map = {}
+        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
+        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
+        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
+        node_map["src_a"] = FlinkStatementNode(table_name="src_a")
+        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
+        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
+        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
+        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
+        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
+        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
+        node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
+        node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
+   
+        node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
+        node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
+
+        table_list = ['x','y','z','a','b']
+        merged_nodes = {}
+        merged_dependencies = []
+        for node in table_list:
+            nodes, dependencies = deployment_mgr._get_ancestor_subgraph(node_map[node], node_map)
+            print(len(nodes) , len(dependencies))
+            merged_nodes.update(nodes)
+            for dep in dependencies:
+                merged_dependencies.append(dep)
+        print(len(merged_nodes))
+        print(len(merged_dependencies))
+        sorted_nodes = deployment_mgr._topological_sort(merged_nodes, merged_dependencies)
+        for node in sorted_nodes:
+            print(f"{node.table_name}")
         
+       
 
 if __name__ == '__main__':
     unittest.main()

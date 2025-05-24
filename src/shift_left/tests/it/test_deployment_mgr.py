@@ -37,45 +37,28 @@ class TestDeploymentManager(unittest.TestCase):
                 print(f"Table {table} dropped")
             except Exception as e:
                 print(e)
- 
-    def test_2_build_execution_plan(self):  
-        inventory_path= os.getenv("PIPELINES")
-        pipeline_def: FlinkTablePipelineDefinition = dm.read_pipeline_definition_from_file(inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
-        execution_plan = dm.build_execution_plan_from_any_table(
-                                    pipeline_def=pipeline_def, 
-                                    compute_pool_id=get_config()['flink']['compute_pool_id'], 
-                                    dml_only=False, 
-                                    may_start_children=True, 
-                                    force_sources=True,
-                                    start_time=datetime.now())
-        assert execution_plan
-        assert (execution_plan.nodes[0].table_name == "src_table_1" 
-                or execution_plan.nodes[0].table_name == "src_p1_table_2" 
-                or execution_plan.nodes[0].table_name == "src_p1_table_3")
-        for i in range(0, len(execution_plan.nodes)):
-            assert execution_plan.nodes[i].to_run
-        assert execution_plan.nodes[5].table_name == "p1_fct_order"
     
        
-    def test_3_src_table_deployment(src):
+    def test_3_deploy_src_table(self):
         """
         Given a source table with children, deploy the DDL and DML without the children.
         """
         inventory_path = os.getenv("PIPELINES")
         table_name = "src_table_1"
-        result, summary = dm.deploy_pipeline_from_table(table_name=table_name, 
+        summary,result, = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=None, 
                                                dml_only=False, 
-                                               may_start_children=False,
-                                               force_sources=False)
+                                               may_start_descendants=False,
+                                               force_ancestors=False,
+                                               execute_plan=True)
         assert result
         print(result)
         assert summary
         print(summary)
         for statement in result.flink_statements_deployed:
             print(f"statement: {statement.name} - {statement.status.phase} - {statement.spec.compute_pool_id}")
-        report = dm.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
+        report = dm.report_running_flink_statements_for_a_table(table_name)
         assert report
         print(report)
 
@@ -84,12 +67,12 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="p1_fct_order"
         inventory_path= os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table(table_name=table_name, 
+        result = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=True, 
-                                               may_start_children=False,
-                                               force_sources=False)
+                                               may_start_descendants=False,
+                                               force_ancestors=False)
         assert result
         print(result)
         print("Validating running dml")
@@ -104,12 +87,12 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="int_p1_table_1"
         inventory_path= os.getenv("PIPELINES")
-        result = dm.deploy_pipeline_from_table(table_name=table_name, 
+        result = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=True, 
-                                               may_start_children=True,
-                                               force_sources=False)
+                                               may_start_descendants=True,
+                                               force_ancestors=False)
         assert result
         print(result)
         print("Validating running dml")
@@ -123,12 +106,12 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
         import shift_left.core.deployment_mgr as dm
         config = get_config()
-        result = dm.deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/facts/p2",
+        result = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/facts/p2",
                                                inventory_path=os.getenv("PIPELINES"), 
                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
                                                dml_only=False, 
-                                               may_start_children=True,
-                                               force_sources=False)
+                                               may_start_descendants=True,
+                                               force_ancestors=False)
         assert result
         print(result.model_dump_json())
 

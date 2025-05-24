@@ -18,6 +18,7 @@ from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
+import shift_left.core.utils.report_mgr as report_mgr
 from shift_left.core.models.flink_statement_model import (
     Statement, 
     StatementInfo,
@@ -170,22 +171,47 @@ class TestDeploymentManager(unittest.TestCase):
         f has 6 parents: d, then z, x, y then src_y, src_x.
         The topological sort should return src_y, src_x, y, x, z, d, f.
         """
-        print("test_dfs_search_parents_to_run")
+        print("test_build_topological_sorted_parents ")
         pipeline_def = read_pipeline_definition_from_file(
             self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
         )
         node_map = dm._build_statement_node_map(pipeline_def.to_node())
         current_node = pipeline_def.to_node()
-        nodes_to_run = dm._build_topological_sorted_parents(current_node, node_map)
+        nodes_to_run = dm._build_topological_sorted_parents([current_node], node_map)
         
         assert len(nodes_to_run) == 7
         for node in nodes_to_run:
             print(node.table_name, node.to_run, node.to_restart)
         assert nodes_to_run[0].table_name in ("src_y", "src_x")
 
+    def test_build_ancestor_sorted_graph(self):
+        node_map = {}
+        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
+        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
+        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
+        node_map["src_a"] = FlinkStatementNode(table_name="src_a")
+        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
+        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
+        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
+        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
+        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
+        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
+        node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
+        node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
+   
+        node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
+        node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
+
+        ancestors = dm._build_topological_sorted_parents([node_map["z"]], node_map)
+        assert ancestors[0].table_name == "src_x" or ancestors[0].table_name == "src_y"
+        assert ancestors[1].table_name == "src_x" or ancestors[1].table_name == "src_y"
+        assert ancestors[2].table_name == "x" or ancestors[2].table_name == "y"
+        assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
+        assert ancestors[4].table_name == "z"
+
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_build_execution_plan_for_one_table_parent_running(
+    def test_build_execution_plan_for_one_table_while_parents_running(
         self,
         mock_assign_compute_pool_id,
         mock_get_status
@@ -193,9 +219,9 @@ class TestDeploymentManager(unittest.TestCase):
         """Test building execution plan when parent is running.
         
         Should lead to only parents to run when they are not running.
-        F has one parent d. f -> Dd -> [y, z], z -> x, y-> src_y and x -> src_x.
+        F has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
         """
-        print("test_build_execution_plan_for_one_table_parent_running")
+        print("test_build_execution_plan_for_one_table_while_parents_running")
         
         def mock_statement(statement_name: str) -> StatementInfo:
             if statement_name.startswith("dev-dml-d"):
@@ -205,20 +231,20 @@ class TestDeploymentManager(unittest.TestCase):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
 
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
-        )
-        execution_plan = dm.build_execution_plan_from_any_table(
-            pipeline_def=pipeline_def, 
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="f", 
+            inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_children=False, 
-            force_sources=False,
-            start_time=datetime.now()
+            may_start_descendants=False, 
+            force_ancestors=False
         )
         
-        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
+        print(summary)
         assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
+        assert execution_plan.nodes[5].table_name == "d"
+        assert execution_plan.nodes[5].to_run is False
+        assert execution_plan.nodes[5].to_restart is False
         assert execution_plan.nodes[6].table_name == "f"
         assert execution_plan.nodes[6].to_run is True
         assert execution_plan.nodes[6].to_restart is True
@@ -248,18 +274,15 @@ class TestDeploymentManager(unittest.TestCase):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
 
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/facts/p2/e/" + PIPELINE_JSON_FILE_NAME
-        )
-        execution_plan = dm.build_execution_plan_from_any_table(
-            pipeline_def=pipeline_def, 
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="e", 
+            inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_children=False, 
-            force_sources=False,
-            start_time=datetime.now()
+            may_start_descendants=False, 
+            force_ancestors=False
         )  
-        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
+        print(summary)
         assert len(execution_plan.nodes) == 9
         for node in execution_plan.nodes:
             if node.table_name == "src_b":
@@ -308,20 +331,17 @@ class TestDeploymentManager(unittest.TestCase):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
 
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
-        )
-        execution_plan = dm.build_execution_plan_from_any_table(
-            pipeline_def=pipeline_def, 
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="f", 
+            inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_children=False, 
-            force_sources=False,
-            start_time=datetime.now()
+            may_start_descendants=False, 
+            force_ancestors=False
         )  
         
-        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
-        dm.persist_execution_plan(execution_plan)
+        print(summary)
+        dm._persist_execution_plan(execution_plan)
         # 8 as the 3 children of Z are not running   
         assert len(execution_plan.nodes) == 7
 
@@ -361,19 +381,16 @@ class TestDeploymentManager(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME
-        )
-        execution_plan = dm.build_execution_plan_from_any_table(
-            pipeline_def=pipeline_def, 
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="z", 
+            inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_children=True, 
-            force_sources=False,
-            start_time=datetime.now()
+            may_start_descendants=True, 
+            force_ancestors=False
         )  
         
-        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
+        print(summary)
         assert len(execution_plan.nodes) == 12
         for node in execution_plan.nodes:
             print(node.table_name, node.to_run, node.to_restart)
@@ -409,7 +426,7 @@ class TestDeploymentManager(unittest.TestCase):
         mock_deploy_dml.return_value = mock_statement
 
         # Execute
-        result = dm.deploy_pipeline_from_table(
+        _, result = dm.build_deploy_pipeline_from_table(
             table_name=table_name,
             inventory_path=self.inventory_path,
             compute_pool_id=self.compute_pool_id
@@ -543,19 +560,15 @@ class TestDeploymentManager(unittest.TestCase):
         mock_get_status.side_effect = mock_status
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        inventory_path = os.getenv("PIPELINES")
-        pipeline_def = read_pipeline_definition_from_file(
-            inventory_path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME
-        )
-        execution_plan = dm.build_execution_plan_from_any_table(
-            pipeline_def=pipeline_def, 
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="p1_fct_order", 
+            inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_children=False, 
-            force_sources=False,
-            start_time=datetime.now()
+            may_start_descendants=False, 
+            force_ancestors=False
         )
-        print(dm.build_summary_from_execution_plan(execution_plan, self._create_mock_compute_pool_list()))
+        print(summary)
         
         # Verify source tables are in the execution plan with skip action
         for node in execution_plan.nodes:
@@ -572,7 +585,7 @@ class TestDeploymentManager(unittest.TestCase):
 
 
 
-    @patch('shift_left.core.deployment_mgr.deploy_pipeline_from_table')
+    @patch('shift_left.core.deployment_mgr.build_deploy_pipeline_from_table')
     def test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table) -> None:
         """Test deploying pipeline from product."""
         print("test_deploy_pipeline_from_product")
@@ -591,12 +604,12 @@ class TestDeploymentManager(unittest.TestCase):
                                            status="COMPLETED",
                                            status_details="")
             return DeploymentReport(table_name=table_name, 
-                                    dml_name="Both", 
+                                    type="Both", 
                                     update_children=may_start_children, 
                                     flink_statements_deployed=[statement],
                                     ), f"deployed {table_name}"
         mock_deploy_pipeline_from_table.side_effect = _mock_deploy_pipeline_from_table
-        reports, summary = dm.deploy_pipeline_from_product(
+        reports, summary = dm.build_deploy_pipelines_from_product(
             product_name="p1",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID

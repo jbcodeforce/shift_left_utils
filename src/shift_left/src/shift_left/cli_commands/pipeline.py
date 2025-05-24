@@ -154,55 +154,50 @@ def deploy(
         product_name: str =  typer.Option(None, help="The product name to deploy."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
-        may_start_children: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
-        force_sources: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
+        may_start_descendants: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
+        force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
     """
-
-    try:
-        if dir:
-            print(f"Deploy all statements from directory {dir}")
-            result, summary = deployment_mgr.deploy_all_from_directory(
-                directory = dir, 
-                inventory_path = inventory_path, 
-                compute_pool_id = compute_pool_id, 
-                dml_only = dml_only, 
-                may_start_children = may_start_children, 
-                force_sources = force_sources)
-            print(f"{result}")
-        elif table_name:
-            print("#"*50)
-            print(f"Deploy pipeline from table {table_name}")
-            result, summary = deployment_mgr.deploy_pipeline_from_table(
-                table_name = table_name, 
-                inventory_path = inventory_path, 
-                compute_pool_id = compute_pool_id, 
-                dml_only = dml_only, 
-                may_start_children = may_start_children, 
-                force_sources = force_sources)
-            print(f"{result.model_dump_json(indent=3)}")
-        elif product_name:
-            print(f"Deploy pipeline from product {product_name}")
-            result, summary = deployment_mgr.deploy_pipeline_from_product(
-                product_name = product_name, 
-                inventory_path = inventory_path, 
-                compute_pool_id = compute_pool_id, 
-                dml_only = dml_only, 
-                may_start_children = may_start_children, 
-                force_sources = force_sources)
-            print(f"{result}")
-        else:
-            print(f"[red]Error: either table_name or dir must be provided[/red]")
-            raise typer.Exit(1)
-        print(f"{summary}")
-    except Exception as e:
-        print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
-
+    _build_deploy_pipeline( 
+        table_name=table_name, 
+        product_name=product_name, 
+        dir=dir, 
+        inventory_path=inventory_path, 
+        compute_pool_id=compute_pool_id, 
+        dml_only=dml_only, 
+        may_start_descendants=may_start_descendants, 
+        force_ancestors=force_ancestors,
+        execute_plan=True)
     print(f"#### Pipeline deployed ####")
+
+@app.command()
+def build_execution_plan(
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
+        table_name:  str =  typer.Option(default= None, help="The table name to deploy from. Can deploy ancestors and descendants." ),
+        product_name: str =  typer.Option(None, help="The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product."),
+        dir: str = typer.Option(None, help="The directory to deploy the pipeline from."),
+        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
+        dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
+        may_start_descendants: bool = typer.Option(False, help="The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
+        force_ancestors: bool = typer.Option(False, help="This flag forces restarting running ancestorsFlink statements.")):
+    """
+    From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
+    and existing Flink Statement running status.
+    """
+    _build_deploy_pipeline( 
+        table_name=table_name, 
+        product_name=product_name, 
+        dir=dir, 
+        inventory_path=inventory_path, 
+        compute_pool_id=compute_pool_id, 
+        dml_only=dml_only, 
+        may_start_descendants=may_start_descendants, 
+        force_ancestors=force_ancestors,
+        execute_plan=False)
+
 
 @app.command()
 def deploy_source_only( product_name: str =  typer.Argument(help="The product name to deploy the source tables from."),
@@ -228,7 +223,7 @@ def report_running_statements(
     try:
         if table_name:
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
-            results+= deployment_mgr.report_running_flink_statements_for_a_table_execution_plan(table_name, inventory_path)
+            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name)
         elif dir:
             results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, 
                                                                                            inventory_path)
@@ -253,28 +248,53 @@ def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table nam
     result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     print(result)
 
-@app.command()
-def build_execution_plan_from_table(table_name:  Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json.")],
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
-        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
-        dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
-        may_start_children: bool = typer.Option(False, help="The children will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
-        force_sources: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements.")):
-    """
-    From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
-    and existing Flink Statement running status.
-    """
-    print(f"Build an execution plan for table {table_name}")
-    summary=deployment_mgr.build_execution_plan_from_table_and_persist(table_name=table_name,
+    
+def _build_deploy_pipeline(
+        table_name: str, 
+        product_name: str, 
+        dir: str, 
+        inventory_path: str, 
+        compute_pool_id: str, 
+        dml_only: bool, 
+        may_start_descendants: bool, 
+        force_ancestors: bool,
+        execute_plan: bool=False):
+    try:
+        if table_name:
+            print(f"Build an execution plan for table {table_name}")
+            summary,_=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        may_start_children=may_start_children,
-                                                        force_sources=force_sources,
-                                                        start_time=datetime.datetime.now())
+                                                        may_start_descendants=may_start_descendants,
+                                                        force_ancestors=force_ancestors,
+                                                        execute_plan=execute_plan)
 
-    print(f"Execution plan built and persisted for table {table_name}")
-    print(summary)
+            print(f"Execution plan built and persisted for table {table_name}")
+        elif product_name:
+            print(f"Build an execution plan for product {product_name}")
+            summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
+                                                        inventory_path=inventory_path,
+                                                        compute_pool_id=compute_pool_id,
+                                                        dml_only=dml_only,
+                                                        may_start_descendants=may_start_descendants,
+                                                        force_ancestors=force_ancestors,
+                                                        execute_plan=execute_plan)
+            print(f"Execution plan built and persisted for product {product_name}")
+        elif dir:
+            print(f"Build an execution plan for directory {dir}")
+            summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir, 
+                                                                    inventory_path=inventory_path,
+                                                                    compute_pool_id=compute_pool_id,
+                                                                    dml_only=dml_only,
+                                                                    may_start_descendants=may_start_descendants,
+                                                                    force_ancestors=force_ancestors,
+                                                                    execute_plan=execute_plan)
+            
+        print(summary)
+    except Exception as e:
+        print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
     
    
 

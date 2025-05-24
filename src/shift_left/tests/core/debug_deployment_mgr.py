@@ -31,33 +31,17 @@ class DebugDeploymentManager(unittest.TestCase):
         import shift_left.core.deployment_mgr as dm
         config = get_config()
         table_name = "int_qx_infocard_helper_get_full_result"
-        result = dm.deploy_pipeline_from_table(table_name=table_name,
+        result = dm.build_deploy_pipeline_from_table(table_name=table_name,
                                                inventory_path=os.getenv("PIPELINES"), 
                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
                                                dml_only=False, 
-                                               may_start_children=True,
-                                               force_sources=False)
+                                               may_start_descendants=True,
+                                               force_ancestors=False)
         assert result
         print(result.model_dump_json())
 
 
-    def _test_build_execution_plan(self):
-        os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-        inventory_path=  os.environ["PIPELINES"]
-        table_name="src_master_template"
-        pipeline_def=  pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
-        config = get_config()
-        execution_plan = dm.build_execution_plan_from_any_table(pipeline_def=pipeline_def, 
-                                                                compute_pool_id="lfcp-gyjd2v", 
-                                                                dml_only=False, 
-                                                                may_start_children=False,
-                                                                force_sources=False,
-                                                                start_time = datetime.now())
-        
-        dm.persist_execution_plan(execution_plan)
-        print(dm.build_summary_from_execution_plan(execution_plan, compute_pool_mgr.get_compute_pool_list()))
-           
-
+   
     def _test_report_running_flink_statements_for_all_from_product(self):
         os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         inventory_path=  os.environ["PIPELINES"]

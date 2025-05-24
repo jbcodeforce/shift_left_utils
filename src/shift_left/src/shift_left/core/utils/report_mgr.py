@@ -1,11 +1,13 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from shift_left.core.models.flink_statement_model import Statement, FlinkStatementExecutionPlan
+from shift_left.core.models.flink_statement_model import Statement, FlinkStatementExecutionPlan, FlinkStatementNode
 from shift_left.core.models.flink_compute_pool_model import ComputePoolInfo, ComputePoolList
-from shift_left.core.compute_pool_mgr import get_compute_pool_with_id
-from shift_left.core.utils.app_config import shift_left_dir
-from pydantic import Field
 
+import shift_left.core.metric_mgr as metrics_mgr
+import shift_left.core.compute_pool_mgr as compute_pool_mgr
+from shift_left.core.utils.app_config import shift_left_dir, get_config
+from pydantic import Field
+from datetime import datetime
 class StatementBasicInfo(BaseModel):
     name: str
     environment_id: str 
@@ -28,7 +30,7 @@ class DeploymentReport(BaseModel):
         flink_statements_deployed: List of deployed Flink statements
     """
     table_name: Optional[str] = None
-    dml_name: str = Field(default="Both", description="Type of deployment: DML only, or both")
+    type: str = Field(default="Both", description="Type of deployment: DML only, or both")
     update_children: bool = Field(default=False)
     start_time: float = 0
     execution_time: float = 0
@@ -46,6 +48,7 @@ class TableInfo(BaseModel):
     retention_size: int = 0
     message_count: int = 0
     pending_records: int = 0
+
 class TableReport(BaseModel):
     product_name: str = ""
     environment_id: str = ""
@@ -73,6 +76,41 @@ def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
     else:
         return str(text).ljust(length, padding_char)    
     
+def build_TableReport(product_name: str) -> TableReport:
+    table_report = TableReport()
+    table_report.product_name = product_name
+    table_report.environment_id = get_config().get('confluent_cloud').get('environment_id')
+    table_report.catalog_name = get_config().get('flink').get('catalog_name')
+    table_report.database_name = get_config().get('flink').get('database_name')
+    return table_report
+
+def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
+    table_info = TableInfo()
+    table_info.table_name = node.table_name
+    table_info.type = node.type
+    table_info.upgrade_mode = node.upgrade_mode
+    table_info.statement_name = node.dml_statement_name
+    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    if node.existing_statement_info:
+        table_info.status = node.existing_statement_info.status_phase
+        table_info.compute_pool_id = node.existing_statement_info.compute_pool_id
+        table_info.created_at = node.existing_statement_info.created_at
+    else:
+        table_info.status = "UNKNOWN"
+        table_info.compute_pool_id = ""
+        table_info.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, table_info.compute_pool_id)
+    if pool:
+        table_info.compute_pool_name = pool.name
+    else:
+        table_info.compute_pool_name = "UNKNOWN"
+    if table_info.status == "RUNNING":
+        table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
+        #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
+        #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
+                
+    return table_info
+
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)}\t{'Status':<10}\t{'Compute Pool':<15}\t{'Created At':<16}\n"
     report+=f"-"*145 + "\n"
@@ -140,7 +178,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     summary+="\n---Matching compute pools: " 
     summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 125
     for node in execution_plan.nodes:
-        pool = get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
+        pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
         if pool:
             summary+=f"\n{pool.id} \t{pad_or_truncate(pool.name,40)}\t{pad_or_truncate(str(pool.current_cfu) + '/' + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
     with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
@@ -153,7 +191,7 @@ def build_deployment_report(
     dml_ref: str, 
     may_start_children: bool, 
     statements: List[Statement]) -> DeploymentReport:
-    report = DeploymentReport(table_name=table_name, dml_name=dml_ref, update_children=may_start_children)
+    report = DeploymentReport(table_name=table_name, type=dml_ref, update_children=may_start_children)
     for statement in statements:
         if statement:
             report.flink_statements_deployed.append(_build_statement_basic_info(statement))
