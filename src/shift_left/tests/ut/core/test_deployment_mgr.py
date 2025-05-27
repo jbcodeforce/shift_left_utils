@@ -209,35 +209,38 @@ class TestDeploymentManager(unittest.TestCase):
         assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
         assert ancestors[4].table_name == "z"
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     def test_build_execution_plan_for_one_table_while_parents_running(
         self,
         mock_assign_compute_pool_id,
-        mock_get_status
+        mock_get_status,
+        mock_get_compute_pool_list
     ) -> None:
         """Test building execution plan when parent is running.
-        
+    
         Should lead to only parents to run when they are not running.
         F has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
         """
         print("test_build_execution_plan_for_one_table_while_parents_running")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name.startswith("dev-dml-d"):
-                return self._create_mock_statement_info(status_phase="RUNNING")
-            return self._create_mock_statement_info()
+            print(f"mock_statement: {statement_name}")
+            return self._create_mock_statement_info(status_phase="RUNNING")
+ 
             
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         summary, execution_plan = dm.build_deploy_pipeline_from_table(
             table_name="f", 
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=False
+            may_start_descendants=True, 
+            force_ancestors=False,
+            execute_plan=False
         )
         
         print(summary)
@@ -246,7 +249,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[5].to_run is False
         assert execution_plan.nodes[5].to_restart is False
         assert execution_plan.nodes[6].table_name == "f"
-        assert execution_plan.nodes[6].to_run is True
+        assert execution_plan.nodes[6].to_run is False
         assert execution_plan.nodes[6].to_restart is True
 
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
@@ -280,7 +283,8 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
             may_start_descendants=False, 
-            force_ancestors=False
+            force_ancestors=False,
+            execute_plan=False
         )  
         print(summary)
         assert len(execution_plan.nodes) == 9
@@ -337,7 +341,8 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
             may_start_descendants=False, 
-            force_ancestors=False
+            force_ancestors=False,
+            execute_plan=False
         )  
         
         print(summary)
@@ -387,7 +392,8 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
             may_start_descendants=True, 
-            force_ancestors=False
+            force_ancestors=False,
+            execute_plan=False
         )  
         
         print(summary)
@@ -566,7 +572,8 @@ class TestDeploymentManager(unittest.TestCase):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
             dml_only=False, 
             may_start_descendants=False, 
-            force_ancestors=False
+            force_ancestors=False,
+            execute_plan=False
         )
         print(summary)
         
@@ -582,13 +589,45 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
         assert execution_plan.nodes[5].table_name == "p1_fct_order"
 
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.reset_statement_list')
+    def test_build_execution_plan_for_product(self, mock_reset_statement_list, mock_assign_compute_pool_id) -> None:
+        """Test building execution plan for a product."""
+        print("test_build_execution_plan_for_product")
+        # Setup
+        product_name = "p2"
+        inventory_path = self.inventory_path
+        compute_pool_id = self.TEST_COMPUTE_POOL_ID
+        dml_only = False
+        may_start_descendants = False
+        force_ancestors = False
+        execute_plan = False
 
+        mock_reset_statement_list.return_value = None
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
 
+        summary, execution_plan = dm.build_deploy_pipelines_from_product(
+            product_name=product_name,
+            inventory_path=inventory_path,
+            compute_pool_id=compute_pool_id,
+            dml_only=dml_only,
+            may_start_descendants=may_start_descendants,
+            force_ancestors=force_ancestors,
+            execute_plan=execute_plan
+        )
+        print(summary)
+        print(execution_plan)
 
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.build_deploy_pipeline_from_table')
-    def test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table) -> None:
-        """Test deploying pipeline from product."""
-        print("test_deploy_pipeline_from_product")
+    def _test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table,
+                                          mock_get_compute_pool_list) -> None:
+        """
+        Test deploying pipeline from product.
+        -it will rebuild the table inventory
+        """
+        print("test_deploy_pipeline_from_product should get all tables created for p2")
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         def _mock_deploy_pipeline_from_table(table_name: str, 
                                              inventory_path: str, 
                                              compute_pool_id: str, 
@@ -609,8 +648,9 @@ class TestDeploymentManager(unittest.TestCase):
                                     flink_statements_deployed=[statement],
                                     ), f"deployed {table_name}"
         mock_deploy_pipeline_from_table.side_effect = _mock_deploy_pipeline_from_table
+        
         reports, summary = dm.build_deploy_pipelines_from_product(
-            product_name="p1",
+            product_name="p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID
         )

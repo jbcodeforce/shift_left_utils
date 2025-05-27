@@ -101,9 +101,9 @@ def build_deploy_pipeline_from_table(
         ancestors = _build_topological_sorted_parents([start_node], node_map)
         execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors, node_map, force_ancestors, may_start_descendants, compute_pool_id, start_node.table_name, start_node.product_name)
         _persist_execution_plan(execution_plan)
-               
+        summary=build_summary_from_execution_plan(execution_plan, compute_pool_list)
+        logger.info(f"Execute the plan before deployment: {summary}")
         if execute_plan:
-            logger.info(f"Execute the plan before deployment: {summary}")
             statements = _execute_plan(execution_plan, compute_pool_id)
             result = build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
         
@@ -113,8 +113,7 @@ def build_deploy_pipeline_from_table(
                 f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
                 f"{result.model_dump_json(indent=3)}"
             )
-        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
-        summary=build_summary_from_execution_plan(execution_plan, compute_pool_list)
+
         return summary, execution_plan
     except Exception as e:
         logger.error(f"Failed to deploy pipeline from table {table_name} error is: {str(e)}")
@@ -382,7 +381,7 @@ def full_pipeline_undeploy_from_table(
 
 def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementNode], 
                                                  node_map: Dict[str, FlinkStatementNode], 
-                                                 force_sources: bool, 
+                                                 force_ancestors: bool, 
                                                  may_start_children: bool, 
                                                  compute_pool_id: str,
                                                  table_name: str,
@@ -399,7 +398,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
             node = _get_and_update_statement_info_compute_pool_id_for_node(node)
             if node.is_running():
                 if node.type == "source":
-                    node.to_run = force_sources
+                    node.to_run = force_ancestors
                 else:
                     node.to_run = False
             else:
@@ -415,7 +414,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         for node in execution_plan.nodes:
             if node.type == "source" and node.is_running():  
                 # the list of nodes may have been changed by getting new parents from previously processed children so this is needed again.
-                node.to_run = force_sources
+                node.to_run = force_ancestors
             if node.to_run or node.to_restart:
                 for child in node.children:
                     if (child not in execution_plan.nodes and

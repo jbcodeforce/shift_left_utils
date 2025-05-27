@@ -178,19 +178,19 @@ class TestSQLParser(unittest.TestCase):
 
     def test_extract_table_name_from_insert_into_statement(self):   
         parser = SQLparser()
-        query="""INSERT INTO aqem_dim_event_element
+        query="""INSERT INTO element_data
         WITH
             section_detail as (
                 SELECT s.event_section_id, sc.name, s.tenant_id
-                FROM `src_aqem_recordexecution_execution_plan_section` as s
+                FROM `src_execution_plan` as s
                 INNER JOIN
-                    `src_aqem_recordconfiguration_section` as sc
+                    `src_configuration_section` as sc
                     ON sc.id = s.config_section_id
                     AND sc.tenant_id = s.tenant_id
             ),
             tenant as (
                 SELECT CAST(null AS STRING) as id, t.__db as tenant_id
-                FROM `stage_tenant_dimension` as t
+                FROM `tenant_dimension` as t
                 where not (t.__op IS NULL OR t.__op = 'd')
             ),
             attachment as
@@ -318,13 +318,13 @@ class TestSQLParser(unittest.TestCase):
 
     def test_extract_cte_table(self):   
         parser = SQLparser()
-        query="""INSERT INTO aqem_dim_event_element
+        query="""INSERT INTO element_data
         WITH
             section_detail as (
                 SELECT s.event_section_id, sc.name, s.tenant_id
-                FROM `src_aqem_recordexecution_execution_plan_section` as s
+                FROM `src_execution_plan` as s
                 INNER JOIN
-                    `src_aqem_recordconfiguration_section` as sc
+                    `src_configuration_section` as sc
                     ON sc.id = s.config_section_id
                     AND sc.tenant_id = s.tenant_id
             ),
@@ -390,6 +390,41 @@ class TestSQLParser(unittest.TestCase):
         assert columns['description'] == {'name': 'description', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['parent_id'] == {'name': 'parent_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['hierarchy'] == {'name': 'hierarchy', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+    
+    def test_should_not_consider_unnest_as_table_name(self):
+        parser = SQLparser()
+        query="""
+        INSERT INTO `int_element_data_unnest`
+            SELECT
+                ed.id,
+                ed.`name` as element_name,
+                pe.element_type,
+                CASE 
+                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = 'null' THEN null 
+                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = '' THEN null 
+                    ELSE TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', ''))
+                END AS element_data,
+                ed.user_id,
+                ed.tenant_id
+            FROM `src_element_data` as ed
+            INNER JOIN
+                `src_record` as event
+                ON event.id = ed.record_id
+                AND event.tenant_id = ed.tenant_id
+            INNER JOIN `src_plan_element` as pe
+                ON pe.event_element_id = ed.execution_plan_element_id
+                AND pe.tenant_id = ed.tenant_id
+            LEFT JOIN `src_form_element` as fec   
+                ON fec.id = pe.config_element_id
+                AND fec.tenant_id = pe.tenant_id
+            CROSS JOIN UNNEST(split(REGEXP_REPLACE(ed.data, '^\["|\"]$', '') , '", "')) as edata
+            WHERE not (parent_id is not null and table_row_id is null)
+        """
+        rep=parser.extract_table_references(query)
+        assert rep
+        assert "UNNEST" not in rep
+
         
+
 if __name__ == '__main__':
     unittest.main()

@@ -482,7 +482,11 @@ def _add_test_files(table_ref: FlinkTableReference,
 
         
             
-def _build_save_test_definition_json_file(file_path: str, table_name: str, referenced_table_names: List[str]) -> SLTestDefinition:
+def _build_save_test_definition_json_file(
+        file_path: str, 
+        table_name: str, 
+        referenced_table_names: List[str]
+) -> SLTestDefinition:
     test_definition :SLTestDefinition = SLTestDefinition(foundations=[], test_suite=[])
     for table in referenced_table_names:
         if table not in table_name:

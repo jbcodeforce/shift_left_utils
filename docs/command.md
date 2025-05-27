@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1060c65a0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1124ca420&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -408,10 +408,10 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the static...
 * `deploy`: Deploy a pipeline from a given table name...
+* `build-execution-plan`: From a given table, this command goes all...
 * `deploy-source-only`: Deploy only the source tables for a given...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
-* `build-execution-plan-from-table`: From a given table, this command goes all...
 
 ### `pipeline build-metadata`
 
@@ -513,9 +513,35 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--product-name TEXT`: The product name to deploy.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
-* `--may-start-children / --no-may-start-children`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-children]
-* `--force-sources / --no-force-sources`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-sources]
+* `--may-start-descendants / --no-may-start-descendants`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-descendants]
+* `--force-ancestors / --no-force-ancestors`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-ancestors]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
+* `--help`: Show this message and exit.
+
+### `pipeline build-execution-plan`
+
+From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
+and existing Flink Statement running status.
+
+**Usage**:
+
+```console
+$ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--table-name TEXT`: The table name to deploy from. Can deploy ancestors and descendants.
+* `--product-name TEXT`: The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product.
+* `--dir TEXT`: The directory to deploy the pipeline from.
+* `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
+* `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
+* `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
+* `--force-ancestors / --no-force-ancestors`: This flag forces restarting running ancestorsFlink statements.  [default: no-force-ancestors]
 * `--help`: Show this message and exit.
 
 ### `pipeline deploy-source-only`
@@ -549,7 +575,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/master-control/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -575,28 +601,4 @@ $ pipeline undeploy [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 **Options**:
 
-* `--help`: Show this message and exit.
-
-### `pipeline build-execution-plan-from-table`
-
-From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
-and existing Flink Statement running status.
-
-**Usage**:
-
-```console
-$ pipeline build-execution-plan-from-table [OPTIONS] TABLE_NAME INVENTORY_PATH
-```
-
-**Arguments**:
-
-* `TABLE_NAME`: The table name containing pipeline_definition.json.  [required]
-* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
-
-**Options**:
-
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
-* `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
-* `--may-start-children / --no-may-start-children`: The children will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-children]
-* `--force-sources / --no-force-sources`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-sources]
 * `--help`: Show this message and exit.

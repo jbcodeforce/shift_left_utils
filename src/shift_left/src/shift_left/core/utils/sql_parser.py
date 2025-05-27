@@ -13,8 +13,7 @@ class SQLparser:
         self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS+\s*\('
-        self.not_wanted_words= r'\b(\s*CROSS JOIN UNNEST)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?[a-zA-Z_][a-zA-Z0-9_]*)'
-        
+        self.not_wanted_words = r'\b(CROSS\s+JOIN\s+UNNEST)\s*\('
     
 
     def _normalize_sql(self, sql_script):
@@ -38,7 +37,7 @@ class SQLparser:
 
     def remove_junk_words(self, table_name: str) -> str:
         """
-        Remove junk words from the table name
+        Remove words not wanted as table name
         """
         for not_wanted_word in [' UNNEST ']:
             if not_wanted_word in table_name.upper():
@@ -61,7 +60,7 @@ class SQLparser:
             tables = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
             ctes1 = re.findall(self.cte_pattern_1, sql_content, re.IGNORECASE)
             ctes2 = re.findall(self.cte_pattern_2, sql_content, re.IGNORECASE)
-            not_wanted=re.findall(self.not_wanted_words, sql_content, re.IGNORECASE)
+            not_wanted="[UNNEST]"
             matches=set()
             for table in tables:
                 logger.debug(table)

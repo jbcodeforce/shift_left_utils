@@ -41,8 +41,9 @@ See the following **recipes** to support the management of those elements:
 
 [:material-traffic-light: Validate development best practices](#validate-naming-convention-and-best-practices){ .md-button }
 [:material-ab-testing: Use the Test harness](./test_harness.md/#usage--recipe){ .md-button }
-[:material-semantic-web: Understanding Flink semantic](){ .md-button }
-[Validate running statements](){ .md-button }
+[:material-semantic-web: Understanding Flink semantic](#understand-flink-statement-physical-plan){ .md-button }
+
+[Validate running statements](#accessing-running-statements){ .md-button }
 
 [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship){ .md-button }
 [Deploy a pipeline](){ .md-button }
@@ -793,17 +794,36 @@ shift_left pipeline report fct_table --yaml
 
 The execution plan is a hierarchical Flink statement hierarchy enriched with current state of the running DMLs on the platform and with a plan to start non running parents, and update or restart the children depending of the upgrade mode: stateless or stateful.
 
-Here is a basic command for an intermediate table:
+* Here is a basic command for an intermediate table:
+    ```sh
+    shift_left pipeline build-execution --table-name int_table_2 
+    ```
 
-```sh
-shift_left pipeline build-execution-plan-from-table int_table_2 
-```
+* The options that are relevant to control the execution plan:
+    ```sh
+    --compute-pool-id 
+    --may-start-descendants
+    --force-ancestors
+    ```
 
-It will take into account the following parameters in the config.yaml:
+* This command will take into account the following parameters in the config.yaml:
+    ```yaml
+    flink.flink_url
+    flink.api_key
+    flink.api_secret
+    flink.compute_pool_id
+    flink.catalog_name
+    flink.database_name
+    ```
 
-```yaml
-
-```
+* This can be extended to a product, so user may see all the dependencies for a given product:
+    ```sh
+    shift_left pipeline build-execution --product-name p2
+    ```
+* It may be interesting to get the execution plan for a given layer, like all the facts or intermidiates, so the granulatity is at the direcory level, so it can be product and intermidate:
+    ```sh
+    shift_left pipeline build-execution --dir $PIPELINES/intermediates/p2
+    ```
 
 ???- example "The outcome of an execution plan"
     The information reported is taking into account the table hierarchy and the state of the Statement currently running:
@@ -812,9 +832,7 @@ It will take into account the following parameters in the config.yaml:
     To deploy fct_order the following statements need to be executed in the order
 
     --- Parents impacted ---
-	src_2 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
-	src_1 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
-    src_3 is : RUNNING on cpool_id: lfcp-12345 may run-as-parent: True or restart-as-child: False
+	
     ```
 
 ???+ info "For any help of pipeline commands"
