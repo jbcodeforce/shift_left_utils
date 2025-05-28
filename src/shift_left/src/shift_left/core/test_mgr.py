@@ -99,7 +99,7 @@ def execute_one_test(
     prefix = config['kafka']['cluster_type']
 
     try:
-        test_suite_def, table_ref, prefix, test_result = _init_test_foundation(table_name, test_case_name, compute_pool_id)
+        test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id)
     
         # Parse through test case suite in yaml file, run the test case provided in parameter
         for idx, test_case in enumerate(test_suite_def.test_suite):
@@ -110,12 +110,13 @@ def execute_one_test(
                                                 prefix=prefix+"-ins-"+str(idx + 1),
                                                 compute_pool_id=compute_pool_id)
                 test_result.statements.extend(statements)
-                statements, result_text = _execute_test_validation(test_case=test_case,
+                statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
                                                                 table_ref=table_ref,
                                                                 prefix=prefix+"-val"+"-"+str(idx + 1),
                                                                 compute_pool_id=compute_pool_id)
                 test_result.result = result_text
                 test_result.statements.extend(statements)
+                test_result.validation_result = statement_result
         return test_result
     except Exception as e:
         logger.error(f"Error executing test case: {e}")
@@ -129,7 +130,7 @@ def execute_all_tests(table_name: str,
     Execute all test cases defined in the test suite definition for a given table.
     """
     
-    test_suite_def, table_ref, prefix, test_result = _init_test_foundation(table_name, "", compute_pool_id)
+    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id)
  
     test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
     for idx, test_case in enumerate(test_suite_def.test_suite):
@@ -138,13 +139,13 @@ def execute_all_tests(table_name: str,
                                         prefix=prefix+"-ins-"+str(idx + 1),
                                         compute_pool_id=compute_pool_id)
         test_result = TestResult(test_case_name=test_case.name, result="")
-        test_result.statements.extend(statements)
-        statements, result_text = _execute_test_validation(test_case=test_case,
+        statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
                                                             table_ref=table_ref,
                                                             prefix=prefix+"-val-"+str(idx + 1),
                                                             compute_pool_id=compute_pool_id)
         test_result.result = result_text
         test_result.statements.extend(statements)
+        test_result.validation_result = statement_result
         test_suite_result.test_results[test_case.name] = test_result
 
     return test_suite_result
@@ -185,7 +186,7 @@ def delete_test_artifacts(table_name: str,
 
 # ----------- Private APIs  ------------------------------------------------------------
 
-def _init_test_foundation(table_name: str, 
+def _init_test_foundations(table_name: str, 
         test_case_name: str, 
         compute_pool_id: Optional[str] = None
 ) -> Tuple[SLTestDefinition, FlinkTableReference, str, TestResult]:
@@ -237,8 +238,9 @@ def _execute_flink_test_statement(
             return post_statement
         except Exception as e:
             logger.error(e)
+            raise e
     else:
-        print(f"{statement_name} statement already exists")
+        print(f"{statement_name} statement already exists -> do nothing")
         return statement
     
 def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, FlinkTableReference]:
@@ -273,7 +275,7 @@ def _execute_foundation_statements(
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
-        statement = _load_sql_execute_statement(table_name=foundation.table_name,
+        statement = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
                                     compute_pool_id=compute_pool_id)
@@ -296,24 +298,25 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                    prefix: str = 'dev',
                                    compute_pool_id: Optional[str] = None
 ) -> List[Statement]:
-    
+    """
+    Run DDL and DML statements for the given table
+    """
     def replace_table_name(sql_content: str) -> str:
         parser = SQLparser()
         table_names = parser.extract_table_references(sql_content)
         for table in table_names:
-            logger.info(f"table: {table}")
             sql_content = sql_content.replace(table, f"{table}_ut")
         return sql_content
 
     statements = []
-    statement = _load_sql_execute_statement(table_name=table_name,
+    statement = _load_sql_and_execute_statement(table_name=table_name,
                                 sql_path=table_ref.ddl_ref,
                                 prefix=prefix+"-ddl",
                                 compute_pool_id=compute_pool_id,
                                 fct=replace_table_name)
     if statement:
         statements.append(statement)
-    statement = _load_sql_execute_statement(table_name=table_name,
+    statement = _load_sql_and_execute_statement(table_name=table_name,
                                 sql_path=table_ref.dml_ref,
                                 prefix=prefix+"-dml",
                                 compute_pool_id=compute_pool_id,
@@ -323,7 +326,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
     
     return statements
 
-def _load_sql_execute_statement(table_name: str, 
+def _load_sql_and_execute_statement(table_name: str, 
                                 sql_path: str, 
                                 prefix: str = 'dev-ddl', 
                                 compute_pool_id: Optional[str] = None,
@@ -356,7 +359,7 @@ def _execute_test_inputs(test_case: SLTestCase,
     for input_step in test_case.inputs:
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
-            statement = _load_sql_execute_statement(table_name=input_step.table_name,
+            statement = _load_sql_and_execute_statement(table_name=input_step.table_name,
                                         sql_path=sql_path,
                                         prefix=prefix,
                                         compute_pool_id=compute_pool_id,
@@ -386,15 +389,16 @@ def _execute_test_validation(test_case: SLTestCase,
         sql_path = os.path.join(table_ref.table_folder_name, output_step.file_name)
         statement_name = _build_statement_name(output_step.table_name, prefix)
         statement_mgr.delete_statement_if_exists(statement_name)
-        statement = _load_sql_execute_statement(table_name=output_step.table_name,
+        statement = _load_sql_and_execute_statement(table_name=output_step.table_name,
                                     sql_path=sql_path,
                                     prefix=prefix,
                                     compute_pool_id=compute_pool_id,
                                     fct=lambda x: x)
         if statement:
             statements.append(statement)
-        result_text+=_poll_response(statement)+"\n"
-    return statements,result_text
+        result, statement_result=_poll_response(statement)
+        result_text+=result
+    return statements,result_text, statement_result
     
 def _poll_response(statement: Statement) -> str:
     #Get result from the validation query
@@ -423,7 +427,7 @@ def _poll_response(statement: Statement) -> str:
     if resp and resp.results and resp.results.data:
         final_row = resp.results.data[0].row[0]
         logger.info(f"Final Result : {final_row}")
-    return final_row
+    return final_row, resp
 
 def _add_test_files(table_ref: FlinkTableReference, 
                     tests_folder: str, 

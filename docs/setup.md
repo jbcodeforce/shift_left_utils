@@ -59,9 +59,9 @@ pip install src/shift_left/dist/shift_left-0.1.19-py3-none-any.whl
 ```
 
 
-### Specific install for the developers using uv
+### Specific install for the shift_left developers using uv
 
-The installation is simpler with 
+The installation is simpler with the following commands:
 
 ```sh
 uv tool list

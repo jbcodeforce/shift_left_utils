@@ -134,27 +134,31 @@ def get_or_build_inventory(
                 if not dml_file_name:
                     continue
                 # extract table name from dml filefrom sql script   
+                dml_sql_content=""
+                ddl_sql_content=""
                 with open(dml_file_name, "r") as f:
-                    sql_content = f.read()
-                    table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
-                    upgrade_mode = parser.extract_upgrade_mode(sql_content)
-                    directory = os.path.dirname(dml_file_name)
-                    table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
-                    table_type = get_table_type_from_file_path(dml_file_name)
-                    product_name = extract_product_name(table_folder)
-                    ref = FlinkTableReference.model_validate({
-                        "table_name": table_name,
-                        "type": table_type,
-                        "product_name": product_name,
-                        "ddl_ref": from_absolute_to_pipeline(ddl_file_name),
-                        "dml_ref": from_absolute_to_pipeline(dml_file_name),
-                        "table_folder_name": table_folder,
-                        "state_form": upgrade_mode
-                    })
-                    logger.info(ref)
-                    if ref.table_name in inventory:
-                        logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
-                    inventory[ref.table_name] = ref.model_dump()
+                    dml_sql_content = f.read()
+                    table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
+                with open(ddl_file_name, "r") as f:
+                    ddl_sql_content = f.read()  
+                upgrade_mode = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+                directory = os.path.dirname(dml_file_name)
+                table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
+                table_type = get_table_type_from_file_path(dml_file_name)
+                product_name = extract_product_name(table_folder)
+                ref = FlinkTableReference.model_validate({
+                    "table_name": table_name,
+                    "type": table_type,
+                    "product_name": product_name,
+                    "ddl_ref": from_absolute_to_pipeline(ddl_file_name),
+                    "dml_ref": from_absolute_to_pipeline(dml_file_name),
+                    "table_folder_name": table_folder,
+                    "state_form": upgrade_mode
+                })
+                logger.info(ref)
+                if ref.table_name in inventory:
+                    logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
+                inventory[ref.table_name] = ref.model_dump()
     logger.info(f"processed {count} files and got {len(inventory)} entries")
     sorted_inventory_keys = sorted(inventory.keys())            
     sorted_inventory = {k: inventory[k] for k in sorted_inventory_keys}

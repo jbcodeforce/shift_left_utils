@@ -5,9 +5,20 @@
    "dml_ref": "pipelines/sources/p3/src_roles/sql-scripts/dml.src_p3_roles.sql",
    "ddl_ref": "pipelines/sources/p3/src_roles/sql-scripts/ddl.src_p3_roles.sql",
    "path": "pipelines/sources/p3/src_roles",
-   "state_form": "Stateless",
+   "state_form": "Stateful",
    "parents": [],
    "children": [
+      {
+         "table_name": "error_table",
+         "product_name": "p3",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
+         "ddl_ref": "pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
+         "path": "pipelines/intermediates/p3/user_role",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": []
+      },
       {
          "table_name": "int_p3_user_role",
          "product_name": "p3",

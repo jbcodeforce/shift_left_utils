@@ -113,7 +113,8 @@ def build_deploy_pipeline_from_table(
                 f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
                 f"{result.model_dump_json(indent=3)}"
             )
-
+            simple_report=build_simple_report(execution_plan)
+            logger.info(f"Execute the plan after deployment: {simple_report}")
         return summary, execution_plan
     except Exception as e:
         logger.error(f"Failed to deploy pipeline from table {table_name} error is: {str(e)}")
@@ -183,7 +184,6 @@ def build_and_deploy_all_from_directory(
     to define a combined execution plan for all tables in the directory as it is important
     to start Flink statements only one time and in the correct order.
     """
-    count=0
     statement_mgr.reset_statement_list()
     nodes_to_process = []
     combined_node_map = {}
@@ -194,7 +194,7 @@ def build_and_deploy_all_from_directory(
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
             combined_node_map |= _build_statement_node_map(node)
-            count+=1
+    count = len(nodes_to_process)
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
         start_node = ancestors[0]
@@ -211,7 +211,7 @@ def build_and_deploy_all_from_directory(
         summary+=f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
-        return "Nothing run.", TableReport()
+        return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
 
 def deploy_source_only(product_name: str, compute_pool_id: str) -> Tuple[List[DeploymentReport], str]:
     """
@@ -261,17 +261,18 @@ def load_and_deploy_from_execution_plan(execution_plan_file: str,
 
 
 def report_running_flink_statements_for_a_table(
-    table_name: str
+    table_name: str,
+    inventory_path: str
 ) -> str:
     """
     Report running flink statements for a table execution plan
     """
     config = get_config()
     _, execution_plan = build_deploy_pipeline_from_table(table_name, 
+                                                        inventory_path=inventory_path, 
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
-                                                        may_start_descendants=False, 
-                                                        start_time=datetime.now(),
+                                                        may_start_descendants=False,
                                                         force_ancestors=False)
     return build_simple_report(execution_plan)
 
@@ -294,10 +295,10 @@ def report_running_flink_statements_for_all_from_directory(
             logger.info(f"Build report of running flink statements for {pipeline_def.table_name}")
             result+= "#"*40 + f" Table: {pipeline_def.table_name} " + "#"*40 + "\n"
             summary, execution_plan = build_deploy_pipeline_from_table(pipeline_def.table_name, 
+                                                        inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
-                                                        may_start_children=False, 
-                                                        start_time=datetime.now(),
+                                                        may_start_children=False,
                                                         force_sources=False)
             result+= summary + "\n"
             count+=1
@@ -363,8 +364,7 @@ def full_pipeline_undeploy_from_table(
     summary, execution_plan = build_deploy_pipeline_from_table(pipeline_def.table_name, 
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
-                                                        may_start_children=True, 
-                                                        start_time=datetime.now())
+                                                        may_start_children=True)
     config = get_config()
     trace = f"Full pipeline delete from table {table_name}\n"
     for node in reversed(execution_plan.nodes):
@@ -623,7 +623,7 @@ def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatement
         node.compute_pool_name = node.existing_statement_info.compute_pool_name
         node.created_at = node.existing_statement_info.created_at
     else:
-        logger.error(f"Statement {node.existing_statement_info} is not a StatementInfo")
+        logger.warning(f"Statement {node.existing_statement_info} is not a StatementInfo")
     return node 
 
 def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
@@ -724,7 +724,7 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> Li
                         statement = _deploy_ddl_dml(node)
                     else:
                         statement = _deploy_dml(node, False)
-                    node.existing_statement_info = statement
+                    node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
                     statements.append(statement)
                 except Exception as e:
                     logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
@@ -750,17 +750,16 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
-    try:
-        statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
-                                                                                node_to_process.ddl_ref, 
-                                                                                node_to_process.ddl_statement_name)
-        while statement.status.phase not in ["COMPLETED"]:
-            time.sleep(1)
-            statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
-            logger.debug(f"DDL deployment status is: {statement.status.phase}")
-    except Exception as e:
-        logger.error(f"Error deploying DDL for {node_to_process.table_name}: {e}")
-        raise e
+
+    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
+                                                                            node_to_process.ddl_ref, 
+                                                                            node_to_process.ddl_statement_name)
+    while statement.status.phase not in ["COMPLETED", "FAILED"]:
+        time.sleep(1)
+        statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
+        logger.debug(f"DDL deployment status is: {statement.status.phase}")
+    if statement.status.phase == "FAILED":
+        raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
     return _deploy_dml(node_to_process, True)
 
 
@@ -773,6 +772,12 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
                                                                                 to_process.dml_ref, 
                                                                                 to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
+    while statement.status.phase not in ["RUNNING", "FAILED"]:
+        time.sleep(1)
+        statement = statement_mgr.get_statement(to_process.dml_statement_name)
+        logger.debug(f"DML deployment status is: {statement.status.phase}")
+    if statement.status.phase == "FAILED":
+        raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
     return statement
 
 

@@ -75,8 +75,8 @@ class TestDeploymentManager(unittest.TestCase):
     ) -> Statement:
         """Create a mock Statement object."""
         status = Status(phase=status_phase)
-        Statement(name=name, status=status)
-        return Statement(name=name, status_phase=status_phase)
+        return Statement(name=name, status=status)
+
 
     def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
         """Create a mock ComputePoolList object."""
@@ -154,7 +154,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert node_map["src_x"].upgrade_mode == "Stateless"
         assert node_map["src_b"].upgrade_mode == "Stateless"
         assert node_map["src_p2_a"].upgrade_mode == "Stateless"
-        assert node_map["x"].upgrade_mode == "Stateless"
+        assert node_map["x"].upgrade_mode == "Stateful"
         assert node_map["y"].upgrade_mode == "Stateless"
         assert node_map["z"].upgrade_mode == "Stateful"
         assert node_map["d"].upgrade_mode == "Stateful"
@@ -534,8 +534,8 @@ class TestDeploymentManager(unittest.TestCase):
         plan.nodes = [node1, node2]
 
         mock_statement = MagicMock(spec=Statement)
-        mock_deploy_ddl_dml.return_value = mock_statement
-        mock_deploy_dml.return_value = mock_statement
+        mock_deploy_ddl_dml.side_effect = self._create_mock_statement("ddl_statement", "COMPLETED")
+        mock_deploy_dml.side_effect = self._create_mock_statement("dml_statement", "RUNNING")
 
         # Execute
         result = dm._execute_plan(plan, self.compute_pool_id)

@@ -62,7 +62,7 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             logger.debug(f"Statement: {statement_name} -> {statement}")
             if statement and isinstance(statement, Statement) and statement.status:
                 logger.info(f"Statement: {statement_name} status is: {statement.status.phase}")
-                get_statement_list()[statement_name]=_map_to_statement_info(statement)   # important to avoid doing an api call
+                get_statement_list()[statement_name]=map_to_statement_info(statement)   # important to avoid doing an api call
             return statement
     except Exception as e:
         logger.error(e)
@@ -94,7 +94,7 @@ def get_statement(statement_name: str) -> Statement | StatementError:
 def post_flink_statement(compute_pool_id: str,  
                              statement_name: str, 
                              sql_content: str,
-                             stopped: bool = False) -> Statement:
+                             stopped: bool = False) -> Statement | None:
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -143,11 +143,13 @@ def delete_statement_if_exists(statement_name) -> str | None:
             return "deleted"
         return None
     else: # not found in cache, do remote API call
-        logger.info(f"{statement_name} not found in cache, trying DELETE with REST api call")
+        logger.info(f"{statement_name} not found in cache")
         config = get_config()
         client = ConfluentCloudClient(config)
-        return client.delete_flink_statement(statement_name)
-
+        # 05/27 the following call is not really needed as there is most likely no creationg of the same statement outside of the tool.
+        #  so return None
+        # return client.delete_flink_statement(statement_name)
+        return None
 
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """
@@ -159,7 +161,7 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
     client = ConfluentCloudClient(get_config())
     statement = client.get_flink_statement(statement_name)
     if statement and isinstance(statement, Statement):
-        statement_info = _map_to_statement_info(statement)
+        statement_info = map_to_statement_info(statement)
         get_statement_list()[statement_name] = statement_info
         return statement_info
     return None
@@ -221,7 +223,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 logger.debug("Statement execution result:", resp)
                 if resp and 'data' in resp:
                     for info in resp.get('data'):
-                        statement_info = _map_to_statement_info(info)
+                        statement_info = map_to_statement_info(info)
                         _statement_list_cache.statement_list[info['name']] = statement_info
                 if "metadata" in resp and "next" in resp["metadata"]:
                     next_page_token = resp["metadata"]["next"]
@@ -274,7 +276,7 @@ def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] =
     try:
         statement = post_flink_statement(compute_pool_id, statement_name, sql_content)
         if statement and isinstance(statement, Statement) and statement.status.phase in ("RUNNING", "COMPLETED"):
-            get_statement_list()[statement_name] = _map_to_statement_info(statement)
+            get_statement_list()[statement_name] = map_to_statement_info(statement)
             statement_result = get_statement_results(statement_name)
             if statement_result and isinstance(statement_result, StatementResult):
                 if statement_result.results and len(statement_result.results.data) > 0:
@@ -342,15 +344,7 @@ def get_or_build_sql_content_transformer():
             _runner_class = ReplaceEnvInSqlContent()
     return _runner_class
 
-# ------------- private methods -------------
-def _save_statement_list(statement_list: dict[str, StatementInfo]):
-    """
-    Save the statement list to the cache file
-    """
-    with open(STATEMENT_LIST_FILE, "w") as f:
-        json.dump(statement_list.model_dump(), f, indent=4)
-
-def _map_to_statement_info(info: Statement) -> StatementInfo:
+def map_to_statement_info(info: Statement) -> StatementInfo:
     """
     Map the statement info, result of the REST call to the StatementInfo model
     """
@@ -382,6 +376,16 @@ def _map_to_statement_info(info: Statement) -> StatementInfo:
                              created_at= info.metadata.created_at,
                              sql_catalog=catalog,
                              sql_database=database)
+    
+# ------------- private methods -------------
+def _save_statement_list(statement_list: dict[str, StatementInfo]):
+    """
+    Save the statement list to the cache file
+    """
+    with open(STATEMENT_LIST_FILE, "w") as f:
+        json.dump(statement_list.model_dump(), f, indent=4)
+
+
 
 
 def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list, results, table_inventory, config: dict):

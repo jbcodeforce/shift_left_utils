@@ -134,7 +134,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
 
     
     summary_parts = [
-        f"\nTo deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
+        f"\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} To deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
     ]
     
     # Separate nodes into parents and children

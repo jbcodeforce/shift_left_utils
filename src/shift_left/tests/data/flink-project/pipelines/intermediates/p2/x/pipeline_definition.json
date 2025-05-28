@@ -5,7 +5,7 @@
    "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
    "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
    "path": "pipelines/intermediates/p2/x",
-   "state_form": "Stateless",
+   "state_form": "Stateful",
    "parents": [
       {
          "table_name": "src_x",
@@ -14,7 +14,7 @@
          "dml_ref": "pipelines/sources/p2/src_x/sql-scripts/dml.src_x.sql",
          "ddl_ref": "pipelines/sources/p2/src_x/sql-scripts/ddl.src_x.sql",
          "path": "pipelines/sources/p2/src_x",
-         "state_form": "Stateless",
+         "state_form": "Stateful",
          "parents": [],
          "children": [
             {
@@ -24,7 +24,7 @@
                "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
                "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
                "path": "pipelines/intermediates/p2/x",
-               "state_form": "Stateless",
+               "state_form": "Stateful",
                "parents": [],
                "children": []
             }
@@ -32,6 +32,17 @@
       }
    ],
    "children": [
+      {
+         "table_name": "error_table",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+         "path": "pipelines/intermediates/p2/z",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": []
+      },
       {
          "table_name": "z",
          "product_name": "p2",

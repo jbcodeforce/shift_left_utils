@@ -62,8 +62,9 @@ def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> F
     return read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 
-def build_pipeline_definition_from_dml_content(
+def build_pipeline_definition_from_ddl_dml_content(
     dml_file_name: str, 
+    ddl_file_name: str,
     pipeline_path: str
 ) -> FlinkTablePipelineDefinition:
     """Build pipeline definition hierarchy starting from given dml file. This is the exposed API
@@ -79,7 +80,7 @@ def build_pipeline_definition_from_dml_content(
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
     
-    table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(dml_file_name, table_inventory)
+    table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
     logger.debug(f"Build pipeline for table: {table_name} from {dml_file_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name=table_name,
                                               table_type=None,
@@ -171,74 +172,93 @@ def delete_all_metada_files(root_folder: str):
 
 
 def _build_pipeline_definitions_from_sql_content(
-    sql_file_name: str,
+    dml_file_name: str,
+    ddl_file_name: str,
     table_inventory: Dict
 ) -> Tuple[str, Set[FlinkTablePipelineDefinition], str]:
     """Extract parent table references and semantic from SQL content.
     
     Args:
-        sql_file_name: Path to SQL file
+        dml_file_name: Path to SQL file for dml content
+        ddl_file_name: Path to SQL file for ddl content
         table_inventory: Dictionary of all available files
         
     Returns:
         Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition)
     """
     try:
-        if sql_file_name.startswith(PIPELINE_FOLDER_NAME):
-            sql_file_name = os.path.join(os.getenv("PIPELINES"), "..", sql_file_name)
-        logger.debug(f" Reading file content of: {sql_file_name}")
-        with open(sql_file_name) as f:
-            sql_content = f.read()
-            parser = SQLparser()
-            current_table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
-            dependencies = set()
-            referenced_table_names = parser.extract_table_references(sql_content)
-            state_form = parser.extract_upgrade_mode(sql_content)
-            if referenced_table_names:
-                if current_table_name in referenced_table_names:
-                    referenced_table_names.remove(current_table_name)
-                for table_name in referenced_table_names:
-                    # strangely it is possible that the tablename was a field name because of SQL code like TRIM(BOTH '" ' FROM
-                    try:
-                        table_ref_dict= table_inventory[table_name]
-                    except Exception as e:
-                        logger.warning(f"{table_name} is most likely not a known table name")
-                        continue
-                    table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
-                    dependent_state_form = state_form
-                    if table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
-                        table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
-                        with open(table_dml_ref, "r") as g:
-                            _sql_content = g.read()
-                            dependent_state_form = parser.extract_upgrade_mode(_sql_content)
-                    logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
-                    dependencies.add(_build_pipeline_definition(
-                        table_name, 
-                        table_ref.type,
-                        state_form,
-                        table_ref.table_folder_name,
-                        table_ref.dml_ref,
-                        table_ref.ddl_ref,
-                        set(),
-                        set()
-                    ))
-            else:
-                logger.info(f"No referenced table found in {sql_file_name}")
-            return current_table_name, dependencies, state_form
+        if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
+            dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
+        if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
+            ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
+        dml_sql_content = ""
+        ddl_sql_content = ""
+        with open(dml_file_name) as f:
+            dml_sql_content = f.read()
+        with open(ddl_file_name) as f:
+            ddl_sql_content = f.read()
+        parser = SQLparser()
+        current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
+        dependencies = set()
+        referenced_table_names = parser.extract_table_references(dml_sql_content)
+        state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+        if referenced_table_names:
+            if current_table_name in referenced_table_names:
+                referenced_table_names.remove(current_table_name)
+            for table_name in referenced_table_names:
+                # strangely it is possible that the tablename was a field name because of SQL code like TRIM(BOTH '" ' FROM
+                try:
+                    table_ref_dict= table_inventory[table_name]
+                except Exception as e:
+                    logger.warning(f"{table_name} is most likely not a known table name")
+                    continue
+                table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
+                dependent_state_form = state_form
+                if table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
+                    table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
+                    _dml_sql_content=""
+                    _ddl_sql_content=""
+                    with open(table_dml_ref, "r") as g:
+                        _dml_sql_content = g.read()
+                    table_ddl_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.ddl_ref)
+                    with open(table_ddl_ref, "r") as g:
+                        _ddl_sql_content = g.read()
+                    dependent_state_form = parser.extract_upgrade_mode(_dml_sql_content, _ddl_sql_content)
+                logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
+                dependencies.add(_build_pipeline_definition(
+                    table_name, 
+                    table_ref.type,
+                    state_form,
+                    table_ref.table_folder_name,
+                    table_ref.dml_ref,
+                    table_ref.ddl_ref,
+                    set(),
+                    set()
+                ))
+        else:
+            logger.warning(f"No referenced table found in {dml_file_name}")
+        return current_table_name, dependencies, state_form
             
     except Exception as e:
-        logger.error(f"Error while processing {sql_file_name} with message: {e} but process continues...")
+        logger.error(f"Error while processing {dml_file_name} or {ddl_file_name} with message: {e} but process continues...")
         return ERROR_TABLE_NAME, set(), None
 
     
 def _process_one_sink_folder(sink_folder_path, pipeline_path, count: int):
     for sql_scripts_path in sink_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
         if sql_scripts_path.is_dir():
+            dml_file_name = ""
+            ddl_file_name = ""
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
+
                 if file_path.is_file() and file_path.name.startswith("dml"):
                     logger.info(f"Process the dml {file_path}")
+                    dml_file_name = str(file_path.resolve())
                     count += 1
-                    build_pipeline_definition_from_dml_content(str(file_path.resolve()), pipeline_path)
+                if file_path.is_file() and file_path.name.startswith("ddl"):
+                    logger.info(f"Process the ddl {file_path}")
+                    ddl_file_name = str(file_path.resolve())
+            build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)
     return count
     
 
@@ -298,7 +318,7 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
         logger.info(f"{current_node}")
         if not current_node.table_name in processed_nodes:
             if not current_node.parents:
-                table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, table_inventory)
+                table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
                 current_node.parents = parent_references   # set of FlinkTablePipelineDefinition
                 current_node.state_form = state_form
             tmp_node= current_node.model_copy(deep=True)

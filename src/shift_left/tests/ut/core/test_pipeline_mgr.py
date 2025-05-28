@@ -3,7 +3,6 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
-import json 
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
     
@@ -40,8 +39,9 @@ class TestPipelineManager(unittest.TestCase):
         print("test_build_a_src_pipelinedef")
         path= os.getenv("PIPELINES")
         pm.delete_all_metada_files(path)
-        src_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
-        result = pm.build_pipeline_definition_from_dml_content(src_table_path, path)
+        dml_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
+        ddl_table_path=path + "/sources/src_table_1/sql-scripts/ddl.src_table_1.sql"
+        result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
         assert result.table_name == "src_table_1"
         assert len(result.parents) == 0
@@ -52,7 +52,7 @@ class TestPipelineManager(unittest.TestCase):
     def test_all_pipeline_def(self):
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
         pm.build_all_pipeline_definitions( os.getenv("PIPELINES"))
-        assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + pm.PIPELINE_JSON_FILE_NAME)
+        assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
 
     def test_visit_parents(self):
         print("test_visit_parents")
@@ -67,8 +67,9 @@ class TestPipelineManager(unittest.TestCase):
         """ Need to run this one first"""
         print("test_1_build_pipeline_def_for_fact_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
-        result = pm.build_pipeline_definition_from_dml_content(table_path, path)
+        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
+        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
+        result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
         assert len(result.children) == 0
         assert len(result.parents) == 2
@@ -87,8 +88,9 @@ class TestPipelineManager(unittest.TestCase):
     def test_build_pipeline_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
-        pm.build_pipeline_definition_from_dml_content(table_path, path)
+        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
+        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
+        pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         result = pm.get_static_pipeline_report_from_table("p1_fct_order", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
@@ -96,8 +98,9 @@ class TestPipelineManager(unittest.TestCase):
     def test_walk_the_hierarchy_for_report_from_intermediate_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
-        table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
-        pm.build_pipeline_definition_from_dml_content(table_path, path)
+        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
+        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
+        pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         result = pm.get_static_pipeline_report_from_table("int_p1_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))

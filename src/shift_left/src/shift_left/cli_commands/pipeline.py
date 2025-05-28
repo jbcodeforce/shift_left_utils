@@ -40,8 +40,8 @@ def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The pat
     if pipeline_path and pipeline_path != os.getenv("PIPELINES"):
         print(f"Using pipeline path {pipeline_path}")
         os.environ["PIPELINES"] = pipeline_path
-
-    pipeline_mgr.build_pipeline_definition_from_dml_content(dml_file_name, pipeline_path)
+    ddl_file_name = dml_file_name.replace("dml.", "ddl.")
+    pipeline_mgr.build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)
     print(f"Pipeline built from {dml_file_name}")
 
 @app.command()
@@ -171,6 +171,7 @@ def deploy(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         execute_plan=True)
+    
     print(f"#### Pipeline deployed ####")
 
 @app.command()
@@ -219,11 +220,11 @@ def report_running_statements(
     """
     Assess for a given table, what are the running dmls from its descendants. When the directory is specified, it will report the running statements from all the tables in the directory.
     """
-    print(f"Assess runnning Flink DML part of the pipeline from given table name")
+    print(f"Assess runnning Flink DMLs")
     try:
         if table_name:
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
-            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name)
+            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name, inventory_path)
         elif dir:
             results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, 
                                                                                            inventory_path)
@@ -262,14 +263,14 @@ def _build_deploy_pipeline(
     try:
         if table_name:
             print(f"Build an execution plan for table {table_name}")
-            summary,_=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
+            summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         execute_plan=execute_plan)
-
+            deployment_mgr.build_simple_report(execution_plan)
             print(f"Execution plan built and persisted for table {table_name}")
         elif product_name:
             print(f"Build an execution plan for product {product_name}")
@@ -292,6 +293,7 @@ def _build_deploy_pipeline(
                                                                     execute_plan=execute_plan)
             
         print(summary)
+        
     except Exception as e:
         print(f"[red]Error: {e}[/red]")
         raise typer.Exit(1)

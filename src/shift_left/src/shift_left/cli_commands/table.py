@@ -182,13 +182,15 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
         # review this
         test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, 
                                             test_results={test_case_name: test_result})
-        print(test_result.model_dump_json(indent=2))
+        print(f"Valdidation test: {test_result.result}")
     else:
         test_suite_result  = test_mgr.execute_all_tests(table_name, compute_pool_id)
-        print(test_suite_result.model_dump_json(indent=2))
-    with open(f"{shift_left_dir}/{table_name}-test-suite-result.json", "w") as f:
+    file_name = f"{shift_left_dir}/{table_name}-test-suite-result.json"
+    with open(file_name, "w") as f:
         f.write(test_suite_result.model_dump_json(indent=2))
+    print(f"Test suite report saved into {file_name}")
     print("#" * 30 + f" Unit tests execution for {table_name} completed")
+
 
 
 @app.command()
@@ -199,8 +201,12 @@ def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the ta
     """
     print("#" * 30 + f" Unit tests deletion for {table_name}")
     if os.path.exists(f"{shift_left_dir}/{table_name}-test-suite-result.json"):
-        with open(f"{shift_left_dir}/{table_name}-test-suite-result.json", "r") as f:
-            test_suite_result = TestSuiteResult.model_validate_json(f.read())
+        try:
+            with open(f"{shift_left_dir}/{table_name}-test-suite-result.json", "r") as f:
+                test_suite_result = TestSuiteResult.model_validate_json(f.read())
+        except Exception as e:
+            # this could happened if file was wrong.
+            test_suite_result = None
     else:
         test_suite_result = None
     test_mgr.delete_test_artifacts(table_name, compute_pool_id, test_suite_result)

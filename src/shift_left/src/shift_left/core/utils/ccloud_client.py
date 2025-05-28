@@ -55,7 +55,7 @@ class ConfluentCloudClient:
             "User-Agent": f"python-shift-left-utils/{version_str}"
         }
         response = None
-        logger.info(f">>> Make request {method} to {url}")
+        logger.info(f">>> Make request {method} to {url} with {data}")
         try:
             response = requests.request(
                 method=method,
@@ -79,8 +79,7 @@ class ConfluentCloudClient:
                     logger.debug(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
                     return result
                 else:
-                    logger.error(f">>>> Response status code: {response.status_code}, Response text: {response.text}")
-                    logger.error(f"The verb: {method} and url was: {url}")
+                    logger.error(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
                     return json.loads(response.text)
             else:
                 raise e

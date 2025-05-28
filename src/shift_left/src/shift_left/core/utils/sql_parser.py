@@ -104,14 +104,15 @@ class SQLparser:
         except Exception as e:
             raise Exception(f"Error reading SQL file: {str(e)}")
         
-    def extract_upgrade_mode(self, sql_content) -> str:
+    def extract_upgrade_mode(self, dml_sql_content, ddl_sql_content) -> str:
         """
-        Extract the upgrade mode from the sql_content by analyzing it line by line.
+        Extract the upgrade mode from the dml sql_content by analyzing it line by line.
         - CROSS JOIN UNNEST and CROSS JOIN LATERAL are considered stateless
         - Other JOINs and stateful operations make the query stateful
+        For DDL content assert the change_log mode.
         """
         # Split into lines and normalize each line
-        lines = sql_content.split('\n')
+        lines = dml_sql_content.split('\n')
         has_stateful_operation = False
         
         for line in lines:
@@ -127,7 +128,15 @@ class SQLparser:
                 if not re.search(r'\bCROSS\s+JOIN\s+(?:UNNEST|LATERAL)\b', normalized_line, re.IGNORECASE):
                     # Check for CROSS JOIN UNNEST or CROSS JOIN LATERAL
                     has_stateful_operation = True
-                
+        if not has_stateful_operation:
+            # Check for DDL content
+            if ddl_sql_content:
+                lines = ddl_sql_content.split('\n')
+                for line in lines:
+                    normalized_line = self._normalize_sql(line)
+                    if 'changelog.mode' in normalized_line.lower() and ('upsert' in normalized_line.lower() or 'retract' in normalized_line.lower()):
+                        return "Stateful"
+                    
         return "Stateful" if has_stateful_operation else "Stateless"
     
     def build_column_metadata_from_sql_content(self, sql_content: str) -> Dict[str, Dict]:

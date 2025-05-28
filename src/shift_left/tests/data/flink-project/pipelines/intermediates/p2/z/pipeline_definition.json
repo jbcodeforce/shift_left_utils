@@ -56,7 +56,7 @@
    ],
    "children": [
       {
-         "table_name": "d",
+         "table_name": "error_table",
          "product_name": "p2",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
@@ -85,6 +85,17 @@
          "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
          "path": "pipelines/intermediates/p2/c",
          "state_form": "Stateless",
+         "parents": [],
+         "children": []
+      },
+      {
+         "table_name": "d",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+         "path": "pipelines/intermediates/p2/d",
+         "state_form": "Stateful",
          "parents": [],
          "children": []
       }

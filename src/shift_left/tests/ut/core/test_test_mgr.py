@@ -28,7 +28,7 @@ from shift_left.core.test_mgr import (
 
 
 class TestTestManager(unittest.TestCase):
-    """Test suite for test manager functionality."""
+    """Unit test suite for test manager functionality."""
     
     @classmethod
     def setUpClass(cls):
@@ -38,19 +38,25 @@ class TestTestManager(unittest.TestCase):
     def setUp(self):
         self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
     
+    # ---- Mock functions to be used in tests to avoid calling remote services ----
     def _mock_table_exists(self, table_name):
+        """
+        Mock the _table_exists(table_name) function to return True if the table name is in the _ddls_executed dictionary
+        """
         print(f"mock_table_exists: {table_name} returns {self._ddls_executed[table_name]}")
         value = self._ddls_executed[table_name]
-        self._ddls_executed[table_name] = True
+        self._ddls_executed[table_name] = True  # mock the table will exist after the tet execution
         return value
 
     def _mock_get_None_statement(self, statement_name):
         print(f"mock_get_statement: {statement_name} returns None")  
         return None
     
-    # --------- begin tests ---------
+    # --------- tests creation and preparation ---------
     def test_create_tests_structure(self):
-        """Test creation of tests structure with templates & test definitions."""
+        """Test creation of tests structure with templates & test definitions.
+        The table e uses c so c will be part of foundations SQL and CSV inputs are created.
+        """
         # Clean up any existing test files
         test_folder = os.path.join(os.getenv("PIPELINES"), "facts/p2/e/tests")
         if os.path.exists(test_folder):
@@ -119,7 +125,7 @@ class TestTestManager(unittest.TestCase):
         assert "('role_id_1', 'role_name_1')" in table_rows["src_p3_roles"]
         
     def test_read_csv_file_to_sql(self):
-        print("test_read_csv_file_to_sql")
+        print("test_read_csv_file_to_sqlc to validate csv content is transformed into SQL insert into.")
         pipeline_folder = os.getenv("PIPELINES")
         fname = pipeline_folder + "/intermediates/p3/user_role/tests/insert_src_p3_tenants_2.csv"
         headers, rows = test_mgr._red_csv_file(fname)
@@ -129,14 +135,13 @@ class TestTestManager(unittest.TestCase):
         assert sql.startswith("insert into src_p3_tenants_ut (id, name, description, created_at) values")
         print(sql)
 
-
     # ---------- test execution -------------
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_run_statment_under_test_happy_path(self, 
+    def test_run_statement_under_test_happy_path(self, 
                                      mock_post_flink_statement, 
                                      mock_get_statement_info,
                                      mock_table_exists,
@@ -152,6 +157,10 @@ class TestTestManager(unittest.TestCase):
                 return Statement(name=statement_name, status={"phase": "RUNNING"})
         
         def _mock_statement_info(statement_name):
+            """
+            Mock the statement_mgr.get_statement_info(statement_name) function to return None
+            to enforce execution of the statement
+            """
             print(f"mock_statement_info: {statement_name}")
             return None
 
@@ -318,7 +327,7 @@ class TestTestManager(unittest.TestCase):
                                 mock_table_exists,
                                 mock_get_statement):
         
-        """Test the execution of one test case."""
+        """Test the execution of one test case for p1_fct_order"""
         def _mock_statement_info(statement_name):
             print(f"mock_statement_info: {statement_name}")
             if statement_name.startswith("dev-p1-ddl-int-table-1"):
@@ -356,7 +365,7 @@ class TestTestManager(unittest.TestCase):
         assert test_result
         self.assertEqual(len(test_result.statements), 3)
         self.assertEqual(len(test_result.foundation_statements), 4)
-        assert test_result.result == "PASS\n"
+        assert test_result.result == "PASS"
         for statement in test_result.statements:
             print(f"statement: {statement.name} {statement.status}")
         print(test_result.model_dump_json(indent=2))
@@ -404,7 +413,7 @@ class TestTestManager(unittest.TestCase):
         table_name = "int_p3_user_role"
         test_case_name = "test_int_p3_user_role_2"
         compute_pool_id = "dev_pool_id"
-        test_suite_def, table_ref, prefix, test_result= test_mgr._init_test_foundation(table_name, 
+        test_suite_def, table_ref, prefix, test_result= test_mgr._init_test_foundations(table_name, 
                                                                                        test_case_name, 
                                                                                        compute_pool_id)
         print(f"test_suite_def: {test_suite_def.test_suite[1]}")
@@ -469,8 +478,8 @@ class TestTestManager(unittest.TestCase):
         assert suite_result
         assert len(suite_result.test_results) == 2
         assert len(suite_result.foundation_statements) == 4
-        assert suite_result.test_results["test_case_1"].result == "PASS\n"
-        assert suite_result.test_results["test_case_2"].result == "FAIL\n"
+        assert suite_result.test_results["test_case_1"].result == "PASS"
+        assert suite_result.test_results["test_case_2"].result == "FAIL"
         print(suite_result.model_dump_json(indent=2))
 
 
