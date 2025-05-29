@@ -2,14 +2,15 @@
 
 ???- info "Version"
     * Created January 2025.
-    * Update: 05/22/2025. 
+    * Update: 05/28/2025. 
 
 This chapter details the standard activities to manage a Confluent Cloud Flink project with the `shift_left` tool when doing a ETL to real-time migration project. The recipes address new project initiative or a migration project from an existing SQL based ETL solution.
 
 As introduced in the [context chapter](./index.md#context) the CLI groups a set of commands to manage project, tables, and Flink statements as part of pipelines.
 
+<figure markdown="span">
 ![](./images/components.drawio.png)
-
+</figure>
 
 The audience for the recipes chapter are the Data Engineers and the SREs.
 
@@ -30,7 +31,9 @@ The major development activity constructs managed by the tools are:
 
 Developers/ Data Engineers are responsible to develop the Flink SQL statements and the validation tests. 
 
+<figure markdown="span">
 ![](./images/dev_comp.drawio.png)
+</figure>
 
 The table folder structure, table inventory and pipeline_definitions are generated and managed by tools. No human edit is needed and even discouraged.
 
@@ -46,13 +49,16 @@ See the following **recipes** to support the management of those elements:
 [Validate running statements](#accessing-running-statements){ .md-button }
 
 [Understand Flink statement dependencies](#understand-the-current-flink-statement-relationship){ .md-button }
-[Deploy a pipeline](){ .md-button }
+[Verify execution plan for each table, product or folder](#assess-a-flink-statement-execution-plan){ .md-button }
+[Deploy a pipeline](#pipeline-deployment){ .md-button }
 
 ### Deployment centric use cases for SREs
 
 For pipeline deployment, there are very important elements that keep the deployment consistent, most of them are described above, but the execution plan is interesting tool to assess, once a pipeline is defined, how it can be deployed depending if SREs deploy from the source, the sink or an intermediate. (See [pipeline managmeent section](pipeline_mgr.md))
 
+<figure markdown="span">
 ![](./images/deployment_comp.drawio.png)
+</figure>
 
 The involved recipes are:
 
@@ -627,17 +633,21 @@ shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml
 shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order/sql-scripts/dml.fct_order.sql $PIPELINES
 ```
 
-The tool goes over the SQL content and get table names from the JOINs, and the FROM. It will remove CTE and any extracted string that are not table names. The regular expression may have some misses, so the tool searches within the table inventory, anyway.
+The tool goes over the SQL content and gets table names from the JOIN, and the FROM predicates. It will remove any CTE and any extracted string that are not table names. The regular expression may have some misses, so the tool searches within the table inventory, anyway.
 
 The following figure illustrates what will happen for each parent of the referenced table. The first figure illustrates existing Flink statement hierarchy, which means, existing tables have a pipeline_definition.json file in their repective folder, created from previous run. 
 
+<figure markdown="span">
 ![](./images/build_pipeline_def_1.drawio.png)
+</figure>
 
-As a developer the sink table **E** is added and the tool is executed. The **E** and **C** pipeline definitions are new so created, while the **Z** already exists, so the tool update its pipeline_definition children list , by adding the child **C**.
+As a developer add the sink table **E**, the tool is re-executed so that the **E** and **C** pipeline definitions are newly created, while the **Z**, which already exists, has its pipeline_definition children list updated, by adding the child **C**.
 
+<figure markdown="span">
 ![](./images/build_pipeline_def_2.drawio.png)
+</figure>
 
-The tool will keep existing file and merge content.
+The tool will keep existing files and merge content.
 
 ???- example "The different pipeline_definition.json impacted"
     The sink table **E** will have a new metadata file:
@@ -766,9 +776,7 @@ shift_left pipeline report fct_table $PIPELINES
 shift_left pipeline report src_table
 ```
 
-The same approach works for intermediate tables.
-
-The tool supports different output:
+The same approach works for intermediate tables. The tool supports different output:
 
 * A very minimalist graph view
 
@@ -792,7 +800,7 @@ shift_left pipeline report fct_table --yaml
 
 ### Assess a Flink Statement execution plan
 
-The execution plan is a hierarchical Flink statement hierarchy enriched with current state of the running DMLs on the platform and with a plan to start non running parents, and update or restart the children depending of the upgrade mode: stateless or stateful.
+The execution plan is a topological sorted Flink statement hierarchy enriched with current state of the running DMLs, with a plan to start non running parents, and update or restart the children depending of the upgrade mode: stateless or stateful.
 
 * Here is a basic command for an intermediate table:
     ```sh
@@ -820,6 +828,7 @@ The execution plan is a hierarchical Flink statement hierarchy enriched with cur
     ```sh
     shift_left pipeline build-execution --product-name p2
     ```
+
 * It may be interesting to get the execution plan for a given layer, like all the facts or intermidiates, so the granulatity is at the direcory level, so it can be product and intermidate:
     ```sh
     shift_left pipeline build-execution --dir $PIPELINES/intermediates/p2
@@ -872,19 +881,49 @@ shift_left pipeline report-running-statements --dir $PIPELINES/facts/p1
 
 There are multiple choices to deploy a Flink Statement:
 
-1. During development phase where `confluent cli` is used with an higher level of abstractions delivered by a Makefile within the table folder.
-1. Use the CLI to do a controlled deployment of a table. The tool uses the pipeline metadata to walk down the pipeline to change each table with a new version.
-1. The CLI has a mode to delete all tables of a pipelines and redeploy each them with a control manner to avoid overloading the Flink JobManager
+1. During the Flink statement development activity, `confluent cli` may be used but `shift_left table init` command created an higher level of abstraction, using a Makefile within the table folder. This makefile directly use the `confluent cli`.
+    ```sh
+    make create_flink_ddl
+    make create_flink_dml
+    make drop_table_<table_name>
+    ```
+
+1. Use the shift_left CLI to do a controlled deployment of a table. The tool uses the pipeline metadata to walk down the static relationship between Flink statements to build an execution plan and then deploy it. Data engineers should run the [`pipeline build-execution-plan`](#assess-a-flink-statement-execution-plan) to assess the deep relationship between statements and understand the state of running Flink jobs.
+
+1. Deploy statements:
+
+    *  Deploy for one table without updating ancestors. It will start ancestors not just started. The deployment will take the full pipeline from the source to sink giving a sink table name.
+    ```sh
+    shift_left pipeline deploy --from-table p1_fct_order
+    ```
+
+    * Deploy for one table and restart its ancestors
+    ```sh
+    shift_left pipeline deploy --from-table p1_fct_order --force-ancestors
+    ```
+    * Deploy one table and its children
+    ```sh
+    shift_left pipeline deploy  --from-table p1_fct_order --may-start-children
+    ```
+    *  Which can be combined to start everything within the scope of a pipeline
+    ```sh
+    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-children
+    ```
+    *  Which can be combined to start everything within the scope of a pipeline, defaulting to the given compute-pool-id if not found:
+    ```sh
+    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-children --compute-pool-id lfcp-2...
+    ```
+    * Deploy a set of tables within the same layer:
+    ```sh
+    pipeline deploy --dir $PIPELINES/sources/p2 --force-ancestors --may-start-children
+    ```
+    * Deploy a set of tables for a given product:
+    ```sh
+    pipeline deploy --product-name p2 --force-ancestors --may-start-children
+    ```
 
 
-The deployment will take the full pipeline from the source to sink giving a sink table name.
 
-
-#### Using the deploy pipeline command
-
-The pipeline management, requirements and approach are details in the [pipeline management chapter.](./pipeline_mgr.md) The following are commands to use for common use cases:
-
-* Deploy a sink table (Fact, Dimension or View)
 
 ## Troubleshooting the CLI
 

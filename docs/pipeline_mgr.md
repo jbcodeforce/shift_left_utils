@@ -1,7 +1,7 @@
 # Pipeline Management
 
 ???- info "Version"
-    Created Mars 21- 2025 - Update 5/22/25
+    Created Mars 21- 2025 - Update 5/28/25
 
 The goals of this chapter is to present the requirements, design, and validation of the pipeline management tools.
 
@@ -13,8 +13,10 @@ Modifying streaming workloads over time, without serious side effects, is challe
 
 The general strategy for [query evolution](https://docs.confluent.io/cloud/current/flink/concepts/schema-statement-evolution.html#query-evolution) is to replace the existing statement and the corresponding tables it maintains with a new statement and new tables. Let take a simple example of a Flink statement joining two tables and with an output table also used by a join within a second statement:
 
-![](./images/stateful_evolution.drawio.png)
-
+<figure markdown="span">
+![1](./images/stateful_evolution.drawio.png)
+<figcaption>Stateful Flink statement evolution</figcaption>
+</figure>
 The streaming processing has processed all blue records and a new version needs to be applied at a time from which new records processed may have an impact.
 
 The typical change to consider are:

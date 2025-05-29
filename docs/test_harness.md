@@ -164,16 +164,23 @@ A test execution may take some time as it performs the following steps:
 1. Deploy the validation SQL for each test case.
 1. Build test report
 
-* Run the complete suite of tests:
+
+To run the complete suite of tests:
   ```sh
   shift_left table  run-test-suite <table_name>
   ```
 
-* Clean the tests artifacts created on Confluent Cloud with the command:
+Clean the tests artifacts created on Confluent Cloud with the command:
   ```sf
   shift_left table delete-tests <table_name>
   ```
 
+## Running with more data
 
+The second test cases created by the `shift_left table init-unit-tests ` command use a csv file to demonstrate how the tool can manage more data. It is possible to extract data from an existing topics, as json or csv content and then persist it as csv file. The tool, as of now, is transforming the rows in the csb file as insert value SQL. 
+
+In the future it could direcly write to a Kafka topics that are the input tables for the dml under test.
+
+Data engineers may use the csv format to create a lot of records. Now the challenge will be to define the validation SQL script, but this is another story.
 
 
