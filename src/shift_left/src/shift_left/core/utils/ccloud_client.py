@@ -55,7 +55,7 @@ class ConfluentCloudClient:
             "User-Agent": f"python-shift-left-utils/{version_str}"
         }
         response = None
-        logger.info(f">>> Make request {method} to {url} with {data}")
+        logger.info(f">>> Make request {method} to {url} with data: {data}")
         try:
             response = requests.request(
                 method=method,
@@ -183,7 +183,7 @@ class ConfluentCloudClient:
                     execution_time = time.perf_counter() - start_time
                     statement.loop_counter= counter
                     statement.execution_time= execution_time
-                    logger.debug(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                    logger.info(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
                     return statement    
         except Exception as e:
             logger.error(f">>>> wait_response() error waiting for response {e}")

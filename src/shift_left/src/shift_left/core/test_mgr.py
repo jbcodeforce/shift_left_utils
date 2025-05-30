@@ -93,23 +93,27 @@ def execute_one_test(
     4. Runs validation SQL to verify results
     5. Polls validation results with retries
     """
+    statement_mgr.reset_statement_list()
     config = get_config()
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
 
     try:
+        print(f"1. Create table foundations for unit tests")
         test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id)
     
         # Parse through test case suite in yaml file, run the test case provided in parameter
         for idx, test_case in enumerate(test_suite_def.test_suite):
             if test_case.name == test_case_name:
                 logger.info(f"Running test case: {test_case.name}")
+                print(f"2. Create input statements for unit test {test_case.name}")
                 statements = _execute_test_inputs(test_case=test_case,
                                                 table_ref=table_ref,
                                                 prefix=prefix+"-ins-"+str(idx + 1),
                                                 compute_pool_id=compute_pool_id)
                 test_result.statements.extend(statements)
+                print(f"3. Run validation SQL statements for unit test {test_case.name}")
                 statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
                                                                 table_ref=table_ref,
                                                                 prefix=prefix+"-val"+"-"+str(idx + 1),
@@ -129,26 +133,37 @@ def execute_all_tests(table_name: str,
     """
     Execute all test cases defined in the test suite definition for a given table.
     """
-    
-    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id)
- 
-    test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
-    for idx, test_case in enumerate(test_suite_def.test_suite):
-        statements = _execute_test_inputs(test_case=test_case,
-                                        table_ref=table_ref,
-                                        prefix=prefix+"-ins-"+str(idx + 1),
-                                        compute_pool_id=compute_pool_id)
-        test_result = TestResult(test_case_name=test_case.name, result="")
-        statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
-                                                            table_ref=table_ref,
-                                                            prefix=prefix+"-val-"+str(idx + 1),
-                                                            compute_pool_id=compute_pool_id)
-        test_result.result = result_text
-        test_result.statements.extend(statements)
-        test_result.validation_result = statement_result
-        test_suite_result.test_results[test_case.name] = test_result
+    statement_mgr.reset_statement_list()
+    config = get_config()
+    if compute_pool_id is None:
+        compute_pool_id = config['flink']['compute_pool_id']
+    prefix = config['kafka']['cluster_type']
+    try:
+        print(f"1. Create table foundations for unit tests")
+        test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id)
+       
+        test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
+        for idx, test_case in enumerate(test_suite_def.test_suite):
+            print(f"2. Create input statements for unit test {test_case.name}")
+            statements = _execute_test_inputs(test_case=test_case,
+                                            table_ref=table_ref,
+                                            prefix=prefix+"-ins-"+str(idx + 1),
+                                            compute_pool_id=compute_pool_id)
+            test_result = TestResult(test_case_name=test_case.name, result="")
+            print(f"3. Run validation SQL statements for unit test {test_case.name}")
+            statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
+                                                                table_ref=table_ref,
+                                                                prefix=prefix+"-val-"+str(idx + 1),
+                                                                compute_pool_id=compute_pool_id)
+            test_result.result = result_text
+            test_result.statements.extend(statements)
+            test_result.validation_result = statement_result
+            test_suite_result.test_results[test_case.name] = test_result
 
-    return test_suite_result
+        return test_suite_result
+    except Exception as e:
+        logger.error(f"Error executing test suite: {e}")
+        raise e
 
 def delete_test_artifacts(table_name: str, 
                           compute_pool_id: Optional[str] = None, 
@@ -156,32 +171,36 @@ def delete_test_artifacts(table_name: str,
     """
     Delete the test artifacts for a given table.
     """
-    if test_suite_result is None:
-        config = get_config()
-        test_suite_def, table_ref = _load_test_suite_definition(table_name)
-        prefix = config['kafka']['cluster_type']
-        for idx, test_case in enumerate(test_suite_def.test_suite):
-            logger.info(f"Deleting test artifacts for {test_case.name}")
-            for output in test_case.outputs:
-                statement_name = _build_statement_name(output.table_name, prefix+"-val-"+str(idx + 1))
-                statement_mgr.delete_statement_if_exists(statement_name)
-            for input in test_case.inputs:
-                statement_name = _build_statement_name(input.table_name, prefix+"-ins-"+str(idx + 1))
-                statement_mgr.delete_statement_if_exists(statement_name)
-        logger.info(f"Deleting ddl and dml artifacts for {table_name}")
-        statement_name = _build_statement_name(table_name, prefix+"-dml")
-        statement_mgr.delete_statement_if_exists(statement_name)
-        statement_name = _build_statement_name(table_name, prefix+"-ddl")
-        statement_mgr.delete_statement_if_exists(statement_name)
-        statement_mgr.drop_table(table_name+"_ut")
-        for foundation in test_suite_def.foundations:
-            logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}")
-            statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl")
+    config = get_config()
+    if compute_pool_id is None:
+        compute_pool_id = config['flink']['compute_pool_id']
+    statement_mgr.get_statement_list()
+
+    config = get_config()
+    test_suite_def, table_ref = _load_test_suite_definition(table_name)
+    prefix = config['kafka']['cluster_type']
+    for idx, test_case in enumerate(test_suite_def.test_suite):
+        logger.info(f"Deleting test artifacts for {test_case.name}")
+        print(f"Deleting test artifacts for {test_case.name}")
+        for output in test_case.outputs:
+            statement_name = _build_statement_name(output.table_name, prefix+"-val-"+str(idx + 1))
             statement_mgr.delete_statement_if_exists(statement_name)
-            statement_mgr.drop_table(foundation.table_name+"_ut")
-        logger.info(f"Test artifacts for {table_name} deleted")
-    else:
-        print(f"Deleting test artifacts for {table_name} using persisted test suite result")
+        for input in test_case.inputs:
+            statement_name = _build_statement_name(input.table_name, prefix+"-ins-"+str(idx + 1))
+            statement_mgr.delete_statement_if_exists(statement_name)
+    logger.info(f"Deleting ddl and dml artifacts for {table_name}")
+    statement_name = _build_statement_name(table_name, prefix+"-dml")
+    statement_mgr.delete_statement_if_exists(statement_name)
+    statement_name = _build_statement_name(table_name, prefix+"-ddl")
+    statement_mgr.delete_statement_if_exists(statement_name)
+    statement_mgr.drop_table(table_name+"_ut", compute_pool_id)
+    for foundation in test_suite_def.foundations:
+        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}")
+        statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl")
+        statement_mgr.delete_statement_if_exists(statement_name)
+        statement_mgr.drop_table(foundation.table_name+"_ut", compute_pool_id)
+    logger.info(f"Test artifacts for {table_name} deleted")
+
 
 
 # ----------- Private APIs  ------------------------------------------------------------
@@ -275,6 +294,7 @@ def _execute_foundation_statements(
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
+        print(f"Execute DDL for {foundation.table_name} from {testfile_path}")
         statement = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
@@ -357,6 +377,8 @@ def _execute_test_inputs(test_case: SLTestCase,
     logger.info(f"Run insert statements for: {test_case.name}")
     statements = []
     for input_step in test_case.inputs:
+        statement = None
+        print(f"Execute test input for {input_step.table_name}")
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             statement = _load_sql_and_execute_statement(table_name=input_step.table_name,
@@ -368,21 +390,27 @@ def _execute_test_inputs(test_case: SLTestCase,
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             sql_path = from_pipeline_to_absolute(sql_path)
             headers, rows = _red_csv_file(sql_path)
-            sql = _transform_csv_to_sql(input_step.table_name, headers, rows)
+            sql = _transform_csv_to_sql(input_step.table_name+"_ut", headers, rows)
+            print(f"Execute test input {sql}")
             statement_name = _build_statement_name(input_step.table_name, prefix)
+            
             statement = _execute_flink_test_statement(sql_content=sql, 
                                                       statement_name=statement_name,
                                                       product_name=table_ref.product_name,
                                                       compute_pool_id=compute_pool_id)
-        if statement:
+        if statement and isinstance(statement, Statement) and statement.status:
+            print(f"Executed test input {statement.status}")
             statements.append(statement)
+        else:
+            logger.error(f"Error executing test input for {input_step.table_name}")
+            raise ValueError(f"Error executing test input for {input_step.table_name}")
     return statements
 
 def _execute_test_validation(test_case: SLTestCase, 
                           table_ref: FlinkTableReference, 
                           prefix: str = 'dev', 
                           compute_pool_id: Optional[str] = None
-) -> Tuple[List[Statement], str]:
+) -> Tuple[List[Statement], str, StatementResult]:
     statements = []
     result_text = ""
     for output_step in test_case.outputs:
@@ -396,11 +424,11 @@ def _execute_test_validation(test_case: SLTestCase,
                                     fct=lambda x: x)
         if statement:
             statements.append(statement)
-        result, statement_result=_poll_response(statement)
+        result, statement_result=_poll_response(statement_name)
         result_text+=result
     return statements,result_text, statement_result
     
-def _poll_response(statement: Statement) -> str:
+def _poll_response(statement_name: str) -> Tuple[str, StatementResult]:
     #Get result from the validation query
     resp = None
     max_retries = 10
@@ -408,7 +436,7 @@ def _poll_response(statement: Statement) -> str:
 
     for poll in range(1, max_retries):
         try:
-            resp = statement_mgr.get_statement_results(statement.name)
+            resp = statement_mgr.get_statement_results(statement_name)
             # Check if results and data are non-empty
             if resp and resp.results and resp.results.data:
                 logger.info(f"Received results on poll {poll}")
@@ -416,9 +444,11 @@ def _poll_response(statement: Statement) -> str:
                 break
             elif resp:
                 logger.info(f"Attempt {poll}: Empty results, retrying in {retry_delay}s...")
+                print(f"... wait for result to {statement_name}")
                 time.sleep(retry_delay)
         except Exception as e:
             logger.info(f"Attempt {poll} failed with error: {e}")
+            print(f"Attempt {poll} failed with error: {e}")
             #time.sleep(retry_delay)
             break
 
@@ -426,7 +456,8 @@ def _poll_response(statement: Statement) -> str:
     final_row= 'FAIL'
     if resp and resp.results and resp.results.data:
         final_row = resp.results.data[0].row[0]
-        logger.info(f"Final Result : {final_row}")
+    logger.info(f"Final Result for {statement_name}: {final_row}")
+    print(f"Final Result for {statement_name}: {final_row}")
     return final_row, resp
 
 def _add_test_files(table_ref: FlinkTableReference, 
@@ -463,7 +494,7 @@ def _add_test_files(table_ref: FlinkTableReference,
                 logger.info(f"Input file {input_file} created")
             if input_data.file_type == "csv":
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
-                columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
+                columns_names, rows = _build_data_sample(table_struct[input_data.table_name], 5)
                 rows=rows[:-2].replace("),", "").replace("(", "").replace(")", "")
                 with open(input_file, "w") as f:
                     f.write(columns_names+"\n")
@@ -537,7 +568,7 @@ def _process_foundation_ddl_from_test_definitions(test_definition: SLTestDefinit
             f.write(ddl_sql_content)
     return table_struct
 
-def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
+def _build_data_sample(columns: Dict[str, str], idx_offset: int = 0) -> Tuple[str, str]:
     """
     Returns a string of all columns names separated by ',' so it can be used
     in the insert statement and a string of 5 rows of data sample.
@@ -547,13 +578,13 @@ def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
         columns_names += f"`{column}`, "
     columns_names = columns_names[:-2]
     rows = ""
-    for values in range(1,6):
+    for idx in range(1+idx_offset,6+idx_offset):
         rows += "("
         for column in columns:
             if columns[column]['type'] == "BIGINT":
                 rows += f"0, "
             else:
-                rows += f"'{column}_{values}', "
+                rows += f"'{column}_{idx}', "
         rows = rows[:-2]+ '),\n'
     rows = rows[:-2]+ ';\n'
     return columns_names, rows

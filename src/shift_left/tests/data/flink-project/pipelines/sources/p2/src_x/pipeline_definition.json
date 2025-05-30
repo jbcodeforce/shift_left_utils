@@ -9,17 +9,6 @@
    "parents": [],
    "children": [
       {
-         "table_name": "error_table",
-         "product_name": "p2",
-         "type": "intermediate",
-         "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
-         "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
-         "path": "pipelines/intermediates/p2/x",
-         "state_form": "Stateful",
-         "parents": [],
-         "children": []
-      },
-      {
          "table_name": "a",
          "product_name": "p2",
          "type": "intermediate",

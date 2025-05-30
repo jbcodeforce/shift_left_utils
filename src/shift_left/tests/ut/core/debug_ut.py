@@ -3,10 +3,11 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
-os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+import datetime
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
+#os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
+#os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
         
 from shift_left.core.utils.app_config import get_config, shift_left_dir
 from shift_left.core.models.flink_statement_model import ( 
@@ -14,18 +15,24 @@ from shift_left.core.models.flink_statement_model import (
     StatementInfo, 
     StatementListCache, 
     Spec, 
+    Metadata,
     Status,
     FlinkStatementNode
 )
-import  shift_left.core.pipeline_mgr as pipeline_mgr
-
-import shift_left.core.deployment_mgr as deployment_mgr
+from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
+import shift_left.core.pipeline_mgr as pipeline_mgr
+from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
+import shift_left.core.deployment_mgr as dm
 import shift_left.core.test_mgr as test_mgr
 import shift_left.core.table_mgr as table_mgr
 from shift_left.core.utils.file_search import build_inventory
-import json
+
 class TestDebugUnitTests(unittest.TestCase):
         
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Set up test environment before running tests."""
+        cls.inventory_path = os.getenv("PIPELINES")
 
     def _test_explain_table(self):
         result = """== Physical Plan ==\n\nStreamSink [20]\n  +- StreamUnion [19]\n    +- StreamUnion [17]\n    :  +- StreamUnion [15]\n    :  :  +- StreamCalc [13]\n    :  :  :  +- StreamJoin [12]\n    :  :  :    +- StreamExchange [5]\n    :  :  :    :  +- StreamChangelogNormalize [4]\n    :  :  :    :    +- StreamExchange [3]\n    :  :  :    :      +- StreamCalc [2]\n    :  :  :    :        +- StreamTableSourceScan [1]\n    :  :  :    +- StreamExchange [11]\n    :  :  :      +- StreamCalc [10]\n    :  :  :        +- StreamChangelogNormalize [9]\n    :  :  :          +- StreamExchange [8]\n    :  :  :            +- StreamCalc [7]\n    :  :  :              +- StreamTableSourceScan [6]\n    :  :  +- StreamCalc [14]\n    :  :    +- (reused) [9]\n    :  +- StreamCalc [16]\n    :    +- (reused) [9]\n    +- StreamCalc [18]\n      +- (reused) [9]\n\n== Physical Details ==\n\n[1] StreamTableSourceScan\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`src_identity_metadata`\nPrimary key: (id,tenant_id)\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\nState size: low\nStartup mode: earliest-offset\n\n[2] StreamCalc\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\n\n[3] StreamExchange\nChangelog mode: upsert\nUpsert key: (id,tenant_id)\n\n[4] StreamChangelogNormalize\nChangelog mode: retract\nUpsert key: (id,tenant_id)\nState size: medium\nState TTL: never\n\n[5] StreamExchange\nChangelog mode: retract\nUpsert key: (id,tenant_id)\n\n[6] StreamTableSourceScan\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`stage_tenant_dimension`\nPrimary key: (tenant_id)\nChangelog mode: upsert\nUpsert key: (tenant_id)\nState size: low\nStartup mode: earliest-offset\n\n[7] StreamCalc\nChangelog mode: upsert\nUpsert key: (tenant_id)\n\n[8] StreamExchange\nChangelog mode: upsert\nUpsert key: (tenant_id)\n\n[9] StreamChangelogNormalize\nChangelog mode: retract\nUpsert key: (tenant_id)\nState size: medium\nState TTL: never\n\n[10] StreamCalc\nChangelog mode: retract\n\n[11] StreamExchange\nChangelog mode: retract\n\n[12] StreamJoin\nChangelog mode: retract\nState size: medium\nState TTL: never\n\n[13] StreamCalc\nChangelog mode: retract\n\n[14] StreamCalc\nChangelog mode: retract\n\n[15] StreamUnion\nChangelog mode: retract\n\n[16] StreamCalc\nChangelog mode: retract\n\n[17] StreamUnion\nChangelog mode: retract\n\n[18] StreamCalc\nChangelog mode: retract\n\n[19] StreamUnion\nChangelog mode: retract\n\n[20] StreamSink\nTable: `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`aqem_dim_role`\nPrimary key: (sid)\nChangelog mode: upsert\nState size: high\nState TTL: never\n\n== Warnings ==\n\n1. For StreamSink [20]: The primary key does not match the upsert key derived from the query. If the primary key and upsert key don't match, the system needs to add a state-intensive operation for correction. Please revisit the query (upsert key: null) or the table declaration for `stage-flink-us-west-2-b`.`stage-flink-us-west-2-b`.`aqem_dim_role` (primary key: [sid]). For more information, see https://cnfl.io/primary_vs_upsert_key.\n2. Entire statement: Your query includes one or more highly state-intensive operators but does not set a time-to-live (TTL) value, which means that the system potentially needs to store an infinite amount of state. This can result in a DEGRADED statement and higher CFU consumption. If possible, change your query to use a different operator, or set a time-to-live (TTL) value. For more information, see https://cnfl.io/high_state_intensive_operators.\n'"""
@@ -46,39 +53,101 @@ class TestDebugUnitTests(unittest.TestCase):
                         explain_reports.append(json.load(f))
                     print(f"--> {table_mgr._summarize_trace(explain_reports[-1]['trace'])}")
     
-    def test_build_ancestor_sorted_graph(self):
-        node_map = {}
-        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
-        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
-        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
-        node_map["src_a"] = FlinkStatementNode(table_name="src_a")
-        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
-        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
-        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
-        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
-        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
-        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
-        node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
-        node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
-   
-        node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
-        node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
+    TEST_COMPUTE_POOL_ID_1 = "lfcp-121"
+    def _create_mock_get_statement_info(
+        self, 
+        name: str = "statement_name",
+        status_phase: str = "UNKNOWN",
+        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
+    ) -> StatementInfo:
+        """Mock the call to get statement info"""
+        return StatementInfo(
+            name=name,
+            status_phase=status_phase,
+            compute_pool_id=compute_pool_id
+        )
+    
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
+        """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
+        node.compute_pool_id = compute_pool_id
+        node.compute_pool_name = "test-pool"
+        return node
+    
+    def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
+        """Create a mock ComputePoolList object."""
+        pool_1 = ComputePoolInfo(
+            id=self.TEST_COMPUTE_POOL_ID_1,
+            name="test-pool-1",
+            env_id=env_id,
+            max_cfu=100,
+            current_cfu=50
+        )
+        return ComputePoolList(pools=[pool_1])
+    
+    @patch('shift_left.core.deployment_mgr.statement_mgr.build_and_deploy_flink_statement_from_sql_content')    
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    def test_deploy_pipeline_from_table(self, 
+                                        mock_assign_compute_pool_id, 
+                                        mock_get_status, 
+                                        mock_get_compute_pool_list,
+                                        mock_delete,
+                                        mock_drop,
+                                        mock_build_and_deploy_flink_statement_from_sql_content):
+        def _mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x"]:  
+                print(f"mock_ get statement info: {statement_name} -> RUNNING")
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+            else:
+                print(f"mock_ get statement info: {statement_name} -> UNKNOWN")
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN")
+ 
+        def _drop_table(table_name: str, compute_pool_id: str) -> str:
+            print(f"drop_table {table_name} {compute_pool_id}")
+            return "deleted"
 
-        table_list = ['x','y','z','a','b']
-        merged_nodes = {}
-        merged_dependencies = []
-        for node in table_list:
-            nodes, dependencies = deployment_mgr._get_ancestor_subgraph(node_map[node], node_map)
-            print(len(nodes) , len(dependencies))
-            merged_nodes.update(nodes)
-            for dep in dependencies:
-                merged_dependencies.append(dep)
-        print(len(merged_nodes))
-        print(len(merged_dependencies))
-        sorted_nodes = deployment_mgr._topological_sort(merged_nodes, merged_dependencies)
-        for node in sorted_nodes:
-            print(f"{node.table_name}")
-        
+        def _build_statement(node: FlinkStatementNode, flname: str, statement_name: str) -> str:
+            print(f"build_statement {statement_name}")
+            metadata = Metadata(created_at=str(datetime.datetime.now()), uid="test-uid")
+            spec = Spec(compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+                        principal="test-principal",
+                        properties={'sql.current-catalog': 'j9r-catalog', 'sql.current-database': 'j9r-database'},
+                        statement=node.sql_content,
+                        execution_time=5,
+                        stopped=False)
+            if "ddl" in statement_name:
+                status = Status(phase="COMPLETED", detail="")
+            else:
+                status = Status(phase="RUNNING", detail="")
+            return Statement(name=statement_name, 
+                             status=status, 
+                             spec=spec, 
+                             metadata=metadata,
+                             organization_id="org_test",
+                             environment_id="env_test")
+
+        mock_get_status.side_effect = _mock_statement
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_delete.return_value = "deleted"
+        mock_drop.side_effect = _drop_table
+        mock_build_and_deploy_flink_statement_from_sql_content.side_effect = _build_statement
+
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
+                                       inventory_path=self.inventory_path, 
+                                       compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+                                       dml_only=False, 
+                                       execute_plan=True,
+                                       may_start_descendants=False,
+                                       force_ancestors=False)
+        print(f"summary: {summary}")
+        print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+    
+
+
        
 
 if __name__ == '__main__':

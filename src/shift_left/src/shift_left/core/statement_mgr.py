@@ -146,10 +146,10 @@ def delete_statement_if_exists(statement_name) -> str | None:
         logger.info(f"{statement_name} not found in cache")
         config = get_config()
         client = ConfluentCloudClient(config)
-        # 05/27 the following call is not really needed as there is most likely no creationg of the same statement outside of the tool.
+        # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
         #  so return None
-        # return client.delete_flink_statement(statement_name)
-        return None
+        return client.delete_flink_statement(statement_name)
+        #return None
 
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """

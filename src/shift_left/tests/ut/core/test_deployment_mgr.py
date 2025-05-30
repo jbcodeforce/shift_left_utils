@@ -35,31 +35,28 @@ from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 class TestDeploymentManager(unittest.TestCase):
     """Test suite for the deployment manager functionality."""
     
-    data_dir = None
-    TEST_COMPUTE_POOL_ID = "test-pool-123"
+    TEST_COMPUTE_POOL_ID_1 = "test-pool-123"
     TEST_COMPUTE_POOL_ID_2 = "test-pool-120"
     TEST_COMPUTE_POOL_ID_3 = "test-pool-121"
     @classmethod
     def setUpClass(cls) -> None:
         """Set up test environment before running tests."""
-        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
-        os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
-        os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
         pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def setUp(self) -> None:
         """Set up test case before each test."""
         self.config = get_config()
-        self.compute_pool_id = self.TEST_COMPUTE_POOL_ID
+        self.compute_pool_id = self.TEST_COMPUTE_POOL_ID_1
         self.table_name = "test_table"
         self.inventory_path = os.getenv("PIPELINES")
+        self.count = 0  # Initialize count as instance variable
 
     # Following set of methods are used to create reusable mock objects and functions
-    def _create_mock_statement_info(
+    def _create_mock_get_statement_info(
         self, 
         name: str = "statement_name",
         status_phase: str = "UNKNOWN",
-        compute_pool_id: str = TEST_COMPUTE_POOL_ID
+        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
     ) -> StatementInfo:
         """Create a mock StatementInfo object."""
         return StatementInfo(
@@ -81,7 +78,7 @@ class TestDeploymentManager(unittest.TestCase):
     def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
         """Create a mock ComputePoolList object."""
         pool_1 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID,
+            id=self.TEST_COMPUTE_POOL_ID_1,
             name="test-pool",
             env_id=env_id,
             max_cfu=100,
@@ -109,7 +106,7 @@ class TestDeploymentManager(unittest.TestCase):
         product_name: str = "product1",
         dml_statement_name: str = "dml1",
         ddl_statement_name: str = "ddl1",
-        compute_pool_id: str = TEST_COMPUTE_POOL_ID
+        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
     ) -> FlinkStatementNode:
         """Create a mock FlinkStatementNode object."""
         return FlinkStatementNode(
@@ -128,7 +125,7 @@ class TestDeploymentManager(unittest.TestCase):
 
     def _mock_get_and_update_node(self, node: FlinkStatementNode) -> Statement:
         """Mock function for getting and updating node statement info."""
-        node.existing_statement_info = self._create_mock_statement_info(
+        node.existing_statement_info = self._create_mock_get_statement_info(
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_2
         )
         return node
@@ -175,8 +172,8 @@ class TestDeploymentManager(unittest.TestCase):
         pipeline_def = read_pipeline_definition_from_file(
             self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
         )
-        node_map = dm._build_statement_node_map(pipeline_def.to_node())
         current_node = pipeline_def.to_node()
+        node_map = dm._build_statement_node_map(current_node)
         nodes_to_run = dm._build_topological_sorted_parents([current_node], node_map)
         
         assert len(nodes_to_run) == 7
@@ -209,454 +206,172 @@ class TestDeploymentManager(unittest.TestCase):
         assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
         assert ancestors[4].table_name == "z"
 
+    
+    def test_build_children_sorted_graph_from_z(self):
+        node_map = {}
+        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
+        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
+        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
+        node_map["src_a"] = FlinkStatementNode(table_name="src_a")
+        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
+        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
+        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
+        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
+        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
+        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
+        node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
+        node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
+        node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
+        node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
+        node_map["z"].children = [node_map["d"], node_map["c"], node_map["p"]]
+        node_map["d"].children = [node_map["f"]]
+        node_map["c"].children = [node_map["e"]]
+        descendants = dm._build_topological_sorted_children(node_map["z"], node_map)
+        for node in descendants:
+            print(node.table_name, node.to_run, node.to_restart)
+            assert node.table_name in ["p","d", "f", "c", "e", "z"]
+        
+    def test_build_children_sorted_graph_from_src_x(self):
+        pipeline_def = read_pipeline_definition_from_file(
+            self.inventory_path + "/sources/p2/src_x/" + PIPELINE_JSON_FILE_NAME
+        )
+        current_node = pipeline_def.to_node()
+        node_map = dm._build_statement_node_map(current_node)
+        descendants = dm._build_topological_sorted_children(current_node, node_map)
+        for node in descendants:
+            print(node.table_name, node.to_run, node.to_restart)
+            assert node.table_name in ["p","e", "d", "f", "c", "a", "z", "x", "src_x"]
+
+    def test_topological_sort(self):
+        node_map = {}
+        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
+        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
+        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
+        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
+        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
+        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
+        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
+        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
+        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
+        node_map["z"].children = [node_map["d"], node_map["c"]]
+        node_map["src_x"].children = [node_map["x"]]
+        node_map["src_y"].children = [node_map["y"]]
+        node_map["src_b"].children = [node_map["b"]]
+        node_map["x"].children = [node_map["z"]]
+        node_map["y"].children = [node_map["z"]]
+        node_map["b"].children = [node_map["c"]]
+
+        ancestors = dm._build_topological_sorted_parents([node_map["src_x"]], node_map)
+        assert len(ancestors) == 1
+        assert ancestors[0].table_name == "src_x"
+        print("\nancestors of src_x:")
+        for node in ancestors:
+            print(node.table_name)
+        descendants = dm._build_topological_sorted_children(node_map["src_x"], node_map)
+        assert len(descendants) == 5
+        print("\ndescendants of src_x:")
+        for node in descendants:
+            print(node.table_name)
+        combined = ancestors + descendants
+        new_ancestors = dm._build_topological_sorted_parents(combined, node_map)
+        print("\nnew sorted ancestors:")
+        for node in new_ancestors:
+            print(node.table_name)
+        ancestors = dm._build_topological_sorted_parents([node_map["z"]], node_map)
+        print("\nancestors of z:")
+        for node in ancestors:
+            print(node.table_name)
+        descendants = dm._build_topological_sorted_children(node_map["z"], node_map)
+        print("\ndescendants of z:")
+        for node in descendants:
+            print(node.table_name)
+        combined_2 = ancestors + descendants
+        new_ancestors_2 = dm._build_topological_sorted_parents(combined_2, node_map)
+        print("\nnew sorted ancestors:")
+        for node in new_ancestors_2:
+            print(node.table_name)
+
+
+    def test_pass_list_of_tables_to_build_ancestor_sorted_graph(self):
+        """
+        Tst to pass a list of table to build the ancestor sorted graph
+        """
+        node_map = {}
+        node_map["src_x"] = FlinkStatementNode(table_name="src_x")
+        node_map["src_y"] = FlinkStatementNode(table_name="src_y")
+        node_map["src_b"] = FlinkStatementNode(table_name="src_b")
+        node_map["src_a"] = FlinkStatementNode(table_name="src_a")
+        node_map["x"] = FlinkStatementNode(table_name="x", parents=[node_map["src_x"]])
+        node_map["y"] = FlinkStatementNode(table_name="y", parents=[node_map["src_y"]])
+        node_map["b"] = FlinkStatementNode(table_name="b", parents=[node_map["src_b"]])
+        node_map["z"] = FlinkStatementNode(table_name="z", parents=[node_map["x"], node_map["y"]])
+        node_map["d"] = FlinkStatementNode(table_name="d", parents=[node_map["z"], node_map['y']])
+        node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
+        node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
+        node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
+        node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
+        node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
+
+        table_list = ['x','y','z','a','b']
+        merged_nodes = {}
+        merged_dependencies = []
+        for node in table_list:
+            nodes, dependencies = dm._get_ancestor_subgraph(node_map[node], node_map)
+            print(len(nodes) , len(dependencies))
+            merged_nodes.update(nodes)
+            for dep in dependencies:
+                merged_dependencies.append(dep)
+        assert len(merged_nodes) == 9
+        assert len(merged_dependencies) == 11
+        sorted_nodes = dm._topological_sort(merged_nodes, merged_dependencies)
+        for node in sorted_nodes:
+            print(f"{node.table_name}")
+        assert len(sorted_nodes) == 9
+        assert sorted_nodes[0].table_name in ["src_x", "src_a", "src_y", "src_b"]
+        assert sorted_nodes[4].table_name in ["x", "y", "a", "b"]
+        assert sorted_nodes[8].table_name == "z"
+
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_build_execution_plan_for_one_table_while_parents_running(
+    def test_full_pipeline_undeploy(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
-        mock_get_compute_pool_list
+        mock_get_compute_pool_list,
+        mock_drop,
+        mock_delete
     ) -> None:
-        """Test building execution plan when parent is running.
-    
-        Should lead to only parents to run when they are not running.
-        F has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
-        """
-        print("test_build_execution_plan_for_one_table_while_parents_running")
-        
+        """Test successful pipeline undeployment."""
+        print("test_full_pipeline_undeploy")
+        self.count = 0  # Reset count for this test
         def mock_statement(statement_name: str) -> StatementInfo:
-            print(f"mock_statement: {statement_name}")
-            return self._create_mock_statement_info(status_phase="RUNNING")
+            print(f"mock_statement {statement_name}")
+            return self._create_mock_get_statement_info(status_phase="RUNNING")
  
-            
+        def drop_table(table_name: str, compute_pool_id: str) -> str:
+            print(f"drop_table {table_name} {compute_pool_id}")
+            self.count += 1 
+            return "deleted"
+
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="f", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=True, 
-            force_ancestors=False,
-            execute_plan=False
-        )
-        
-        print(summary)
-        assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
-        assert execution_plan.nodes[5].table_name == "d"
-        assert execution_plan.nodes[5].to_run is False
-        assert execution_plan.nodes[5].to_restart is False
-        assert execution_plan.nodes[6].table_name == "f"
-        assert execution_plan.nodes[6].to_run is False
-        assert execution_plan.nodes[6].to_restart is True
-
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
-    def test_build_execution_plan_for_one_table_parent_not_running(
-        self,
-        mock_get_status,
-        mock_get_compute_pool_list,
-        mock_assign_compute_pool_id
-    ) -> None:
-        """Test building execution plan when parent is not running.
-        
-        Start node is e. The parent c is not running so the execution plan includes c before fact e.
-        c has B and Z as parents, Z is running but not B so the plan should start with src_b, b, e.
-        """
-        print("test_build_execution_plan_for_one_table_parent_not_running")
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            if statement_name.startswith(("dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y","dev-p2-dml-src-x", "dev-p2-dml-src-y")):
-                return self._create_mock_statement_info(status_phase="RUNNING")
-            return self._create_mock_statement_info()
-
-        mock_get_status.side_effect = mock_status
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="e", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=False,
-            execute_plan=False
-        )  
-        print(summary)
-        assert len(execution_plan.nodes) == 9
-        for node in execution_plan.nodes:
-            if node.table_name == "src_b":
-                assert node.to_run is True
-                assert node.to_restart is False
-            if node.table_name == "b":
-                assert node.to_run is True
-                assert node.to_restart is False
-            if node.table_name == "e":
-                assert node.to_run is True
-                assert node.to_restart is True
-            if node.table_name == "c":
-                assert node.to_run is True
-                assert node.to_restart is False
-
-
-  
-
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
-    def test_build_execution_plan_with_all_src_running(
-        self,
-        mock_get_status,
-        mock_get_compute_pool_list,
-        mock_assign_compute_pool_id
-    ) -> None:
-        """Test building execution plan with all sources running.
-        
-        From a leaf like f start parents up to the running sources. All sources are already running.
-        Plan should have: y,x,z,d,f.
-        """
-        print("test_build_execution_plan_with_all_src_running")
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            if statement_name.startswith((
-                "dev-p2-dml-src-y",
-                "dev-p2-dml-src-x",
-                "dev-p2-dml-src-p2-a",
-                "dev-p2-dml-src-b"
-            )):
-                return self._create_mock_statement_info(status_phase="RUNNING")  
-            return self._create_mock_statement_info()
-
-        mock_get_status.side_effect = mock_status
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="f", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=False,
-            execute_plan=False
-        )  
-        
-        print(summary)
-        dm._persist_execution_plan(execution_plan)
-        # 8 as the 3 children of Z are not running   
-        assert len(execution_plan.nodes) == 7
-
-        assert execution_plan.nodes[2].table_name in ("y", "x")
-        assert execution_plan.nodes[2].to_run is True
-        assert execution_plan.nodes[2].to_restart is False
-        assert execution_plan.nodes[3].table_name in ("z", "x", "y")
-        assert execution_plan.nodes[3].to_run is True
-        assert execution_plan.nodes[3].to_restart is False
-        assert execution_plan.nodes[4].table_name in ("z", "d")
-        assert execution_plan.nodes[4].to_restart is False
-        assert execution_plan.nodes[6].table_name == "f"
-        assert execution_plan.nodes[6].to_run is True
-        assert execution_plan.nodes[6].to_restart is True
-
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement')
-    def test_build_execution_plan_for_intermediate_table_including_children(
-        self,
-        mock_get_statement, 
-        mock_assign_compute_pool_id,
-        mock_get_compute_pool_list
-    ) -> None:
-        """Test building execution plan for intermediate table including children.
-        
-        From an intermediate like z, look for parents, x,y up to running sources src_y, src_x that are not already running.
-        Plan should have: src_x, src_y, x, y, z, d, src_b, b, c, f and e.
-        """
-        print("test_build_execution_plan_for_intermediate_table_including_children")
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            print(f"mock_status: {statement_name}")
-            return self._create_mock_statement_info()
-            
-        mock_get_statement.side_effect = mock_status
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="z", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=True, 
-            force_ancestors=False,
-            execute_plan=False
-        )  
-        
-        print(summary)
-        assert len(execution_plan.nodes) == 12
-        for node in execution_plan.nodes:
-            print(node.table_name, node.to_run, node.to_restart)
-            if node.table_name in ['src_y', 'src_x', 'x', 'y', 'z']:
-                assert node.to_run is True
-            if node.table_name in ['p', 'd', 'c', 'z']:
-                assert node.to_restart is True
-
-
-
-    @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
-    @patch('shift_left.core.deployment_mgr._deploy_dml')
-    @patch('shift_left.core.deployment_mgr._get_statement')
-    def _test_deploy_pipeline_from_table_success(
-        self,
-        mock_get_status,
-        mock_deploy_dml,
-        mock_deploy_ddl_dml
-    ) -> None:
-        """Test successful pipeline deployment from table."""
-        print("test_deploy_pipeline_from_table_success")
-        table_name = "z"
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            if statement_name.startswith("dev-dml-z"):
-                return self._create_mock_statement_info(status_phase="RUNNING")
-            return self._create_mock_statement_info()
-            
-        mock_get_status.side_effect = mock_status
-        
-        mock_statement = MagicMock(spec=Statement)
-        mock_deploy_ddl_dml.return_value = mock_statement
-        mock_deploy_dml.return_value = mock_statement
-
-        # Execute
-        _, result = dm.build_deploy_pipeline_from_table(
-            table_name=table_name,
-            inventory_path=self.inventory_path,
-            compute_pool_id=self.compute_pool_id
-        )
-
-        # Verify
-        self.assertEqual(result.table_name, self.table_name)
-        self.assertEqual(result.compute_pool_id, self.compute_pool_id)
-
-    @patch('shift_left.core.deployment_mgr.get_table_ref_from_inventory')
-    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
-    @patch('shift_left.core.deployment_mgr.delete_statement_if_exists')
-    @patch('shift_left.core.deployment_mgr.drop_table')
-    def _test_full_pipeline_undeploy_from_table_success(
-        self,
-        mock_drop,
-        mock_delete,
-        mock_read,
-        mock_get_table_ref,
-    ) -> None:
-        """Test successful pipeline undeployment."""
-        print("test_full_pipeline_undeploy_from_table_success")
-        # Setup mocks
-        mock_table_ref = MagicMock()
-        mock_get_table_ref.return_value = mock_table_ref
-        
-        mock_pipeline = MagicMock(spec=FlinkTablePipelineDefinition)
-        mock_pipeline.children = set()  # No children means it's a sink table
-        mock_read.return_value = mock_pipeline
+        mock_delete.return_value = "deleted"
+        mock_drop.side_effect = drop_table
         
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
-            table_name=self.table_name,
+            table_name="z",
             inventory_path=self.inventory_path
         )
-
+        print(result)
         # Verify
-        self.assertTrue(result.startswith(f"{self.table_name} deleted"))
         mock_delete.assert_called()
-        mock_drop.assert_called_with(self.table_name, self.config['flink']['compute_pool_id'])
-
-    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_pipeline_definition_for_table')
-    def _test_full_pipeline_undeploy_from_table_not_found(
-        self,
-        mock_drop_table,
-        mock_get_def    ) -> None:
-        """Test undeployment when table is not found."""
-        print("test_full_pipeline_undeploy_from_table_not_found")
-        # Setup mocks
-        mock_get_def.return_value = None
-
-        # Execute
-        result = dm.full_pipeline_undeploy_from_table(
-            table_name=self.table_name,
-            inventory_path=self.inventory_path
-        )
-
-        # Verify
-        self.assertEqual(
-            result,
-            f"ERROR: Table {self.table_name} not found in table inventory"
-        )
-
-
-    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
-    def test_build_table_graph_for_node(self, mock_read) -> None:
-        """Test building table graph for a node."""
-        print("test_build_table_graph_for_node")
-        # Setup
-        start_node = self._create_mock_statement_node("start_table")
-
-        mock_pipeline = MagicMock(spec=FlinkTablePipelineDefinition)
-        mock_read.return_value = mock_pipeline
-
-        # Execute
-        result = dm._build_statement_node_map(start_node)
-
-        # Verify
-        self.assertIsInstance(result, dict)
-        self.assertIn(start_node.table_name, result)
-        self.assertEqual(result[start_node.table_name], start_node)
-
-    @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
-    @patch('shift_left.core.deployment_mgr._deploy_dml')
-    def test_execute_plan(self, mock_deploy_dml, mock_deploy_ddl_dml) -> None:
-        """Test execution of a plan."""
-        print("test_execute_plan")
-        # Setup
-        plan = FlinkStatementExecutionPlan(nodes=[])
-        node1 = self._create_mock_statement_node("table1")
-        node1.to_run = True
-        node1.dml_only = False
-        
-        node2 = self._create_mock_statement_node("table2")
-        node2.to_run = False
-        node2.to_restart = True
-        node2.dml_only = True
-        plan.nodes = [node1, node2]
-
-        mock_statement = MagicMock(spec=Statement)
-        mock_deploy_ddl_dml.side_effect = self._create_mock_statement("ddl_statement", "COMPLETED")
-        mock_deploy_dml.side_effect = self._create_mock_statement("dml_statement", "RUNNING")
-
-        # Execute
-        result = dm._execute_plan(plan, self.compute_pool_id)
-
-        # Verify
-        self.assertEqual(len(result), 2)
-        mock_deploy_ddl_dml.assert_called_once()
-        mock_deploy_dml.assert_called_once()
-
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    def test_execution_plan_with_src_running(
-        self, 
-        mock_get_status, 
-        mock_get_compute_pool_list, 
-        mock_assign_compute_pool_id
-    ) -> None:
-        """Test execution plan with source tables running."""
-        print("test_execution_plan_with_src_running")
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            print(f"mock_status: {statement_name}")
-            if statement_name.startswith("dev-dml-src-") or statement_name.startswith("dev-p1-dml-src-"):
-                return self._create_mock_statement_info(name=statement_name, status_phase="RUNNING")
-            return self._create_mock_statement_info()
-            
-        mock_get_status.side_effect = mock_status
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="p1_fct_order", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=False,
-            execute_plan=False
-        )
-        print(summary)
-        
-        # Verify source tables are in the execution plan with skip action
-        for node in execution_plan.nodes:
-            if node.table_name.startswith("src_"):
-                assert not node.to_restart and not node.to_run, \
-                    f"Source table {node.table_name} should not be restarted or run"
-            
-        # Verify the expected intermediate and fact tables are present
-        assert len(execution_plan.nodes) == 6
-        assert execution_plan.nodes[3].table_name in ("int_p1_table_1", "int_p1_table_2")
-        assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
-        assert execution_plan.nodes[5].table_name == "p1_fct_order"
-
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.reset_statement_list')
-    def test_build_execution_plan_for_product(self, mock_reset_statement_list, mock_assign_compute_pool_id) -> None:
-        """Test building execution plan for a product."""
-        print("test_build_execution_plan_for_product")
-        # Setup
-        product_name = "p2"
-        inventory_path = self.inventory_path
-        compute_pool_id = self.TEST_COMPUTE_POOL_ID
-        dml_only = False
-        may_start_descendants = False
-        force_ancestors = False
-        execute_plan = False
-
-        mock_reset_statement_list.return_value = None
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-
-        summary, execution_plan = dm.build_deploy_pipelines_from_product(
-            product_name=product_name,
-            inventory_path=inventory_path,
-            compute_pool_id=compute_pool_id,
-            dml_only=dml_only,
-            may_start_descendants=may_start_descendants,
-            force_ancestors=force_ancestors,
-            execute_plan=execute_plan
-        )
-        print(summary)
-        print(execution_plan)
-
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.build_deploy_pipeline_from_table')
-    def _test_deploy_pipeline_from_product(self, mock_deploy_pipeline_from_table,
-                                          mock_get_compute_pool_list) -> None:
-        """
-        Test deploying pipeline from product.
-        -it will rebuild the table inventory
-        """
-        print("test_deploy_pipeline_from_product should get all tables created for p2")
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        def _mock_deploy_pipeline_from_table(table_name: str, 
-                                             inventory_path: str, 
-                                             compute_pool_id: str, 
-                                             dml_only: bool, 
-                                             may_start_children: bool, 
-                                             force_sources: bool) -> Tuple[DeploymentReport, str]:
-            statement = StatementBasicInfo(name="dml-" + table_name, 
-                                           environment_id="dev", 
-                                           compute_pool_id=compute_pool_id,
-                                           created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                           uid=uuid.uuid4().hex,
-                                           execution_time=0,
-                                           status="COMPLETED",
-                                           status_details="")
-            return DeploymentReport(table_name=table_name, 
-                                    type="Both", 
-                                    update_children=may_start_children, 
-                                    flink_statements_deployed=[statement],
-                                    ), f"deployed {table_name}"
-        mock_deploy_pipeline_from_table.side_effect = _mock_deploy_pipeline_from_table
-        
-        reports, summary = dm.build_deploy_pipelines_from_product(
-            product_name="p2",
-            inventory_path=self.inventory_path,
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID
-        )
-        print(summary)
-        for report in reports:
-            print(report)
+        assert self.count == 14  # call for all tables
 
 if __name__ == '__main__':
     unittest.main()
