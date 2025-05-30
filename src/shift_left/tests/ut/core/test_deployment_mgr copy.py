@@ -132,51 +132,6 @@ class TestDeploymentManager(unittest.TestCase):
     #  ----------- TESTS -----------
    
 
-
-
-
-    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_pipeline_definition_for_table')
-    def _test_full_pipeline_undeploy_from_table_not_found(
-        self,
-        mock_drop_table,
-        mock_get_def    ) -> None:
-        """Test undeployment when table is not found."""
-        print("test_full_pipeline_undeploy_from_table_not_found")
-        # Setup mocks
-        mock_get_def.return_value = None
-
-        # Execute
-        result = dm.full_pipeline_undeploy_from_table(
-            table_name=self.table_name,
-            inventory_path=self.inventory_path
-        )
-
-        # Verify
-        self.assertEqual(
-            result,
-            f"ERROR: Table {self.table_name} not found in table inventory"
-        )
-
-
-    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
-    def test_build_table_graph_for_node(self, mock_read) -> None:
-        """Test building table graph for a node."""
-        print("test_build_table_graph_for_node")
-        # Setup
-        start_node = self._create_mock_statement_node("start_table")
-
-        mock_pipeline = MagicMock(spec=FlinkTablePipelineDefinition)
-        mock_read.return_value = mock_pipeline
-
-        # Execute
-        result = dm._build_statement_node_map(start_node)
-
-        # Verify
-        self.assertIsInstance(result, dict)
-        self.assertIn(start_node.table_name, result)
-        self.assertEqual(result[start_node.table_name], start_node)
-
     @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
     @patch('shift_left.core.deployment_mgr._deploy_dml')
     def test_execute_plan(self, mock_deploy_dml, mock_deploy_ddl_dml) -> None:
@@ -206,78 +161,8 @@ class TestDeploymentManager(unittest.TestCase):
         mock_deploy_ddl_dml.assert_called_once()
         mock_deploy_dml.assert_called_once()
 
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    def test_execution_plan_with_src_running(
-        self, 
-        mock_get_status, 
-        mock_get_compute_pool_list, 
-        mock_assign_compute_pool_id
-    ) -> None:
-        """Test execution plan with source tables running."""
-        print("test_execution_plan_with_src_running")
-        
-        def mock_status(statement_name: str) -> StatementInfo:
-            print(f"mock_status: {statement_name}")
-            if statement_name.startswith("dev-dml-src-") or statement_name.startswith("dev-p1-dml-src-"):
-                return self._create_mock_statement_info(name=statement_name, status_phase="RUNNING")
-            return self._create_mock_statement_info()
-            
-        mock_get_status.side_effect = mock_status
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="p1_fct_order", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID, 
-            dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=False,
-            execute_plan=False
-        )
-        print(summary)
-        
-        # Verify source tables are in the execution plan with skip action
-        for node in execution_plan.nodes:
-            if node.table_name.startswith("src_"):
-                assert not node.to_restart and not node.to_run, \
-                    f"Source table {node.table_name} should not be restarted or run"
-            
-        # Verify the expected intermediate and fact tables are present
-        assert len(execution_plan.nodes) == 6
-        assert execution_plan.nodes[3].table_name in ("int_p1_table_1", "int_p1_table_2")
-        assert execution_plan.nodes[4].table_name in ("int_p1_table_1", "int_p1_table_2")
-        assert execution_plan.nodes[5].table_name == "p1_fct_order"
 
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.reset_statement_list')
-    def test_build_execution_plan_for_product(self, mock_reset_statement_list, mock_assign_compute_pool_id) -> None:
-        """Test building execution plan for a product."""
-        print("test_build_execution_plan_for_product")
-        # Setup
-        product_name = "p2"
-        inventory_path = self.inventory_path
-        compute_pool_id = self.TEST_COMPUTE_POOL_ID
-        dml_only = False
-        may_start_descendants = False
-        force_ancestors = False
-        execute_plan = False
 
-        mock_reset_statement_list.return_value = None
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-
-        summary, execution_plan = dm.build_deploy_pipelines_from_product(
-            product_name=product_name,
-            inventory_path=inventory_path,
-            compute_pool_id=compute_pool_id,
-            dml_only=dml_only,
-            may_start_descendants=may_start_descendants,
-            force_ancestors=force_ancestors,
-            execute_plan=execute_plan
-        )
-        print(summary)
-        print(execution_plan)
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.build_deploy_pipeline_from_table')

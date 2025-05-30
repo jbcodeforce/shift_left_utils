@@ -8,12 +8,12 @@
    "state_form": "Stateful",
    "parents": [
       {
-         "table_name": "src_p3_roles",
+         "table_name": "src_p3_users",
          "product_name": "p3",
          "type": "source",
-         "dml_ref": "pipelines/sources/p3/src_roles/sql-scripts/dml.src_p3_roles.sql",
-         "ddl_ref": "pipelines/sources/p3/src_roles/sql-scripts/ddl.src_p3_roles.sql",
-         "path": "pipelines/sources/p3/src_roles",
+         "dml_ref": "pipelines/sources/p3/src_users/sql-scripts/dml.src_p3_users.sql",
+         "ddl_ref": "pipelines/sources/p3/src_users/sql-scripts/ddl.src_p3_users.sql",
+         "path": "pipelines/sources/p3/src_users",
          "state_form": "Stateful",
          "parents": [],
          "children": [
@@ -54,12 +54,12 @@
          ]
       },
       {
-         "table_name": "src_p3_users",
+         "table_name": "src_p3_roles",
          "product_name": "p3",
          "type": "source",
-         "dml_ref": "pipelines/sources/p3/src_users/sql-scripts/dml.src_p3_users.sql",
-         "ddl_ref": "pipelines/sources/p3/src_users/sql-scripts/ddl.src_p3_users.sql",
-         "path": "pipelines/sources/p3/src_users",
+         "dml_ref": "pipelines/sources/p3/src_roles/sql-scripts/dml.src_p3_roles.sql",
+         "ddl_ref": "pipelines/sources/p3/src_roles/sql-scripts/ddl.src_p3_roles.sql",
+         "path": "pipelines/sources/p3/src_roles",
          "state_form": "Stateful",
          "parents": [],
          "children": [
