@@ -48,7 +48,7 @@ class TableInfo(BaseModel):
     to_restart: bool = False
     retention_size: int = 0
     message_count: int = 0
-    pending_records: int = 0
+    pending_records: float = 0
 
 class TableReport(BaseModel):
     product_name: str = ""

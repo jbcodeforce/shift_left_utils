@@ -79,6 +79,9 @@ def _process_results(statement_result: StatementResult, result: int) -> int:
     return result
 
 def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
+    """
+    Get the pending records for a statement using the REST API metrics endpoint.
+    """
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     view="cloud"
@@ -103,7 +106,7 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
                 for point in metric.get("points", []):
                     sum += point["value"]
                 if len(metric.get("points", [])) > 0:
-                    sum = round(sum/len(metric["points"]))
+                    sum = round(sum/len(metric.get("points")))
             else:
                 sum += metric.get("value", 0)
         return sum

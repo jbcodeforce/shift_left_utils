@@ -323,6 +323,7 @@ def report_running_flink_statements_for_a_product(
                 node: FlinkStatementNode = pipeline_def.to_node()
                 node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
                 table_info = report_mgr.build_TableInfo(node)
+                print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {table_info.pending_records}")
                 table_report.tables.append(table_info)
     table_count=0
     running_count=0

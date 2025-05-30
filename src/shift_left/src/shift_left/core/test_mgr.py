@@ -494,7 +494,7 @@ def _add_test_files(table_ref: FlinkTableReference,
                 logger.info(f"Input file {input_file} created")
             if input_data.file_type == "csv":
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
-                columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
+                columns_names, rows = _build_data_sample(table_struct[input_data.table_name], 5)
                 rows=rows[:-2].replace("),", "").replace("(", "").replace(")", "")
                 with open(input_file, "w") as f:
                     f.write(columns_names+"\n")
@@ -568,7 +568,7 @@ def _process_foundation_ddl_from_test_definitions(test_definition: SLTestDefinit
             f.write(ddl_sql_content)
     return table_struct
 
-def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
+def _build_data_sample(columns: Dict[str, str], idx_offset: int = 0) -> Tuple[str, str]:
     """
     Returns a string of all columns names separated by ',' so it can be used
     in the insert statement and a string of 5 rows of data sample.
@@ -578,13 +578,13 @@ def _build_data_sample(columns: Dict[str, str]) -> Tuple[str, str]:
         columns_names += f"`{column}`, "
     columns_names = columns_names[:-2]
     rows = ""
-    for values in range(1,6):
+    for idx in range(1+idx_offset,6+idx_offset):
         rows += "("
         for column in columns:
             if columns[column]['type'] == "BIGINT":
                 rows += f"0, "
             else:
-                rows += f"'{column}_{values}', "
+                rows += f"'{column}_{idx}', "
         rows = rows[:-2]+ '),\n'
     rows = rows[:-2]+ ';\n'
     return columns_names, rows
