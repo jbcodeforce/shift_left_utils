@@ -66,8 +66,8 @@ class TestStatementManager(unittest.TestCase):
     ) -> Statement:
         """Create a mock Statement object."""
         status = Status(phase=status_phase)
-        Statement(name=name, status=status)
-        return Statement(name=name, status_phase=status_phase)
+        return Statement(name=name, status=status)
+
 
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
     def test_1_get_statement_list_with_mock(self, MockConfluentCloudClient):

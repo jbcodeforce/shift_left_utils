@@ -270,7 +270,6 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         execute_plan=execute_plan)
-            deployment_mgr.build_simple_report(execution_plan)
             print(f"Execution plan built and persisted for table {table_name}")
         elif product_name:
             print(f"Build an execution plan for product {product_name}")
