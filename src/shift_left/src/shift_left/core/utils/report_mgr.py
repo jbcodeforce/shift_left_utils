@@ -45,6 +45,7 @@ class TableInfo(BaseModel):
     created_at: str = ""
     compute_pool_id: str = ""
     compute_pool_name: str = ""
+    to_restart: bool = False
     retention_size: int = 0
     message_count: int = 0
     pending_records: int = 0
@@ -90,6 +91,7 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
     table_info.type = node.type
     table_info.upgrade_mode = node.upgrade_mode
     table_info.statement_name = node.dml_statement_name
+    table_info.to_restart = node.to_restart or node.to_run
     compute_pool_list = compute_pool_mgr.get_compute_pool_list()
     if node.existing_statement_info:
         table_info.status = node.existing_statement_info.status_phase
@@ -107,7 +109,7 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
     if table_info.status == "RUNNING":
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
-        #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
+        table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
                 
     return table_info
 
@@ -138,8 +140,8 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     ]
     
     # Separate nodes into parents and children
-    parents = [node for node in execution_plan.nodes if (node.to_run or node.is_running()) and not node.to_restart]
-    children = [node for node in execution_plan.nodes if node.to_restart]
+    parents = [node for node in execution_plan.nodes if (node.to_run or node.is_running())]
+    children = [node for node in execution_plan.nodes if node.to_restart and not node.to_run]
     
     # Build parent section
     if parents:
@@ -149,7 +151,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
             "-" * 125
         ])
         for node in parents:
-            action = "Run" if node.to_run else "Skip"
+            action = "To run" if node.to_run else "Skip"
             if node.to_restart:
                 action= "Restart"
             status_phase = node.existing_statement_info.status_phase if node.existing_statement_info else "Not deployed"

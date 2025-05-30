@@ -14,7 +14,7 @@ _config = None
 
 def generate_session_id() -> str:
     """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
-    date_str = datetime.datetime.now().strftime("%m-%d-%y")
+    date_str = datetime.datetime.now().strftime("%m-%d-%y-%H-%M-%S")
     random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
     return f"{date_str}-{random_str}"
 

@@ -96,19 +96,11 @@ def build_pipeline_definition_from_ddl_dml_content(
 
 def build_all_pipeline_definitions(pipeline_path: str):
     count = 0
-    dimensions_path = Path(pipeline_path) / "dimensions"
-    count += _process_one_sink_folder(dimensions_path, pipeline_path, count)
-    facts_path = Path(pipeline_path) / "facts"
-    count += _process_one_sink_folder(facts_path, pipeline_path, count)
-    views_path = Path(pipeline_path) / "views"
-    count += _process_one_sink_folder(views_path, pipeline_path, count)
-    views_path = Path(pipeline_path) / "intermediates"
-    count += _process_one_sink_folder(views_path, pipeline_path, count)
-    views_path = Path(pipeline_path) / "stage"
-    count += _process_one_sink_folder(views_path, pipeline_path, count)
-    views_path = Path(pipeline_path) / "sources"
-    count += _process_one_sink_folder(views_path, pipeline_path, count)
+    for folder in ["dimensions", "facts", "views", "intermediates", "stage", "sources"]:
+        path = Path(pipeline_path) / folder
+        count=_process_one_sink_folder(path, pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
+    print(f"Total number of pipeline definitions created: {count}")
 
     
 def get_static_pipeline_report_from_table(
@@ -252,12 +244,11 @@ def _process_one_sink_folder(sink_folder_path, pipeline_path, count: int):
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
 
                 if file_path.is_file() and file_path.name.startswith("dml"):
-                    logger.info(f"Process the dml {file_path}")
+                    logger.debug(f"Process the dml {file_path}")
                     dml_file_name = str(file_path.resolve())
-                    count += 1
                 if file_path.is_file() and file_path.name.startswith("ddl"):
-                    logger.info(f"Process the ddl {file_path}")
                     ddl_file_name = str(file_path.resolve())
+            count += 1
             build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)
     return count
     

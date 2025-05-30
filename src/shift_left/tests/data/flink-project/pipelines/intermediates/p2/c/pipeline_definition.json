@@ -56,17 +56,6 @@
    ],
    "children": [
       {
-         "table_name": "error_table",
-         "product_name": "p2",
-         "type": "fact",
-         "dml_ref": "pipelines/facts/p2/e/sql-scripts/dml.e.sql",
-         "ddl_ref": "pipelines/facts/p2/e/sql-scripts/ddl.e.sql",
-         "path": "pipelines/facts/p2/e",
-         "state_form": "Stateless",
-         "parents": [],
-         "children": []
-      },
-      {
          "table_name": "e",
          "product_name": "p2",
          "type": "fact",
