@@ -14,7 +14,9 @@
             "cwd": "${fileDirname}",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src"
               },
+               "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
             "name": "Debugger: src-project",
@@ -22,24 +24,15 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "cwd": "${fileDirname}/../..",
+            "cwd": "${workspaceFolder}",
             "env": {
                 "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage-flink.yaml",
-                "PIPELINES": "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
-              },
+                "PIPELINES": "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines",
+                "PYTHONPATH": "${workspaceFolder}/src/shift_left/src"
+            },
+             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Debug tests",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${fileDirname}",
-            "env": {
-
-                "PYTHONPATH": "${fileDirname}/utils"
-              }
-        },  {
             "name": "Python IT Debugger: current file",
             "type": "debugpy",
             "request": "launch",
@@ -47,8 +40,10 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml"
+                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src"
               },
+               "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
     ]
 }

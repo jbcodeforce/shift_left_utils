@@ -7,7 +7,7 @@ import yaml
 import time
 import os
 
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import get_config, logger, session_id
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.models.flink_statement_model import Statement, StatementError, StatementResult

@@ -260,6 +260,7 @@ def _build_deploy_pipeline(
         may_start_descendants: bool, 
         force_ancestors: bool,
         execute_plan: bool=False):
+    summary="Nothing done"
     try:
         if table_name:
             print(f"Build an execution plan for table {table_name}")

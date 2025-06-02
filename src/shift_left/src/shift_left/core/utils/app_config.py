@@ -16,7 +16,7 @@ def generate_session_id() -> str:
     """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
     date_str = datetime.datetime.now().strftime("%m-%d-%y-%H-%M-%S")
     random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-    return f"{date_str}-{random_str}"
+    return f"{date_str}-{random_str}", random_str
 
 @lru_cache
 def get_config() -> dict[str, str] | None:
@@ -36,8 +36,8 @@ def get_config() -> dict[str, str] | None:
 
 shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left') 
 log_dir = os.path.join(shift_left_dir, 'logs')
-session_id = generate_session_id()
-session_log_dir = os.path.join(log_dir, session_id)
+log_name, session_id = generate_session_id()
+session_log_dir = os.path.join(log_dir, log_name)
 
 logger = logging.getLogger("shift_left")
 logger.propagate = False  # Prevent propagation to root logger

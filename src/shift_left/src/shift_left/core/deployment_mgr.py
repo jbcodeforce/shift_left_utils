@@ -94,7 +94,13 @@ def build_deploy_pipeline_from_table(
         start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
         start_node.to_restart = True
         ancestors = _build_topological_sorted_parents([start_node], node_map)
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors, node_map, force_ancestors, may_start_descendants, compute_pool_id, start_node.table_name, start_node.product_name)
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors= ancestors, 
+                                                                      node_map=node_map, 
+                                                                      force_ancestors=force_ancestors, 
+                                                                      may_start_descendants=may_start_descendants, 
+                                                                      compute_pool_id=compute_pool_id, 
+                                                                      table_name=start_node.table_name, 
+                                                                      expected_product_name=start_node.product_name)
         _persist_execution_plan(execution_plan)
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
@@ -408,8 +414,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                 for child in node.children:
                     if (child not in execution_plan.nodes and
                         (node.update_children or child.upgrade_mode == "Stateful" or node.upgrade_mode == "Stateful")):
-                            child_node = node_map[child.table_name]
-                            child_node = _get_and_update_statement_info_compute_pool_id_for_node(child_node)
+                            node_map, child_node = _get_static_info_update_node_map(child, node_map)
                             if child_node.is_running() or may_start_descendants:
                                 child_node.to_restart = not child_node.to_run
                                 child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
@@ -435,6 +440,25 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         logger.error(f"Failed to build execution plan. Error is : {str(e)}")
         raise
 
+def _get_static_info_update_node_map(simple_node: FlinkStatementNode, 
+                                     node_map: Dict[str, FlinkStatementNode]
+) -> Tuple[Dict[str, FlinkStatementNode], FlinkStatementNode]:
+    """
+    When navigating to ancestors and assessing if children of those ancestors are to be started,
+    we need to get the static info of the current table and may be modify the node map content
+    """
+    try:
+        if not simple_node.table_name in node_map:
+            logger.info(f"Building node map for {simple_node.table_name} len(node_map): {len(node_map)}")
+            node_map |= _build_statement_node_map(simple_node)
+        node = node_map[simple_node.table_name]
+        node = _get_and_update_statement_info_compute_pool_id_for_node(node)
+        return node_map, node
+    except Exception as e:
+        logger.error(f"Failed to build node map for {simple_node.table_name}. Error is : {str(e)}")
+        raise e
+
+    
 
 def _process_ancestors(ancestors: List[FlinkStatementNode], 
                        execution_plan: FlinkStatementExecutionPlan, 
@@ -507,10 +531,10 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
         current_node = queue.popleft()
         for parent in current_node.parents:
             if parent not in visited:
-                complete_parent = node_map[parent.table_name]
-                ancestors[parent.table_name] = complete_parent
-                visited.add(complete_parent)
-                queue.append(complete_parent)
+                node_map, enriched_parent = _get_static_info_update_node_map(parent, node_map)
+                ancestors[parent.table_name] = enriched_parent
+                visited.add(enriched_parent)
+                queue.append(enriched_parent)
             #if parent not in ancestors:  # Ensure parent itself is unique in the set
             #     ancestors[parent.table_name] = parent
     ancestors[start_node.table_name] = start_node
@@ -518,19 +542,19 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
     # for each node in the topological sort.
     ancestor_dependencies = []
 
-    def _add_parent_dependencies(table_name: str, node_map: dict, new_ancestors: dict) -> None:
+    def _add_parent_dependencies(node: FlinkStatementNode, node_map: dict, new_ancestors: dict) -> None:
         """Add the parents of the table to the ancestor dependencies list"""
-        node = node_map[table_name]
-        for parent in node.parents:
-            ancestor_dependencies.append((table_name, parent))
+        node_map, enriched_node = _get_static_info_update_node_map(node, node_map)
+        for parent in enriched_node.parents:
+            ancestor_dependencies.append((node.table_name, parent))
             if parent.table_name not in new_ancestors:
                 new_ancestors[parent.table_name] = parent
-            _add_parent_dependencies(parent.table_name, node_map, new_ancestors)
+            _add_parent_dependencies(parent, node_map, new_ancestors)
 
 
     new_ancestors = ancestors.copy()
-    for table_name in ancestors.keys():
-        _add_parent_dependencies(table_name, node_map, new_ancestors)
+    for node in ancestors.values():
+        _add_parent_dependencies(node, node_map, new_ancestors)
     ancestors.update(new_ancestors)
     return ancestors, ancestor_dependencies
 
@@ -606,18 +630,18 @@ def _get_descendants_subgraph(start_node: FlinkStatementNode,
     # Include dependencies within the ancestor subgraph
     descendant_dependencies = []
 
-    def _add_child_dependencies(table_name: str, node_map: dict, new_descendants: dict) -> None:
-        node = node_map[table_name]
-        for child in node.children:
-            descendant_dependencies.append((table_name, child))
+    def _add_child_dependencies(node: FlinkStatementNode, node_map: dict, new_descendants: dict) -> None:
+        node_map, enriched_node = _get_static_info_update_node_map(node, node_map)
+        for child in enriched_node.children:
+            descendant_dependencies.append((node.table_name, child))
             if child.table_name not in new_descendants:
                 new_descendants[child.table_name] = child
-            _add_child_dependencies(child.table_name, node_map, new_descendants)
+            _add_child_dependencies(child, node_map, new_descendants)
 
 
     new_descendants = descendants.copy()
-    for table_name in descendants.keys():
-        _add_child_dependencies(table_name, node_map, new_descendants)
+    for node in descendants.values():
+        _add_child_dependencies(node, node_map, new_descendants)
     descendants.update(new_descendants)
     return descendants, descendant_dependencies
 
@@ -656,15 +680,6 @@ def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
             in_out_graph.append(node)
     return in_out_graph
 
-def _add_non_running_parents(node, execution_plan, node_map):
-    for p in node.parents:
-        node_p = node_map[p.table_name]
-        node_p = _get_and_update_statement_info_compute_pool_id_for_node(node_p)
-        if not node_p.is_running() and not node_p.to_run and node_p not in execution_plan:
-            # position the parent before the node to be sure it is started before it
-            idx=execution_plan.nodes.index(node)
-            execution_plan.nodes.insert(idx,node_p)
-            node_p.to_run = True
 
 def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
     """

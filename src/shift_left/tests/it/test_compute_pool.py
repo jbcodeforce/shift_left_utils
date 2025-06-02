@@ -59,11 +59,6 @@ class TestComputePoolMgr(unittest.TestCase):
             print(e)
             assert True
 
-    def _test_5_delete_compute_pool(self):
-        compute_mgr.delete_compute_pool("lfcp-9rv5k5")
-        cpl = compute_mgr.get_compute_pool_list()
-        print(cpl.model_dump_json(indent=3))
-        assert True
 
 if __name__ == '__main__':
     unittest.main()
