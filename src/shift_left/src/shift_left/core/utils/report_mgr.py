@@ -8,10 +8,11 @@ import shift_left.core.compute_pool_mgr as compute_pool_mgr
 from shift_left.core.utils.app_config import shift_left_dir, get_config
 from pydantic import Field
 from datetime import datetime
+
 class StatementBasicInfo(BaseModel):
     name: str
     environment_id: str 
-    created_at: str
+    created_at: datetime = Field(default=None)
     uid: str
     compute_pool_id: str
     status: str
@@ -42,7 +43,7 @@ class TableInfo(BaseModel):
     upgrade_mode: str = ""
     statement_name: str = ""
     status: str = ""
-    created_at: str = ""
+    created_at: datetime = Field(default=None)
     compute_pool_id: str = ""
     compute_pool_name: str = ""
     to_restart: bool = False
@@ -100,7 +101,7 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
     else:
         table_info.status = "UNKNOWN"
         table_info.compute_pool_id = ""
-        table_info.created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        table_info.created_at = datetime.now()
     pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, table_info.compute_pool_id)
     if pool:
         table_info.compute_pool_name = pool.name
@@ -118,7 +119,7 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report+=f"-"*145 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)}\t{pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at,16)}\n"
+            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)}\t{pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)}\n"
     return report
 
 

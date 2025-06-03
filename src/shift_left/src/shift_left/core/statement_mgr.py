@@ -138,18 +138,17 @@ def delete_statement_if_exists(statement_name) -> str | None:
         config = get_config()
         client = ConfluentCloudClient(config)
         result = client.delete_flink_statement(statement_name)
-        if result == "deleted":
-            statement_list.pop(statement_name)
-            return "deleted"
-        return None
+
     else: # not found in cache, do remote API call
         logger.info(f"{statement_name} not found in cache")
         config = get_config()
         client = ConfluentCloudClient(config)
         # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
         #  so return None
-        return client.delete_flink_statement(statement_name)
-        #return None
+        result=client.delete_flink_statement(statement_name)
+    if result == "deleted" and statement_name in statement_list:
+        statement_list.pop(statement_name)
+    return "deleted"
 
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """
@@ -201,14 +200,14 @@ def get_statement_list() -> dict[str, StatementInfo]:
             try:
                 with open(STATEMENT_LIST_FILE, "r") as f:
                     _statement_list_cache = StatementListCache.model_validate(json.load(f))
-                if _statement_list_cache.created_at and (datetime.now() - datetime.fromisoformat(_statement_list_cache.created_at)).total_seconds() < get_config()['app']['cache_ttl']:  
+                if _statement_list_cache.created_at and (datetime.now() - datetime.strptime(_statement_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
                     reload = False
             except Exception as e:
                 logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
                 reload = True
                 os.remove(STATEMENT_LIST_FILE)
         if reload:
-            _statement_list_cache = StatementListCache(created_at=datetime.now().isoformat())
+            _statement_list_cache = StatementListCache(created_at=datetime.now())
             logger.info("Load the current list of Flink statements from REST API")
             config = get_config()
             page_size = config["confluent_cloud"].get("page_size", 100)
@@ -383,7 +382,7 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
     Save the statement list to the cache file
     """
     with open(STATEMENT_LIST_FILE, "w") as f:
-        json.dump(statement_list.model_dump(), f, indent=4)
+        f.write(statement_list.model_dump_json(indent=2, warnings=False))
 
 
 

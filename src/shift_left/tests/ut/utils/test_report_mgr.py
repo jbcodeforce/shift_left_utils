@@ -77,6 +77,7 @@ class TestReportMgr(unittest.TestCase):
                 )
             ]
         )
+
     def test_build_deployment_report(self):
         print(f"test_build_deployment_report")
         statements = [
@@ -139,3 +140,5 @@ class TestReportMgr(unittest.TestCase):
         assert "running" in report
         assert "test_compute_p" in report
 
+if __name__ == '__main__':
+    unittest.main()

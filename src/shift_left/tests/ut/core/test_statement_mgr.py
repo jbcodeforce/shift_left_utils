@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import os
 import pathlib
+from datetime import datetime
 import json
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 from shift_left.core.utils.app_config import get_config
@@ -340,7 +341,7 @@ class TestStatementManager(unittest.TestCase):
 
 
     def test_get_statement_list_cache(self):
-        statement_list = StatementListCache(created_at='2025-04-20T10:15:02.853006',statement_list={                                                                          
+        statement_list = StatementListCache(created_at=datetime.now(), statement_list={                                                                          
                                             'info-1': StatementInfo(                     
                                                         name='info-1',                           
                                                         status_phase='STOPPED',                                                           
@@ -362,7 +363,7 @@ class TestStatementManager(unittest.TestCase):
                                                         sql_database='development-us-west-2'                                    
                                             )}) 
         assert statement_list
-        str_dump = json.dumps(statement_list.model_dump())
+        str_dump = statement_list.model_dump_json(indent=2, warnings=False)
         print(isinstance(str_dump, str))
         print(f"statement_list: {str_dump}")
         statement_list_cache = StatementListCache.model_validate(json.loads(str_dump))

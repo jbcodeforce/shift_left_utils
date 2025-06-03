@@ -1,11 +1,12 @@
 CREATE TABLE IF NOT EXISTS src_y (
   default_key STRING,
   y_value STRING,
+  x_key STRING,
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED
 ) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS
 WITH (
-  'changelog.mode' = 'append',
+  'changelog.mode' = 'upsert',
    'key.avro-registry.schema-context' = '.flink-dev',
    'value.avro-registry.schema-context' = '.flink-dev',
   'key.format' = 'avro-registry',
@@ -14,7 +15,5 @@ WITH (
   'kafka.producer.compression.type' = 'snappy',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
-  'value.fields-include' = 'all',
-  'key.avro-registry.schema-context' = 'dev-',
-  'value.avro-registry.schema-context' = 'dev-'
+  'value.fields-include' = 'all'
 );

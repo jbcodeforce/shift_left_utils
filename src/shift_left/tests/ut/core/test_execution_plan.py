@@ -191,7 +191,7 @@ class TestExecutionPlan(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_execution_plan_for_z_restart_all_ancestors(
+    def test_execution_plan_for_z_restart_all_ancestors_without_children(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
@@ -199,10 +199,9 @@ class TestExecutionPlan(unittest.TestCase):
     ) -> None:
         """ 
         when forcing to start all ancestors of z using force_ancestors=True
-        as z is stateful, it will restart its children: d,f
-        as d is stateful, it will restart its children: f
+        even if z is stateful, it will not restart its children: d, p, c as may_start_descendants is False
         restart z
-        should restart the 14 nodes
+        should restart the 5 nodes
         """
         print("\n--> test_execution_plan_for_z__restart_all_ancestors should start node src_x, src_y, x, y, z, src_a, a, d, p, src_b, b c, f, e")
         
@@ -222,61 +221,18 @@ class TestExecutionPlan(unittest.TestCase):
             execute_plan=False
         )
         print(f"{summary}")
-        assert len(execution_plan.nodes) == 14  # all nodes are present as we want to see running ones too
+        assert len(execution_plan.nodes) == 5 
         for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x" , "src_y" ,"y", "src_b", "b", "src_p2_a", "a", "c"]:
-                assert node.to_run is True
+            if node.table_name in ["src_x", "x" , "src_y" , "y"]:
                 assert node.to_restart is False
+                assert node.to_run is True
             if node.table_name == "z":
                 assert node.to_run is True
                 assert node.to_restart is True
             if node.table_name in ["e","f"]:
                 assert node.to_run is False
-                assert node.to_restart is True
-
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_execution_plan_for_z_restart_all_ancestors_child_except_not_running_ones(
-        self,
-        mock_assign_compute_pool_id,
-        mock_get_status,
-        mock_get_compute_pool_list
-    ) -> None:
-        """ 
-        when forcing to start all ancestors of z using force_ancestors=True
-        as z is stateful, it should restart  p, d,c but c and d are not running so only p will be restarted
-        should restart the 6 nodes
-        """
-        print("\n--> test_execution_plan_for_z_restart_all_ancestors_child_except_not_running_ones should start node src_x, src_y, x, y, z, p,")
-        
-        def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-c", "dev-p2-dml-d", "dev-p2-dml-a"]:  
-                return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
-            else:
-                return self._create_mock_get_statement_info(status_phase="RUNNING")
-
-        mock_get_status.side_effect = mock_statement
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="z", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-            dml_only=False, 
-            may_start_descendants=False, 
-            force_ancestors=True,
-            execute_plan=False
-        )
-        print(f"{summary}")
-        assert len(execution_plan.nodes) == 6  # all nodes are present as we want to see running ones too
-        for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x" , "src_y" ,"y"]:
-                assert node.to_run is True
                 assert node.to_restart is False
-            if node.table_name == "z":
-                assert node.to_run is True
-                assert node.to_restart is True
+
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
@@ -433,7 +389,7 @@ class TestExecutionPlan(unittest.TestCase):
         Test deploying pipeline from product.
         should get non running tables to restart
         """
-        print("test_deploy_pipeline_from_product should get all tables created for p2")
+        print("test_deploy_pipeline_from_product should get all non runnng tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
@@ -565,7 +521,7 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_pending_records) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
-        As it force to restart, it may restart children for stateful source statements
+        As it forces to restar
         """
         print("test_deploy_pipeline_for_all_sources should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
@@ -588,12 +544,54 @@ class TestExecutionPlan(unittest.TestCase):
             force_ancestors=True
         )
         print(f"{summary}\n")
-        assert len(report.tables) == 11
+        assert len(report.tables) == 4
         print("Table\t\tStatement\t\tTo Restart")
         for table in report.tables:
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
+
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    def test_deploy_pipeline_for_all_sources_and_children(self, 
+                                        mock_get_status,
+                                        mock_get_compute_pool_list,
+                                        mock_assign_compute_pool_id,
+                                        mock_get_retention_size,
+                                        mock_get_pending_records) -> None:
+        """
+        Test deploying pipeline from a directory, like all sources, as may_start_descendants is true
+        it should restart all tables and children of stateful tables
+        """
+        print("test_deploy_pipeline_for_all_sources should get all tables created for p2")
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+            else:
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
+        
+        mock_get_status.side_effect = mock_statement
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_retention_size.return_value = 100000
+        mock_get_pending_records.return_value = 10000
+        summary, report = dm.build_and_deploy_all_from_directory(
+            directory=self.inventory_path + "/sources/p2",
+            inventory_path=self.inventory_path,
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
+            execute_plan=False,
+            may_start_descendants=True,
+            force_ancestors=True
+        )
+        print(f"{summary}\n")
+        assert len(report.tables) == 14 
+        print("Table\t\tStatement\t\tTo Restart")
+        for table in report.tables:
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            assert table.to_restart is True
 
 
 

@@ -156,6 +156,7 @@ def deploy(
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
+        cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.")
         ):
     """
@@ -170,6 +171,7 @@ def deploy(
         dml_only=dml_only, 
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
+        cross_product_deployment=cross_product_deployment,
         execute_plan=True)
     
     print(f"#### Pipeline deployed ####")
@@ -183,7 +185,8 @@ def build_execution_plan(
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
-        force_ancestors: bool = typer.Option(False, help="This flag forces restarting running ancestorsFlink statements.")):
+        force_ancestors: bool = typer.Option(False, help="This flag forces restarting running ancestorsFlink statements."),
+        cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
@@ -197,6 +200,7 @@ def build_execution_plan(
         dml_only=dml_only, 
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
+        cross_product_deployment=cross_product_deployment,
         execute_plan=False)
 
 
@@ -259,6 +263,7 @@ def _build_deploy_pipeline(
         dml_only: bool, 
         may_start_descendants: bool, 
         force_ancestors: bool,
+        cross_product_deployment: bool,
         execute_plan: bool=False):
     summary="Nothing done"
     try:
@@ -270,6 +275,7 @@ def _build_deploy_pipeline(
                                                         dml_only=dml_only,
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
+                                                        cross_product_deployment=cross_product_deployment,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for table {table_name}")
         elif product_name:
@@ -280,6 +286,7 @@ def _build_deploy_pipeline(
                                                         dml_only=dml_only,
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
+                                                        cross_product_deployment=cross_product_deployment,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for product {product_name}")
         elif dir:
@@ -290,6 +297,7 @@ def _build_deploy_pipeline(
                                                                     dml_only=dml_only,
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
+                                                                    cross_product_deployment=cross_product_deployment,
                                                                     execute_plan=execute_plan)
             
         print(summary)

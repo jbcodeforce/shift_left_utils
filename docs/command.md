@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1064fa570&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1079ba540&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -515,6 +515,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-descendants]
 * `--force-ancestors / --no-force-ancestors`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-ancestors]
+* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
 * `--help`: Show this message and exit.
 
@@ -542,6 +543,7 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
 * `--force-ancestors / --no-force-ancestors`: This flag forces restarting running ancestorsFlink statements.  [default: no-force-ancestors]
+* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--help`: Show this message and exit.
 
 ### `pipeline deploy-source-only`
@@ -575,7 +577,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 

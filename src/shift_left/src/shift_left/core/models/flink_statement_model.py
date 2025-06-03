@@ -102,13 +102,13 @@ class StatementInfo(BaseModel):
     sql_content:  Optional[str] =  Field(default=None, description="Current sql content of the Flink Statement")
     compute_pool_id:   Optional[str] =  Field(default=None, description="Compute pool id hosting the statement")
     compute_pool_name:   Optional[str] =  Field(default=None, description="Compute pool name hosting the statement")
-    created_at:   Optional[str] =  Field(default=None, description="Statement creation date")
+    created_at:   Optional[datetime] =  Field(default=datetime.now(), description="Statement creation date")
     principal:   Optional[str] =  Field(default=None, description="Principal service account")
     sql_catalog:  Optional[str] =  Field(default=None, description="Flink catalog name")
     sql_database:  Optional[str] =  Field(default=None, description="Flink database name")
 
 class StatementListCache(BaseModel):
-    created_at: Optional[str] = Field(default=None)
+    created_at: Optional[datetime] = Field(default=datetime.now())
     statement_list: Optional[dict[str, StatementInfo]] = Field(default={})
 
 
@@ -122,7 +122,7 @@ class FlinkStatementNode(BaseModel):
     product_name: Optional[str] = Field(default=None, description="Data Product name")
     type: Optional[str] = Field(default=None, description="Type of the node")
     path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
-    created_at: Optional[datetime] = Field(default=None)
+    created_at: Optional[datetime] = Field(default=datetime.now())
     dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
     dml_statement_name: Optional[str] =  Field(default=None, description="DML Statement name")
     ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
@@ -167,7 +167,7 @@ class FlinkStatementExecutionPlan(BaseModel):
     The start node is part of the nodes list.
     The nodes list is sorted by the order of execution
     """
-    created_at: datetime = Field(default=None)
+    created_at: datetime = Field(default=datetime.now())
     start_table_name: str = Field(default=None)
     environment_id: str = Field(default=None)
     nodes: List[FlinkStatementNode] = Field(default=[])

@@ -26,11 +26,6 @@ class TestProjectManager(unittest.TestCase):
             assert line_count > 0
         os.remove("./topics.txt")
 
-    def test_list_of_compute_pools(self):
-        env_id=get_config()['confluent_cloud']['environment_id']
-        results = pm.get_list_of_compute_pool(env_id)
-        assert results
-        assert len(results) > 0
         
 if __name__ == '__main__':
     unittest.main()

@@ -17,37 +17,6 @@ STATEMENT_COMPUTE_POOL_FILE=shift_left_dir + "/pool_assignments.json"
 COMPUTE_POOL_LIST_FILE=shift_left_dir + "/compute_pool_list.json"
 
 
-def get_or_build_compute_pool(compute_pool_id: str, pipeline_def: FlinkTablePipelineDefinition) -> str:
-    """
-    if the compute pool is given, use it, else assess if there is a statement
-    for this table already running and reuse the compute pool, if not
-    reuse the compute pool persisted in the table's pipeline definition.
-    else create a new pool.
-    """
-    config = get_config()
-    if not compute_pool_id:
-        # Before using the config compute pool, do we want to get the compute pool associated to the statement?
-        compute_pool_id = config['flink']['compute_pool_id']
-    logger.info(f"Validate the {compute_pool_id} exists and has enough resources")
-
-    if compute_pool_id:
-        client = ConfluentCloudClient(config)
-        env_id = config['confluent_cloud']['environment_id']
-        validated, pool_name = _validate_a_pool(client, compute_pool_id, env_id)
-        if validated:
-            return compute_pool_id, pool_name
-    else:
-        logger.debug(f"Look at the compute pool, currently used by {pipeline_def.dml_ref} by querying statement")
-        _, dml_statement_name = get_ddl_dml_names_from_pipe_def(pipeline_def)
-        statement = get_statement_info(dml_statement_name)
-        if statement and statement.compute_pool_id:
-            pool_id= statement.compute_pool_id
-            return pool_id
-        else:
-            logger.info(f"Build a new compute pool")
-            return create_compute_pool(pipeline_def.table_name)
-
-
 _compute_pool_list = None
 def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePoolList:
     global _compute_pool_list

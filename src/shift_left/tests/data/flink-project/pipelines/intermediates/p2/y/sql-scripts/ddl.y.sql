@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS y (
-  default_key STRING,
+  default_key STRING NOT NULL,
   y_value STRING,
   x_key STRING,
   -- put here column definitions
@@ -15,7 +15,5 @@ WITH (
   'kafka.producer.compression.type' = 'snappy',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
-  'value.fields-include' = 'all',
-  'key.avro-registry.schema-context' = 'dev-',
-  'value.avro-registry.schema-context' = 'dev-'
+  'value.fields-include' = 'all'
 );

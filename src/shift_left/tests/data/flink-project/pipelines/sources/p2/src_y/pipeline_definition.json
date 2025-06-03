@@ -5,7 +5,7 @@
    "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
    "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
    "path": "pipelines/sources/p2/src_y",
-   "state_form": "Stateless",
+   "state_form": "Stateful",
    "parents": [],
    "children": [
       {

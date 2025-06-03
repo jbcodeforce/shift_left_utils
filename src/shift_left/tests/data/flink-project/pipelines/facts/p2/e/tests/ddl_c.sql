@@ -16,7 +16,5 @@ WITH (
   'kafka.produc_uter.c_utompression.type' = 'snappy',
    'sc_utan.bounded.mode' = 'unbounded',
    'sc_utan.startup.mode' = 'earliest-offset',
-  'value.fields-inc_utlude' = 'all',
-  'key.avro-registry.sc_uthema-c_utontext' = 'dev-',
-  'value.avro-registry.sc_uthema-c_utontext' = 'dev-'
+  'value.fields-inc_utlude' = 'all'
 );
