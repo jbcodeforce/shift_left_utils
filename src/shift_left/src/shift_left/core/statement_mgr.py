@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from importlib import import_module
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
+from shift_left.core.utils.app_config import get_config, logger, session_log_dir
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
     get_or_build_inventory,
@@ -33,7 +33,7 @@ from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
 from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
-STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
+STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
                                                       flink_statement_file_path: str = None,

@@ -360,10 +360,12 @@ def full_pipeline_undeploy_from_table(
                                                         force_ancestors=True)
     config = get_config()
     trace = f"Full pipeline delete from table {table_name}\n"
+    print(f"{trace}")
     for node in reversed(execution_plan.nodes):
         statement_mgr.delete_statement_if_exists(node.dml_statement_name)
         rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
         trace+=f"Dropped table {node.table_name} with result: {rep}\n"
+        print(f"Dropped table {node.table_name}")
     execution_time = time.perf_counter() - start_time
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
     return trace
@@ -424,8 +426,8 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                                 _child = _assign_compute_pool_id_to_node(node=_child, compute_pool_id=compute_pool_id)
                             execution_plan.nodes = _merge_graphs(execution_plan.nodes, list(reversed(sorted_children)))
 
-                    elif child in execution_plan.nodes and  child.product_name != expected_product_name: # to remove
-                        execution_plan.nodes.remove(child)
+                    #elif child in execution_plan.nodes and  child.product_name != expected_product_name: # to remove
+                    #    execution_plan.nodes.remove(child)
                             
         #execution_plan.nodes = _build_topological_sorted_parents(execution_plan.nodes, node_map)                    
         logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
@@ -517,7 +519,7 @@ def _persist_execution_plan(execution_plan: FlinkStatementExecutionPlan, filenam
 def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dict[str, FlinkStatementNode], 
                                                          Dict[str, List[FlinkStatementNode]]]:
     """Builds a subgraph containing all ancestors of the start node.
-    Returns a dictionary of unique ancestor and a list of <table, ancestor> tuple 
+    Returns a dictionary of unique ancestor and a list of <table_name, ancestor> tuple 
     for each parent of a node.
     """
     ancestors = {}
@@ -535,12 +537,14 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
             #if parent not in ancestors:  # Ensure parent itself is unique in the set
             #     ancestors[parent.table_name] = parent
     ancestors[start_node.table_name] = start_node
-    # List of tuple <table, parent> for each parent of a node, will help to count the number of incoming edges
-    # for each node in the topological sort.
+    # List of tuple <table_name, parent> for each parent of a node, will help to count the number of incoming edges
+    # for each node in the topological sort. The ancestor dependencies has one record per table_name, parent tuple.
+    # a node with 3 ancestors will have 3 records in the ancestor dependencies list.
     ancestor_dependencies = []
 
     def _add_parent_dependencies(node: FlinkStatementNode, node_map: dict, new_ancestors: dict) -> None:
-        """Add the parents of the table to the ancestor dependencies list"""
+        """Add the <table-name, parent> tuple to the ancestor dependencies list. Update the node_map to be
+        sur it gets alls the static info of the node and its parents"""
         node_map, enriched_node = _get_static_info_update_node_map(node, node_map)
         for parent in enriched_node.parents:
             ancestor_dependencies.append((node.table_name, parent))
@@ -604,6 +608,9 @@ def _topological_sort(
                     queue.append(nodes[tbname])
 
     if len(sorted_nodes) == len(nodes):
+        print(f"Topological sort done")
+        for node in sorted_nodes:
+            print(f"Node {node.table_name} has {len(node.parents)} parents and {len(node.children)} children")
         return sorted_nodes
     else:
         raise ValueError("Graph has a cycle, cannot perform topological sort.")

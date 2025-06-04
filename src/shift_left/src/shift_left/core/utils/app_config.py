@@ -46,14 +46,14 @@ logger.setLevel(get_config()["app"]["logging"])
 log_file_path = os.path.join(session_log_dir, "shift_left_cli.log")
 file_handler = RotatingFileHandler(
     log_file_path, 
-    maxBytes=10*1024*1024,  # 10MB
+    maxBytes=5*1024*1024,  # 5MB
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 print("-" * 80)
-print(f"| SHIFT_LEFT SESSION LOGS FOLDER: {session_log_dir} |")
+print(f"| SHIFT_LEFT Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} LOGS folder is : {session_log_dir} |")
 print("-" * 80)
 #console_handler = logging.StreamHandler()
 #console_handler.setLevel(logging.INFO)

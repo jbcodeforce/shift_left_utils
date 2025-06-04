@@ -28,7 +28,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
 
     def test_exec_plan(self):
         runner = CliRunner()
-        result = runner.invoke(app, ['build-execution-plan', '--table-name', 'stage_tenant_dimension'])
+        result = runner.invoke(app, ['build-execution-plan', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         print(result.stdout)
         
 if __name__ == '__main__':

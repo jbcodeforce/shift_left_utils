@@ -82,6 +82,7 @@ class ConfluentCloudClient:
                     logger.error(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
                     return json.loads(response.text)
             else:
+                logger.error(f">>>> Response to {method} at {url} has reported error: {e}")
                 raise e
     
     def get_environment_list(self):
@@ -164,13 +165,13 @@ class ConfluentCloudClient:
         try:
             while True:
                 statement = self.get_flink_statement(statement_name)
-                if statement.status.phase in ["PENDING"]:
+                if statement and statement.status and statement.status.phase in ["PENDING"]:
                     logger.debug(f"{statement_name} still pending.... sleep and poll again")
                     time.sleep(timer)
                     counter+=1
-                    if counter == 6:
-                        timer = 30
-                    if counter >= 15:
+                    if counter % 3 == 0:
+                        timer+= 10
+                    if counter >= 6:
                         logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
                         error_statement = Statement.model_validate({"name": statement_name, 
                                                                     "spec": statement.spec,
@@ -188,7 +189,10 @@ class ConfluentCloudClient:
         except Exception as e:
             logger.error(f">>>> wait_response() error waiting for response {e}")
             execution_time = time.perf_counter() - start_time
-            statement_result = Statement.model_validate({"loop_counter": counter, "execution_time": execution_time, "result" : None})
+            statement_result = Statement.model_validate({"name": statement_name, 
+                                                          "status": {"phase": "FAILED", "detail": e},
+                                                         "loop_counter": counter, 
+                                                         "execution_time": execution_time, "result" : None})
             raise Exception(f"Done waiting with response= {statement_result.model_dump_json(indent=3)}")
 
     # ---- Topic related methods ----
@@ -270,7 +274,7 @@ class ConfluentCloudClient:
                     return None
         except Exception as e:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
-            return None
+            raise e
 
     def delete_flink_statement(self, statement_name: str) -> str:
         url = self.build_flink_url_and_auth_header()
