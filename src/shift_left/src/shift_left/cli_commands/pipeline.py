@@ -203,18 +203,6 @@ def build_execution_plan(
         cross_product_deployment=cross_product_deployment,
         execute_plan=False)
 
-
-@app.command()
-def deploy_source_only( product_name: str =  typer.Argument(help="The product name to deploy the source tables from."),
-                        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),):
-    """
-    Deploy only the source tables for a given product name. This will run in parallel, drop existing tables. 
-    """
-    print(f"Deploy only the source tables for product: {product_name}")
-    result, summary = deployment_mgr.deploy_source_only(product_name, compute_pool_id)
-    print(f"{result}")
-    print(f"{summary}")
-
 @app.command()
 def report_running_statements(
         dir: str = typer.Option(None, help="The directory to report the running statements from. If not provided, it will report the running statements from the table name."),
@@ -224,7 +212,7 @@ def report_running_statements(
     """
     Assess for a given table, what are the running dmls from its descendants. When the directory is specified, it will report the running statements from all the tables in the directory.
     """
-    print(f"Assess runnning Flink DMLs")
+    print(f"Assess running Flink DMLs")
     try:
         if table_name:
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
@@ -278,6 +266,11 @@ def _build_deploy_pipeline(
                                                         cross_product_deployment=cross_product_deployment,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for table {table_name}")
+            print(f"Potential Impacted tables:\n" + "-"*30 )
+            for node in execution_plan.nodes:
+                if node.to_run or node.to_restart:
+                    print(f"{node.table_name}")
+            print(f"\n" + "-"*30 + "\n")
         elif product_name:
             print(f"Build an execution plan for product {product_name}")
             summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,

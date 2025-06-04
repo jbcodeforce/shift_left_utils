@@ -804,7 +804,7 @@ The execution plan is a topological sorted Flink statement hierarchy enriched wi
 
 * Here is a basic command for an intermediate table:
     ```sh
-    shift_left pipeline build-execution --table-name int_table_2 
+    shift_left pipeline build-execution-plan --table-name int_table_2 
     ```
 
 * The options that are relevant to control the execution plan:
@@ -812,6 +812,7 @@ The execution plan is a topological sorted Flink statement hierarchy enriched wi
     --compute-pool-id 
     --may-start-descendants
     --force-ancestors
+    --cross-product-deployment
     ```
 
 * This command will take into account the following parameters in the config.yaml:
@@ -824,14 +825,14 @@ The execution plan is a topological sorted Flink statement hierarchy enriched wi
     flink.database_name
     ```
 
-* This can be extended to a product, so user may see all the dependencies for a given product:
+* The execution plan can be extended to a product, so a user may see all the dependencies for a given product:
     ```sh
-    shift_left pipeline build-execution --product-name p2
+    shift_left pipeline build-execution-plan --product-name p2
     ```
 
-* It may be interesting to get the execution plan for a given layer, like all the facts or intermidiates, so the granulatity is at the direcory level, so it can be product and intermidate:
+* It may be interesting to get the execution plan for a given layer, like all the facts or intermediates, so the granulatity is at the directory level, so it can be intermediate, facts... or even combination of level/product like:
     ```sh
-    shift_left pipeline build-execution --dir $PIPELINES/intermediates/p2
+    shift_left pipeline build-execution-plan --dir $PIPELINES/intermediates/p2
     ```
 
 ???- example "The outcome of an execution plan"
@@ -903,23 +904,23 @@ There are multiple choices to deploy a Flink Statement:
     ```
     * Deploy one table and its children
     ```sh
-    shift_left pipeline deploy  --from-table p1_fct_order --may-start-children
+    shift_left pipeline deploy  --from-table p1_fct_order --may-start-descendants
     ```
     *  Which can be combined to start everything within the scope of a pipeline
     ```sh
-    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-children
+    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants
     ```
     *  Which can be combined to start everything within the scope of a pipeline, defaulting to the given compute-pool-id if not found:
     ```sh
-    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-children --compute-pool-id lfcp-2...
+    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants --compute-pool-id lfcp-2...
     ```
     * Deploy a set of tables within the same layer:
     ```sh
-    pipeline deploy --dir $PIPELINES/sources/p2 --force-ancestors --may-start-children
+    pipeline deploy --dir $PIPELINES/sources/p2 --force-ancestors --may-start-descendants
     ```
     * Deploy a set of tables for a given product:
     ```sh
-    pipeline deploy --product-name p2 --force-ancestors --may-start-children
+    pipeline deploy --product-name p2 --force-ancestors --may-start-descendants
     ```
 
 

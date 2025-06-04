@@ -106,9 +106,9 @@ class TestExecutionPlan(unittest.TestCase):
         mock_get_compute_pool_list
     ) -> None:
         """
-        when direct parent d is running
+        when direct parent d is running 
         restarting the leaf "f"
-        Should restart only current table f
+        Should restart only current table f which has one parent d.
         f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
         """
         print("\n--> test_build_execution_plan_for_one_table_while_parents_running should start node f only")
@@ -125,7 +125,7 @@ class TestExecutionPlan(unittest.TestCase):
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
             dml_only=False, 
-            may_start_descendants=False, 
+            may_start_descendants=False, # should get same result if true
             force_ancestors=False,
             execute_plan=False
         )
@@ -139,24 +139,74 @@ class TestExecutionPlan(unittest.TestCase):
                 assert node.to_run is False
                 assert node.to_restart is True
 
-
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_build_execution_plan_for_leaf_table_f_while_some_parents_not_running(
+    def test_build_execution_plan_for_leaf_table_f_while_direct_parent_not_running(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
         mock_get_compute_pool_list
     ) -> None:
-        """ when y, src_y parents are not running
-            restarting the leaf "f"
-            Should lead to restart src_y, y, d, and f
         """
-        print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_parents_not_running should start node src_y, y, d, and f")
+        when direct parent d is not running  
+        restarting the leaf "f"
+        Should restart d then f 
+        f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
+        """
+        print("\n--> test_build_execution_plan_for_leaf_table_f_while_direct_parent_not_running should start nodes d and f")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name == "dev-p2-dml-src-x" or statement_name == "dev-p2-dml-x" or statement_name == "dev-p2-dml-z":  
+            if statement_name in ["dev-p2-dml-d", "dev-p2-dml-f"]:
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN")
+            else:
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+ 
+        mock_get_status.side_effect = mock_statement
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="f", 
+            inventory_path=self.inventory_path, 
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+            dml_only=False, 
+            may_start_descendants=False, 
+            force_ancestors=False,
+            execute_plan=False
+        )
+        print(f"{summary}")
+        assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
+        for node in execution_plan.nodes:
+            if node.table_name in ["src_x", "x", "src_y", "y", "z"]:
+                assert node.to_run is False
+                assert node.to_restart is False
+            if node.table_name in ["d"]:
+                assert node.to_run is True
+                assert node.to_restart is False
+            if node.table_name in ["f"]:
+                assert node.to_restart is True
+
+
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    def test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running(
+        self,
+        mock_assign_compute_pool_id,
+        mock_get_status,
+        mock_get_compute_pool_list
+    ) -> None:
+        """ when y, src_y ancestors are not running, so z not running too
+            restarting the leaf "f"
+            Should lead to restart src_y, y, d, z, f
+            BUT Z is restarted and its statefull so p,c,e needs to be restarted too
+            as C has src_b and b running, it can be started too
+        """
+        print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running should start nodes src_y, y, z, d, c, p, e and f")
+        
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-src-x", "dev-p2-dml-x", "dev-p2-dml-src-b", "dev-p2-dml-b"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
@@ -171,21 +221,67 @@ class TestExecutionPlan(unittest.TestCase):
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
             dml_only=False, 
-            may_start_descendants=False, 
+            may_start_descendants=True, 
             force_ancestors=False,
             execute_plan=False
         )
         print(f"{summary}")
-        assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
+        assert len(execution_plan.nodes) == 12
         for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x", "z"]:
+            if node.table_name in ["src_x", "x", "src_b", "b"]: 
                 assert node.to_run is False
                 assert node.to_restart is False
-            if node.table_name in  ["src_y", "y", "d"]:
+            if node.table_name in  ["src_y", "y", "d", "z", "p"]:
                 assert node.to_run is True
                 assert node.to_restart is False
-            if node.table_name == "f":
+            if node.table_name in ["f", "e"]:
+                assert node.to_restart is True
+
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    def test_build_execution_plan_for_leaf_table_e_while_some_ancestors_not_running(
+        self,
+        mock_assign_compute_pool_id,
+        mock_get_status,
+        mock_get_compute_pool_list
+    ) -> None:
+        """ when b, src_b, c ancestors are not running
+            restarting the leaf "e"
+            Should lead to restart src_b, b, c, e
+        """
+        print("\n--> test_build_execution_plan_for_leaf_table_e_while_some_ancestors_not_running should start nodes  src_b, b, c, e")
+        
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-src-x", "dev-p2-dml-x", "dev-p2-dml-z", "dev-p2-dml-src-y", "dev-p2-dml-y"]:  
+                print(f"mock_ get statement info: {statement_name} -> RUNNING")
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+            else:
+                print(f"mock_ get statement info: {statement_name} -> UNKNOWN")
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN")
+ 
+        mock_get_status.side_effect = mock_statement
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="e", 
+            inventory_path=self.inventory_path, 
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+            dml_only=False, 
+            may_start_descendants=True, 
+            force_ancestors=False,
+            execute_plan=False
+        )
+        print(f"{summary}")
+        assert len(execution_plan.nodes) == 9
+        for node in execution_plan.nodes:
+            if node.table_name in ["src_x", "x", "src_y", "y", "z"]: 
+                assert node.to_run is False
+                assert node.to_restart is False
+            if node.table_name in  ["src_b", "b", "c"]:
                 assert node.to_run is True
+                assert node.to_restart is False
+            if node.table_name in ["e"]:
                 assert node.to_restart is True
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
@@ -245,8 +341,9 @@ class TestExecutionPlan(unittest.TestCase):
     ) -> None:
         """
         when starting z without forcing ancestors and may_start_descendants=True
-        should not start  z ancestors
+        should not start z ancestors but restart its children
         z children needs to be restarted. d -> [y, z], p -> z, c -> [z,b] f-> d, e-> c.
+         
         """
         print("\n--> test_build_execution_plan_for_table_z_ancestor_running_restart_children_of_z_only should start node z, d,f,p,c,e")
         
@@ -269,15 +366,15 @@ class TestExecutionPlan(unittest.TestCase):
             execute_plan=False
         )
         print(f"{summary}")
-        assert len(execution_plan.nodes) == 10  # all nodes are present as we want to see running ones too
+        assert len(execution_plan.nodes) == 12  # all nodes are present as we want to also see the running ones
         for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x" , "src_y" ,"y"]:
+            if node.table_name in ["src_x", "x", "src_y", "y" , "x", "src_b", "b"]:
                 assert node.to_run is False
                 assert node.to_restart is False
-            if node.table_name == "z":
-                assert node.to_run is False
-                assert node.to_restart is True
-            if node.table_name in ["d", "f", "p", "c", "e"]:
+            if node.table_name in ["d", "c"]:
+                assert node.to_run is True
+                assert node.to_restart is False
+            if node.table_name in ["z", "f", "p", "e"]:
                 assert node.to_run is False
                 assert node.to_restart is True
         

@@ -383,6 +383,9 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
     """
     Build the execution plan using the sorted ancestors, and then taking into account children of each node and their stateful mode.
     The execution plan is a DAG of nodes that need to be executed in the correct order.
+    State is always needed if the output of processing a row is not only determined by that row itself, but also depends on the rows, 
+    which have previously been processed. A join needs to materialize both sides of the join, as if a row in left hand side is updated
+    the statements needs to emit an updated match for all matching rows in the right hand side.
     """
     try:
         execution_plan = FlinkStatementExecutionPlan(
@@ -392,33 +395,34 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         )
         # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
         # in the same product family as the start_node. The ancestor list is sorted so first node needs to run first
-        _process_ancestors(ancestors, execution_plan, force_ancestors, may_start_descendants, compute_pool_id)
+        execution_plan = _process_ancestors(ancestors, execution_plan, force_ancestors, compute_pool_id)
     
-        # At this level, execution_plan.nodes has the list of ancestors from start node. For each node, we need to assess
-        # if children needs to be started. Child is started if may_start_children id true 
-        # or if current node is stateful, as parent drops its output table so will regenerates
-        # records that may becomes duplicates for downstream statements.
+        # At this level, execution_plan.nodes has the list of ancestors from the  starting node. 
+        # For each node, we need to assess if children and ancestors needs to be started. 
+        # Only restart ancestors, if user forced to: The current node once it deletes its output table will reprocess
+        # records from the earliest and regenerates its states and aggregations. 
+        # The children needs to be restarted if the current node is stateful. 
         for node in execution_plan.nodes:
+            # The execution plan nodes list may be updated by processing children. As to start a child it may be needed
+            # to start a parent not yet in the execution plan.
             if node.to_run or node.to_restart:
-                # the approach is to add to the execution plan all children of each node that needs to be restarted.
+                # the approach is to add to the execution plan all children that need to be restarted.
                 for child in node.children:
-                    if (child not in execution_plan.nodes and
-                        (may_start_descendants and node.upgrade_mode == "Stateful")
-                        and (child.product_name == expected_product_name and not cross_product_deployment)):
-                            # TO DO support stateless and (child.upgrade_mode == "Stateful" or node.upgrade_mode == "Stateful")
+                    if ((node.upgrade_mode == "Stateful" and may_start_descendants) 
+                    or (node.upgrade_mode != "Stateful" and may_start_descendants and child.upgrade_mode == "Stateful")):
+                        if (child not in execution_plan.nodes 
+                            and (child.product_name == expected_product_name and not cross_product_deployment)):
                             node_map, child_node = _get_static_info_update_node_map(child, node_map)
-                            #if child_node.is_running() and may_start_descendants:
                             child_node.to_restart = not child_node.to_run
                             child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
-                            child_node.parents.remove(node)  # do not reprocess parent of current child
-                            if force_ancestors:
-                                new_ancestors = _build_topological_sorted_parents([child_node], node_map)
-                                _process_ancestors(new_ancestors, execution_plan, force_ancestors, may_start_descendants, compute_pool_id)
+                            child_node.parents.remove(node)  # do not reprocess current node as parent of current child
+                            new_ancestors = _build_topological_sorted_parents([child_node], node_map)
+                            execution_plan = _process_ancestors(new_ancestors, execution_plan, force_ancestors, compute_pool_id)
                             sorted_children = _build_topological_sorted_children(child_node, node_map)
                             for _child in sorted_children:
                                 _child.to_restart = not _child.to_run
                                 _child = _assign_compute_pool_id_to_node(node=_child, compute_pool_id=compute_pool_id)
-                            _merge_graphs(execution_plan.nodes, list(reversed(sorted_children)))
+                            execution_plan.nodes = _merge_graphs(execution_plan.nodes, list(reversed(sorted_children)))
 
                     elif child in execution_plan.nodes and  child.product_name != expected_product_name: # to remove
                         execution_plan.nodes.remove(child)
@@ -427,7 +431,6 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
         logger.debug(execution_plan)
         return execution_plan
-        
     except Exception as e:
         logger.error(f"Failed to build execution plan. Error is : {str(e)}")
         raise
@@ -455,10 +458,12 @@ def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
 def _process_ancestors(ancestors: List[FlinkStatementNode], 
                        execution_plan: FlinkStatementExecutionPlan, 
                        force_ancestors: bool,
-                       may_start_children: bool,
-                       compute_pool_id: str):
+                       compute_pool_id: str
+)-> FlinkStatementExecutionPlan:
     """
-    Process the ancestors of the current node.
+    Process the ancestors of the current node. Ancestor needs to be started
+    if it is not running so the current node will run successfully.
+    A stateful node enforces restarting its children.
     """
     for node in ancestors:
         node = _get_and_update_statement_info_compute_pool_id_for_node(node)
@@ -467,12 +472,12 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
         else:
             node.to_run = True
         if node.to_run and node.upgrade_mode == "Stateful": 
-            node.update_children = may_start_children  # should be set to true
+            node.update_children = True
         if node.to_run and not node.compute_pool_id:
             node = _assign_compute_pool_id_to_node(node, compute_pool_id)
         if node not in execution_plan.nodes:
             execution_plan.nodes.append(node)
-
+    return execution_plan
 
 def _persist_execution_plan(execution_plan: FlinkStatementExecutionPlan, filename: str = None):
     """
@@ -566,7 +571,10 @@ def _build_topological_sorted_parents(current_nodes: List[FlinkStatementNode],
             ancestor_dependencies.append(dep)
     return _topological_sort(ancestor_nodes, ancestor_dependencies)
 
-def _build_topological_sorted_children(current_node: FlinkStatementNode, node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
+def _build_topological_sorted_children(
+        current_node: FlinkStatementNode, 
+        node_map: Dict[str, FlinkStatementNode]
+)-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG of the current node"""
     nodes, dependencies = _get_descendants_subgraph(current_node, node_map)
     return _topological_sort(nodes, dependencies)
@@ -662,10 +670,10 @@ def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatement
         logger.warning(f"Statement {node.existing_statement_info} is not a StatementInfo")
     return node 
 
-def _merge_graphs(in_out_graph, in_graph) -> dict[str, FlinkStatementNode]:
+def _merge_graphs(in_out_graph:  List[FlinkStatementNode], in_graph:  List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
-    It may be possible while navigating to the children that some parent of those children are not part
-    of the current graph, so there is a need to merge the graph
+    It may be possible while navigating to the children that some parents of those children are not part
+    of the current graph, so there is a need to merge the graphs
     """
     for node in in_graph:
         if node not in in_out_graph:
