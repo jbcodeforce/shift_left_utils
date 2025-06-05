@@ -83,7 +83,7 @@ def build_deploy_pipeline_from_table(
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
         start_node = pipeline_def.to_node()
         start_time = start_time or datetime.now()
-        start_node.created_at = start_time
+        start_node.created_at = datetime.now()
         start_node.dml_only = dml_only
         start_node.compute_pool_id = compute_pool_id
         start_node = _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id)
