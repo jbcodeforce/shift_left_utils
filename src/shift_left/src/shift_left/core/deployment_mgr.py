@@ -77,6 +77,7 @@ def build_deploy_pipeline_from_table(
     """
     logger.info("#"*10 + f"# Build and/or deploy pipeline from table {table_name} " + "#"*10)
     start_time = time.perf_counter()
+    print(f"ROBBY: start_time - {start_time}")
     #statement_mgr.reset_statement_list()
     try:
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
