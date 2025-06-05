@@ -119,8 +119,6 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report+=f"-"*145 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            print(f"ROBBY: created_at - {str(node.created_at)}")
-            print(f"ROBBY: node - {str(node)}")
             report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)}\t{pad_or_truncate(node.existing_statement_info.status_phase,10)}\t{pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)}\n"
     return report
 
