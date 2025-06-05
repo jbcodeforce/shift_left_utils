@@ -232,13 +232,18 @@ def report_running_statements(
     print(f"#"*120)
 
 @app.command()
-def undeploy(table_name:  Annotated[str, typer.Argument(help="The sink table name containing pipeline_definition.json, from where the undeploy will run.")],
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]):
+def undeploy(
+        table_name:  str = typer.Option(default= None, help="The sink table name from where the undeploy will run."),
+        product_name: str =  typer.Option(default= None, help="The product name to undeploy from"),
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
     print(f"#### Full Delete of a pipeline from the table {table_name} for not shareable tables")
-    result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
+    if table_name:
+        result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
+    elif product_name:
+        result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
     print(result)
 
     

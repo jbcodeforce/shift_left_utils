@@ -13,7 +13,7 @@ class TestKsqlMigration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
+        cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "ksql-project")
         os.makedirs(os.environ["STAGING"], exist_ok=True)   
@@ -35,11 +35,13 @@ class TestKsqlMigration(unittest.TestCase):
         with open(ksql_src_file, "r") as f:
             ksql_content = f.read()
         agent = KsqlToFlinkSqlAgent()
+        print(f"Translating {ksql_file} to flink sql")
         flink_content = agent.translate_from_ksql_to_flink_sql(ksql_content)
         print(flink_content)
         with open(os.environ["STAGING"] + "/data_product/" + ksql_file.replace(".ksql", ".sql"), "w") as f:
             f.write(flink_content)
         return flink_content
+    
     def _test_ksql_table_declaration_migration(self):
         print("Should generate a flink ddl file in the staging folder")
         print("It may take some time....")

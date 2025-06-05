@@ -38,9 +38,7 @@ theme:
       - navigation.expand
       - navigation.top
       - navigation.footer
-      - search.highlight
-      - navigation.instant
-      - navigation.instant.progress
+
 extra_css: ["extra.css"]
 plugins:
   - search:

@@ -82,7 +82,7 @@ def build_deploy_pipeline_from_table(
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
         start_node = pipeline_def.to_node()
-        start_time = start_time or datetime.now()
+        start_time = start_time
         start_node.created_at = start_time
         start_node.dml_only = dml_only
         start_node.compute_pool_id = compute_pool_id
@@ -370,6 +370,7 @@ def full_pipeline_undeploy_from_table(
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
     return trace
 
+def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str) -> str:
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
@@ -608,9 +609,6 @@ def _topological_sort(
                     queue.append(nodes[tbname])
 
     if len(sorted_nodes) == len(nodes):
-        print(f"Topological sort done")
-        for node in sorted_nodes:
-            print(f"Node {node.table_name} has {len(node.parents)} parents and {len(node.children)} children")
         return sorted_nodes
     else:
         raise ValueError("Graph has a cycle, cannot perform topological sort.")

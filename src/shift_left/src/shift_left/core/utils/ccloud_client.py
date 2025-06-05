@@ -171,8 +171,9 @@ class ConfluentCloudClient:
                     counter+=1
                     if counter % 3 == 0:
                         timer+= 10
-                    if counter >= 6:
+                    if counter >= 10:
                         logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                        execution_time = time.perf_counter() - start_time
                         error_statement = Statement.model_validate({"name": statement_name, 
                                                                     "spec": statement.spec,
                                                                     "status": {"phase": "FAILED", "detail": "Done waiting with response"},
