@@ -77,7 +77,7 @@ def build_deploy_pipeline_from_table(
     """
     logger.info("#"*10 + f"# Build and/or deploy pipeline from table {table_name} " + "#"*10)
     start_time = time.perf_counter()
-    statement_mgr.reset_statement_list()
+    #statement_mgr.reset_statement_list()
     try:
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
@@ -690,9 +690,12 @@ def _merge_graphs(in_out_graph:  List[FlinkStatementNode], in_graph:  List[Flink
 
 def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
     """
-    Assign a compute pool id to a node. Node may already have an assigned compute pool id from a running statement or becasuse it
-    is set as argument of the command line. If this is an ancestor or a child of a running node, it may be possible there is no running 
-    statement for that node so not compute pool id is set. In this case we need to find a compute pool to use.
+    Assign a compute pool id to a node. Node may already have an assigned compute pool id from a running statement or because it
+    was set as argument of the command line. 
+    If the node is an ancestor or a child of a running node, it may be possible there is no running 
+    statement for that node so no compute pool id is set. 
+    In this case we need to find a compute pool to use by looking at the table name and the naming convention 
+    applied to the compute pool.
     """
     logger.info(f"Assign compute pool id to node {node.table_name}, backup pool is {compute_pool_id}")
     # If the node already has an assigned compute pool, continue using that
@@ -701,13 +704,14 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
         return node
     # get the list of compute pools available in the environment that match the table name
     pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
-    
-    # If we don't have any matching compute pools, we need to find a pool to use
+    # If we don't have any matching compute pool, we need to find a pool to use
     if  not pools or len(pools) == 0:
+        # assess user's parameter for compute pool id
         if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
             node.compute_pool_id = compute_pool_id
             node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
         else:
+            # assess compute pool id from config.yaml
             configured_compute_pool_id = get_config()['flink']['compute_pool_id']
             if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
                 node.compute_pool_id = configured_compute_pool_id
@@ -717,7 +721,8 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
                 logger.info(f"Created compute pool {node.compute_pool_name} for {node.table_name}")
         return node
     if len(pools) == 1:
-        if pools[0].current_cfu / pools[0].max_cfu < .7:
+        # matching pool found, assess capacity  
+        if compute_pool_mgr.is_pool_valid(pools[0].id):
             node.compute_pool_id = pools[0].id
             node.compute_pool_name = pools[0].name  
         else:
@@ -725,12 +730,16 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
             if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
                 node.compute_pool_id = configured_compute_pool_id
                 node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+            else:
+                raise Exception(f"Compute pool {pools[0].name} is not available for {node.table_name}, also tried config.yaml.")
         return node
-    # let use the configured compute pool id if it is valid
+    # more than one? let use the configured compute pool id if it is valid
     configured_compute_pool_id = get_config()['flink']['compute_pool_id']
     if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
         node.compute_pool_id = configured_compute_pool_id
         node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+    else:
+        raise Exception(f"Compute pool {configured_compute_pool_id} is not available for {node.table_name}")
     return node
 
 

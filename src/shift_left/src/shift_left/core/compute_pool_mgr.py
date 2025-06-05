@@ -98,8 +98,34 @@ def is_pool_valid(compute_pool_id) -> bool:
 
     client = ConfluentCloudClient(config)
     env_id = config['confluent_cloud']['environment_id']
-    validated, _ = _validate_a_pool(client, compute_pool_id, env_id)
-    return compute_pool_id and validated
+    try:
+        pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
+        if (
+            pool_info == None
+            or
+            (
+                "errors" in pool_info
+                and
+                # Including 403 because there's a bug in Confluent
+                #  where it returns 403 instead of 404 for missing resources.
+                any(map(
+                    lambda e:"status" in e and int(e["status"]) in [403,404],
+                    pool_info["errors"],
+                ))
+            )
+        ):
+            logger.info(f"Compute Pool not found")
+            raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
+        logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
+        ratio = get_pool_usage(pool_info) 
+        if ratio >= 0.7:
+            raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
+        return pool_info['status']['phase'] == "PROVISIONED"
+    except Exception as e:
+        logger.warning(e)
+        logger.info("Continue processing using another compute pool from parameter or config.yaml")
+        return False
+    
 
 def create_compute_pool(table_name: str) -> Tuple[str, str]:
     config = get_config()
@@ -159,7 +185,7 @@ def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
 
 def _verify_compute_pool_provisioned(client, pool_id: str, env_id: str) -> bool:
     """
-    Wait for the compute pool is provisionned
+    Wait for the compute pool to be provisionned
     """
     provisioning = True
     failed = False
@@ -170,46 +196,6 @@ def _verify_compute_pool_provisioned(client, pool_id: str, env_id: str) -> bool:
         provisioning = (result['status']['phase'] == "PROVISIONING")
         failed = (result['status']['phase'] == "FAILED")
     return False if failed else True
-
-
-
-
-def _validate_a_pool(client: ConfluentCloudClient, 
-                     compute_pool_id: str, 
-                     env_id: str
-) -> Tuple[bool, str]:
-    """
-    Validate a pool exist and with enough resources
-    """
-    try:
-        pool_info=client.get_compute_pool_info(compute_pool_id, env_id)
-        if (
-            pool_info == None
-            or
-            (
-                "errors" in pool_info
-                and
-                # Including 403 because there's a bug in Confluent
-                #  where it returns 403 instead of 404 for missing resources.
-                any(map(
-                    lambda e:"status" in e and int(e["status"]) in [403,404],
-                    pool_info["errors"],
-                ))
-            )
-        ):
-            logger.info(f"Compute Pool not found")
-            raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
-        logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
-        ratio = get_pool_usage(pool_info) 
-        if ratio >= 0.7:
-            raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
-        return pool_info['status']['phase'] == "PROVISIONED", pool_info['spec']['display_name']
-    except Exception as e:
-        logger.error(e)
-        logger.info("Continue processing using another compute pool from parameter or config.yaml")
-        return False, None
-
-
 
 
 _compute_pool_name_modifier = None
