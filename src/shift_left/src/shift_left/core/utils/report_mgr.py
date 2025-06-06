@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from shift_left.core.models.flink_statement_model import Statement, FlinkStatementExecutionPlan, FlinkStatementNode
-from shift_left.core.models.flink_compute_pool_model import ComputePoolInfo, ComputePoolList
+from shift_left.core.models.flink_compute_pool_model import ComputePoolList
 
 import shift_left.core.metric_mgr as metrics_mgr
+import shift_left.core.utils.report_mgr as report_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
 from shift_left.core.utils.app_config import shift_left_dir, get_config
 from pydantic import Field
@@ -147,7 +148,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     # Build parent section
     if parents:
         summary_parts.extend([
-            "\n--- Ancestors impacted ---",
+            f"\n--- Ancestors: {len(parents)} ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
             "-" * 125
         ])
@@ -163,8 +164,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     # Build children section
     if children:
         summary_parts.extend([
-            f"\n--- {len(parents)} parents",
-            "--- Children to restart ---",
+            f"\n--- Children to restart ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
             "-" * 125
         ])

@@ -12,9 +12,12 @@ The execution plan is used to undeploy a pipeline.
 import time
 import os
 import multiprocessing
+import threading
 from datetime import datetime
 from collections import deque
 from typing import Optional, List, Any, Set, Tuple, Dict, Final
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from queue import Queue
 
 from shift_left.core import (
     pipeline_mgr,
@@ -82,8 +85,8 @@ def build_deploy_pipeline_from_table(
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
         start_node = pipeline_def.to_node()
-        start_time = start_time
-        start_node.created_at = start_time
+        start_time = start_time or datetime.now()
+        start_node.created_at = datetime.now()
         start_node.dml_only = dml_only
         start_node.compute_pool_id = compute_pool_id
         start_node = _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id)
@@ -106,7 +109,9 @@ def build_deploy_pipeline_from_table(
         _persist_execution_plan(execution_plan)
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
+        
         if execute_plan:
+            print(f"Executing plan: {summary}")
             statements = _execute_plan(execution_plan, compute_pool_id)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
         
@@ -137,7 +142,7 @@ def build_deploy_pipelines_from_product(
     """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions. 
     As each statement deployment is creating an execution plan, previously started statements will not be restarted.
     """
-    inventory_path = os.getenv("PIPELINES")
+    inventory_path = inventory_path or os.getenv("PIPELINES")
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     compute_pool_list = compute_pool_mgr.get_compute_pool_list()
     if not compute_pool_id:
@@ -165,14 +170,16 @@ def build_deploy_pipelines_from_product(
                                                                       compute_pool_id=compute_pool_id, 
                                                                       table_name=start_node.table_name, 
                                                                       expected_product_name=start_node.product_name)
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+        summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         if execute_plan:
+            print(f"Executing plan: {summary}")
             _execute_plan(execution_plan, compute_pool_id)
         table_report = report_mgr.build_TableReport(start_node.product_name)
         for node in execution_plan.nodes:
             table_info = report_mgr.build_TableInfo(node)
             table_report.tables.append(table_info)
-        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
-        summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
+
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -217,37 +224,20 @@ def build_and_deploy_all_from_directory(
                                                                       compute_pool_id=compute_pool_id, 
                                                                       table_name=start_node.table_name, 
                                                                       expected_product_name=start_node.product_name)
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+        summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         if execute_plan:
+            print(f"Executing plan: {summary}")
             _execute_plan(execution_plan, compute_pool_id)
         table_report = report_mgr.build_TableReport(start_node.product_name)
         for node in execution_plan.nodes:
             table_info = report_mgr.build_TableInfo(node)
             table_report.tables.append(table_info)
-        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
-        summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
         return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
 
-
-def deploy_from_execution_plan(
-    execution_plan: FlinkStatementExecutionPlan, 
-    compute_pool_id: str
-) -> list[Statement]:
-    """
-    Execute the statements in the execution plan.
-    """
-    return _execute_plan(execution_plan, compute_pool_id)
-
-def load_and_deploy_from_execution_plan(execution_plan_file: str, 
-                              compute_pool_id: str) -> list[Statement]:
-    """
-    Execute the statements in the execution plan loaded from a file.
-    """
-    with open(execution_plan_file, "r") as f:
-        execution_plan = FlinkStatementExecutionPlan.model_validate_json(f.read())
-    return _execute_plan(execution_plan, compute_pool_id)
 
 
 def report_running_flink_statements_for_a_table(
@@ -288,8 +278,8 @@ def report_running_flink_statements_for_all_from_directory(
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
-                                                        may_start_children=False,
-                                                        force_sources=False)
+                                                        may_start_descendants=False,
+                                                        force_ancestors=False)
             result+= summary + "\n"
             count+=1
     result+=f"#"*40 + f" Found {count} tables with running flink statements " + "#"*40 + "\n"
@@ -303,7 +293,7 @@ def report_running_flink_statements_for_a_product(
     Report running flink statements for all the pipelines in the product.
     """
     table_report = report_mgr.build_TableReport(product_name)
-    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     for table_name, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
@@ -341,25 +331,25 @@ def report_running_flink_statements_for_a_product(
     return result   
 
 def full_pipeline_undeploy_from_table(
-    table_name: str, 
+    sink_table_name: str, 
     inventory_path: str
 ) -> str:
     """
     Stop DML statement and drop tables: look at the parents of the current table 
     and remove the parent that has one running child. Delete all the children of the current table.
     """
-    logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
+    logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {sink_table_name}\n" + "#"*20)
     start_time = time.perf_counter()
-    pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+    sink_table_pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(sink_table_name, inventory_path)
     config = get_config()
-    summary, execution_plan = build_deploy_pipeline_from_table(table_name=pipeline_def.table_name,  
+    summary, execution_plan = build_deploy_pipeline_from_table(table_name=sink_table_pipeline_def.table_name,  
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
                                                         may_start_descendants=True,
                                                         force_ancestors=True)
     config = get_config()
-    trace = f"Full pipeline delete from table {table_name}\n"
+    trace = f"Full pipeline delete from table {sink_table_name}\n"
     print(f"{trace}")
     for node in reversed(execution_plan.nodes):
         statement_mgr.delete_statement_if_exists(node.dml_statement_name)
@@ -367,13 +357,91 @@ def full_pipeline_undeploy_from_table(
         trace+=f"Dropped table {node.table_name} with result: {rep}\n"
         print(f"Dropped table {node.table_name}")
     execution_time = time.perf_counter() - start_time
-    logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
+    logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {sink_table_name}")
     return trace
 
-def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str) -> str:
+def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, compute_pool_id: str = None) -> str:
+    """
+    To undeploy we need to build an integrated execution plan for all the tables in the product.
+    Undeploy in the reverse order of the execution plan, but keep table that have other product as children
+    """
+    compute_pool_id = compute_pool_id or get_config()['flink']['compute_pool_id']
+    inventory_path = inventory_path or os.getenv("PIPELINES")
+    start_time = time.perf_counter()
+    nodes_to_process = []
+    combined_node_map = {}
+    count=0
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    for table_name, table_ref_dict in table_inventory.items():
+        table_ref = FlinkTableReference(**table_ref_dict)
+        if table_ref.product_name == product_name:
+            node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
+            nodes_to_process.append(node)
+            # Build the static graph from the Flink statement relationship
+            combined_node_map |= _build_statement_node_map(node)
+            count+=1
+    if count > 0:            
+        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+        start_node = ancestors[0]
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
+                                                                      node_map=combined_node_map, 
+                                                                      force_ancestors=False, 
+                                                                      may_start_descendants=True, 
+                                                                      cross_product_deployment=False,
+                                                                      compute_pool_id=compute_pool_id, 
+                                                                      table_name=start_node.table_name, 
+                                                                      expected_product_name=start_node.product_name)
+       
+        execution_plan.nodes.reverse()
+        print(f"Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
+        for node in execution_plan.nodes:
+            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {"RUNNING" if node.is_running() else "NOT RUNNING"} {node.compute_pool_id}")
+            
+        count=0
+        trace = f"Full pipeline delete from product {product_name}\n"
+        
+        # Filter nodes that need to be processed
+        nodes_to_drop = [node for node in execution_plan.nodes if node.product_name == product_name and node.is_running()]
+        
+        # Get number of CPU cores for max workers
+        max_workers = multiprocessing.cpu_count()
+        
+        # Process nodes in parallel using a thread pool
+        results = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks and get future objects
+            future_to_node = {executor.submit(_drop_node_worker, node): node for node in nodes_to_drop}
+            
+            # Process completed tasks as they finish
+            for future in as_completed(future_to_node):
+                node = future_to_node[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    results.append(f"Failed to process {node.table_name}: {str(e)}\n")
+        
+        # Combine results
+        trace += "".join(results)
+        count = len(nodes_to_drop)
+                
+    execution_time = time.perf_counter() - start_time
+    print(f"Done in {execution_time} seconds to undeploy pipeline from product {product_name}")
+    return trace
+
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
+
+def _drop_node_worker(node: FlinkStatementNode) -> str:
+    """Worker function to drop a single node's table and statements."""
+    try:
+        print(f"Dropping table {node.table_name}")
+        statement_mgr.delete_statement_if_exists(node.dml_statement_name)   
+        rep = statement_mgr.drop_table(node.table_name, node.compute_pool_id)
+        return f"Dropped table {node.table_name} with result: {rep}\n"
+    except Exception as e:
+        return f"Failed to drop table {node.table_name}: {str(e)}\n"
 
 def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementNode], 
                                                  node_map: Dict[str, FlinkStatementNode], 
@@ -742,7 +810,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
 
 
 
-def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> List[Statement]:
+def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str, accept_exceptions: bool = False) -> List[Statement]:
     """Execute statements in the execution plan.
     
     Args:
@@ -775,8 +843,11 @@ def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str) -> Li
                     node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
                     statements.append(statement)
                 except Exception as e:
-                    logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
-                    raise RuntimeError(f"Statement execution failed: {str(e)}")
+                    if not accept_exceptions:
+                        logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
+                        raise RuntimeError(f"Statement execution failed: {str(e)}")
+                    else:
+                        logger.info(f"Statement execution failed: {str(e)}, move to next node")
             else:
                 logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
                 

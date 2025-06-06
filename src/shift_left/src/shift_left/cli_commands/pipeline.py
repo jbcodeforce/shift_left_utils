@@ -239,10 +239,12 @@ def undeploy(
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
-    print(f"#### Full Delete of a pipeline from the table {table_name} for not shareable tables")
+   
     if table_name:
+        print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     elif product_name:
+        print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
     print(result)
 
