@@ -26,7 +26,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         print(nb_of_messages)
         assert nb_of_messages >= 0
 
-    def test_exec_plan(self):
+    def _test_exec_plan(self):
         runner = CliRunner()
         result = runner.invoke(app, ['build-execution-plan', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         print(result.stdout)

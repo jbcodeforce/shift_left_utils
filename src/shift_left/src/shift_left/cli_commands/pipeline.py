@@ -248,6 +248,18 @@ def undeploy(
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
     print(result)
 
+@app.command()
+def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare tables from."),
+            compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
+       ):
+    """
+    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+    """
+    print(f"Prepare tables using sql file {sql_file_name}")
+    deployment_mgr.prepare_tables_from_sql_file(sql_file_name, compute_pool_id)
+    print(f"Content of {sql_file_name} executed")
+
+# ----- Private APIs -----
     
 def _build_deploy_pipeline(
         table_name: str, 

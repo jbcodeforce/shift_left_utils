@@ -163,39 +163,41 @@ class ConfluentCloudClient:
         logger.info(f"As status is PENDING, start polling response for {statement_name}")
         pending_counter = 0
         error_counter = 0
+        statement = None
         while True:
             try:
                 statement = self.get_flink_statement(statement_name)
-                if statement and statement.status and statement.status.phase in ["PENDING"]:
-                    logger.debug(f"{statement_name} still pending.... sleep and poll again")
-                    time.sleep(timer)
-                    pending_counter+=1
-                    if pending_counter % 3 == 0:
-                        timer+= 10
-                    if pending_counter >= 10:
-                        logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
-                        execution_time = time.perf_counter() - start_time
-                        error_statement = Statement.model_validate({"name": statement_name, 
-                                                                    "spec": statement.spec,
-                                                                    "status": {"phase": "FAILED", "detail": "Done waiting with response"},
-                                                                    "loop_counter": pending_counter, 
-                                                                    "execution_time": execution_time, 
-                                                                    "result" : None})
-                        raise Exception(f"Done waiting with response= {error_statement.model_dump_json(indent=3)}")   
-                else:
-                    execution_time = time.perf_counter() - start_time
-                    statement.loop_counter= pending_counter
-                    statement.execution_time= execution_time
-                    logger.info(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
-                    return statement    
             except Exception as e:
                 if error_counter > 3:
-                    logger.error(f">>>> wait_response() error waiting for response {e}")
+                    logger.error(f">>>> wait_response() there is an error waiting for response {e}")
                     raise Exception(f"Done waiting with response because of error {e}")
                 else:
                     logger.warning(f">>>> wait_response() current response {e}")
                     time.sleep(timer)
                     error_counter+=1
+            if statement and statement.status and statement.status.phase in ["PENDING"]:
+                logger.debug(f"{statement_name} still pending.... sleep and poll again")
+                time.sleep(timer)
+                pending_counter+=1
+                if pending_counter % 3 == 0:
+                    timer+= 10
+                if pending_counter >= 10:
+                    logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                    execution_time = time.perf_counter() - start_time
+                    error_statement = Statement.model_validate({"name": statement_name, 
+                                                                "spec": statement.spec,
+                                                                "status": {"phase": "FAILED", "detail": "Done waiting with response"},
+                                                                "loop_counter": pending_counter, 
+                                                                "execution_time": execution_time, 
+                                                                "result" : None})
+                    raise Exception(f"Done waiting with response= {error_statement.model_dump_json(indent=3)}")   
+            else:
+                execution_time = time.perf_counter() - start_time
+                statement.loop_counter= pending_counter
+                statement.execution_time= execution_time
+                logger.info(f"Done waiting, got {statement.status.phase} with response= {statement.model_dump_json(indent=3)}") 
+                return statement    
+
                 
 
     # ---- Topic related methods ----

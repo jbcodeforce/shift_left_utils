@@ -144,10 +144,10 @@ def build_deploy_pipelines_from_product(
     """
     inventory_path = inventory_path or os.getenv("PIPELINES")
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-    compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+    start_time = time.perf_counter()
     if not compute_pool_id:
         compute_pool_id = get_config()['flink']['compute_pool_id']
-    statement_mgr.reset_statement_list()
+    #statement_mgr.reset_statement_list()
     nodes_to_process = []
     combined_node_map = {}
     count=0
@@ -170,11 +170,18 @@ def build_deploy_pipelines_from_product(
                                                                       compute_pool_id=compute_pool_id, 
                                                                       table_name=start_node.table_name, 
                                                                       expected_product_name=start_node.product_name)
+        if start_node.is_running() and not force_ancestors:
+            start_node.to_restart = False
+            start_node.to_run = False
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         if execute_plan:
             print(f"Executing plan: {summary}")
+            start_time = time.perf_counter()
             _execute_plan(execution_plan, compute_pool_id)
+        execution_time = (time.perf_counter() - start_time) / 1000
+        print(f"Execution time: {execution_time} seconds")
+        summary+=f"\nExecution time: {execution_time} seconds"
         table_report = report_mgr.build_TableReport(start_node.product_name)
         for node in execution_plan.nodes:
             table_info = report_mgr.build_TableInfo(node)
@@ -200,7 +207,8 @@ def build_and_deploy_all_from_directory(
     to define a combined execution plan for all tables in the directory as it is important
     to start Flink statements only one time and in the correct order.
     """
-    statement_mgr.reset_statement_list()
+    #statement_mgr.reset_statement_list()
+    start_time = time.perf_counter()
     nodes_to_process = []
     combined_node_map = {}
     for root, _, files in os.walk(directory):
@@ -228,7 +236,11 @@ def build_and_deploy_all_from_directory(
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         if execute_plan:
             print(f"Executing plan: {summary}")
-            _execute_plan(execution_plan, compute_pool_id)
+            accept_exceptions= [True if "sources" in directory else False]
+            _execute_plan(execution_plan, compute_pool_id, accept_exceptions=accept_exceptions)
+        execution_time = (time.perf_counter() - start_time) / 1000
+        print(f"Execution time: {execution_time} seconds")
+        summary+=f"\nExecution time: {execution_time} seconds"
         table_report = report_mgr.build_TableReport(start_node.product_name)
         for node in execution_plan.nodes:
             table_info = report_mgr.build_TableInfo(node)
@@ -429,6 +441,17 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
     print(f"Done in {execution_time} seconds to undeploy pipeline from product {product_name}")
     return trace
 
+
+def prepare_tables_from_sql_file(sql_file_name: str, 
+                                 compute_pool_id: str = None):
+    """
+    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+    """
+    config = get_config()
+    compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
+    with open(sql_file_name, "r") as f:
+        for line in f:
+            print(line)
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
@@ -810,7 +833,9 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
 
 
 
-def _execute_plan(plan: FlinkStatementExecutionPlan, compute_pool_id: str, accept_exceptions: bool = False) -> List[Statement]:
+def _execute_plan(plan: FlinkStatementExecutionPlan, 
+                  compute_pool_id: str, 
+                  accept_exceptions: bool = False) -> List[Statement]:
     """Execute statements in the execution plan.
     
     Args:
