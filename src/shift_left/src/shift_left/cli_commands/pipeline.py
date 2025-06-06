@@ -69,7 +69,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
         to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree"),
-         children_only: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
+        children_too: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
         parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
         output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
     """
@@ -78,8 +78,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console = Console()
     print(f"Generating pipeline report for table {table_name}")
     try:
-        parent_only = not children_only
-        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path, parent_only, children_only)
+        parent_only = not children_too
+        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path, parent_only, children_too)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -107,11 +107,12 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
     
-    def add_nodes_to_tree(node_data, tree_node):
+    def add_nodes_to_tree(node_data, tree_node, summary: str):
         # Process parents recursively
         if parent_only and node_data.parents:
             for parent in node_data.parents:
                 parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
+                summary+=f"{parent.table_name}\n"
                 # Add file references
                 if parent.dml_ref:
                     parent_node.add(f"[dim]DML: {parent.dml_ref}[/dim]")
@@ -120,12 +121,13 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 parent_node.add(f"[dim]Path: {parent.path}[/dim]")
                 parent_node.add(f"[dim]Type: {parent.type}[/dim]")
                 # Recursively process parents of parents
-                add_nodes_to_tree(parent, parent_node)
+                summary=add_nodes_to_tree(parent, parent_node, summary)
         
         # Process children recursively
-        if children_only and node_data.children:
+        if children_too and node_data.children:
             for child in node_data.children:
                 child_node = tree_node.add(f"[green]{child.table_name}[/green]")
+                summary+=f"\t{child.table_name}\n"
                 # Add file references
                 if child.dml_ref:
                     child_node.add(f"[dim]DML: {child.dml_ref}[/dim]")
@@ -134,18 +136,22 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 child_node.add(f"[dim]Base: {child.path}[/dim]")
                 child_node.add(f"[dim]Type: {child.type}[/dim]")
                 # Recursively process children of children
-                add_nodes_to_tree(child, child_node)
+                summary=add_nodes_to_tree(child, child_node, summary)
+        return summary
     
     # Add the root node details
     tree.add(f"[dim]DML: {pipeline_def.dml_ref}[/dim]")
     tree.add(f"[dim]DDL: {pipeline_def.ddl_ref}[/dim]")
     
     # Add parent nodes
-    add_nodes_to_tree(pipeline_def, tree)
+    summary = ""
+    summary = add_nodes_to_tree(pipeline_def, tree, summary)
     
     # Print the tree
-    console.print(f"\n[bold]Pipeline {'children' if children_only else 'parents'} hierarchy:[/bold]")
+    console.print(f"\n[bold]Pipeline with {'children' if children_too else 'parents'} hierarchy:[/bold]")
     console.print(tree)
+    console.print(f"\n[bold]table names only:[/bold]")
+    console.print(summary)
 
 @app.command()
 def deploy(

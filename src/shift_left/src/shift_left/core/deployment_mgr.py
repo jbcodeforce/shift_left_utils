@@ -1008,6 +1008,7 @@ def _prepare_table_report(table_report: TableReport, base_file_name):
         else:
             non_running_count+=1
         table_count+=1
+    print(f"Writing report to {shift_left_dir}/{base_file_name}_report.csv and {shift_left_dir}/{base_file_name}_report.json")
     with open(f"{shift_left_dir}/{base_file_name}_report.csv", "w") as f:
         f.write(csv_content)
     with open(f"{shift_left_dir}/{base_file_name}_report.json", "w") as f:
