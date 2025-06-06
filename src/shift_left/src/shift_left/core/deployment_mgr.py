@@ -275,27 +275,22 @@ def report_running_flink_statements_for_all_from_directory(
     """
     Review execution plans for all the pipelines in the directory.
     """
-    result = "#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
-    result+= "\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
-    result+= "\tDatabase: " + get_config()['flink']['database_name'] + "\n"
-    config = get_config()
-    count=0
+    # Extract last two folders from directory path
+    path_parts = directory.rstrip('/').split('/')
+    if len(path_parts) >= 2:
+        report_name = f"{path_parts[-2]}_{path_parts[-1]}"
+    else:
+        report_name = path_parts[-1]
+    table_report = report_mgr.build_TableReport(report_name)
     for root, _, files in os.walk(directory):
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            logger.info(f"Build report of running flink statements for {pipeline_def.table_name}")
-            result+= "#"*40 + f" Table: {pipeline_def.table_name} " + "#"*40 + "\n"
-            summary, execution_plan = build_deploy_pipeline_from_table(pipeline_def.table_name, 
-                                                        inventory_path=inventory_path,
-                                                        compute_pool_id=config['flink']['compute_pool_id'],
-                                                        dml_only=False,
-                                                        may_start_descendants=False,
-                                                        force_ancestors=False)
-            result+= summary + "\n"
-            count+=1
-    result+=f"#"*40 + f" Found {count} tables with running flink statements " + "#"*40 + "\n"
+            _update_table_report_with_table_info(pipeline_def, table_report)
+    result = _prepare_table_report(table_report, report_name)
     return result
+
+  
 
 def report_running_flink_statements_for_a_product(
     product_name: str, 
@@ -304,42 +299,16 @@ def report_running_flink_statements_for_a_product(
     """
     Report running flink statements for all the pipelines in the product.
     """
-    table_report = report_mgr.build_TableReport(product_name)
+    table_report = report_mgr.build_TableReport(f"product:{product_name}")
     
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-    for table_name, table_ref_dict in table_inventory.items():
+    for _, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref.product_name == product_name:
             file_path=table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            if pipeline_def:
-                node: FlinkStatementNode = pipeline_def.to_node()
-                node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
-                table_info = report_mgr.build_TableInfo(node)
-                print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {table_info.pending_records}")
-                table_report.tables.append(table_info)
-    table_count=0
-    running_count=0
-    non_running_count=0
-    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records\n"
-    for table in table_report.tables:
-        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at},{table.retention_size},{table.message_count},{table.pending_records}\n"
-        if table.status == 'RUNNING':
-            running_count+=1
-        else:
-            non_running_count+=1
-        table_count+=1
-
-    with open(f"{shift_left_dir}/{product_name}_report.csv", "w") as f:
-        f.write(csv_content)
-    with open(f"{shift_left_dir}/{product_name}_report.json", "w") as f:
-        f.write(table_report.model_dump_json(indent=4))
-    result=f"#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
-    result+=f"\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
-    result+=f"\tDatabase: " + get_config()['flink']['database_name'] + "\n"
-    result+=csv_content
-    result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
-    result+=f"\tNon running tables: {non_running_count}" + "\n"
+            _update_table_report_with_table_info(pipeline_def, table_report)
+    result = _prepare_table_report(table_report, product_name)
     return result   
 
 def full_pipeline_undeploy_from_table(
@@ -1019,6 +988,36 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     """
     return node.product_name == current.product_name
 
+def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinition, table_report: TableReport):
+    if pipeline_def:
+        node: FlinkStatementNode = pipeline_def.to_node()
+        node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
+        table_info = report_mgr.build_TableInfo(node)
+        print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {table_info.pending_records}")
+        table_report.tables.append(table_info)
 
+def _prepare_table_report(table_report: TableReport, base_file_name):
+    table_count=0
+    running_count=0
+    non_running_count=0
+    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records\n"
+    for table in table_report.tables:
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at},{table.retention_size},{table.message_count},{table.pending_records}\n"   
+        if table.status == 'RUNNING':
+            running_count+=1
+        else:
+            non_running_count+=1
+        table_count+=1
+    with open(f"{shift_left_dir}/{base_file_name}_report.csv", "w") as f:
+        f.write(csv_content)
+    with open(f"{shift_left_dir}/{base_file_name}_report.json", "w") as f:
+        f.write(table_report.model_dump_json(indent=4))
+    result=f"#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+=f"\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+=f"\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    result+=csv_content
+    result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
+    result+=f"\tNon running tables: {non_running_count}" + "\n"
+    return result 
 # --- to work on for stateless ---------------
 

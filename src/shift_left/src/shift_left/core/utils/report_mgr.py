@@ -53,7 +53,7 @@ class TableInfo(BaseModel):
     pending_records: float = 0
 
 class TableReport(BaseModel):
-    product_name: str = ""
+    report_name: str = ""
     environment_id: str = ""
     catalog_name: str = ""
     database_name: str = ""
@@ -79,9 +79,9 @@ def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
     else:
         return str(text).ljust(length, padding_char)    
     
-def build_TableReport(product_name: str) -> TableReport:
+def build_TableReport(report_name: str) -> TableReport:
     table_report = TableReport()
-    table_report.product_name = product_name
+    table_report.report_name = report_name
     table_report.environment_id = get_config().get('confluent_cloud').get('environment_id')
     table_report.catalog_name = get_config().get('flink').get('catalog_name')
     table_report.database_name = get_config().get('flink').get('database_name')
