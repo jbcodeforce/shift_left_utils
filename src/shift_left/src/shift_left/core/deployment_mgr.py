@@ -376,7 +376,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
         execution_plan.nodes.reverse()
         print(f"Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
         for node in execution_plan.nodes:
-            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {"RUNNING" if node.is_running() else "NOT RUNNING"} {node.compute_pool_id}")
+            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {'RUNNING' if node.is_running() else 'NOT RUNNING'} {node.compute_pool_id}")
             
         count=0
         trace = f"Full pipeline delete from product {product_name}\n"

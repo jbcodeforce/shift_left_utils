@@ -34,7 +34,7 @@ As Confluent Cloud for Flink is natively integrated with Kafka, the goal of inte
 
 ### 3. Performance Testing
 
-The goal is to assess how long it takes to deploy a complete pipeline, with focus on when data products are available for end consumption. As an example we will take a classical shift_left processing architecture with a timing reprensentation:
+The goal is to assess how long it takes to deploy a complete pipeline, with focus on when data products are available for end consumption. As an example we will take a classical shift_left processing architecture with a timing representation:
 
 <figure markdown="span">
 ![](./images/perf_test_basic.drawio.png)

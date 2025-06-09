@@ -908,22 +908,34 @@ There are multiple choices to deploy a Flink Statement:
     ```
     *  Which can be combined to start everything within the scope of a pipeline
     ```sh
-    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants
+    shift_left  pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants
     ```
     *  Which can be combined to start everything within the scope of a pipeline, defaulting to the given compute-pool-id if not found:
     ```sh
-    pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants --compute-pool-id lfcp-2...
+    shift_left pipeline deploy --from-table p1_fct_order  --force-ancestors --may-start-descendants --compute-pool-id lfcp-2...
     ```
     * Deploy a set of tables within the same layer:
     ```sh
-    pipeline deploy --dir $PIPELINES/sources/p2 --force-ancestors --may-start-descendants
+    shift_left pipeline deploy --dir $PIPELINES/sources/p2 --force-ancestors --may-start-descendants
     ```
     * Deploy a set of tables for a given product:
     ```sh
-    pipeline deploy --product-name p2 --force-ancestors --may-start-descendants
+    shift_left pipeline deploy --product-name p2 --force-ancestors --may-start-descendants
     ```
 
+### Undeploy pipeline
 
+It is possible to undeploy a pipeline from a given table:
+
+```sh
+shift_left pipeline undeploy --table-name p1_fct_order
+```
+
+Or at the product level:
+
+```sh
+shift_left pipeline undeploy --product-name p1
+```
 
 
 ## Troubleshooting the CLI
