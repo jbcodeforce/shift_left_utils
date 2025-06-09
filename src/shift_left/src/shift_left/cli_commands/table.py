@@ -7,16 +7,14 @@ from importlib import import_module
 from rich import print
 from typing_extensions import Annotated
 from shift_left.core.table_mgr import (
-    build_folder_structure_for_table, 
     search_source_dependencies_for_dbt_table, 
     get_short_table_name, 
     update_makefile_in_folder, 
     validate_table_cross_products,
-    search_users_of_table,
     update_sql_content_for_file,
     update_all_makefiles_in_folder,
-    get_or_create_inventory)
-from shift_left.core.process_src_tables import process_one_file
+)
+from shift_left.core.process_src_tables import migrate_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
 from shift_left.core.utils.app_config import shift_left_dir
 import shift_left.core.table_mgr as table_mgr
@@ -89,7 +87,7 @@ def migrate(
         print("[red]Error: SRC_FOLDER and STAGING environment variables need to be defined.[/red]")
         exit(1)
     print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
-    process_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive)
+    migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 
 @app.command()

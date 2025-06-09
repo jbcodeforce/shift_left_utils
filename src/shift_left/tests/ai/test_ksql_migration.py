@@ -68,7 +68,6 @@ class TestKsqlMigration(unittest.TestCase):
         content=self._process_one_ksql_file(ksql_src_file)
         assert content is not None
 
-    
     def test_ksql_f(self):
         ksql_src_file = "ddl-f.ksql"
         content=self._process_one_ksql_file(ksql_src_file)

@@ -3,7 +3,7 @@
 ???- info "Versions"
     * Created 12/2024
     * Updated 02/23: new pipeline helper functions to support sink to source pipeline metadata creation or source to sink.
-    * Update 05/22: New features, and explanation in recipes for better manage Large Flink project.
+    * Update 06/08: New features, and explanation in recipes for better manage Large Flink project.
 
 Recognizing the increasing need for real-time data processing, driven by demands for immediate insights and responsive applications (ultimately benefiting the end customer), this initiative tackles the challenging task of migrating traditional batch pipelines to modern, stream-based architectures using Apache Flink. 
 
@@ -36,7 +36,10 @@ The target environment will be Apache Flink running within the Confluent Cloud a
 
 At the system context level, for the tools of this repository, we can see the following high level components:
 
+<figure markdown='span'>
 ![](./images/components.drawio.png)
+<capture>Shift Left project system context</capture>
+</figure>
 
 1. The source project to migrate: could be dbt or SQL
 1. The new Flink project repository, where the project structure is built with a specific tool
@@ -46,11 +49,14 @@ At the system context level, for the tools of this repository, we can see the fo
 1. Pipeline dependencies is a tool to get understanding of the sink to source pipeline and from the source to sink too. There is another tool that help assess which tables use a given table.
 1. Finally pipeline deployment help to automate, and pace the deployment of a given pipeline.
 
-## Shift_left tooling
+## Shift_left tool
 
 The following diagram illustrates the development environment which, mainly, uses two docker container containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
 
+<figure markdown='span'>
 ![](./images/environment.drawio.png)
+<capture>shift_left tool context</capture>
+</figure>
 
 The `shift_left` cli groups a set of Python tools, Python 3.13.1 and the needed libraries to integrate with Ollama, and Confluent Cloud via REST APIs . The [ollama image](https://hub.docker.com/r/ollama/ollama) is used to run **qwen2.5-coder:32b** LLM model locally on the developer's computer.
 
@@ -60,9 +66,12 @@ If the developer laptop does not have enough capacity, there is an option to run
 
 ## A migration path
 
-Any batch pipelines that create tables or files in a Lakehouse platform can be refactored using Flink pipelines, as illustrated in the following figure:
+Any batch pipelines that create tables or files in a Lakehouse platform can be refactored using Apache Flink pipelines, as illustrated in the following figure:
 
+<figure markdown='span'>
 ![](./images/generic_src_to_sink_flow.drawio.png)
+<capture>Shifting left the data pipeline processing</capture>
+</figure>
 
 In the diagram above, the architecture employs a sink configured as a PostgreSQL database, which will support business intelligence dashboards. It can also be a set of Iceberg tables persisted in an object storage. The Flink tables are mapped to Kafka topics, and Kafka connectors are used to transfer data from these topics to the PostgreSQL database. On the left side of the diagram source topics content is coming from Change Data Capture.
 
@@ -161,13 +170,13 @@ Adopt the naming convention from the change data capture, like Debezium for the 
 
 As a developer of this project read:
 
-[:material-source-branch: the contribution article](./contributing.md){ .md-button }
+[:material-source-branch: How to contribute article](./contributing.md){ .md-button }
 [:material-map-marker-star-outline: Code structure and development practices](./coding/index.md){ .md-button }
 
-As a Data engineers read:
+As a Data engineer read:
 
 [:material-database-marker: The recipe for data engineers and the corresponding referenced practices](./recipes.md#data-engineer-centric-use-cases){ .md-button }
 
-As Site Reliable engineers read:
+As Site Reliable Engineer read:
 
 [:material-sitemap: The recipe for SRE and the corresponding referenced practices](./recipes.md#deployment-centric-use-cases-for-sres){ .md-button }
