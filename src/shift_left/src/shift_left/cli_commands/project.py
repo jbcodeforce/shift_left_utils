@@ -22,7 +22,7 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def init(project_name: Annotated[str, typer.Argument(help= "Name of project to create")] = "default_data_project", 
             project_path: Annotated[str, typer.Argument(help= "")] = "./tmp", 
-            project_type: Annotated[str, typer.Option()] = DATA_PRODUCT_PROJECT_TYPE):
+            project_type: Annotated[str, typer.Option()] = KIMBALL_PROJECT_TYPE):
     """
     Create a project structure with a specified name, target path, and optional project type. 
     The project type can be one of `kimball` or `data_product`. 

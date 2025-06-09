@@ -83,12 +83,12 @@ def migrate(
     """
     print("#" * 30 + f" Migrate source SQL Table defined in {sql_src_file_name}")
     if not sql_src_file_name.endswith(".sql"):
-        print("[red]Error: the first parameter needs to be a dml sql file[/red]")
+        print("[red]Error: the sql_src_file_name parameter needs to be a dml sql file[/red]")
         exit(1)
-    if not os.getenv("SRC_FOLDER"):
-        print("[red]Error: SRC_FOLDER environment variable needs to be defined.[/red]")
+    if not os.getenv("SRC_FOLDER") and not os.getenv("STAGING"):
+        print("[red]Error: SRC_FOLDER and STAGING environment variables need to be defined.[/red]")
         exit(1)
-    print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} with its pipeline: {recursive}")
+    print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
     process_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 

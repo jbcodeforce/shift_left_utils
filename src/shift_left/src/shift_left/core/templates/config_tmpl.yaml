@@ -44,6 +44,7 @@ app:
   products: ["p1", "p2", "p3"]
   cache_ttl: 120 # in seconds
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
+  translator_to_flink_sql_agent: shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent
   dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
   compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
   data_limit_column_name_to_select_from: tenant_id

@@ -111,7 +111,7 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
     if table_info.status == "RUNNING":
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
-        table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
+        #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
                 
     return table_info
 

@@ -11,6 +11,7 @@ nav:
     - CLI References: command.md
     - Test Harness: test_harness.md
     - Pipeline management: pipeline_mgr.md
+    - Performance Testing: perf_test.md
   - For Contributors:
       - Contributing: contributing.md
       - Code structure: coding/index.md

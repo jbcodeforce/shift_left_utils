@@ -8,7 +8,7 @@ import importlib.resources
 from typing import Tuple, List
 from shift_left.core.utils.file_search import create_folder_if_not_exist
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
@@ -24,13 +24,12 @@ def build_project_structure(project_name: str,
     create_folder_if_not_exist(os.path.join(project_folder, "pipelines"))
     create_folder_if_not_exist(os.path.join(project_folder, "staging"))
     create_folder_if_not_exist(os.path.join(project_folder, "docs"))
-    create_folder_if_not_exist(os.path.join(project_folder, "logs"))
     if project_type == DATA_PRODUCT_PROJECT_TYPE:
         _define_dp_structure(os.path.join(project_folder, "pipelines"))
     else:
         _define_kimball_structure(os.path.join(project_folder, "pipelines"))
     #os.chdir(project_folder)
-    _initialize_git_repo(".")
+    _initialize_git_repo(project_folder)
     _add_important_files(project_folder)
         
 
@@ -47,7 +46,7 @@ def get_topic_list(file_name: str):
 # --- Private APIs ---
 
 def _initialize_git_repo(project_folder: str):
-    logger.info(f"_initialize_git_repo({project_folder})")
+    print(f"initialize_git_repo({project_folder})")
     try:
         subprocess.run(["git", "init"], check=True, cwd=project_folder)
     except subprocess.CalledProcessError as e:
@@ -58,7 +57,6 @@ def _define_dp_structure(pipeline_folder: str):
     create_folder_if_not_exist(data_folder)
     create_folder_if_not_exist(data_folder + "/intermediates")
     create_folder_if_not_exist(data_folder + "/facts")
-    create_folder_if_not_exist(data_folder + "/dimensions")
     create_folder_if_not_exist(data_folder + "/sources")
 
 def _define_kimball_structure(pipeline_folder: str):
@@ -66,13 +64,23 @@ def _define_kimball_structure(pipeline_folder: str):
     create_folder_if_not_exist(pipeline_folder + "/facts")
     create_folder_if_not_exist(pipeline_folder + "/dimensions")
     create_folder_if_not_exist(pipeline_folder + "/sources")
+    create_folder_if_not_exist(pipeline_folder + "/views")
 
 def _add_important_files(project_folder: str):    
     logger.info(f"add_important_files({project_folder}")
-    for file in ["common.mk", "config_tmpl.yaml"]:
+    for file in ["common.mk"]:
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
         shutil.copyfile(template_path, os.path.join(project_folder, "pipelines", file))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath(".env_tmpl")
     shutil.copyfile(template_path, os.path.join(project_folder, ".env"))
+    # Update FLINK_PROJECT in .env file with project folder path
+    env_file = os.path.join(project_folder, ".env")
+    with open(env_file, 'r') as f:
+        env_content = f.read()
+    env_content = env_content.replace("FLINK_PROJECT=", f"FLINK_PROJECT={project_folder}")
+    with open(env_file, 'w') as f:
+        f.write(env_content)
     template_path = importlib.resources.files("shift_left.core.templates").joinpath(".gitignore_tmpl")  
     shutil.copyfile(template_path, os.path.join(project_folder, ".gitignore"))
+    template_path = importlib.resources.files("shift_left.core.templates").joinpath("config_tmpl.yaml")
+    shutil.copyfile(template_path, os.path.join(shift_left_dir, "config.yaml"))

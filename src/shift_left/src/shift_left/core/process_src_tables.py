@@ -11,7 +11,8 @@ there is one pipeline per sink table.
 import os
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
-from shift_left.core.utils.flink_sql_code_agent_lg import translate_to_flink_sqls
+
+from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist, 
     SCRIPTS_DIR,
@@ -35,7 +36,7 @@ TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
 # ---- PUBLIC APIs ----
 
-def process_one_file(table_name: str,
+def migrate_one_file(table_name: str,
                     sql_src_file: str, 
                     staging_target_folder: str, 
                     src_folder_path: str,
@@ -64,7 +65,7 @@ def process_from_table_name(table_name: str, staging_folder: str, src_folder_pat
     if table_name in all_files:
         matching_sql_file=all_files[table_name]
         logger.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
-        process_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
+        migrate_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
     else:
         logger.error(f"Matching sql file {table_name} not found in {all_files}!")
 
@@ -128,17 +129,6 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
 
-def _create_test_dedup(table_name: str, target_folder: str):
-    file_name=f"{target_folder}/validate_no_duplicate.sql" 
-    env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    sql_template = env.get_template(f"{TEST_DEDUL_TMPL}")
-    context = {
-        'table_name': table_name,
-    }
-    rendered_sql = sql_template.render(context)
-    logger.info(f"writing file {file_name}")
-    with open(file_name, 'w') as f:
-        f.write(rendered_sql)
     
 def _process_ddl_file(file_path: str, sql_file: str):
     """
@@ -233,13 +223,14 @@ def _process_non_source_sql_file(table_name: str,
     where_to_write_path = os.path.join(target_path, product_path)
     table_folder, internal_table_name = build_folder_structure_for_table(table_name, where_to_write_path, None)
     parents=[]
+    translator_agent = get_or_build_sql_translator_agent()
     with open(sql_src_file_name, "r") as f:
         sql_content= f.read()
         parser = SQLparser()
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        dml, ddl = translate_to_flink_sqls(table_name, sql_content)
+        dml, ddl = translator_agent.translate_to_flink_sqls(table_name, sql_content)
         _save_dml_ddl(table_folder, internal_table_name, dml, ddl)
     if walk_parent:
         parents=_remove_already_processed_table(parents)

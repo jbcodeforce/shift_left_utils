@@ -74,7 +74,7 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             if response is not None:
                 if response.status_code == 404:
-                    logger.warning(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
+                    logger.debug(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
                     logger.debug(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
                     return result

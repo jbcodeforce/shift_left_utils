@@ -179,7 +179,7 @@ def build_deploy_pipelines_from_product(
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()
             _execute_plan(execution_plan, compute_pool_id)
-        execution_time = (time.perf_counter() - start_time) / 1000
+        execution_time = (time.perf_counter() - start_time)
         print(f"Execution time: {execution_time} seconds")
         summary+=f"\nExecution time: {execution_time} seconds"
         table_report = report_mgr.build_TableReport(start_node.product_name)
@@ -238,7 +238,7 @@ def build_and_deploy_all_from_directory(
             print(f"Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
             _execute_plan(execution_plan, compute_pool_id, accept_exceptions=accept_exceptions)
-        execution_time = (time.perf_counter() - start_time) / 1000
+        execution_time = (time.perf_counter() - start_time)
         print(f"Execution time: {execution_time} seconds")
         summary+=f"\nExecution time: {execution_time} seconds"
         table_report = report_mgr.build_TableReport(start_node.product_name)

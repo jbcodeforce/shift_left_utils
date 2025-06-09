@@ -14,7 +14,7 @@ run-test-suite    Run all the unit tests or a specified test case by sending dat
 delete-tests      Delete the Flink statements and kafka topics used for unit tests for a given table.
 ```
 
-[See usage paragraph](#usage--recipe)
+[See usage paragraph](#usage-and-recipe)
 
 ## Context
 
@@ -56,7 +56,7 @@ The following diagram illustrates a  target unit testing environment:
 
 
 
-## Usage / Recipe
+## Usage and Recipe
 
 * Select a table to test the logic from. This test tool is relevant for DML with complex logic. In this example `user_role` has a join between three tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`:
   ```sql

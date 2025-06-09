@@ -10,17 +10,23 @@ from shift_left.core.models.flink_statement_model import Statement
 
 # use structured output to get the sql from LLM output
 class FlinkSql(BaseModel):
-    sql: str
+    dml_sql: str
+    ddl_sql: str
 
 translator_system_prompt= """
-you are an agent expert in Apache Flink SQL and Confluent kSQL.
-Your goal is to translate a ksqlDB script into Apache Flink SQL for real-time processing.
+you are a code assistant, expert in Apache Flink SQL and Confluent kSQL.
+Your goal is to translate a ksqlDB script into Apache Flink SQL script representing the same semantic.
 
 * Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 * Do not use VARCHAR prefer STRING. 
-* Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE
+* Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE or CREATE STREAM
 * use an INSERT INTO statement to continuously write to the table when the source is a stream
+* EMIT CHANGES is a specific clause of ksqlDB's continuous query semantics. In Flink SQL, an INSERT INTO statement is used to continuously write to the table.
 * When the sql contains LATEST_BY_OFFSET(column_name), it should be translated to column_name in a DML statement
+* Flink SQL uses LOCATE(substring, string, [start_position]) which is similar to ksqlDB's INSTR, but it doesn't have the occurrence parameter.
+* To find the n-th occurrence, you'd typically need to nest LOCATE calls or use regular expressions.
+* The ksqlDB INSTR(field_name, ' ',-1, 1) looks for the last space. In Flink SQL, you can achieve this by searching from the end of the string. 
+* LOCATE(' ', field_name, LENGTH(field_name) - X) where X is a suitable offset from the end
 * The KSQL LATEST_BY_OFFSET combined with GROUP BY dbTable on a stream effectively creates a materialized view (a table) where for each unique dbTable, the latest values for all other columns are maintained.
 * consider stream in ksql to be translated as a table in flink
 
@@ -46,6 +52,7 @@ Finish the statement with the following declaration:
    'scan.startup.mode' = 'earliest-offset',
    'value.fields-include' = 'all'
 )
+generate in json format clearly separating the dml and ddl statements. 
 """
 
 translator_prompt_template = """
@@ -53,8 +60,8 @@ ksql_input: {sql_input}
 """
 
 flink_sql_syntax_checker_system_prompt = """
-you are an agent expert in Apache Flink SQL syntax.
-Your goal is to check the syntax of the following Apache Flink SQL statement.
+you are,a code assistant, expert in Apache Flink SQL syntax.
+Your goal is to check the syntax of the following Apache Flink SQL statement and fix the reported error.
 amd generate a syntaxically valid SQL script.
 
 When the sql starts with CREATE TABLE, be sure to replace existing WITH clause with the following declaration:
@@ -76,13 +83,14 @@ When the sql starts with CREATE TABLE, be sure to replace existing WITH clause w
 syntax_checker_prompt_template = """
 flink_sql_input: {sql_input}
 history of the conversation: {history}
+reported error: {error_message}
 """
 
 class KsqlToFlinkSqlAgent:
 
     def __init__(self):
-        #self.model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
-        self.model_name=os.getenv("LLM_MODEL","mistral-small:latest")
+        self.qwen_model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
+        self.mistral_model_name=os.getenv("LLM_MODEL","mistral-small:latest")
         self.llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 
 
@@ -108,42 +116,50 @@ class KsqlToFlinkSqlAgent:
             {"role": "system", "content": translator_system_prompt},
             {"role": "user", "content": translator_prompt_template.format(sql_input=sql)}
         ]
-        response= chat(model=self.model_name, 
+        response= chat(model=self.qwen_model_name, 
                         format=FlinkSql.model_json_schema(), 
                         messages=messages, 
                         options={'temperature': 0}
                         )
         obj_response = FlinkSql.model_validate_json(response.message.content)
-        return obj_response.sql
+        return obj_response.dml_sql, obj_response.ddl_sql
 
-    def _syntax_checker_agent(self, sql: str, history: str) -> str:
+    def _syntax_checker_agent(self, sql: str, 
+                              history: str,
+                              error_message: str) -> str:
         messages=[
             {"role": "system", "content": flink_sql_syntax_checker_system_prompt},
-            {"role": "user", "content": syntax_checker_prompt_template.format(sql_input=sql, history=history)}
+            {"role": "user", "content": syntax_checker_prompt_template.format(sql_input=sql, history=history, error_message=error_message)}
         ]
-        response= chat(model=self.model_name, 
+        response= chat(model=self.mistral_model_name, 
                         format=FlinkSql.model_json_schema(), 
                         messages=messages, 
                         options={'temperature': 0}
                         )
         obj_response = FlinkSql.model_validate_json(response.message.content)
-        return obj_response.sql
+        return obj_response.dml_sql
 
-    def translate_from_ksql_to_flink_sql(self, ksql: str) -> str:
+
+
+    def translate_from_ksql_to_flink_sql(self, ksql: str) -> Tuple[str, str]:
         """
         Entry point to translate ksql to flink sql
         """
         agent_history = []
         final_sql_created = False
         iteration_count = 0
-        translated_sql = self._translator_agent(ksql)
-        print(f"Done with translator agent {translated_sql}")
+        translated_sql, ddl_sql = self._translator_agent(ksql)
+        print(f"Done with translator agent:\n {translated_sql}\n{ddl_sql}")
+        error_message = ""
         while not final_sql_created and iteration_count < 3:
             iteration_count += 1
-            final_sql = self._syntax_checker_agent(translated_sql, agent_history)
+            final_sql = self._syntax_checker_agent(translated_sql, agent_history, error_message)
             print(f"Process with syntax checker agent {iteration_count}")
             agent_history.append({"agent": "syntax_checker", "sql": final_sql})
-                    
+            final_sql_created, status_detail = self._validate_flink_sql_on_cc("EXPLAIN " + final_sql)
+            if not final_sql_created:
+                print(f"Error: {status_detail}")
+                error_message = status_detail
         return final_sql
 
 

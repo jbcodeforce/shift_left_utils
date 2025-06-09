@@ -36,7 +36,7 @@ model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
 
 translator_prompt_template = """
-you are qwen-coder, an agent expert in Apache Flink SQL and  DBT (Data Build Tool). 
+you are qwen-coder, a code assistant, expert in Apache Flink SQL and  DBT (Data Build Tool). 
 Translate the following DML SQL batch script into Apache Flink SQL for real-time processing.
 Replace dbt utility functions with equivalent Flink SQL functions.
 Maintain the original logic and functionality.
@@ -44,11 +44,15 @@ Maintain the original logic and functionality.
 * Keep all the select statements defined with the WITH keyword.
 * Do not add suggestions or explanations in the response, just return the structured Flink sql output.
 * Do not use VARCHAR prefer STRING. 
-* Transform the dbt function `surrogate_key` to a MD5(CONCAT_WS()) equivalent.  Start the contact argument with the char ' as a first field to concat with.
+* Transform the dbt function `surrogate_key` to a MD5(CONCAT_WS()) equivalent.  
+* Start the contact argument with the char , as a first field to concat with, as an example: MD5(CONCAT_WS(','))
 * end each line with , for the select part of the query. Do not start a row content with ','
-* any _pk_fk substring needs to be changed to _sid 
-* remove  the string ```sql line
-* remove line with only ```  string
+* change left anti join to left join with where condition on the right side key. For example: 
+the SQL: "left anti join left_table on right_table.role_id = left_table.role_id and  right_table.__db = left_table.tenant_id"
+should be changed to: "left join left_table on right_table.role_id = left_table.role_id and  right_table.__db = left_table.tenant_id where right_table.role_id is null or right_table.__db is null"
+* for any '_pk_fk substring change to '_sid' 
+* remove line with the string: ```sql
+* remove line with  ``` string
 
 Start the generated code with:
 
@@ -58,21 +62,20 @@ Question: {sql_input}
 """
 
 flink_sql_syntaxic_template="""
-you are qwen-coder, an agent expert in Apache Flink SQL syntax. Your goal is to generate a cleaner Apache Flink SQL
-statement from the following  statement: {flink_sql}.
+you are qwen-coder, a code assistant, expert in Apache Flink SQL syntax. Your goal is to generate a syntactically correct Apache Flink SQL
+statement from the following Flink SQL statement: {flink_sql}.
 
-Use back quote character like ` around column name when column name match any SQL keyword. As an example a column named value should be `value` 
+Use back quote character like ` around column name when column name matches any SQL keywords. As an example a column named value should be `value` 
 while a column named tenant_id should be tenant_id. 
 
-* remove  the string ```sql line
+* remove  line with the string ```sql
 * remove line with only ```  string
-
 
 Do not generate explanations for the fixes you did.
 """
 
 flink_ddl_generation_template="""
-you are qwen-coder an agent expert in Apache Flink SQL. Your goal is to build a CREATE TABLE Apache Flink SQL
+you are qwen-coder, a code assistant, expert in Apache Flink SQL. Your goal is to build a CREATE TABLE Apache Flink SQL
 statement from the current flink sql insert into statement like:
 
 {flink_sql}
@@ -86,7 +89,7 @@ Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-Remove column named: dl_landed_at, __ts_ms, __source_ms within create table or  select statement.
+Remove column named: dl_landed_at, __ts_ms, __source_ms within create table or select statement.
 
 Finish the statement with the following declaration:
    PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
@@ -95,10 +98,10 @@ Finish the statement with the following declaration:
    'kafka.cleanup-policy'= 'compact',
    'key.avro-registry.schema-context' = '.flink-dev',
    'value.avro-registry.schema-context' = '.flink-dev',
-  'key.format' = 'avro-registry',
-  'value.format' = 'avro-registry',
-  'kafka.retention.time' = '0',
-  'kafka.producer.compression.type' = 'snappy',
+   'key.format' = 'avro-registry',
+   'value.format' = 'avro-registry',
+   'kafka.retention.time' = '0',
+   'kafka.producer.compression.type' = 'snappy',
    'scan.bounded.mode' = 'unbounded',
    'scan.startup.mode' = 'earliest-offset',
    'value.fields-include' = 'all'
@@ -144,15 +147,13 @@ class AgentState(TypedDict):
     flink_sql: str
     derived_ddl: str
 
-
-    
 def define_flink_sql_agent():
     
     def run_translator_agent(state):
         """
         change the sql_input string to the matching flink sql statement, and keep in state.flink_sql
         """
-        print(f"\n--- Start translator AI Agent ---")
+        print(f"\n--- Start the `translator AI Agent ---")
         prompt = ChatPromptTemplate.from_template(translator_prompt_template) 
         chain = prompt | model 
         llm_out = chain.invoke(state)
@@ -186,6 +187,7 @@ def define_flink_sql_agent():
         better_sql=extract_sql_blocks(sql)
         print(f" --- Done Clean SQL Agent: \n{better_sql}")
         return {"flink_sql": better_sql}
+    
     
 
     workflow = StateGraph(AgentState)

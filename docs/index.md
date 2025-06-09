@@ -52,33 +52,32 @@ The following diagram illustrates the development environment which, mainly, use
 
 ![](./images/environment.drawio.png)
 
-The shift left utils docker image groups a set of Python tools, Python 3.13.1 and the needed libraries to integrate with Ollama, like using LLM client API with Langgraph. The [ollama image](https://hub.docker.com/r/ollama/ollama) is used to run **qwen2.5-coder:32b** LLM model locally on the developer's computer.
+The `shift_left` cli groups a set of Python tools, Python 3.13.1 and the needed libraries to integrate with Ollama, and Confluent Cloud via REST APIs . The [ollama image](https://hub.docker.com/r/ollama/ollama) is used to run **qwen2.5-coder:32b** LLM model locally on the developer's computer.
 
 Follow the [setup instructions to get started with the migration project](./setup.md).
 
-If the developer laptop does not have enough capacity, there is an option to run Ollama on an EC2 server.
+If the developer laptop does not have enough capacity, there is an option to run Ollama on an EC2 machine with GPUs.
 
 ## A migration path
 
-Any batch pipelines that create tables or files in a Lakehouse platform can be refactored using a Flink pipeline, as illustrated in the following figure:
+Any batch pipelines that create tables or files in a Lakehouse platform can be refactored using Flink pipelines, as illustrated in the following figure:
 
 ![](./images/generic_src_to_sink_flow.drawio.png)
 
-The diagram above illustrates the target architecture for each pipeline after migration. This architecture employs a sink configured as a PostgreSQL database, which will support business intelligence dashboards. The Flink tables are mapped to Kafka topics, and Kafka connectors are utilized to transfer data from these topics to the PostgreSQL database.
+In the diagram above, the architecture employs a sink configured as a PostgreSQL database, which will support business intelligence dashboards. It can also be a set of Iceberg tables persisted in an object storage. The Flink tables are mapped to Kafka topics, and Kafka connectors are used to transfer data from these topics to the PostgreSQL database. On the left side of the diagram source topics content is coming from Change Data Capture.
 
 From the perspective of a Confluent Cloud Flink pipeline, the last topic serves as the sink.
 
-To facilitate the refactoring, the approach begins with the sink table and works backward to identify the sources. Once the sources are determined, the process may involve implementing a set of deduplication statements and intermediate steps to apply business logic or data transformations.
+To facilitate the refactoring, the approach begins with the sink table and works backward to identify the sources. Once the sources are determined, the process may involve implementing a set of deduplication statements and intermediate steps to apply some business logic and data transformations.
 
-The dbt project contains all the SQL statements necessary for migration, located in the models folder. The goal of the tools is to process these files and replicate the same organizational structure for Flink SQL statements, which includes sources, intermediates, staging, dimensions, and facts. Additionally, the tools aim to automate parts of the migration process.
+The dbt project contains all the SQL statements necessary to do a classical bronze to gold landing zone transformation. The goal of the shift_left migration tools is to process these files and replicate the same organizational structure for the Flink SQL statements, which includes sources, intermediates, dimensions, and facts, but adapting the SQL structure due to the power fo Apache Flinkc. 
 
-
-The target structure will look like in the following example:
+The target Flink project structure will look like in the following example:
 
 ```sh
 pipelines
 ├── dimensions
-│   └── {application_name}
+│   └── {data_product_name}
 │       └── {dimension_name}
 │           ├── Makefile
 │           ├── sql-scripts
@@ -86,7 +85,7 @@ pipelines
 │           │   └── dml.{dim_trainee}.sql
 │           └── tests
 ├── facts
-│   └── {application_name}
+│   └── {data_product_name}
 │       └─── {fact_name}
 │           ├── Makefile
 │           ├── sql-scripts
@@ -94,7 +93,7 @@ pipelines
 │           │   └── dml.{fact_name}.sql
 │           └── tests
 ├── intermediates
-│   └── {application_name}
+│   └── {data_product_name}
 │       └─── {fact_name}
 │          ├── Makefile
 │          ├── sql-scripts
@@ -102,7 +101,7 @@ pipelines
 │          │   └── dml.{intermediate_name}.sql
 │          └── tests
 ├── sources
-│   └── {application_name}
+│   └── {data_product_name}
 │       ├── {src_name}
 │           ├── Makefile
 │           ├── dedups
@@ -111,6 +110,40 @@ pipelines
 │               └── ddl.{src_name}.sql
 
 ```
+
+### An illustrative example
+
+The `src/shift_left/tests/data` folder includes a dbt project used to demonstrate the power of LLM for automatic migration. The dbt is an example of ELT batch processing including a set of SQL scripts organized by sources, intermediates and facts scripts. 
+
+1. The source file to migrate is [data/dbt-project/facts/p7/fct_user_role.sql](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/tests/data/dbt-project/facts/p7/fct_user_role.sql). This file includes references to dbt table names, macros, and then templated SQL statements.
+1. When starting a new project, Data engineers, may create the target Flink project, using the Kimball architecture, with the following command:
+    ```sh
+    shift_left project init demo-flink-project ~/Code
+    ```
+
+1. Modify the config.yaml file to reflect the Confluent Cloud environment. [See dedicated note on the config.yaml](./setup.md/#set-up-configuration-yaml-file), but for migration the only important parameters are:
+    ```yaml
+    confluent_cloud:
+    flink:
+    app:
+    ```
+
+1. Modify the set of mandatory environment variables for the Confluent Cloud environment in the `.env` file under the project, then:
+    ```sql
+    source ~/Code/demo-flink-project/.env
+    ```
+
+1. Understand the dependencies of the table to migrate:
+    ```sql
+    shift_left table search-source-dependencies $SRC_FOLDER/facts/p7/fct_user_role.sql
+    ```
+    
+1. Then for each table to migrate, run the command:
+    ```sql
+    shift_left table migrate user_role  $SRC_FOLDER/facts/p7/fct_user_role.sql $STAGING --recursive
+    ```
+
+This command can take some time as it involves multiple calls to LLM.
 
 ## Source Topic management
 

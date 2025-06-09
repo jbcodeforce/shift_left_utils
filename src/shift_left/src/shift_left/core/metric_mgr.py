@@ -81,6 +81,7 @@ def _process_results(statement_result: StatementResult, result: int) -> int:
 def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     """
     Get the pending records for a statement using the REST API metrics endpoint.
+    Metric data points are typically available for query in the API within 5 minutes of their origination at the source.
     """
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
