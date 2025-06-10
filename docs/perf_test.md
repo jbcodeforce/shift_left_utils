@@ -34,7 +34,13 @@ As Confluent Cloud for Flink is natively integrated with Kafka, the goal of inte
 
 ### 3. Performance Testing
 
-The goal is to assess how long it takes to deploy a complete pipeline, with focus on when data products are available for end consumption. As an example we will take a classical shift_left processing architecture with a timing representation:
+The goal are: 
+
+1. To measure how it takes to deploy Flink Statements for a table, a pipeline, a data product
+1. To assess how long it takes for a data created at the source is available for end consumption. 
+1. To assess how long it takes to process the lag of data in the first topics representing raw data
+
+As an example, we will take a classical shift left processing architecture with a timing representation:
 
 <figure markdown="span">
 ![](./images/perf_test_basic.drawio.png)
@@ -43,16 +49,16 @@ The goal is to assess how long it takes to deploy a complete pipeline, with focu
 * Throughput Testing
 
     * Measure maximum processing rate (events/second)
-    * Test with different message sizes
     * Evaluate parallel processing capabilities
-    * Monitor CPU and memory usage
 
 * Latency Testing
 
     * Measure end-to-end processing latency
-    * Test with different window sizes
-    * Evaluate backpressure handling
-    * Monitor network latency
+
+* Scalability Testing
+
+    * Test horizontal scaling by assessing CFU increase up to the limit, control those statements to assess if we need to split them.
+    * Test with increasing data volumes
 
 * Scalability Testing
 
@@ -60,6 +66,14 @@ The goal is to assess how long it takes to deploy a complete pipeline, with focu
     * Evaluate job manager performance
     * Test with increasing data volumes
     * Monitor resource utilization
+
+**Metrics to use:**
+
+* Get time stamp when the statement is created
+* Time stamp when deploy is started and finished
+* Time stamp when the LAG is processed
+* Number of message per second processed per Flink statement
+* Time stamp from source to destination for a given transaction
 
 ### 4. Blue/Green Deployment Testing
 

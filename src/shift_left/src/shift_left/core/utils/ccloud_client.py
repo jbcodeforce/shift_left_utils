@@ -168,7 +168,7 @@ class ConfluentCloudClient:
             try:
                 statement = self.get_flink_statement(statement_name)
             except Exception as e:
-                if error_counter > 3:
+                if error_counter > 5:
                     logger.error(f">>>> wait_response() there is an error waiting for response {e}")
                     raise Exception(f"Done waiting with response because of error {e}")
                 else:
@@ -181,7 +181,8 @@ class ConfluentCloudClient:
                 pending_counter+=1
                 if pending_counter % 3 == 0:
                     timer+= 10
-                if pending_counter >= 10:
+                    print(f"Wait {statement_name} deployment, increase wait response timer to {timer} seconds")
+                if pending_counter >= 23:
                     logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
                     execution_time = time.perf_counter() - start_time
                     error_statement = Statement.model_validate({"name": statement_name, 
@@ -353,4 +354,5 @@ class ConfluentCloudClient:
             logger.error(f"Error executing rest call: {e}")
             return None
      
+
 

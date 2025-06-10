@@ -6,7 +6,7 @@ import unittest
 import shutil
 from unittest.mock import patch
 import os, pathlib
-from shift_left.core.process_src_tables import process_one_file
+from shift_left.core.process_src_tables import migrate_one_file
 
 DDL="""
     CREATE TABLE IF NOT EXISTS a_table (
@@ -47,23 +47,27 @@ class TestProcessSrcTable(unittest.TestCase):
         os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
 
-    @patch("shift_left.core.process_src_tables.translate_to_flink_sqls")
-    def test_process_one_file(self, mock_llm_result):
-        mock_llm_result.return_value = (DML, DDL)
+    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
+    def test_process_one_file(self,TranslatorToFlinkSqlAgent):
+
+        mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
+        mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
      
         shutil.rmtree(os.getenv("STAGING"))
-        process_one_file("a_table",
+        migrate_one_file("a_table",
             os.getenv("SRC_FOLDER") + "/facts/p5/a.sql",   
             os.getenv("STAGING"),   
                 os.getenv("SRC_FOLDER"),
             False)
         assert os.path.exists( os.getenv("STAGING") + "/facts/p5/")
 
-    @patch("shift_left.core.process_src_tables.translate_to_flink_sqls")
-    def test_process_one_file_recurring(self, mock_llm_result):
-        mock_llm_result.return_value = (DML, DDL)
+    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
+    def test_process_one_file_recurring(self, TranslatorToFlinkSqlAgent):
+
+        mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
+        mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
         shutil.rmtree(os.getenv("STAGING"))
-        process_one_file("a_table",
+        migrate_one_file("a_table",
             os.getenv("SRC_FOLDER") + "/facts/p5/a.sql",   
             os.getenv("STAGING"),   
                 os.getenv("SRC_FOLDER"),

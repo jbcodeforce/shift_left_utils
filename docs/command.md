@@ -61,7 +61,7 @@ $ project init [OPTIONS] [PROJECT_NAME] [PROJECT_PATH]
 
 **Options**:
 
-* `--project-type TEXT`: [default: data_product]
+* `--project-type TEXT`: [default: kimball]
 * `--help`: Show this message and exit.
 
 ### `project list-topics`
@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1079ba540&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1078b6f30&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -409,9 +409,9 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report`: Generate a report showing the static...
 * `deploy`: Deploy a pipeline from a given table name...
 * `build-execution-plan`: From a given table, this command goes all...
-* `deploy-source-only`: Deploy only the source tables for a given...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
+* `prepare`: Execute the content of the sql file, line...
 
 ### `pipeline build-metadata`
 
@@ -488,7 +488,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--yaml`: Output the report in YAML format
 * `--json`: Output the report in JSON format
 * `--graph`: Output the report in Graphical tree
-* `--children-only / --no-children-only`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-only]
+* `--children-too / --no-children-too`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-too]
 * `--parent-only / --no-parent-only`: By default the report includes only parents  [default: parent-only]
 * `--output-file-name TEXT`: Output file name to save the report.
 * `--help`: Show this message and exit.
@@ -546,25 +546,6 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--help`: Show this message and exit.
 
-### `pipeline deploy-source-only`
-
-Deploy only the source tables for a given product name. This will run in parallel, drop existing tables.
-
-**Usage**:
-
-```console
-$ pipeline deploy-source-only [OPTIONS] PRODUCT_NAME
-```
-
-**Arguments**:
-
-* `PRODUCT_NAME`: The product name to deploy the source tables from.  [required]
-
-**Options**:
-
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
-* `--help`: Show this message and exit.
-
 ### `pipeline report-running-statements`
 
 Assess for a given table, what are the running dmls from its descendants. When the directory is specified, it will report the running statements from all the tables in the directory.
@@ -577,7 +558,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -593,14 +574,34 @@ From a given sink table, this command goes all the way to the full pipeline and 
 **Usage**:
 
 ```console
-$ pipeline undeploy [OPTIONS] TABLE_NAME INVENTORY_PATH
+$ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 ```
 
 **Arguments**:
 
-* `TABLE_NAME`: The sink table name containing pipeline_definition.json, from where the undeploy will run.  [required]
-* `INVENTORY_PATH`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
+* `--table-name TEXT`: The sink table name from where the undeploy will run.
+* `--product-name TEXT`: The product name to undeploy from
+* `--help`: Show this message and exit.
+
+### `pipeline prepare`
+
+Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+
+**Usage**:
+
+```console
+$ pipeline prepare [OPTIONS] SQL_FILE_NAME
+```
+
+**Arguments**:
+
+* `SQL_FILE_NAME`: The sql file to prepare tables from.  [required]
+
+**Options**:
+
+* `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
 * `--help`: Show this message and exit.

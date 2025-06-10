@@ -30,6 +30,24 @@ class TestDebugIntegrationTests(unittest.TestCase):
         runner = CliRunner()
         result = runner.invoke(app, ['build-execution-plan', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         print(result.stdout)
+
+    def _test_get_available_metrics(self):
+        config = get_config()
+        compute_pool_id = config["flink"]["compute_pool_id"]
+        compute_pool_id = "lfcp-6qoqvq"
+        metrics = metric_mgr.get_available_metrics(compute_pool_id)
+        print(len(metrics['data']))
+        for metric in metrics['data']:
+            if 'flink' in metric['name']:   
+                print(metric)
+        
+    def test_get_pending_records(self):
+        config = get_config()
+        compute_pool_id = config["flink"]["compute_pool_id"]
+        compute_pool_id = "lfcp-6qoqvq"
+        pending_records = metric_mgr.get_pending_records("stage-qx-dml-src-qx-audit-trail-columns-changed", compute_pool_id)
+        print(pending_records)
+        assert pending_records >= 0
         
 if __name__ == '__main__':
     unittest.main()

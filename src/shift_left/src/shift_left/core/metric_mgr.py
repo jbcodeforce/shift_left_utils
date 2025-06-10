@@ -8,6 +8,26 @@ import json
 from datetime import datetime, timedelta
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import StatementResult
+
+
+def get_available_metrics(compute_pool_id: str) -> list:
+    """
+    Get the available metrics for a compute pool.
+    """
+    config = get_config()
+    ccloud_client = ConfluentCloudClient(config)
+    dataset="cloud"
+   
+    url=f"https://api.telemetry.confluent.cloud/v2/metrics/{dataset}/descriptors/metrics"
+    response = None
+    try:
+        response  = ccloud_client.make_request("GET", url)
+        return response
+    except Exception as e:
+        logger.error(f"Error executing rest call: {e}")
+        raise Exception(f"Error executing rest call: {e}")
+    return response
+
 def get_retention_size(table_name: str) -> int:
     """
     Get the retention size of a table using the REST API metrics endpoint.
@@ -85,21 +105,24 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     """
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
-    view="cloud"
+    dataset="cloud"
     qtype="query"
-    now_minus_1_minute = datetime.now() - timedelta(minutes=1)
+    now_minus_10_minutes = datetime.now() - timedelta(minutes=10)
     now= datetime.now()
-    interval = f"{now_minus_1_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
-    query= {"aggregations":[{"metric":"io.confluent.flink/pending_records"}],
+    interval = f"{now_minus_10_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00"
+    query= {"aggregations":[
+            {"metric": "io.confluent.flink/pending_records"}
+        ],
           "filter": {"op":"AND",
                      "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
                                 {"field":"resource.flink_statement.name","op":"EQ","value": statement_name}
                                 ]},
-                    "granularity":"PT1M",
+                    "granularity":"PT5M",
                     "intervals":[interval],
                     "limit":1000}
     try:
-        metrics = ccloud_client.get_metrics(view, qtype, json.dumps(query))
+        logger.debug(f"query: {json.dumps(query)}")
+        metrics = ccloud_client.get_metrics(dataset, qtype, json.dumps(query))
         logger.info(f"{statement_name} metrics: {metrics}")
         sum= 0
         for metric in metrics.get("data", []):

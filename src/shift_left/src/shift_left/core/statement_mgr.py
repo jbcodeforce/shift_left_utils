@@ -375,6 +375,8 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
                              created_at= info.metadata.created_at,
                              sql_catalog=catalog,
                              sql_database=database)
+    else:
+        raise Exception(f"Invalid statement info: {info}")
     
 # ------------- private methods -------------
 def _save_statement_list(statement_list: dict[str, StatementInfo]):

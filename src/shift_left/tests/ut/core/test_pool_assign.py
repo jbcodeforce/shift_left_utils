@@ -223,10 +223,12 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_get_compute_pool_id_from_config(self, 
+    def _test_get_compute_pool_id_from_config(self, 
                                             mock_get_compute_pool_list, 
                                             MockConfluentCloudClient):
-        """ should use the compute pool id from config.yaml"""
+        """ should use the compute pool id from config.yaml
+        06/10/25 REMOVED the logic to use the compute pool id from config.yaml
+        """
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_response={}
@@ -263,7 +265,7 @@ class TestPoolAssignment(unittest.TestCase):
     def test_too_high_cfu(self, 
                          mock_get_compute_pool_list, 
                          MockConfluentCloudClient):
-        """When the cfu is too high use the configured compute pool"""
+        """When the cfu is too high create a new compute pool if not already exists"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_response={}
@@ -273,8 +275,8 @@ class TestPoolAssignment(unittest.TestCase):
         node = self._create_mock_statement_node(table_name="table-X", compute_pool_id="high-cfu")
         self.config['flink']['compute_pool_id'] = TEST_COMPUTE_POOL_ID_3
         node = dm._assign_compute_pool_id_to_node(node, None)
-        assert node.compute_pool_id == TEST_COMPUTE_POOL_ID_3
-        assert node.compute_pool_name == "dev-table-3"
+        assert node.compute_pool_id == 'cp-id-1'
+        assert node.compute_pool_name == "cp-name-1"
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')

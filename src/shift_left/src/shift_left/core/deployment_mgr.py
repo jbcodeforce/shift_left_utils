@@ -111,7 +111,6 @@ def build_deploy_pipeline_from_table(
         logger.info(f"Execute the plan before deployment: {summary}")
         
         if execute_plan:
-            print(f"Executing plan: {summary}")
             statements = _execute_plan(execution_plan, compute_pool_id)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
         
@@ -121,8 +120,9 @@ def build_deploy_pipeline_from_table(
                 f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
                 f"{result.model_dump_json(indent=3)}"
             )
+            print(f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
             simple_report=report_mgr.build_simple_report(execution_plan)
-            logger.info(f"Execute the plan after deployment: {simple_report}")
+            #logger.info(f"Execute the plan after deployment: {simple_report}")
             summary+=f"\n{simple_report}"
         return summary, execution_plan
     except Exception as e:
@@ -502,7 +502,7 @@ def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
                                      node_map: Dict[str, FlinkStatementNode]
 ) -> Tuple[Dict[str, FlinkStatementNode], FlinkStatementNode]:
     """
-    When navigating to ancestors and assessing if children of those ancestors are to be started,
+    When navigating to ancestors and assessing if children of those ancestors have to be started,
     we need to get the static info of the current table and may be modify the node map content
     """
     try:
@@ -710,11 +710,6 @@ def _get_descendants_subgraph(start_node: FlinkStatementNode,
     descendants.update(new_descendants)
     return descendants, descendant_dependencies
 
-
-
-
-
-
 def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatementNode) -> FlinkStatementNode:
     """
     Update node with current statement info.
@@ -764,19 +759,21 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
     # If we don't have any matching compute pool, we need to find a pool to use
     if  not pools or len(pools) == 0:
+        logger.info(f"No matching compute pool found for {node.table_name}")
         # assess user's parameter for compute pool id
         if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
             node.compute_pool_id = compute_pool_id
             node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
         else:
             # assess compute pool id from config.yaml
-            configured_compute_pool_id = get_config()['flink']['compute_pool_id']
-            if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
-                node.compute_pool_id = configured_compute_pool_id
-                node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
-            else:
-                node.compute_pool_id, node.compute_pool_name =compute_pool_mgr.create_compute_pool(node.table_name)
-                logger.info(f"Created compute pool {node.compute_pool_name} for {node.table_name}")
+            # configured_compute_pool_id = get_config()['flink']['compute_pool_id']
+            #if configured_compute_pool_id and compute_pool_mgr.is_pool_valid(configured_compute_pool_id):
+            #    node.compute_pool_id = configured_compute_pool_id
+            #    node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
+            #else:
+            logger.info(f"Create compute pool {node.compute_pool_name} for {node.table_name} ... it may take a while")
+            node.compute_pool_id, node.compute_pool_name =compute_pool_mgr.create_compute_pool(node.table_name)
+           
         return node
     if len(pools) == 1:
         # matching pool found, assess capacity  
@@ -789,7 +786,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
                 node.compute_pool_id = configured_compute_pool_id
                 node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
             else:
-                raise Exception(f"Compute pool {pools[0].name} is not available for {node.table_name}, also tried config.yaml.")
+                raise Exception(f"Compute pool {pools[0].name} is not available for {node.table_name}")
         return node
     # more than one? let use the configured compute pool id if it is valid
     configured_compute_pool_id = get_config()['flink']['compute_pool_id']
@@ -820,37 +817,38 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
     print(f"--- Execution Plan for {plan.start_table_name} started ---")
     statements = []
-    
-    try:
-        for node in plan.nodes:
-            if not node.compute_pool_id:
-                node.compute_pool_id = compute_pool_id
-                
-            if node.to_run or node.to_restart:
-                logger.info(f"Deploy table: '{node.table_name}'")
-                print(f"Deploy table: '{node.table_name}' using Flink: {node.dml_statement_name}")
-                try:
-                    if not node.dml_only:
-                        statement = _deploy_ddl_dml(node)
-                    else:
-                        statement = _deploy_dml(node, False)
-                    node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
-                    statements.append(statement)
-                except Exception as e:
-                    if not accept_exceptions:
-                        logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
-                        raise RuntimeError(f"Statement execution failed: {str(e)}")
-                    else:
-                        logger.info(f"Statement execution failed: {str(e)}, move to next node")
-            else:
-                logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
-                
-        return statements
+    for node in plan.nodes:
+        statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
+        if statement:
+            statements.append(statement)
+        else:
+            logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
+            continue
+    return statements
         
-    except Exception as e:
-        logger.error(f"Failed to execute plan: {str(e)}")
-        raise
 
+def _deploy_one_node(node: FlinkStatementNode,accept_exceptions: bool = False, compute_pool_id: str = None)-> Statement:
+    if not node.compute_pool_id:
+            node.compute_pool_id = compute_pool_id
+            
+    if node.to_run or node.to_restart:
+        logger.info(f"Deploy table: '{node.table_name}'")
+        print(f"Deploy table: '{node.table_name}' using Flink: {node.dml_statement_name}")
+        try:
+            if not node.dml_only:
+                statement = _deploy_ddl_dml(node)
+            else:
+                statement = _deploy_dml(node, False)
+            node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
+            return statement
+        except Exception as e:
+            if not accept_exceptions:
+                logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
+                raise RuntimeError(f"Statement execution failed: {str(e)}")
+            else:
+                logger.info(f"Statement execution failed: {str(e)}, move to next node")
+    else:
+        logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
 
 
 def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
@@ -886,7 +884,7 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
                                                                                 to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
     while statement.status.phase in ["PENDING"]:
-        time.sleep(1)
+        time.sleep(5)
         statement = statement_mgr.get_statement(to_process.dml_statement_name)
         logger.debug(f"DML deployment status is: {statement.status.phase}")
     if statement.status.phase == "FAILED":
