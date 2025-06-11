@@ -99,6 +99,7 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
         table_info.status = node.existing_statement_info.status_phase
         table_info.compute_pool_id = node.existing_statement_info.compute_pool_id
         table_info.created_at = node.existing_statement_info.created_at
+        table_info.statement_name = node.existing_statement_info.name
     else:
         table_info.status = "UNKNOWN"
         table_info.compute_pool_id = ""
@@ -112,7 +113,6 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
         table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
-                
     return table_info
 
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:

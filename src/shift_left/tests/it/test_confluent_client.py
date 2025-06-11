@@ -5,14 +5,13 @@ import unittest
 import json
 import os, pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
-#os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
 class TestConfluentClient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent /  "config-ccloud.yaml")
+        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 
     def test_get_environment_list(self):
         print("#"*30 + "\ntest_get_environment_list\n")
@@ -29,8 +28,8 @@ class TestConfluentClient(unittest.TestCase):
         client = ConfluentCloudClient(get_config())
         config=get_config()
         pools = client.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'), config.get('confluent_cloud').get('region'))
-        self.assertGreater(pools.data, 0)
-        print(json.dumps(pools, indent=2))
+        self.assertGreater(len(pools.data), 0)
+        print(pools.model_dump_json(indent=2))
 
     def test_verify_compute_exist(self):
         config = get_config()
@@ -40,7 +39,7 @@ class TestConfluentClient(unittest.TestCase):
         print(pool['spec'])
         print(f"{pool['status']['current_cfu']} over {pool['spec']['max_cfu']}")
 
-    def _test_create_compute_pool(self):
+    def test_create_compute_pool(self):
         spec = {}
         config = get_config()
         spec['display_name'] = "test_pool"
@@ -48,8 +47,8 @@ class TestConfluentClient(unittest.TestCase):
         spec['region'] = config['confluent_cloud']['region']
         spec['max_cfu'] =  config['flink']['max_cfu']
         spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
-        client = ConfluentCloudClient(spec)
-        pool = client.create_compute_pool(config)
+        client = ConfluentCloudClient(config)
+        pool = client.create_compute_pool(spec)
         assert pool
                                             
     def test_get_topic_list(self):
@@ -88,15 +87,12 @@ class TestConfluentClient(unittest.TestCase):
 
     def _test_get_topic_message_count(self):
         print("#"*30 + "\ntest_get_topic_message_count\n")
-        os.environ["CONFIG_FILE"] =  os.getenv("HOME") +  "/.shift_left/config-stage-flink.yaml"
         client = ConfluentCloudClient(get_config())
         topic_name = "src_aqem_tag_tag"
         message_count = client.get_topic_message_count(topic_name)
         print(f"Message count for {topic_name}: {message_count}")
     
 
-    def _test_update_statement(self):
-        print("Not clear yet how it works")
 
 if __name__ == '__main__':
     unittest.main()

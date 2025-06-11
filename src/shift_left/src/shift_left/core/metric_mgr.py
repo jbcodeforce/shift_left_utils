@@ -146,7 +146,7 @@ def get_output_records(statement_name: str, compute_pool_id: str) -> int:
     qtype="query"
     now_minus_10_minute = datetime.now() - timedelta(minutes=10)
     now= datetime.now()
-    interval = f"{now_minus_10_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+    interval = f"{now_minus_10_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00"
     print(f"interval: {interval}")
     query= {"aggregations":[{"metric":"io.confluent.flink/num_records_out"}],
           "filter": {"op":"AND",
