@@ -163,7 +163,8 @@ def deploy(
         may_start_descendants: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
-        dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.")
+        dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
+        sequential: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
@@ -178,6 +179,7 @@ def deploy(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
+        sequential=sequential,
         execute_plan=True)
     
     print(f"#### Pipeline deployed ####")
@@ -284,6 +286,7 @@ def _build_deploy_pipeline(
         may_start_descendants: bool, 
         force_ancestors: bool,
         cross_product_deployment: bool,
+        sequential: bool = False,
         execute_plan: bool=False):
     summary="Nothing done"
     try:
@@ -296,6 +299,7 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,
+                                                        sequential=sequential,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
@@ -311,7 +315,8 @@ def _build_deploy_pipeline(
                                                         dml_only=dml_only,
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
-                                                        cross_product_deployment=cross_product_deployment,
+                                                        cross_product_deployment=cross_product_deployment,  
+                                                        sequential=sequential,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for product {product_name}")
         elif dir:
@@ -323,6 +328,7 @@ def _build_deploy_pipeline(
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
+                                                                    sequential=sequential,
                                                                     execute_plan=execute_plan)
         if report:
             print(f"Table_name | Status | Pending Records | Num Records Out")

@@ -58,7 +58,8 @@ def build_deploy_pipeline_from_table(
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
-    execute_plan: bool = False
+    execute_plan: bool = False,
+    sequential: bool = False
 ) -> Tuple[str, FlinkStatementExecutionPlan]:
     """
     Build an execution plan from the static relationship between Flink Statements.
@@ -105,13 +106,14 @@ def build_deploy_pipeline_from_table(
                                                                       cross_product_deployment=cross_product_deployment,
                                                                       compute_pool_id=compute_pool_id, 
                                                                       table_name=start_node.table_name, 
+                                                                      sequential=True,
                                                                       expected_product_name=start_node.product_name)
         _persist_execution_plan(execution_plan)
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
         
         if execute_plan:
-            statements = _execute_plan(execution_plan, compute_pool_id)
+            statements = _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
         
             result.execution_time = time.perf_counter() - start_time
@@ -137,7 +139,8 @@ def build_deploy_pipelines_from_product(
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
-    execute_plan: bool = False
+    execute_plan: bool = False,
+    sequential: bool = False
 ) -> Tuple[str, TableReport]:
     """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions. 
     As each statement deployment is creating an execution plan, previously started statements will not be restarted.
@@ -178,7 +181,7 @@ def build_deploy_pipelines_from_product(
         if execute_plan:
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()
-            _execute_plan(execution_plan, compute_pool_id)
+            _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=True, sequential=sequential)
             execution_time = (time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
@@ -201,7 +204,8 @@ def build_and_deploy_all_from_directory(
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
-    execute_plan: bool = False
+    execute_plan: bool = False,
+    sequential: bool = False
 ) -> Tuple[str, TableReport]:
     """
     Deploy all the pipelines within a directory tree. The approach is 
@@ -239,7 +243,7 @@ def build_and_deploy_all_from_directory(
         if execute_plan:
             print(f"Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
-            _execute_plan(execution_plan, compute_pool_id, accept_exceptions=accept_exceptions)
+            _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=accept_exceptions, sequential=sequential)
             execution_time = (time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
@@ -818,7 +822,8 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
 
 def _execute_plan(plan: FlinkStatementExecutionPlan, 
                   compute_pool_id: str, 
-                  accept_exceptions: bool = False) -> List[Statement]:
+                  accept_exceptions: bool = False,
+                  sequential: bool = False) -> List[Statement]:
     """Execute statements in the execution plan.
     
     Args:
@@ -834,11 +839,13 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
     print(f"--- Execution Plan for {plan.start_table_name} started ---")
     statements = []
+    autonomous_nodes=[]
     max_workers = multiprocessing.cpu_count()
     nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     print(f"{len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
-        autonomous_nodes = _build_autonomous_nodes(plan.nodes)
+        if not sequential:
+            autonomous_nodes = _build_autonomous_nodes(plan.nodes)
         if len(autonomous_nodes) > 0:
             print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
             with ThreadPoolExecutor(max_workers=max_workers) as executor:

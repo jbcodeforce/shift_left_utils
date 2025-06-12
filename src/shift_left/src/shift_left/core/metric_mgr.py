@@ -124,7 +124,6 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
         #now=datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
     else:
         now = datetime.now(pytz.UTC)
-    print(f"The now time: {now}")
     now_minus_15_minutes = now - timedelta(minutes=15)
     interval = f"{now_minus_15_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
     query= {"aggregations":[
@@ -141,7 +140,6 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
         logger.info(f"query: {json.dumps(query)}")
         metrics = ccloud_client.get_metrics(dataset, qtype, json.dumps(query))
         logger.info(f"{statement_name} metrics: {metrics}")
-        print(f"{statement_name} metrics: {metrics}")
         sum= 0
         for metric in metrics.get("data", []):
             if "points" in metric:

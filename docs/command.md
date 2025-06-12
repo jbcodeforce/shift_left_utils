@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1078b6f30&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1069b6fc0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -517,6 +517,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--force-ancestors / --no-force-ancestors`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-ancestors]
 * `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
+* `--sequential / --no-sequential`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.  [default: no-sequential]
 * `--help`: Show this message and exit.
 
 ### `pipeline build-execution-plan`
@@ -565,6 +566,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 * `--dir TEXT`: The directory to report the running statements from. If not provided, it will report the running statements from the table name.
 * `--table-name TEXT`: The table name containing pipeline_definition.json to get child list
 * `--product-name TEXT`: The product name to report the running statements from.
+* `--from-date TEXT`: The date from which to report the metrics from. Format: YYYY-MM-DDThh:mm:ss
 * `--help`: Show this message and exit.
 
 ### `pipeline undeploy`
