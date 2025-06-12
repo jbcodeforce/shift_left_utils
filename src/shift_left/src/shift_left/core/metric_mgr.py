@@ -115,14 +115,18 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
     qtype="query"
+    
     if from_date:
+        # Parse input date and localize to configured timezone
         from_date_local = pytz.timezone(config['app']['timezone']).localize(datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S"))
-        now= from_date_local.astimezone(pytz.utc)
-        now_minus_10_minutes = now - timedelta(minutes=10)
-    else:   
-        now_minus_10_minutes = datetime.now(pytz.timezone(config['app']['timezone'])) - timedelta(minutes=10)
-        now= datetime.now(pytz.timezone(config['app']['timezone']))
-    interval = f"{now_minus_10_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+        # Convert to UTC-1
+        now = from_date_local.astimezone(pytz.UTC)
+        #now=datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
+    else:
+        now = datetime.now(pytz.UTC)
+    print(f"The now time: {now}")
+    now_minus_15_minutes = now - timedelta(minutes=15)
+    interval = f"{now_minus_15_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
     query= {"aggregations":[
             {"metric": metric_name}
         ],
