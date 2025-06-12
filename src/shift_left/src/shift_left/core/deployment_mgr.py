@@ -223,8 +223,7 @@ def build_and_deploy_all_from_directory(
     logger.info(f"Found {count} tables to process")
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
-        start_node = ancestors[0]
-        start_node.to_restart = True
+        start_node = ancestors[-1]
         execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
                                                                       node_map=combined_node_map, 
                                                                       force_ancestors=force_ancestors, 
@@ -834,15 +833,36 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     statements = []
     max_workers = multiprocessing.cpu_count()
     nodes_to_execute = _get_nodes_to_execute(plan.nodes)
-    autonomous_nodes = _build_autonomous_nodes(plan.nodes)
+    
+    
+    
     while len(nodes_to_execute) > 0:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in autonomous_nodes]
-            for future in as_completed(futures):
-                statements.append(future.result())
-        for node in autonomous_nodes:
-            node.to_run = False
-            node.to_restart = False
+        autonomous_nodes = _build_autonomous_nodes(plan.nodes)
+        if len(autonomous_nodes) > 0:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in autonomous_nodes]
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        if result is not None:  # Only append if we got a valid result
+                            statements.append(result)
+                    except Exception as e:
+                        logger.error(f"Failed to get result from future: {str(e)}")
+                        if not accept_exceptions:
+                            raise
+            for node in autonomous_nodes:
+                node.to_run = False
+                node.to_restart = False    
+        else:
+            for node in nodes_to_execute:
+                statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
+                if statement:
+                    statements.append(statement)
+                else:
+                    logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
+                    continue
+                node.to_run = False
+                node.to_restart = False
         nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     return statements
 
