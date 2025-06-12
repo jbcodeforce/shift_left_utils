@@ -179,13 +179,14 @@ def build_deploy_pipelines_from_product(
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()
             _execute_plan(execution_plan, compute_pool_id)
-        execution_time = (time.perf_counter() - start_time)
-        print(f"Execution time: {execution_time} seconds")
-        summary+=f"\nExecution time: {execution_time} seconds"
-        table_report = report_mgr.build_TableReport(start_node.product_name)
-        for node in execution_plan.nodes:
-            table_info = report_mgr.build_TableInfo(node)
-            table_report.tables.append(table_info)
+            execution_time = (time.perf_counter() - start_time)
+            print(f"Execution time: {execution_time} seconds")
+            summary+=f"\nExecution time: {execution_time} seconds"
+            print("... build table report now...")
+            table_report = report_mgr.build_TableReport(start_node.product_name)
+            for node in execution_plan.nodes:
+                table_info = report_mgr.build_TableInfo(node)
+                table_report.tables.append(table_info)
 
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
@@ -288,7 +289,7 @@ def report_running_flink_statements_for_all_from_directory(
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
             _update_table_report_with_table_info(pipeline_def, table_report)
-    result = _prepare_table_report(table_report, report_name)
+    result = report_mgr.prepare_table_report(table_report, report_name)
     return result
 
   
@@ -301,7 +302,6 @@ def report_running_flink_statements_for_a_product(
     Report running flink statements for all the pipelines in the product.
     """
     table_report = report_mgr.build_TableReport(f"product:{product_name}")
-    
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     for _, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
@@ -309,7 +309,7 @@ def report_running_flink_statements_for_a_product(
             file_path=table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
             _update_table_report_with_table_info(pipeline_def, table_report)
-    result = _prepare_table_report(table_report, product_name)
+    result = report_mgr.prepare_table_report(table_report, product_name)
     return result   
 
 def full_pipeline_undeploy_from_table(
@@ -833,12 +833,11 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     statements = []
     max_workers = multiprocessing.cpu_count()
     nodes_to_execute = _get_nodes_to_execute(plan.nodes)
-    
-    
-    
+    print(f"{len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
         autonomous_nodes = _build_autonomous_nodes(plan.nodes)
         if len(autonomous_nodes) > 0:
+            print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in autonomous_nodes]
                 for future in as_completed(futures):
@@ -854,15 +853,16 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                 node.to_run = False
                 node.to_restart = False    
         else:
-            for node in nodes_to_execute:
-                statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
-                if statement:
-                    statements.append(statement)
-                else:
-                    logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
-                    continue
-                node.to_run = False
-                node.to_restart = False
+            print(f"Still {len(nodes_to_execute)} statements to execute")
+            node = nodes_to_execute[0]
+            statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
+            if statement:
+                statements.append(statement)
+            else:
+                logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
+                continue
+            node.to_run = False
+            node.to_restart = False
         nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     return statements
 
@@ -882,15 +882,21 @@ def _build_autonomous_nodes(nodes: List[FlinkStatementNode]) -> List[FlinkStatem
     """
     autonomous_nodes = []
     for node in nodes:
-        if node.parents:
-            for p in node.parents:
-                for n in nodes:
-                    if n.table_name == p:
-                        if not (n.to_run or n.to_restart) and node not in autonomous_nodes:
-                            autonomous_nodes.append(node)
-                            break
-        else:
-            if (node.to_run or node.to_restart) and node not in autonomous_nodes:
+        if (node.to_run or node.to_restart):
+            if node.parents:
+                for p in node.parents:
+                    if isinstance(p, str):
+                        for n in nodes:
+                            if n.table_name == p:
+                                if not n.to_run and not n.to_restart and node not in autonomous_nodes:
+                                    autonomous_nodes.append(node)
+                                    break
+                    else:
+                        for n in nodes:
+                            if not n.to_run and not n.to_restart and node not in autonomous_nodes:
+                                autonomous_nodes.append(node)
+                                break
+            elif node not in autonomous_nodes:
                 autonomous_nodes.append(node)
     return autonomous_nodes
 
@@ -1055,32 +1061,9 @@ def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinit
         node: FlinkStatementNode = pipeline_def.to_node()
         node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
         table_info = report_mgr.build_TableInfo(node)
-        print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {table_info.pending_records}")
+        print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {int(table_info.pending_records)} num records out: {int(table_info.num_records_out)}")
         table_report.tables.append(table_info)
 
-def _prepare_table_report(table_report: TableReport, base_file_name):
-    table_count=0
-    running_count=0
-    non_running_count=0
-    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records\n"
-    for table in table_report.tables:
-        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at},{table.retention_size},{table.message_count},{table.pending_records}\n"   
-        if table.status == 'RUNNING':
-            running_count+=1
-        else:
-            non_running_count+=1
-        table_count+=1
-    print(f"Writing report to {shift_left_dir}/{base_file_name}_report.csv and {shift_left_dir}/{base_file_name}_report.json")
-    with open(f"{shift_left_dir}/{base_file_name}_report.csv", "w") as f:
-        f.write(csv_content)
-    with open(f"{shift_left_dir}/{base_file_name}_report.json", "w") as f:
-        f.write(table_report.model_dump_json(indent=4))
-    result=f"#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
-    result+=f"\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
-    result+=f"\tDatabase: " + get_config()['flink']['database_name'] + "\n"
-    result+=csv_content
-    result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
-    result+=f"\tNon running tables: {non_running_count}" + "\n"
-    return result 
+
 # --- to work on for stateless ---------------
 

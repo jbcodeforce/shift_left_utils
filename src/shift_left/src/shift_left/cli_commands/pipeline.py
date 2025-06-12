@@ -317,8 +317,11 @@ def _build_deploy_pipeline(
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     execute_plan=execute_plan)
-            
-        print(summary)
+        if report:
+            print(f"Table_name | Status | Pending Records | Num Records Out")
+            for table_info in report.tables:
+                print(f"{table_info.table_name} | {table_info.status} | {table_info.pending_records} | {table_info.num_records_out}")
+        print("Done.")
         
     except Exception as e:
         print(f"[red]Error: {e}[/red]")

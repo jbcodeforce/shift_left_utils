@@ -208,7 +208,8 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 os.remove(STATEMENT_LIST_FILE)
         if reload:
             _statement_list_cache = StatementListCache(created_at=datetime.now())
-            logger.info("Load the current list of Flink statements from REST API")
+            logger.info("Load the current list of Flink statements using REST API")
+            print("Load the current list of Flink statements using REST API")
             config = get_config()
             page_size = config["confluent_cloud"].get("page_size", 100)
             client = ConfluentCloudClient(config)

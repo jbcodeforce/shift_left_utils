@@ -122,8 +122,8 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report+=f"-"*165 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            pending_records = metrics_mgr.get_pending_records(node.existing_statement_info.name, node.compute_pool_id)
-            num_records_out = metrics_mgr.get_num_records_out(node.table_name, node.compute_pool_id)
+            pending_records = int(metrics_mgr.get_pending_records(node.existing_statement_info.name, node.compute_pool_id))
+            num_records_out = int(metrics_mgr.get_num_records_out(node.table_name, node.compute_pool_id))
             report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)} {pad_or_truncate(pending_records,10)} {pad_or_truncate(num_records_out,10)}\n"
     return report
 
@@ -203,6 +203,31 @@ def build_deployment_report(
         if statement:
             report.flink_statements_deployed.append(_build_statement_basic_info(statement))
     return report
+
+def prepare_table_report(table_report: TableReport, base_file_name):
+    table_count=0
+    running_count=0
+    non_running_count=0
+    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records,num_records_out\n"
+    for table in table_report.tables:
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at},{table.retention_size},{table.message_count},{table.pending_records},{table.num_records_out}\n"   
+        if table.status == 'RUNNING':
+            running_count+=1
+        else:
+            non_running_count+=1
+        table_count+=1
+    print(f"Writing report to {shift_left_dir}/{base_file_name}_report.csv and {shift_left_dir}/{base_file_name}_report.json")
+    with open(f"{shift_left_dir}/{base_file_name}_report.csv", "w") as f:
+        f.write(csv_content)
+    with open(f"{shift_left_dir}/{base_file_name}_report.json", "w") as f:
+        f.write(table_report.model_dump_json(indent=4))
+    result=f"#"*120 + "\n\tEnvironment: " + get_config()['confluent_cloud']['environment_id'] + "\n"
+    result+=f"\tCatalog: " + get_config()['flink']['catalog_name'] + "\n"
+    result+=f"\tDatabase: " + get_config()['flink']['database_name'] + "\n"
+    result+=csv_content
+    result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
+    result+=f"\tNon running tables: {non_running_count}" + "\n"
+    return result 
 
 def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
     if statement.status and statement.status.detail:

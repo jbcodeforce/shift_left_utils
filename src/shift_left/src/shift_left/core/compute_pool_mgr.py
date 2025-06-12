@@ -48,7 +48,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                                         current_cfu=pool.status.current_cfu)
                 _compute_pool_list.pools.append(cp_pool)
             _save_compute_pool_list(_compute_pool_list)
-            logger.debug(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
+            logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
     return _compute_pool_list
 
 
@@ -95,7 +95,13 @@ def is_pool_valid(compute_pool_id) -> bool:
     """
     config = get_config()
     logger.debug(f"Validate the {compute_pool_id} exists and has enough resources")
-
+    compute_pool_list = get_compute_pool_list()
+    for pool in compute_pool_list.pools:
+        if pool.id == compute_pool_id:
+            ratio = get_pool_usage_from_pool_info(pool)
+            if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
+                raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
+            return True
     client = ConfluentCloudClient(config)
     env_id = config['confluent_cloud']['environment_id']
     try:
@@ -117,7 +123,7 @@ def is_pool_valid(compute_pool_id) -> bool:
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
-        ratio = get_pool_usage(pool_info) 
+        ratio = get_pool_usage_from_dict(pool_info) 
         if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
             raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
         return pool_info['status']['phase'] == "PROVISIONED"
@@ -161,9 +167,14 @@ def delete_compute_pool(compute_pool_id: str):
     client = ConfluentCloudClient(config)
     client.delete_compute_pool(compute_pool_id, env_id)
 
-def get_pool_usage(pool_info: dict) -> float:
+def get_pool_usage_from_dict(pool_info: dict) -> float:
     current = pool_info['status']['current_cfu']
     max = pool_info['spec']['max_cfu']
+    return (current / max)
+
+def get_pool_usage_from_pool_info(pool_info: ComputePoolInfo) -> float:
+    current = pool_info.current_cfu
+    max = pool_info.max_cfu
     return (current / max)
 
 # ------ Private methods ------
