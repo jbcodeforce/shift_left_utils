@@ -215,6 +215,7 @@ def build_and_deploy_all_from_directory(
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             node = read_pipeline_definition_from_file(file_path).to_node()
+            node.to_restart = True
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
             combined_node_map |= _build_statement_node_map(node)
@@ -234,18 +235,19 @@ def build_and_deploy_all_from_directory(
                                                                       expected_product_name=start_node.product_name)
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
+        table_report = report_mgr.build_TableReport(start_node.product_name)
         if execute_plan:
             print(f"Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
             _execute_plan(execution_plan, compute_pool_id, accept_exceptions=accept_exceptions)
-        execution_time = (time.perf_counter() - start_time)
-        print(f"Execution time: {execution_time} seconds")
-        summary+=f"\nExecution time: {execution_time} seconds"
-        table_report = report_mgr.build_TableReport(start_node.product_name)
-        for node in execution_plan.nodes:
-            table_info = report_mgr.build_TableInfo(node)
-            table_report.tables.append(table_info)
-        summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+            execution_time = (time.perf_counter() - start_time)
+            print(f"Execution time: {execution_time} seconds")
+            summary+=f"\nExecution time: {execution_time} seconds"
+            
+            for node in execution_plan.nodes:
+                table_info = report_mgr.build_TableInfo(node)
+                table_report.tables.append(table_info)
+            summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
         return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
@@ -402,7 +404,6 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
                 except Exception as e:
                     results.append(f"Failed to process {node.table_name}: {str(e)}\n")
         
-        # Combine results
         trace += "".join(results)
         count = len(nodes_to_drop)
                 
@@ -418,9 +419,23 @@ def prepare_tables_from_sql_file(sql_file_name: str,
     """
     config = get_config()
     compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
+    transformer = statement_mgr.get_or_build_sql_content_transformer()
     with open(sql_file_name, "r") as f:
+        idx=0
         for line in f:
-            print(line)
+            _, sql_out= transformer.update_sql_content(line, 
+                                                       "", 
+                                                       "")
+            print(sql_out)
+            statement_name = f"prepare-table-{idx}"
+            statement = statement_mgr.post_flink_statement(compute_pool_id, 
+                                                           statement_name, 
+                                                           sql_out)
+            while statement.status.phase != "COMPLETED":
+                time.sleep(1)
+                statement = statement_mgr.get_statement_info(statement_name)
+            idx+=1
+            statement_mgr.delete_statement_if_exists(statement_name)
 #
 # ------------------------------------- private APIs  ---------------------------------
 #
@@ -817,39 +832,68 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
     print(f"--- Execution Plan for {plan.start_table_name} started ---")
     statements = []
-    for node in plan.nodes:
-        statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
-        if statement:
-            statements.append(statement)
-        else:
-            logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
-            continue
+    max_workers = multiprocessing.cpu_count()
+    nodes_to_execute = _get_nodes_to_execute(plan.nodes)
+    autonomous_nodes = _build_autonomous_nodes(plan.nodes)
+    while len(nodes_to_execute) > 0:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in autonomous_nodes]
+            for future in as_completed(futures):
+                statements.append(future.result())
+        for node in autonomous_nodes:
+            node.to_run = False
+            node.to_restart = False
+        nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     return statements
-        
+
+def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
+    """
+    Build a list of nodes to execute.
+    """
+    nodes_to_execute = []
+    for node in nodes:
+        if node.to_run or node.to_restart:
+            nodes_to_execute.append(node)
+    return nodes_to_execute
+
+def _build_autonomous_nodes(nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
+    """
+    Build a list of autonomous nodes.
+    """
+    autonomous_nodes = []
+    for node in nodes:
+        if node.parents:
+            for p in node.parents:
+                for n in nodes:
+                    if n.table_name == p:
+                        if not (n.to_run or n.to_restart) and node not in autonomous_nodes:
+                            autonomous_nodes.append(node)
+                            break
+        else:
+            if (node.to_run or node.to_restart) and node not in autonomous_nodes:
+                autonomous_nodes.append(node)
+    return autonomous_nodes
 
 def _deploy_one_node(node: FlinkStatementNode,accept_exceptions: bool = False, compute_pool_id: str = None)-> Statement:
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
             
-    if node.to_run or node.to_restart:
-        logger.info(f"Deploy table: '{node.table_name}'")
-        print(f"Deploy table: '{node.table_name}' using Flink: {node.dml_statement_name}")
-        try:
-            if not node.dml_only:
-                statement = _deploy_ddl_dml(node)
-            else:
-                statement = _deploy_dml(node, False)
-            node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
-            return statement
-        except Exception as e:
-            if not accept_exceptions:
-                logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
-                raise RuntimeError(f"Statement execution failed: {str(e)}")
-            else:
-                logger.info(f"Statement execution failed: {str(e)}, move to next node")
-    else:
-        logger.info(f"No restart or no to_run, {node.dml_statement_name} already running!")
-
+    logger.info(f"Deploy table: '{node.table_name}'")
+    print(f"Deploy table: '{node.table_name}' using Flink: {node.dml_statement_name}")
+    try:
+        if not node.dml_only:
+            statement = _deploy_ddl_dml(node)
+        else:
+            statement = _deploy_dml(node, False)
+        node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
+        return statement
+    except Exception as e:
+        if not accept_exceptions:
+            logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
+            raise RuntimeError(f"Statement execution failed: {str(e)}")
+        else:
+            logger.info(f"Statement execution failed: {str(e)}, move to next node")
+    
 
 def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     """

@@ -51,6 +51,7 @@ class TableInfo(BaseModel):
     retention_size: int = 0
     message_count: int = 0
     pending_records: float = 0
+    num_records_out: int = 0
 
 class TableReport(BaseModel):
     report_name: str = ""
@@ -113,15 +114,17 @@ def build_TableInfo(node: FlinkStatementNode) -> TableInfo:
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
         table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id)
+        table_info.num_records_out = metrics_mgr.get_num_records_out(table_info.table_name, table_info.compute_pool_id)
     return table_info
 
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
-    report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15}\t{'Created At':<16} {'Pending_msgs':<10}\n"
-    report+=f"-"*145 + "\n"
+    report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15}\t{'Created At':<16} {'Pending_msgs':<10} {'Num_records_out':<10}\n"
+    report+=f"-"*165 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
             pending_records = metrics_mgr.get_pending_records(node.existing_statement_info.name, node.compute_pool_id)
-            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)} {pad_or_truncate(pending_records,10)}\n"
+            num_records_out = metrics_mgr.get_num_records_out(node.table_name, node.compute_pool_id)
+            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)} {pad_or_truncate(pending_records,10)} {pad_or_truncate(num_records_out,10)}\n"
     return report
 
 

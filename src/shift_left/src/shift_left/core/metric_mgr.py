@@ -26,7 +26,7 @@ def get_available_metrics(compute_pool_id: str) -> list:
     except Exception as e:
         logger.error(f"Error executing rest call: {e}")
         raise Exception(f"Error executing rest call: {e}")
-    return response
+
 
 def get_retention_size(table_name: str) -> int:
     """
@@ -103,6 +103,14 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     Get the pending records for a statement using the REST API metrics endpoint.
     Metric data points are typically available for query in the API within 5 minutes of their origination at the source.
     """
+    return _get_int_metric(statement_name, compute_pool_id, "io.confluent.flink/pending_records")
+
+
+def get_num_records_out(statement_name: str, compute_pool_id: str) -> int:
+    return _get_int_metric(statement_name, compute_pool_id, "io.confluent.flink/num_records_out")
+    
+
+def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str) -> int:
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
@@ -111,7 +119,7 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     now= datetime.now()
     interval = f"{now_minus_10_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00"
     query= {"aggregations":[
-            {"metric": "io.confluent.flink/pending_records"}
+            {"metric": metric_name}
         ],
           "filter": {"op":"AND",
                      "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
@@ -137,29 +145,3 @@ def get_pending_records(statement_name: str, compute_pool_id: str) -> int:
     except Exception as e:
         logger.error(f"Error getting pending records for {statement_name}: {e}")
         return 0
-
-
-def get_output_records(statement_name: str, compute_pool_id: str) -> int:
-    config = get_config()
-    ccloud_client = ConfluentCloudClient(config)
-    view="cloud"
-    qtype="query"
-    now_minus_10_minute = datetime.now() - timedelta(minutes=10)
-    now= datetime.now()
-    interval = f"{now_minus_10_minute.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}-07:00"
-    print(f"interval: {interval}")
-    query= {"aggregations":[{"metric":"io.confluent.flink/num_records_out"}],
-          "filter": {"op":"AND",
-                     "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
-                                {"field":"resource.flink_statement.name","op":"EQ","value": statement_name}
-                                ]},
-          "granularity":"PT1M",
-          "intervals":[interval],
-          "limit":1000}
-    metrics = ccloud_client.get_metrics(view, qtype, json.dumps(query))
-    logger.info(f"metrics: {metrics}")
-    sum= 0
-    for metric in metrics["data"]:
-        print(f"metric: {metric}")
-        sum += metric["value"]
-    return sum  

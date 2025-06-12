@@ -7,7 +7,7 @@ import datetime
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 #os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
-#os.environ["PIPELINES"]= "/Users/jerome/Code/customers/master-control/data-platform-flink/pipelines"
+#os.environ["PIPELINES"]= "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
         
 from shift_left.core.utils.app_config import get_config, shift_left_dir
 from shift_left.core.models.flink_statement_model import ( 
@@ -85,8 +85,56 @@ class TestDebugUnitTests(unittest.TestCase):
         return ComputePoolList(pools=[pool_1])
     
     
-    def test_creat_compute_pool_in_deployment_mgr(self):
-    
+    def _test_running_statement_parallel(self):
+        """
+        Test the running statement
+        """
+        pass
+
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    def test_build_execution_plan_for_leaf_table_f_while_parents_running(
+        self,
+        mock_assign_compute_pool_id,
+        mock_get_status,
+        mock_get_compute_pool_list
+    ) -> None:
+        """
+        when direct parent d is running 
+        restarting the leaf "f"
+        Should restart only current table f which has one parent d.
+        f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
+        """
+        print("\n--> test_build_execution_plan_for_one_table_while_parents_running should start node f only")
+        
+        def mock_statement(statement_name: str) -> StatementInfo:
+            return self._create_mock_get_statement_info(status_phase="RUNNING")
+ 
+        mock_get_status.side_effect = mock_statement
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="z", 
+            inventory_path=self.inventory_path, 
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+            dml_only=False, 
+            may_start_descendants=False, # should get same result if true
+            force_ancestors=True,
+            execute_plan=False
+        )
+        autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
+        print(f"autonomous_nodes: {autonomous_nodes}")
+        print(f"{summary}")
+        assert len(execution_plan.nodes) == 7  # all nodes are present as we want to see running ones too
+        for node in execution_plan.nodes:
+            if node.table_name in ["src_x", "x", "src_y", "y", "z", "d"]:
+                assert node.to_run is False
+                assert node.to_restart is False
+            if node.table_name == "f":
+                assert node.to_run is False
+                assert node.to_restart is True
 
 
        

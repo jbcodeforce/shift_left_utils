@@ -19,6 +19,7 @@ from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 import shift_left.core.utils.report_mgr as report_mgr
+from shift_left.core.utils.report_mgr import TableReport
 from shift_left.core.models.flink_statement_model import (
     Statement, 
     StatementInfo,
@@ -333,6 +334,10 @@ class TestDeploymentManager(unittest.TestCase):
         assert sorted_nodes[4].table_name in ["x", "y", "a", "b"]
         assert sorted_nodes[8].table_name == "z"
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.build_simple_report')
+    @patch('shift_left.core.deployment_mgr.ThreadPoolExecutor')
+    @patch('shift_left.core.deployment_mgr._deploy_one_node')
+    @patch('shift_left.core.deployment_mgr.report_mgr.build_TableReport')
     @patch('shift_left.core.deployment_mgr.statement_mgr.build_and_deploy_flink_statement_from_sql_content')    
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
@@ -345,7 +350,11 @@ class TestDeploymentManager(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_delete,
                                         mock_drop,
-                                        mock_build_and_deploy_flink_statement_from_sql_content):
+                                        mock_build_and_deploy_flink_statement_from_sql_content,
+                                        mock_build_tableReport,
+                                        mock_thread_pool_executor,
+                                        mock_deploy_one_node,
+                                        mock_build_simple_report):
         def _mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
@@ -384,20 +393,39 @@ class TestDeploymentManager(unittest.TestCase):
         mock_delete.return_value = "deleted"
         mock_drop.side_effect = _drop_table
         mock_build_and_deploy_flink_statement_from_sql_content.side_effect = _build_statement
-
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
+        mock_build_tableReport.return_value = TableReport(table_name="d", 
+                                                          statement_name="dev-p2-dml-z", 
+                                                          status="RUNNING", 
+                                                          compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+                                                          created_at=datetime.now(), 
+                                                          pending_records=10, 
+                                                          num_records_out=100)
+        mock_build_simple_report.return_value = "simple_report"
+        mock_future1 = MagicMock()
+        mock_future2 = MagicMock()
+        mock_future3 = MagicMock()
+        mock_future1.result.return_value = _build_statement(None, None, "dev-p2-dml-z")
+        mock_future2.result.return_value = _build_statement(None, None, "dev-p2-dml-y")
+        mock_future3.result.return_value = _build_statement(None, None, "dev-p2-dml-x")
+        mock_executor = MagicMock()
+        mock_executor.__enter__.return_value = mock_executor
+        mock_executor.submit.side_effect = [mock_future1, mock_future2, mock_future3]
+        mock_thread_pool_executor.return_value = mock_executor
+        with patch('shift_left.core.deployment_mgr.as_completed') as mock_as_completed:
+            mock_as_completed.return_value = [mock_future1, mock_future2, mock_future3]
+            summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
                                        inventory_path=self.inventory_path, 
                                        compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
                                        dml_only=False, 
                                        execute_plan=True,
                                        may_start_descendants=False,
                                        force_ancestors=False)
-        assert execution_plan.start_table_name == "d"
-        assert len(execution_plan.nodes) == 6
-        assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
-        assert execution_plan.nodes[2].table_name in ["x", "y"]
-        print(f"summary: {summary}")
-        print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+            assert execution_plan.start_table_name == "d"
+            assert len(execution_plan.nodes) == 6
+            assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
+            assert execution_plan.nodes[2].table_name in ["x", "y"]
+            print(f"summary: {summary}")
+            print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
 
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
@@ -441,5 +469,45 @@ class TestDeploymentManager(unittest.TestCase):
         mock_delete.assert_called()
         assert self.count == 11  # call for all tables
 
+    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    def test_prepare_table(self, mock_delete, mock_post):
+        """
+        Test the prepare table
+        """
+
+        
+        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+            print(f"mock_post_statement: {statement_name}")
+            print(f"sql_content: {sql_content}")
+            status = Status(
+                phase= "COMPLETED", 
+                detail= ""
+            )
+            spec = Spec(
+                compute_pool_id=get_config().get('flink').get('compute_pool_id'),
+                principal="principal_sa",
+                statement=sql_content,
+                properties={"sql.current-catalog": "default", "sql.current-database": "default"},
+                stopped=False
+            )
+            metadata = Metadata(
+                created_at="2025-04-20T10:15:02.853006",
+                labels={},
+                resource_version="1",
+                self="https://test-url",
+                uid="test-uid",
+                updated_at="2025-04-20T10:15:02.853006"
+            )
+            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
+
+
+        mock_delete.return_value = "deleted"
+        mock_post.side_effect = mock_post_statement
+        path_to_sql_file = os.getenv("HOME") + "/Code/customers/mc/data-platform-flink/pipelines/alter_table_debezium_avro_dev1.sql"
+        dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file, 
+                                        compute_pool_id="lfcp-121")
+        
+    
 if __name__ == '__main__':
     unittest.main()

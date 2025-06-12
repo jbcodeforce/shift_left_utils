@@ -28,7 +28,7 @@ from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
     FlinkStatementExecutionPlan
 )
-from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo
+from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo,TableReport
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 
@@ -471,6 +471,7 @@ class TestExecutionPlan(unittest.TestCase):
                 assert node.to_restart is True
 
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
@@ -481,7 +482,8 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
                                         mock_get_retention_size,
-                                        mock_get_pending_records) -> None:
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from product.
         should get non running tables to restart
@@ -498,6 +500,7 @@ class TestExecutionPlan(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
         summary, report = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
@@ -516,6 +519,7 @@ class TestExecutionPlan(unittest.TestCase):
             else:
                 assert table.to_restart is False
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
@@ -526,7 +530,8 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
                                         mock_get_retention_size,
-                                        mock_get_pending_records) -> None:
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from product.
         should restart all tables to restart
@@ -543,6 +548,7 @@ class TestExecutionPlan(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
         summary, report = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
@@ -559,6 +565,7 @@ class TestExecutionPlan(unittest.TestCase):
             assert table.to_restart is True
 
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
@@ -569,7 +576,8 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
                                         mock_get_retention_size,
-                                        mock_get_pending_records) -> None:
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
          taking into account the running statements.
@@ -587,6 +595,7 @@ class TestExecutionPlan(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
         summary, report = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
@@ -606,6 +615,7 @@ class TestExecutionPlan(unittest.TestCase):
                 assert table.to_restart is False
 
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
@@ -615,7 +625,8 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
                                         mock_get_retention_size,
-                                        mock_get_pending_records) -> None:
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
         As it forces to restar
@@ -632,6 +643,8 @@ class TestExecutionPlan(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
+
         summary, report = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
@@ -647,7 +660,7 @@ class TestExecutionPlan(unittest.TestCase):
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
-
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
@@ -658,7 +671,8 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
                                         mock_get_retention_size,
-                                        mock_get_pending_records) -> None:
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from a directory, like all sources, as may_start_descendants is true
         it should restart all tables and children of stateful tables
@@ -675,6 +689,7 @@ class TestExecutionPlan(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
         summary, report = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,

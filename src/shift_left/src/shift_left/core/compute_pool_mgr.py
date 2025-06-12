@@ -118,7 +118,7 @@ def is_pool_valid(compute_pool_id) -> bool:
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
         ratio = get_pool_usage(pool_info) 
-        if ratio >= 0.7:
+        if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
             raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
         return pool_info['status']['phase'] == "PROVISIONED"
     except Exception as e:

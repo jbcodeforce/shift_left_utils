@@ -252,7 +252,7 @@ def undeploy(
     elif product_name:
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
-    print(result)
+
 
 @app.command()
 def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare tables from."),
