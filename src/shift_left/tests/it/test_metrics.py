@@ -152,6 +152,8 @@ class TestConfluentMetrics(unittest.TestCase):
         print("test_get_output_records")
         statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
         compute_pool_id = "lfcp-1o07pz"
+        statement_name = "stage-aqem-dml-src-aqem-recordexecution-participant"
+        compute_pool_id = "lfcp-6xzvx6"
         output_records = metric_mgr.get_num_records_out(statement_name, compute_pool_id)
         print(f"output_records: {output_records}")
         assert output_records >= 0

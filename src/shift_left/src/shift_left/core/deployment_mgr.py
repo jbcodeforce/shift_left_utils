@@ -121,7 +121,7 @@ def build_deploy_pipeline_from_table(
                 f"{result.model_dump_json(indent=3)}"
             )
             print(f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
-            simple_report=report_mgr.build_simple_report(execution_plan)
+            simple_report=report_mgr.build_simple_report(execution_plan, None)
             #logger.info(f"Execute the plan after deployment: {simple_report}")
             summary+=f"\n{simple_report}"
         return summary, execution_plan
@@ -256,7 +256,8 @@ def build_and_deploy_all_from_directory(
 
 def report_running_flink_statements_for_a_table(
     table_name: str,
-    inventory_path: str
+    inventory_path: str,
+    from_date: str = None
 ) -> str:
     """
     Report running flink statements for a table execution plan
@@ -268,11 +269,12 @@ def report_running_flink_statements_for_a_table(
                                                         dml_only=False,
                                                         may_start_descendants=False,
                                                         force_ancestors=False)
-    return report_mgr.build_simple_report(execution_plan)
+    return report_mgr.build_simple_report(execution_plan, from_date)
 
 def report_running_flink_statements_for_all_from_directory(
     directory: str, 
-    inventory_path: str
+    inventory_path: str,
+    from_date: str = None
 ) -> str:
     """
     Review execution plans for all the pipelines in the directory.
@@ -288,7 +290,7 @@ def report_running_flink_statements_for_all_from_directory(
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            _update_table_report_with_table_info(pipeline_def, table_report)
+            _update_table_report_with_table_info(pipeline_def, table_report, from_date)
     result = report_mgr.prepare_table_report(table_report, report_name)
     return result
 
@@ -296,7 +298,8 @@ def report_running_flink_statements_for_all_from_directory(
 
 def report_running_flink_statements_for_a_product(
     product_name: str, 
-    inventory_path: str
+    inventory_path: str,
+    from_date: str
 ) -> str:
     """
     Report running flink statements for all the pipelines in the product.
@@ -308,7 +311,7 @@ def report_running_flink_statements_for_a_product(
         if table_ref.product_name == product_name:
             file_path=table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            _update_table_report_with_table_info(pipeline_def, table_report)
+            _update_table_report_with_table_info(pipeline_def, table_report, from_date)
     result = report_mgr.prepare_table_report(table_report, product_name)
     return result   
 
@@ -1056,7 +1059,7 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     """
     return node.product_name == current.product_name
 
-def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinition, table_report: TableReport):
+def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinition, table_report: TableReport, from_date: str):
     if pipeline_def:
         node: FlinkStatementNode = pipeline_def.to_node()
         node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    

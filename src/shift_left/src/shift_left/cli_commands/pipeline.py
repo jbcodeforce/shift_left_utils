@@ -214,7 +214,9 @@ def report_running_statements(
         dir: str = typer.Option(None, help="The directory to report the running statements from. If not provided, it will report the running statements from the table name."),
         table_name: str =  typer.Option(None, help="The table name containing pipeline_definition.json to get child list"),
         product_name: str =  typer.Option(None, help="The product name to report the running statements from."),
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
+        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES"),
+        from_date: str = typer.Option(None, help="The date from which to report the metrics from. Format: YYYY-MM-DDThh:mm:ss")
+):
     """
     Assess for a given table, what are the running dmls from its descendants. When the directory is specified, it will report the running statements from all the tables in the directory.
     """
@@ -222,12 +224,17 @@ def report_running_statements(
     try:
         if table_name:
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
-            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name, inventory_path)
+            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name, 
+                                                                                 inventory_path, 
+                                                                                 from_date)
         elif dir:
             results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, 
-                                                                                           inventory_path)
+                                                                                           inventory_path,
+                                                                                           from_date)
         elif product_name:
-            results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, inventory_path)
+            results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, 
+                                                                                  inventory_path, 
+                                                                                  from_date)
         else:
             print(f"[red]Error: either table_name or dir must be provided[/red]")
             raise typer.Exit(1)

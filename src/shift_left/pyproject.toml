@@ -24,6 +24,7 @@ dependencies = [
     "toml>=0.10.2",
     "confluent-kafka>=2.10.0",
     "pytest>=8.3.5",
+    "pytz>=2025.2",
 ]
 
 

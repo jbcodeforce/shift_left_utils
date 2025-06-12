@@ -96,7 +96,7 @@ def build_pipeline_definition_from_ddl_dml_content(
 
 def build_all_pipeline_definitions(pipeline_path: str):
     count = 0
-    for folder in ["dimensions", "facts", "views", "intermediates", "stage", "sources"]:
+    for folder in ["dimensions", "facts", "views", "intermediates", "stage", "sources", "seeds"]:
         path = Path(pipeline_path) / folder
         count=_process_one_sink_folder(path, pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
