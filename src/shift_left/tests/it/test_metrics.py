@@ -74,9 +74,11 @@ def get_topic_message_count(topic_name) -> int:
         return None
         
 class TestConfluentMetrics(unittest.TestCase):
-
+    """
+    TO DO change to hardcoded table and compute pool id. 
+    Test Confluent metrics
+    """
     
-
     def test_socket_connection(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         config = get_config()
@@ -147,6 +149,15 @@ class TestConfluentMetrics(unittest.TestCase):
         pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
         print(f"pending_records: {pending_records}")
         assert pending_records >= 0
+
+    def test_get_available_metrics(self):
+        config = get_config()
+        compute_pool_id = config["flink"]["compute_pool_id"]
+        metrics = metric_mgr.get_available_metrics(compute_pool_id)
+        print(len(metrics['data']))
+        for metric in metrics['data']:
+            if 'flink' in metric['name']:   
+                print(metric)
 
     def test_get_output_records(self):
         print("test_get_output_records")

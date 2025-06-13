@@ -19,7 +19,7 @@
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Debugger: src-project",
+            "name": "Debugger: mc-project",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",

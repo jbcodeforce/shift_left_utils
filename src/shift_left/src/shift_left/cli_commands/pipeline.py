@@ -238,7 +238,7 @@ def report_running_statements(
                                                                                   inventory_path, 
                                                                                   from_date)
         else:
-            print(f"[red]Error: either table_name or dir must be provided[/red]")
+            print(f"[red]Error: either table-name, product-name or dir must be provided[/red]")
             raise typer.Exit(1)
         print(results)
     except Exception as e:

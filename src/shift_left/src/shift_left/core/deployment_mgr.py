@@ -110,7 +110,7 @@ def build_deploy_pipeline_from_table(
         _persist_execution_plan(execution_plan)
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         logger.info(f"Execute the plan before deployment: {summary}")
-        
+        print(summary)
         if execute_plan:
             statements = _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
@@ -494,7 +494,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                     if ((node.upgrade_mode == "Stateful" and may_start_descendants) 
                     or (node.upgrade_mode != "Stateful" and may_start_descendants and child.upgrade_mode == "Stateful")):
                         if (child not in execution_plan.nodes 
-                            and (child.product_name == expected_product_name and not cross_product_deployment)):
+                            and (child.product_name == expected_product_name or cross_product_deployment)):
                             node_map, child_node = _get_static_info_update_node_map(child, node_map)
                             child_node.to_restart = not child_node.to_run
                             child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
@@ -792,6 +792,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
             #    node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
             #else:
             logger.info(f"Create compute pool {node.compute_pool_name} for {node.table_name} ... it may take a while")
+            print(f"Create compute pool {node.compute_pool_name} for {node.table_name} ... it may take a while")
             node.compute_pool_id, node.compute_pool_name =compute_pool_mgr.create_compute_pool(node.table_name)
            
         return node
@@ -858,7 +859,7 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                         logger.error(f"Failed to get result from future: {str(e)}")
                         if not accept_exceptions:
                             raise
-            for node in autonomous_nodes:
+            for node in autonomous_nodes: # to build the list of node to execute, need to avoid restarting the nodes that are just restarted
                 node.to_run = False
                 node.to_restart = False    
         else:
@@ -887,14 +888,14 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
 
 def _build_autonomous_nodes(nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
-    Build a list of autonomous nodes.
+    Build a list of autonomous statements: a statement has no no-running parents.
     """
     autonomous_nodes = []
     for node in nodes:
         if (node.to_run or node.to_restart):
             if node.parents:
                 for p in node.parents:
-                    if isinstance(p, str):
+                    if isinstance(p, str):  # to assess why with some testing this is a string
                         for n in nodes:
                             if n.table_name == p:
                                 if not n.to_run and not n.to_restart and node not in autonomous_nodes:
@@ -1069,8 +1070,8 @@ def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinit
     if pipeline_def:
         node: FlinkStatementNode = pipeline_def.to_node()
         node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
-        table_info = report_mgr.build_TableInfo(node)
-        print(f"Table info: {table_info.table_name} {table_info.status} pool_id: {table_info.compute_pool_id} pending records: {int(table_info.pending_records)} num records out: {int(table_info.num_records_out)}")
+        table_info = report_mgr.build_TableInfo(node=node, from_date=from_date)
+        print(f"Table info: {report_mgr.pad_or_truncate(table_info.table_name, 40)} {report_mgr.pad_or_truncate(table_info.status, 10)} created: {report_mgr.pad_or_truncate(table_info.created_at.strftime('%Y-%m-%dT%H:%M:%S'), 20)} pool: {report_mgr.pad_or_truncate(table_info.compute_pool_id, 10)} pending records: {table_info.pending_records} num records out: {table_info.num_records_out}")
         table_report.tables.append(table_info)
 
 

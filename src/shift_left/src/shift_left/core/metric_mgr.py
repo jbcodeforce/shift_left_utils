@@ -123,9 +123,10 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
         now = from_date_local.astimezone(pytz.UTC)
         #now=datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
     else:
-        now = datetime.now(pytz.UTC)
-    now_minus_15_minutes = now - timedelta(minutes=15)
-    interval = f"{now_minus_15_minutes.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
+        #now = datetime.now(pytz.UTC)
+        now= datetime.now()
+    now_minus_60_minutes = now - timedelta(minutes=60)
+    interval = f"{now_minus_60_minutes.strftime('%Y-%m-%dT%H:%M:%S')}/{now.strftime('%Y-%m-%dT%H:%M:%S')}"
     query= {"aggregations":[
             {"metric": metric_name}
         ],
@@ -133,7 +134,9 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
                      "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
                                 {"field":"resource.flink_statement.name","op":"EQ","value": statement_name}
                                 ]},
-                    "granularity":"PT5M",
+                    "granularity":"PT1M",
+                    "format": "GROUPED",
+                    "grouped_by": ["resource.compute_pool.id", "resource.flink_statement.name"],
                     "intervals":[interval],
                     "limit":1000}
     try:
