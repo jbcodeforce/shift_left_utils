@@ -290,6 +290,7 @@ def _build_deploy_pipeline(
         execute_plan: bool=False):
     summary="Nothing done"
     try:
+        report=None
         if table_name:
             print(f"Build an execution plan for table {table_name}")
             summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
@@ -307,6 +308,7 @@ def _build_deploy_pipeline(
                 if node.to_run or node.to_restart:
                     print(f"{node.table_name}")
             print(f"\n" + "-"*30 + "\n")
+
         elif product_name:
             print(f"Build an execution plan for product {product_name}")
             summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
@@ -319,6 +321,7 @@ def _build_deploy_pipeline(
                                                         sequential=sequential,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for product {product_name}")
+
         elif dir:
             print(f"Build an execution plan for directory {dir}")
             summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir, 
@@ -330,6 +333,8 @@ def _build_deploy_pipeline(
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     sequential=sequential,
                                                                     execute_plan=execute_plan)
+        if not execute_plan:
+            print(summary)
         if report:
             print(f"Table_name | Status | Pending Records | Num Records Out")
             for table_info in report.tables:

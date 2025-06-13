@@ -106,7 +106,6 @@ def build_deploy_pipeline_from_table(
                                                                       cross_product_deployment=cross_product_deployment,
                                                                       compute_pool_id=compute_pool_id, 
                                                                       table_name=start_node.table_name, 
-                                                                      sequential=True,
                                                                       expected_product_name=start_node.product_name)
         _persist_execution_plan(execution_plan)
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
