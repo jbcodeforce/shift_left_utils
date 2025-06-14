@@ -15,9 +15,9 @@ import multiprocessing
 import threading
 from datetime import datetime
 from collections import deque
-from typing import Optional, List, Any, Set, Tuple, Dict, Final
+from typing import List, Any, Set, Tuple, Dict, Final
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from queue import Queue
+
 
 from shift_left.core import (
     pipeline_mgr,
@@ -32,7 +32,6 @@ from shift_left.core.models.flink_statement_model import (
 )
 
 from shift_left.core.utils.report_mgr import (
-    DeploymentReport,
     TableReport
 )
 import shift_left.core.utils.report_mgr as report_mgr
@@ -177,6 +176,7 @@ def build_deploy_pipelines_from_product(
             start_node.to_run = False
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
+        table_report = report_mgr.build_TableReport(start_node.product_name)
         if execute_plan:
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()

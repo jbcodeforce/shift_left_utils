@@ -90,22 +90,19 @@ class TestDebugUnitTests(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_build_execution_plan_for_leaf_table_f_while_parents_running(
+    def test_execute_plan_in_parallel(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
         mock_get_compute_pool_list
     ) -> None:
         """
-        when direct parent d is running 
-        restarting the leaf "f"
-        Should restart only current table f which has one parent d.
-        f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
+        restarting the leaf "f" and all parents. 
         """
-        print("\n--> test_build_execution_plan_for_one_table_while_parents_running should start node f only")
+        print("\n--> test_execute_plan_in_parallel, should runs src in parallel")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            return self._create_mock_get_statement_info(status_phase="RUNNING")
+            return self._create_mock_get_statement_info(status_phase="UNKNOWN")
  
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
@@ -116,9 +113,9 @@ class TestDebugUnitTests(unittest.TestCase):
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
             dml_only=False, 
-            may_start_descendants=False, # should get same result if true
+            may_start_descendants=True, # should get same result if true
             force_ancestors=True,
-            execute_plan=False
+            execute_plan=True
         )
         autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
         print(f"autonomous_nodes: {autonomous_nodes}")
