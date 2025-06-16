@@ -861,6 +861,7 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
         else:
             print(f"Still {len(nodes_to_execute)} statements to execute")
             node = nodes_to_execute[0]
+            nodes_to_execute.remove(node)
             statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
             if statement:
                 statements.append(statement)
