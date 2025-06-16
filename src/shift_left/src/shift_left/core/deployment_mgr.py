@@ -17,13 +17,9 @@ from datetime import datetime
 from collections import deque
 from typing import List, Any, Set, Tuple, Dict, Final
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-
-from shift_left.core import (
-    pipeline_mgr,
-    compute_pool_mgr,
-    statement_mgr
-)
+from shift_left.core import pipeline_mgr
+from shift_left.core import compute_pool_mgr
+from shift_left.core import statement_mgr
 from shift_left.core.models.flink_statement_model import (
     Statement,
     FlinkStatementNode,
@@ -775,7 +771,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     if node.compute_pool_id and compute_pool_mgr.is_pool_valid(node.compute_pool_id):  # this may be loaded from the statement info
         node.compute_pool_name = compute_pool_mgr.get_compute_pool_name(node.compute_pool_id)
         return node
-    # get the list of compute pools available in the environment that match the table name
+    # get the list of compute pools available that match the table name
     pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
     # If we don't have any matching compute pool, we need to find a pool to use
     if  not pools or len(pools) == 0:
@@ -886,28 +882,34 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
             nodes_to_execute.append(node)
     return nodes_to_execute
 
-def _build_autonomous_nodes(nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
+def _build_autonomous_nodes(execution_plan_nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
-    Build a list of autonomous statements: a statement has no no-running parents.
+    Build a list of autonomous statements: a statement is autonomous so can be executed
+    in parallel of other statements in the list if it has no parents or all
+    its parents are running and not to be restarted.
     """
     autonomous_nodes = []
-    for node in nodes:
+    for node in execution_plan_nodes:
         if (node.to_run or node.to_restart):
-            if node.parents:
-                for p in node.parents:
-                    if isinstance(p, str):  # to assess why with some testing this is a string
-                        for n in nodes:
-                            if n.table_name == p:
-                                if not n.to_run and not n.to_restart and node not in autonomous_nodes:
-                                    autonomous_nodes.append(node)
-                                    break
-                    else:
-                        for n in nodes:
-                            if not n.to_run and not n.to_restart and node not in autonomous_nodes:
-                                autonomous_nodes.append(node)
-                                break
-            elif node not in autonomous_nodes:
+            if not node.parents and node not in autonomous_nodes:
                 autonomous_nodes.append(node)
+            else:
+                all_parents_running = True
+                for p in node.parents:
+                    if isinstance(p, str):  # to assess why with some time there is astring
+                        for n in execution_plan_nodes:
+                            # search if parent is in the execution plan
+                            if n.table_name == p:
+                                if (n.to_run or n.to_restart or n in autonomous_nodes):
+                                    all_parents_running = False
+                                    break
+                    else: # p is a FlinkStatementNode
+                        if p.to_run or p.to_restart or p in autonomous_nodes:
+                            all_parents_running = False
+                            break
+                if all_parents_running:
+                    autonomous_nodes.append(node)
+
     return autonomous_nodes
 
 def _deploy_one_node(node: FlinkStatementNode,accept_exceptions: bool = False, compute_pool_id: str = None)-> Statement:

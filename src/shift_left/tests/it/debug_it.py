@@ -13,15 +13,15 @@ import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.metric_mgr as metric_mgr
 import shift_left.core.test_mgr as test_mgr
 from typer.testing import CliRunner
-from shift_left.cli_commands.pipeline import app
+from shift_left.cli import app
 
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
     def test_exec_plan(self):
         runner = CliRunner()
-        #result = runner.invoke(app, ['build-execution-plan', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
-        result = runner.invoke(app, ['build-execution-plan', '--table-name', 'src_tenant_metadata', '--may-start-descendants', '--cross-product-deployment'])
+        result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
+        #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
         print(result.stdout)
 
         

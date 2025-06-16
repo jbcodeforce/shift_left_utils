@@ -113,8 +113,8 @@ def build_TableInfo(node: FlinkStatementNode, from_date: str = None) -> TableInf
     if table_info.status == "RUNNING":
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name, from_date)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
-        table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id, from_date)
-        table_info.num_records_out = metrics_mgr.get_num_records_out(table_info.table_name, table_info.compute_pool_id, from_date)
+        #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id, from_date)
+        #table_info.num_records_out = metrics_mgr.get_num_records_out(table_info.table_name, table_info.compute_pool_id, from_date)
     return table_info
 
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan, from_date: str = None) -> str:
@@ -122,8 +122,10 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan, from_date: 
     report+=f"-"*165 + "\n"
     for node in execution_plan.nodes:
         if node.existing_statement_info:
-            pending_records = metrics_mgr.get_pending_records(node.existing_statement_info.name, node.compute_pool_id, from_date)
-            num_records_out = metrics_mgr.get_num_records_out(node.table_name, node.compute_pool_id, from_date)
+            #pending_records = metrics_mgr.get_pending_records(node.existing_statement_info.name, node.compute_pool_id, from_date)
+            #num_records_out = metrics_mgr.get_num_records_out(node.table_name, node.compute_pool_id, from_date)
+            pending_records = 0
+            num_records_out = 0
             report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)} {pad_or_truncate(pending_records,10)} {pad_or_truncate(num_records_out,10)}\n"
     return report
 

@@ -5,7 +5,7 @@ import time
 import os, json
 from importlib import import_module
 from typing import Tuple
-from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
+from shift_left.core.utils.app_config import get_config, logger, shift_left_dir, session_log_dir
 from shift_left.core.statement_mgr import get_statement_info
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.models.flink_compute_pool_model import *
@@ -13,8 +13,8 @@ from shift_left.core.utils.naming_convention import ComputePoolNameModifier
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
 
-STATEMENT_COMPUTE_POOL_FILE=shift_left_dir + "/pool_assignments.json"
-COMPUTE_POOL_LIST_FILE=shift_left_dir + "/compute_pool_list.json"
+STATEMENT_COMPUTE_POOL_FILE=session_log_dir + "/pool_assignments.json"
+COMPUTE_POOL_LIST_FILE=session_log_dir + "/compute_pool_list.json"
 
 
 _compute_pool_list = None
@@ -153,9 +153,12 @@ def create_compute_pool(table_name: str) -> Tuple[str, str]:
                                         status_phase=result['status']['phase'], 
                                         current_cfu=result['status']['current_cfu']))
                 return pool_id, result['spec']['display_name']
+        elif result.get('errors').get('status') == "409":
+            logger.error(f"Compute pool {spec['display_name']} already exists")
+            return pool_id, spec['display_name']
         else:
-            logger.error(f"Error creating compute pool: {result.get('errors')}")
-            raise Exception(f"Error creating compute pool: {result.get('errors')}")
+            logger.error(f"Error creating compute pool: {result.get('errors')} -> using the one in config.yaml")
+            return config['flink']['compute_pool_id'], spec['display_name']
     except Exception as e:
         logger.error(e)
         raise e
