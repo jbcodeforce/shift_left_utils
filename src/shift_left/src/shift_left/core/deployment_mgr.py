@@ -252,6 +252,68 @@ def build_and_deploy_all_from_directory(
         return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
 
 
+def build_and_deploy_all_from_table_list(
+    table_list_file_name: str,
+    inventory_path: str,
+    compute_pool_id: str,
+    dml_only: bool = False,
+    may_start_descendants: bool = False,
+    force_ancestors: bool = False,  
+    cross_product_deployment: bool = False,
+    execute_plan: bool = False,
+    sequential: bool = False
+) -> Tuple[str, TableReport]:
+    """
+    Deploy all the pipelines in the table list file.    
+    """
+    inventory_path = inventory_path or os.getenv("PIPELINES")
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    start_time = time.perf_counter()
+    nodes_to_process = []
+    combined_node_map = {}
+    with open(table_list_file_name, "r") as f:
+        table_names = f.read().splitlines()
+        count=0
+        for table_name in table_names:
+            print(f"Table name: {table_name}")
+            for _inventory_table_name, table_ref_dict in table_inventory.items():
+                table_ref = FlinkTableReference(**table_ref_dict)
+                if _inventory_table_name == table_name:
+                    node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
+                    nodes_to_process.append(node)
+                    node.to_restart = True
+                    # Build the static graph from the Flink statement relationship
+                    combined_node_map |= _build_statement_node_map(node)
+                    count+=1
+                    break
+    if count > 0:            
+        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+        start_node = ancestors[0]
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
+                                                                      node_map=combined_node_map, 
+                                                                      force_ancestors=force_ancestors, 
+                                                                      may_start_descendants=may_start_descendants, 
+                                                                      cross_product_deployment=cross_product_deployment,
+                                                                      compute_pool_id=compute_pool_id, 
+                                                                      table_name=start_node.table_name, 
+                                                                      expected_product_name=start_node.product_name)
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+        summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
+        table_report = report_mgr.build_TableReport(start_node.product_name)
+        if execute_plan:
+            print(f"Executing plan: {summary}")
+            _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
+            execution_time = (time.perf_counter() - start_time)
+            print(f"Execution time: {execution_time} seconds")
+            summary+=f"\nExecution time: {execution_time} seconds"
+            
+            for node in execution_plan.nodes:
+                table_info = report_mgr.build_TableInfo(node)
+                table_report.tables.append(table_info)
+            summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+        return summary, table_report
+    else:
+        return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
 
 def report_running_flink_statements_for_a_table(
     table_name: str,
@@ -508,6 +570,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                             
         #execution_plan.nodes = _build_topological_sorted_parents(execution_plan.nodes, node_map)                    
         logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
+        print(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
         logger.debug(execution_plan)
         return execution_plan
     except Exception as e:

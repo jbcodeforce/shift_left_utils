@@ -215,8 +215,6 @@ def get_or_create_inventory(pipeline_folder: str):
     """
     return build_inventory(pipeline_folder)
 
-
-
 def validate_table_cross_products(rootdir: str):
     config=get_config()
     for product in config["app"]["products"]:
@@ -282,6 +280,22 @@ def explain_tables_for_product(product_name: str, compute_pool_id: str, persist_
             print(f"--> {_summarize_trace(explain_report['trace'])}")
     return product_tables_report
 
+def explain_tables_for_list_of_tables(table_list_file_name: str, compute_pool_id: str, persist_report: bool = False) -> dict:
+    """
+    Explain the tables in the list of tables file using the Flink CLI
+    """
+    product_tables_report = {}
+    inventory_path = os.getenv("PIPELINES")
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    with open(table_list_file_name, "r") as f:
+        table_names = f.read().splitlines()
+        for table_name in table_names:
+            table_ref = FlinkTableReference(**table_inventory[table_name])
+            print(f"Process {table_name}")
+            explain_report = _get_flink_execution_plan_explanation(table_ref, compute_pool_id, persist_report=persist_report)
+            product_tables_report[table_name] = explain_report['trace']
+        print(f"--> {_summarize_trace(explain_report['trace'])}")
+    return product_tables_report
 
 # --------- Private APIs ---------------
 

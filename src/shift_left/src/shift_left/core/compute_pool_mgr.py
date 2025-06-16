@@ -35,6 +35,8 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                 reload = False
         if reload:
             logger.info(f"Get the compute pool list for environment {env_id}, {region} using API")
+            print(f"Get the compute pool list for environment {env_id}, {region} using API")
+            start_time = time.perf_counter()
             client = ConfluentCloudClient(get_config())
             response: ComputePoolListResponse = client.get_compute_pool_list(env_id, region)
             _compute_pool_list = ComputePoolList(created_at=datetime.now().isoformat())
@@ -49,6 +51,8 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                 _compute_pool_list.pools.append(cp_pool)
             _save_compute_pool_list(_compute_pool_list)
             logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
+            stop_time = time.perf_counter()
+            print(f"Compute pool list has {len(_compute_pool_list.pools)} pools in {stop_time - start_time} seconds")
     return _compute_pool_list
 
 

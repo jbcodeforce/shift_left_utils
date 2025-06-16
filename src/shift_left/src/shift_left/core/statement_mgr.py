@@ -210,6 +210,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
             _statement_list_cache = StatementListCache(created_at=datetime.now())
             logger.info("Load the current list of Flink statements using REST API")
             print("Load the current list of Flink statements using REST API")
+            start_time = time.perf_counter()
             config = get_config()
             page_size = config["confluent_cloud"].get("page_size", 100)
             client = ConfluentCloudClient(config)
@@ -232,6 +233,8 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 else:
                     break
             _save_statement_list(_statement_list_cache)
+            stop_time = time.perf_counter()
+            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements in {stop_time - start_time} seconds")
     return _statement_list_cache.statement_list
 
 

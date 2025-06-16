@@ -158,6 +158,7 @@ def deploy(
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")],
         table_name:  str =  typer.Option(default= None, help="The table name containing pipeline_definition.json."),
         product_name: str =  typer.Option(None, help="The product name to deploy."),
+        table_list_file_name: str = typer.Option(None, help="The file containing the list of tables to deploy."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
@@ -173,6 +174,7 @@ def deploy(
         table_name=table_name, 
         product_name=product_name, 
         dir=dir, 
+        table_list_file_name=table_list_file_name,
         inventory_path=inventory_path, 
         compute_pool_id=compute_pool_id, 
         dml_only=dml_only, 
@@ -190,6 +192,7 @@ def build_execution_plan(
         table_name:  str =  typer.Option(default= None, help="The table name to deploy from. Can deploy ancestors and descendants." ),
         product_name: str =  typer.Option(None, help="The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from."),
+        table_list_file_name: str = typer.Option(None, help="The file containing the list of tables to deploy."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
@@ -203,6 +206,7 @@ def build_execution_plan(
         table_name=table_name, 
         product_name=product_name, 
         dir=dir, 
+        table_list_file_name=table_list_file_name,
         inventory_path=inventory_path, 
         compute_pool_id=compute_pool_id, 
         dml_only=dml_only, 
@@ -280,6 +284,7 @@ def _build_deploy_pipeline(
         table_name: str, 
         product_name: str, 
         dir: str, 
+        table_list_file_name: str,
         inventory_path: str, 
         compute_pool_id: str, 
         dml_only: bool, 
@@ -333,6 +338,20 @@ def _build_deploy_pipeline(
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     sequential=sequential,
                                                                     execute_plan=execute_plan)
+        elif table_list_file_name:
+            print(f"Build an execution plan for tables in {table_list_file_name}")
+            summary, report=deployment_mgr.build_and_deploy_all_from_table_list(table_list_file_name=table_list_file_name,
+                                                                    inventory_path=inventory_path,
+                                                                    compute_pool_id=compute_pool_id,
+                                                                    dml_only=dml_only,
+                                                                    may_start_descendants=may_start_descendants,
+                                                                    force_ancestors=force_ancestors,
+                                                                    cross_product_deployment=cross_product_deployment,
+                                                                    sequential=sequential,
+                                                                    execute_plan=execute_plan)
+        else:
+            print(f"[red]Error: either table-name, product-name, dir or table-list-file-name must be provided[/red]")
+            raise typer.Exit(1)
         if not execute_plan:
             print(summary)
         if report:
