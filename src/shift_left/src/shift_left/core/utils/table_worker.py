@@ -223,6 +223,6 @@ class ReplaceEnvInSqlContent(TableWorker):
                     sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
                     updated = (sql_out != sql_content)
                     sql_content=sql_out
-                    logger.debug(f"{k} , {v} ")
+                    logger.info(f"{k} , {v} ")
         logger.debug(sql_content)
         return updated, sql_content

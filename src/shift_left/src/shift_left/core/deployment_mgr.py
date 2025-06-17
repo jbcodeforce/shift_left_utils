@@ -791,7 +791,7 @@ def _get_descendants_subgraph(start_node: FlinkStatementNode,
 
 def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatementNode) -> FlinkStatementNode:
     """
-    Update node with current statement info.
+    Update node with current statem
     
     Args:
         node: Node to update
@@ -895,8 +895,8 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     Raises:
         RuntimeError: If statement execution fails
     """
-    logger.info(f"--- Execution Plan for {plan.start_table_name} started ---")
-    print(f"--- Execution Plan for {plan.start_table_name} started ---")
+    logger.info(f"--- Execute Plan for {plan.start_table_name} started ---")
+    print(f"--- Execute for {plan.start_table_name} started ---")
     statements = []
     autonomous_nodes=[]
     max_workers = multiprocessing.cpu_count()
@@ -908,19 +908,27 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
         if len(autonomous_nodes) > 0:
             print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in autonomous_nodes]
+                to_process = []
+                if len(autonomous_nodes) < max_workers:
+                    max_workers = len(autonomous_nodes)
+                for idx in range(max_workers):
+                    to_process.append(autonomous_nodes[idx])
+
+                futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
                 for future in as_completed(futures):
                     try:
                         result = future.result()
                         if result is not None:  # Only append if we got a valid result
                             statements.append(result)
+
                     except Exception as e:
                         logger.error(f"Failed to get result from future: {str(e)}")
                         if not accept_exceptions:
                             raise
-            for node in autonomous_nodes: # to build the list of node to execute, need to avoid restarting the nodes that are just restarted
-                node.to_run = False
-                node.to_restart = False    
+                for node in to_process:
+                    node.to_run = False
+                    node.to_restart = False  
+                    autonomous_nodes.remove(node)
         else:
             print(f"Still {len(nodes_to_execute)} statements to execute")
             node = nodes_to_execute[0]

@@ -113,9 +113,9 @@ class TestDebugUnitTests(unittest.TestCase):
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
             dml_only=False, 
-            may_start_descendants=True, # should get same result if true
+            may_start_descendants=False, # should get same result if true
             force_ancestors=True,
-            execute_plan=True
+            execute_plan=False
         )
         autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
         print(f"autonomous_nodes: {autonomous_nodes}")
