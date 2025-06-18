@@ -11,7 +11,7 @@ from rich import print
 from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
-import shift_left.core.utils.app_config as get_config
+from shift_left.core.utils.app_config import get_config
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 
