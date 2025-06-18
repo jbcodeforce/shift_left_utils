@@ -45,7 +45,7 @@ resume_flink_statement = \
 	confluent flink statement resume $1 --cloud $(CLOUD) --region $(REGION) 
 
 delete_flink_statement = \
-	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --context $(CC_CONTEXT)
+	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --context $(CC_CONTEXT) --environment $(ENV_ID)
 
 list_topic_content = \
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \
