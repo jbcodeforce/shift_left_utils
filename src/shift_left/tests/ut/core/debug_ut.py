@@ -90,7 +90,7 @@ class TestDebugUnitTests(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_execute_plan_in_parallel(
+    def test_autonomous_and_nodes_to_execute(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
@@ -99,7 +99,7 @@ class TestDebugUnitTests(unittest.TestCase):
         """
         restarting the leaf "f" and all parents. 
         """
-        print("\n--> test_execute_plan_in_parallel, should runs src in parallel")
+        print("\n--> test_execute_plan_in_parallel, should runs all src in parallel")
         
         def mock_statement(statement_name: str) -> StatementInfo:
             return self._create_mock_get_statement_info(status_phase="UNKNOWN")
@@ -108,25 +108,22 @@ class TestDebugUnitTests(unittest.TestCase):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="z", 
+        _, execution_plan = dm.build_deploy_pipeline_from_table(
+            table_name="f", 
             inventory_path=self.inventory_path, 
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
             dml_only=False, 
             may_start_descendants=False, # should get same result if true
             force_ancestors=True,
-            execute_plan=False
+            execute_plan=False  # set to false as we just want to validate autonomous nodes and nodes to execute
         )
         autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
-        print(f"autonomous_nodes: {autonomous_nodes}")
-        nodes_to_execute = dm._get_nodes_to_execute(execution_plan.nodes)
-        print(f"nodes_to_execute: {nodes_to_execute}")
-        print(f"{summary}")
-        assert len(execution_plan.nodes) == 5  # all nodes are present as we want to see running ones too
-        assert len(nodes_to_execute) == 5
         assert len(autonomous_nodes) == 2
+
+        nodes_to_execute = dm._get_nodes_to_execute(execution_plan.nodes)
+        assert len(nodes_to_execute) == 7
         for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x", "src_y", "y"]:
+            if node.table_name in ["src_x", "x", "src_y", "y", "z", "d"]:
                 assert node.to_run is True
                 assert node.to_restart is False
 

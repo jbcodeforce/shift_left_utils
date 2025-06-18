@@ -11,7 +11,7 @@ from rich import print
 from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
-import shift_left.core.utils.app_config as app_config
+import shift_left.core.utils.app_config as get_config
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 
@@ -170,6 +170,7 @@ def deploy(
     """
     Deploy a pipeline from a given table name , product name or a directory.
     """
+    print(f"Deploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
     _build_deploy_pipeline( 
         table_name=table_name, 
         product_name=product_name, 
@@ -258,7 +259,12 @@ def undeploy(
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
-   
+    print(f"Undeploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
+    print("Are you sure you want to undeploy? (y/n)")
+    answer = input()
+    if answer != "y":
+        print("Undeploy cancelled")
+        raise typer.Exit(1)
     if table_name:
         print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)

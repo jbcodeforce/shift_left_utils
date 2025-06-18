@@ -48,7 +48,7 @@ MAX_CFU_INCREMENT: Final[int] = 20
 def build_deploy_pipeline_from_table(
     table_name: str,
     inventory_path: str,
-    compute_pool_id: str,
+    compute_pool_id: str = None,
     dml_only: bool = False,
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
@@ -110,7 +110,7 @@ def build_deploy_pipeline_from_table(
             statements = _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
         
-            result.execution_time = time.perf_counter() - start_time
+            result.execution_time = int(time.perf_counter() - start_time)
             result.start_time = start_time
             logger.info(
                 f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
@@ -177,7 +177,7 @@ def build_deploy_pipelines_from_product(
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()
             _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=True, sequential=sequential)
-            execution_time = (time.perf_counter() - start_time)
+            execution_time = int(time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             print("... build table report now...")
@@ -239,7 +239,7 @@ def build_and_deploy_all_from_directory(
             print(f"Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
             _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=accept_exceptions, sequential=sequential)
-            execution_time = (time.perf_counter() - start_time)
+            execution_time = int(time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             
@@ -303,7 +303,7 @@ def build_and_deploy_all_from_table_list(
         if execute_plan:
             print(f"Executing plan: {summary}")
             _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
-            execution_time = (time.perf_counter() - start_time)
+            execution_time = int(time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             
@@ -402,7 +402,7 @@ def full_pipeline_undeploy_from_table(
         rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
         trace+=f"Dropped table {node.table_name} with result: {rep}\n"
         print(f"Dropped table {node.table_name}")
-    execution_time = time.perf_counter() - start_time
+    execution_time = int(time.perf_counter() - start_time)
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {sink_table_name}")
     return trace
 
@@ -470,7 +470,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
         trace += "".join(results)
         count = len(nodes_to_drop)
                 
-    execution_time = time.perf_counter() - start_time
+    execution_time = int(time.perf_counter() - start_time)
     print(f"Done in {execution_time} seconds to undeploy pipeline from product {product_name}")
     return trace
 

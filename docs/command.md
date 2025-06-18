@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1069b6fc0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1270b3080&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -385,6 +385,7 @@ $ table explain [OPTIONS]
 
 * `--table-name TEXT`: Name of the table to get Flink execution plan explanations from.
 * `--product-name TEXT`: The directory to run the explain on each tables found within this directory. table or dir needs to be provided.
+* `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--persist-report`: Persist the report in the shift_left_dir folder.
 * `--help`: Show this message and exit.
@@ -511,6 +512,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 
 * `--table-name TEXT`: The table name containing pipeline_definition.json.
 * `--product-name TEXT`: The product name to deploy.
+* `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-descendants]
@@ -540,6 +542,7 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--table-name TEXT`: The table name to deploy from. Can deploy ancestors and descendants.
 * `--product-name TEXT`: The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product.
 * `--dir TEXT`: The directory to deploy the pipeline from.
+* `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
