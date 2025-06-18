@@ -144,7 +144,7 @@ class TestTableWorker(unittest.TestCase):
         assert "'kafka.producer.compression.type' = 'snappy'" in sql_out
         print(sql_out)
 
-    def test_schema_context_update_from_env(self):
+    def test_schema_context_update_for_stage_env(self):
         module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
         get_config()['kafka']['cluster_type']='stage'
         mod = import_module(module_path)
@@ -170,7 +170,33 @@ class TestTableWorker(unittest.TestCase):
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
         assert "'value.avro-registry.schema-context' = '.flink-stage'" in sql_out
 
-    def test_dml_sql_content_update_from_env(self):
+    def test_schema_context_update_for_prod_env(self):
+        module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
+        get_config()['kafka']['cluster_type']='prod'
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        sql_in="""
+        CREATE TABLE table_1 (
+            a string
+        ) WITH (
+            'key.avro-registry.schema-context' = '.flink-dev',
+            'value.avro-registry.schema-context' = '.flink-dev',
+            'changelog.mode' = 'upsert',
+            'kafka.retention.time' = '0',
+            'scan.bounded.mode' = 'unbounded',
+            'scan.startup.mode' = 'earliest-offset',
+            'value.fields-include' = 'all',
+            'key.format' = 'avro-registry',
+            'value.format' = 'avro-registry'
+        )
+        """ 
+        updated, sql_out= runner_class().update_sql_content(sql_in)
+        print(sql_out)
+        assert updated
+        assert "'key.avro-registry.schema-context' = '.flink-prod'" in sql_out
+        assert "'value.avro-registry.schema-context' = '.flink-prod'" in sql_out
+
+    def test_dml_sql_content_update_for_stage_env(self):
         module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
@@ -190,6 +216,28 @@ class TestTableWorker(unittest.TestCase):
         updated, sql_out= runner_class().update_sql_content(sql_in)
         print(sql_out)
         assert "replicated.stage.ap-tag-order-stage.template" in sql_out
+
+    def test_dml_sql_content_update_for_prod_env(self):
+        module_path, class_name = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent".rsplit('.',1)
+        mod = import_module(module_path)
+        runner_class = getattr(mod, class_name)
+        get_config()['kafka']['cluster_type']='prod'
+        get_config()['kafka']['src_topic_prefix']='replicated'
+        sql_in="""
+        INSERT INTO src_order
+        SELECT 
+            id,
+            status,
+            name,
+            after.is_migrated
+        FROM
+            `ap-tag-order-dev.template`
+        );
+        """ 
+        updated, sql_out= runner_class().update_sql_content(sql_in)
+        print(sql_out)
+        assert updated
+        assert "replicated.prod.ap-tag-order-prod.template" in sql_out
 
     def test_regex_replace(self):
         import re
@@ -423,6 +471,19 @@ class TestTableWorker(unittest.TestCase):
         print(sql_out)
         assert updated
         assert "replicated.stage.ap-tag-order-stage.template" in sql_out
+
+    def test_replace_topic_name_in_sql_content_for_prod_env(self):
+        """Test clone.dev is replace by clone.prod in sql content"""
+        # Test with invalid SQL content
+        sql_in = "insert into src_order select id, status, name, is_migrated from `clone.dev.ap-tag-order-dev.template`;"
+       
+        get_config()['kafka']['cluster_type']='prod'
+        get_config()['kafka']['src_topic_prefix']='replicated'
+        worker = ReplaceEnvInSqlContent()
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        print(sql_out)
+        assert updated
+        assert "replicated.prod.ap-tag-order-prod.template" in sql_out
 
     def test_change_data_limit_where_condition(self):
         """Test change data limit where condition"""

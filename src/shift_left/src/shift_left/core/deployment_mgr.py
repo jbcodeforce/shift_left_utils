@@ -595,8 +595,6 @@ def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
         logger.error(f"Failed to build node map for {simple_node.table_name}. Error is : {str(e)}")
         raise e
 
-    
-
 def _process_ancestors(ancestors: List[FlinkStatementNode], 
                        execution_plan: FlinkStatementExecutionPlan, 
                        force_ancestors: bool,

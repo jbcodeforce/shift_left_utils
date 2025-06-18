@@ -172,6 +172,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "search": r"\s*select\s+\*\s+from\s+final\s*;?",
                 "replace": rf"SELECT * FROM final WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = '{product_name}')"
             }
+        },
+        "prod": {
+            "adapt": {
+                "search": r"^(.*?)(ap-.*?)-(dev)\.",
+                "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
+            }
         }
     }
     ddl_replacements = {
@@ -180,6 +186,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "search": rf"(.flink)-(dev)",
                 # Replaces .flink-dev with .flink-{env} in schema context
                 # For example: .flink-dev -> .flink-stage in staging environment
+                "replace": rf"\1-{env}"
+            }
+        },
+        "prod": {
+            "schema-context": {
+                "search": rf"(.flink)-(dev)",
                 "replace": rf"\1-{env}"
             }
         }
@@ -191,7 +203,9 @@ class ReplaceEnvInSqlContent(TableWorker):
         self.topic_prefix = self.config.get('kafka',{'src_topic_prefix': 'clone'}).get('src_topic_prefix')
         # Update the replacements with the current env
         self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
+        self.dml_replacements["prod"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
+        self.ddl_replacements["prod"]["schema-context"]["replace"] = rf"\1-{self.env}"
         self.insert_into_src=r"\s*INSERT\s+INTO\s+src_"
 
 
