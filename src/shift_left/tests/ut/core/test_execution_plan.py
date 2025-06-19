@@ -581,7 +581,7 @@ class TestExecutionPlan(unittest.TestCase):
         """
         Test deploying pipeline from a directory, like all sources,
          taking into account the running statements.
-        should restart only the non running tables
+        should restart only the non running src_ tables
         """
         print("test_deploy_pipeline_for_non_running_sources should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
@@ -629,7 +629,7 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
-        As it forces to restar
+        As it forces to restart
         """
         print("test_deploy_pipeline_for_all_sources should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:

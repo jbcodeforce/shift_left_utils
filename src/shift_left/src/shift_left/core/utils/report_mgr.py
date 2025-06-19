@@ -80,15 +80,18 @@ def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
     else:
         return str(text).ljust(length, padding_char)    
     
-def build_TableReport(report_name: str) -> TableReport:
+def build_TableReport(report_name: str, nodes: List[FlinkStatementNode], get_metrics: bool = False) -> TableReport:
     table_report = TableReport()
     table_report.report_name = report_name
     table_report.environment_id = get_config().get('confluent_cloud').get('environment_id')
     table_report.catalog_name = get_config().get('flink').get('catalog_name')
     table_report.database_name = get_config().get('flink').get('database_name')
+    for node in nodes:
+        table_info = build_TableInfo(node, get_metrics=get_metrics)
+        table_report.tables.append(table_info)
     return table_report
 
-def build_TableInfo(node: FlinkStatementNode, from_date: str = None) -> TableInfo:
+def build_TableInfo(node: FlinkStatementNode, from_date: str = None, get_metrics: bool = False) -> TableInfo:
     table_info = TableInfo()
     table_info.table_name = node.table_name
     table_info.type = node.type
@@ -110,7 +113,7 @@ def build_TableInfo(node: FlinkStatementNode, from_date: str = None) -> TableInf
         table_info.compute_pool_name = pool.name
     else:
         table_info.compute_pool_name = "UNKNOWN"
-    if table_info.status == "RUNNING":
+    if table_info.status == "RUNNING" and get_metrics:
         table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name, from_date)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
         #table_info.pending_records = metrics_mgr.get_pending_records(table_info.statement_name, table_info.compute_pool_id, from_date)

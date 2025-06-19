@@ -172,7 +172,7 @@ def build_deploy_pipelines_from_product(
             start_node.to_run = False
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
             print(f"Executing plan: {summary}")
             start_time = time.perf_counter()
@@ -181,11 +181,7 @@ def build_deploy_pipelines_from_product(
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             print("... build table report now...")
-            table_report = report_mgr.build_TableReport(start_node.product_name)
-            for node in execution_plan.nodes:
-                table_info = report_mgr.build_TableInfo(node)
-                table_report.tables.append(table_info)
-
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -215,7 +211,7 @@ def build_and_deploy_all_from_directory(
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             node = read_pipeline_definition_from_file(file_path).to_node()
-            node.to_restart = True
+            #node.to_restart = True
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
             combined_node_map |= _build_statement_node_map(node)
@@ -234,7 +230,7 @@ def build_and_deploy_all_from_directory(
                                                                       expected_product_name=start_node.product_name)
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
             print(f"Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
@@ -242,10 +238,7 @@ def build_and_deploy_all_from_directory(
             execution_time = int(time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
-            
-            for node in execution_plan.nodes:
-                table_info = report_mgr.build_TableInfo(node)
-                table_report.tables.append(table_info)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -299,17 +292,14 @@ def build_and_deploy_all_from_table_list(
                                                                       expected_product_name=start_node.product_name)
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
             print(f"Executing plan: {summary}")
             _execute_plan(plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential)
             execution_time = int(time.perf_counter() - start_time)
             print(f"Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
-            
-            for node in execution_plan.nodes:
-                table_info = report_mgr.build_TableInfo(node)
-                table_report.tables.append(table_info)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -540,9 +530,9 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
     
         # At this level, execution_plan.nodes has the list of ancestors from the  starting node. 
         # For each node, we need to assess if children and ancestors needs to be started. 
-        # Only restart ancestors, if user forced to: The current node once it deletes its output table will reprocess
+        # Only restart ancestors, if user forced to do so: The current node once it deletes its output table(s) will reprocess
         # records from the earliest and regenerates its states and aggregations. 
-        # The children needs to be restarted if the current node is stateful. 
+        # The children needs to be restarted if the current node is stateful.
         for node in execution_plan.nodes:
             # The execution plan nodes list may be updated by processing children. As to start a child it may be needed
             # to start a parent not yet in the execution plan.
