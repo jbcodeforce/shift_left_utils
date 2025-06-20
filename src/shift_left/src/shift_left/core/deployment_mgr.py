@@ -1003,15 +1003,15 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
-
+    # create the table with ddl.
     statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
                                                                             node_to_process.ddl_ref, 
                                                                             node_to_process.ddl_statement_name)
     while statement.status.phase in ["PENDING"]:
-        time.sleep(1)
+        time.sleep(2)
         statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
-        logger.debug(f"DDL deployment status is: {statement.status.phase}")
-    if statement.status.phase in ["FAILED", "FAILING"]:
+        logger.info(f"DDL deployment status is: {statement.status.phase}")
+    if statement.status.phase not in ["COMPLETED", "RUNNING"]:
         raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
     return _deploy_dml(node_to_process, True)
 

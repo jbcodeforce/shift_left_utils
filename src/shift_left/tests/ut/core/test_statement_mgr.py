@@ -24,18 +24,15 @@ from shift_left.core.models.flink_statement_model import (
 import  shift_left.core.statement_mgr as statement_mgr 
 
 class TestStatementManager(unittest.TestCase):
-    
-    def setUp(self):
-        """Set up test fixtures before each test method."""
-        # Remove cached statement list file if it exists
-        if os.path.exists(statement_mgr.STATEMENT_LIST_FILE):
-            os.remove(statement_mgr.STATEMENT_LIST_FILE)
-        
+    """
+    Verify basic statement manager functionality
+    """
+    def setUp(self):        
         # Reset any cached data in the statement manager
         statement_mgr._statement_list_cache = None
         statement_mgr._statement_compute_pool_map = None
         
-    _statement_list = {
+    _statement_list = { # mockup of the statement list
         'dev-ddl-src-table-1': StatementInfo(
                 name="dev-ddl-src-table-1",
                 status_phase="COMPLETED",

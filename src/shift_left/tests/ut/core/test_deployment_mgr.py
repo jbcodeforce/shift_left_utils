@@ -33,14 +33,12 @@ from shift_left.core.deployment_mgr import (
 )
 from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
-from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
+from ut.core.BaseUT import BaseUT
 
-class TestDeploymentManager(unittest.TestCase):
+class TestDeploymentManager(unittest.TestCase, BaseUT):
     """Test suite for the deployment manager functionality."""
     
-    TEST_COMPUTE_POOL_ID_1 = "test-pool-123"
-    TEST_COMPUTE_POOL_ID_2 = "test-pool-120"
-    TEST_COMPUTE_POOL_ID_3 = "test-pool-121"
+
     @classmethod
     def setUpClass(cls) -> None:
         """Set up test environment before running tests."""
@@ -54,62 +52,13 @@ class TestDeploymentManager(unittest.TestCase):
         self.inventory_path = os.getenv("PIPELINES")
         self.count = 0  # Initialize count as instance variable
 
-    # Following set of methods are used to create reusable mock objects and functions
-    def _create_mock_get_statement_info(
-        self, 
-        name: str = "statement_name",
-        status_phase: str = "UNKNOWN",
-        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
-    ) -> StatementInfo:
-        """Create a mock StatementInfo object."""
-        return StatementInfo(
-            name=name,
-            status_phase=status_phase,
-            compute_pool_id=compute_pool_id
-        )
-    
-    def _create_mock_statement(
-        self, 
-        name: str = "statement_name",
-        status_phase: str = "UNKNOWN"
-    ) -> Statement:
-        """Create a mock Statement object."""
-        status = Status(phase=status_phase)
-        return Statement(name=name, status=status)
-
-
-    def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
-        """Create a mock ComputePoolList object."""
-        pool_1 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_1,
-            name="test-pool",
-            env_id=env_id,
-            max_cfu=100,
-            current_cfu=50
-        )
-        pool_2 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_2,
-            name="test-pool-2",
-            env_id=env_id,
-            max_cfu=100,
-            current_cfu=50
-        )
-        pool_3 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_3,
-            name="dev-p1-fct-order",
-            env_id=env_id,
-            max_cfu=10,
-            current_cfu=0
-        )
-        return ComputePoolList(pools=[pool_1, pool_2, pool_3])
-
     def _create_mock_statement_node(
         self,
         table_name: str,
         product_name: str = "product1",
         dml_statement_name: str = "dml1",
         ddl_statement_name: str = "ddl1",
-        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
+        compute_pool_id: str = self.TEST_COMPUTE_POOL_ID_1
     ) -> FlinkStatementNode:
         """Create a mock FlinkStatementNode object."""
         return FlinkStatementNode(
