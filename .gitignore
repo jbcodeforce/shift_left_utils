@@ -14,5 +14,6 @@ tmp/
 .DS_Store
 .webui_secret_key
 set_test_env
+set_stage_env
 **to_investigate.md
 **/data/ksql-project/

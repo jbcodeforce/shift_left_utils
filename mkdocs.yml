@@ -15,6 +15,7 @@ nav:
   - For Contributors:
       - Contributing: contributing.md
       - Code structure: coding/index.md
+      - AI based migration: coding/llm_based_translation.md
       - Feature Tracking: tracking.md
 theme: 
   name: material

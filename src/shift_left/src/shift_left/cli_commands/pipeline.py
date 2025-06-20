@@ -76,6 +76,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     Generate a report showing the static pipeline hierarchy for a given table using its pipeline_definition.json
     """
     console = Console()
+    table_name = table_name.lower()
     print(f"Generating pipeline report for table {table_name}")
     try:
         parent_only = not children_too
@@ -239,6 +240,7 @@ def report_running_statements(
                                                                                            inventory_path,
                                                                                            from_date)
         elif product_name:
+            product_name = product_name.lower()
             results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, 
                                                                                   inventory_path, 
                                                                                   from_date)
@@ -269,6 +271,7 @@ def undeploy(
         print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     elif product_name:
+        product_name = product_name.lower()
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
 
@@ -303,6 +306,7 @@ def _build_deploy_pipeline(
     try:
         report=None
         if table_name:
+            table_name = table_name.lower()
             print(f"Build an execution plan for table {table_name}")
             summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
@@ -321,6 +325,7 @@ def _build_deploy_pipeline(
             print(f"\n" + "-"*30 + "\n")
 
         elif product_name:
+            product_name = product_name.lower()
             print(f"Build an execution plan for product {product_name}")
             summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
                                                         inventory_path=inventory_path,

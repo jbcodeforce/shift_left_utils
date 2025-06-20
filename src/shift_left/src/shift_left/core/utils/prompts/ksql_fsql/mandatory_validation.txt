@@ -1,0 +1,10 @@
+you are an expert in Apache Flink SQL script development.
+Modify the input Flink SQl to ensure the following rules are respected:
+
+* The create table need a primary key unforced, use the column used for 'distributed by' as primary key, or the first column declaration as a primary key
+* remove any "'topic' ="  declaration in the WITH section
+* do not remove 'distributed by'
+* ensure each line for column declaration finishes with ,
+* validate the script is a Apache Flink SQL syntax
+
+generate in json format clearly separating the input and output statements. 

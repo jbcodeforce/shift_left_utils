@@ -14,8 +14,8 @@ class TestKsqlMigration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
-        os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
-        os.environ["SRC_FOLDER"] = str(cls.data_dir / "ksql-project")
+        os.environ["STAGING"] = str(cls.data_dir / "ksql-project/staging")
+        os.environ["SRC_FOLDER"] = str(cls.data_dir / "ksql-project/sources")
         os.makedirs(os.environ["STAGING"], exist_ok=True)   
         os.makedirs(os.environ["STAGING"] + "/data_product", exist_ok=True)
 
@@ -30,14 +30,14 @@ class TestKsqlMigration(unittest.TestCase):
         src_folder = os.environ["SRC_FOLDER"]
         return [f for f in os.listdir(src_folder) if f.endswith(".ksql")]
 
-    def _process_one_ksql_file(self, ksql_file: str):
+    def _process_one_ksql_file(self, ksql_file: str, validate: bool = False):
         src_folder = os.environ["SRC_FOLDER"]
         ksql_src_file = src_folder + "/" + ksql_file
         agent = KsqlTranslatorToFlinkSqlAgent()
         with open(ksql_src_file, "r") as f:
             ksql_content = f.read()
             print(f"Translating {ksql_file} to flink sql")
-            flink_content, ddl_content = agent.translate_to_flink_sqls("", ksql_content)
+            flink_content, _ = agent.translate_to_flink_sqls("", ksql_content, validate=validate)
             print(flink_content)
             with open(os.environ["STAGING"] + "/data_product/" + ksql_file.replace(".ksql", ".sql"), "w") as f:
                 f.write(flink_content)
@@ -48,8 +48,11 @@ class TestKsqlMigration(unittest.TestCase):
         print("Should generate a flink ddl file in the staging folder")
         print("It may take some time....")
         ksql_src_file = "ddl-a.ksql"
-        content=self._process_one_ksql_file(ksql_src_file)
+        content=self._process_one_ksql_file(ksql_src_file, validate=True)
         assert content is not None
+        assert 'create table if not exists kpi_config_stream (' in content
+        assert ' kpiStatus string,' in content
+        assert not "'topic' =" in content
 
     def test_ksql_table_with_from_group_by_migration(self):
         print("Should generate a flink dml file in the staging folder")
