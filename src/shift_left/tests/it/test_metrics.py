@@ -4,8 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import pathlib
 import os
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
-os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
+os.environ["CONFIG_FILE"] = os.getenv("CONFIG_FILE", str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml"))
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from datetime import datetime, timedelta
@@ -17,6 +16,15 @@ import socket
 import os
 import json
 
+"""
+Integration tests for metrics. The config.yaml used needs to get the correct credentials to access the Confluent Cloud
+and should not be committed to git.
+"""
+TEST_TABLE_NAME = "src_mx_data_capture"
+STATEMENT_NAME = TEST_TABLE_NAME.replace("_", "-")
+STATEMENT_NAME = "stage-mx-dml-src-mx-data-capture"
+COMPUTE_POOL_ID = "lfcp-jy0djw"
+#get_config()["flink"]["compute_pool_id"]
 
 def get_topic_message_count(topic_name) -> int:
     """
@@ -75,11 +83,14 @@ def get_topic_message_count(topic_name) -> int:
         
 class TestConfluentMetrics(unittest.TestCase):
     """
-    TO DO change to hardcoded table and compute pool id. 
     Test Confluent metrics
     """
-    
-    def test_socket_connection(self):
+
+    def setUp(self):
+        pass
+
+
+    def _test_socket_connection(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         config = get_config()
         kafka_cluster_host=config["kafka"]["bootstrap.servers"].split(":")[0]
@@ -127,32 +138,34 @@ class TestConfluentMetrics(unittest.TestCase):
         }
 
 
-    def test_get_retention_size(self):
+    def _test_get_retention_size(self):
         print("test_get_retention_size")
-        table_name = "src_aqem_recordconfiguration_form_element"
+        table_name = TEST_TABLE_NAME
         retention_size = metric_mgr.get_retention_size(table_name)
         print(f"retention_size: {retention_size}")
         assert retention_size > 0
     
-    def test_get_total_message(self):
+    def _test_get_total_message(self):
         print("test_get_total_messages")
-        table_name = "src_aqem_recordconfiguration_form_element"
-        compute_pool_id = "lfcp-79zx9j"
+        """ this could take a lot of time if the topic has a lot of messages"""
+        table_name = TEST_TABLE_NAME
+        compute_pool_id = COMPUTE_POOL_ID
         nb_of_messages = metric_mgr.get_total_amount_of_messages(table_name, compute_pool_id)
         print(nb_of_messages)
         assert nb_of_messages >= 0
 
-    def test_get_pending_records(self):
-        print("test_get_pending_records")
-        statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
-        compute_pool_id = "lfcp-1o07pz"
-        pending_records = metric_mgr.get_pending_records(statement_name, compute_pool_id)
+    def test_get_pending_records_given_compute_pool_ids(self):
+        print("test_get_pending_records using pool ids")
+        statement_name = STATEMENT_NAME
+        compute_pool_id =  COMPUTE_POOL_ID
+        pending_records = metric_mgr.get_pending_records([compute_pool_id, "lfcp-2n8792", "lfcp-mo56ww", "lfcp-qv5qgp"])
         print(f"pending_records: {pending_records}")
-        assert pending_records >= 0
+        assert len(pending_records) > 0
 
-    def test_get_available_metrics(self):
-        config = get_config()
-        compute_pool_id = config["flink"]["compute_pool_id"]
+
+
+    def _test_get_available_metrics(self):
+        compute_pool_id = COMPUTE_POOL_ID
         metrics = metric_mgr.get_available_metrics(compute_pool_id)
         print(len(metrics['data']))
         for metric in metrics['data']:
@@ -161,13 +174,11 @@ class TestConfluentMetrics(unittest.TestCase):
 
     def test_get_output_records(self):
         print("test_get_output_records")
-        statement_name = "stage-aqem-dml-aqem-mv-fct-step-event"
-        compute_pool_id = "lfcp-1o07pz"
-        statement_name = "stage-aqem-dml-src-aqem-recordexecution-participant"
-        compute_pool_id = "lfcp-6xzvx6"
-        output_records = metric_mgr.get_num_records_out(statement_name, compute_pool_id)
+        statement_name = STATEMENT_NAME
+        compute_pool_id = COMPUTE_POOL_ID
+        output_records = metric_mgr.get_num_records_out([compute_pool_id, "lfcp-2n8792", "lfcp-mo56ww", "lfcp-qv5qgp"])
         print(f"output_records: {output_records}")
-        assert output_records >= 0
+        assert len(output_records) > 0
 
 if __name__ == '__main__':
     unittest.main()

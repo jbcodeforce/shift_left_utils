@@ -336,14 +336,17 @@ def report_running_flink_statements_for_all_from_directory(
         report_name = f"{path_parts[-2]}_{path_parts[-1]}"
     else:
         report_name = path_parts[-1]
-    table_report = report_mgr.build_TableReport(report_name)
+    nodes= []
     for root, _, files in os.walk(directory):
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            _update_table_report_with_table_info(pipeline_def, table_report, from_date)
-    result = report_mgr.prepare_table_report(table_report, report_name)
-    return result
+            node=pipeline_def.to_node()
+            node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
+            node.compute_pool_id = node.existing_statement_info.compute_pool_id
+            nodes.append(node)
+    table_report = report_mgr.build_TableReport(report_name, nodes, from_date=from_date, get_metrics=True)
+    return report_mgr.persist_table_reports(table_report, report_name)
 
   
 
@@ -355,16 +358,20 @@ def report_running_flink_statements_for_a_product(
     """
     Report running flink statements for all the pipelines in the product.
     """
-    table_report = report_mgr.build_TableReport(f"product:{product_name}")
+    report_name = f"product:{product_name}"
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    nodes= []
     for _, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref.product_name == product_name:
             file_path=table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
-            _update_table_report_with_table_info(pipeline_def, table_report, from_date)
-    result = report_mgr.prepare_table_report(table_report, product_name)
-    return result   
+            node=pipeline_def.to_node()
+            node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
+            node.compute_pool_id = node.existing_statement_info.compute_pool_id
+            nodes.append(node)
+    table_report = report_mgr.build_TableReport(report_name, nodes, from_date=from_date, get_metrics=True)
+    return report_mgr.persist_table_reports(table_report, report_name) 
 
 def full_pipeline_undeploy_from_table(
     sink_table_name: str, 
@@ -1127,14 +1134,6 @@ def _accepted_to_process(current: FlinkStatementNode, node: FlinkStatementNode) 
     Prevents processing nodes that would create circular dependencies.
     """
     return node.product_name == current.product_name
-
-def _update_table_report_with_table_info(pipeline_def: FlinkTablePipelineDefinition, table_report: TableReport, from_date: str):
-    if pipeline_def:
-        node: FlinkStatementNode = pipeline_def.to_node()
-        node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
-        table_info = report_mgr.build_TableInfo(node=node, from_date=from_date)
-        print(f"Table info: {report_mgr.pad_or_truncate(table_info.table_name, 40)} {report_mgr.pad_or_truncate(table_info.status, 10)} created: {report_mgr.pad_or_truncate(table_info.created_at.strftime('%Y-%m-%dT%H:%M:%S'), 20)} pool: {report_mgr.pad_or_truncate(table_info.compute_pool_id, 10)} pending records: {table_info.pending_records} num records out: {table_info.num_records_out}")
-        table_report.tables.append(table_info)
 
 
 # --- to work on for stateless ---------------

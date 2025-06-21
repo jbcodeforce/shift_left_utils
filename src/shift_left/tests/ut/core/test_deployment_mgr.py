@@ -35,7 +35,7 @@ from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInf
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from ut.core.BaseUT import BaseUT
 
-class TestDeploymentManager(unittest.TestCase, BaseUT):
+class TestDeploymentManager(BaseUT):
     """Test suite for the deployment manager functionality."""
     
 
@@ -58,7 +58,7 @@ class TestDeploymentManager(unittest.TestCase, BaseUT):
         product_name: str = "product1",
         dml_statement_name: str = "dml1",
         ddl_statement_name: str = "ddl1",
-        compute_pool_id: str = self.TEST_COMPUTE_POOL_ID_1
+        compute_pool_id: str = ""
     ) -> FlinkStatementNode:
         """Create a mock FlinkStatementNode object."""
         return FlinkStatementNode(
@@ -304,6 +304,7 @@ class TestDeploymentManager(unittest.TestCase, BaseUT):
                                         mock_thread_pool_executor,
                                         mock_deploy_one_node,
                                         mock_build_simple_report):
+        
         def _mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")

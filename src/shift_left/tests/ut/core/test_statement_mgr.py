@@ -9,6 +9,7 @@ import pathlib
 from datetime import datetime
 import json
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["PIPELINES"] =  str(pathlib.Path(__file__).parent.parent.parent /  "data/flink-project/pipelines")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import (
     Statement, 
@@ -22,8 +23,9 @@ from shift_left.core.models.flink_statement_model import (
     OpRow, 
     Metadata)
 import  shift_left.core.statement_mgr as statement_mgr 
+from ut.core.BaseUT import BaseUT
 
-class TestStatementManager(unittest.TestCase):
+class TestStatementManager(BaseUT):
     """
     Verify basic statement manager functionality
     """
@@ -56,15 +58,6 @@ class TestStatementManager(unittest.TestCase):
                 sql_database="default"
             ) 
     }
-
-    def _create_mock_statement(
-        self, 
-        name: str = "statement_name",
-        status_phase: str = "UNKNOWN"
-    ) -> Statement:
-        """Create a mock Statement object."""
-        status = Status(phase=status_phase)
-        return Statement(name=name, status=status)
 
 
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
@@ -117,7 +110,7 @@ class TestStatementManager(unittest.TestCase):
             }
         }
 
-        # Setup mock client
+        # Setup mock client: 1/ instance of the client, 2/ mock the make_request and build_flink_url_and_auth_header methods
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.build_flink_url_and_auth_header.return_value = "https://test-url"
@@ -148,8 +141,13 @@ class TestStatementManager(unittest.TestCase):
         mock_client_instance.make_request.assert_called_once()
         mock_client_instance.build_flink_url_and_auth_header.assert_called_once()
      
+
+
     @patch('shift_left.core.statement_mgr.get_statement_list')
     def test_get_statement_status(self, mock_get_statement_list):
+        """
+        Test the get_statement_status_with_cache method
+        """
         mock_get_statement_list.return_value = {
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
             "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
@@ -191,7 +189,6 @@ class TestStatementManager(unittest.TestCase):
         }
         mock_client.make_request.return_value = mock_response
 
-        # Execute test
         result = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_content)
 
         # Verify results
@@ -223,6 +220,8 @@ class TestStatementManager(unittest.TestCase):
         MockConfluentCloudClient.assert_called_once()
         mock_client_instance.delete_flink_statement.assert_called_once_with(sname)
        
+
+
     def test_get_sql_content_transformer(self):
         sql_in="""
         CREATE TABLE table_1 (
@@ -246,6 +245,8 @@ class TestStatementManager(unittest.TestCase):
         print(sql_out)
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
         
+
+
     @patch('shift_left.core.statement_mgr.get_statement_results')
     @patch('shift_left.core.statement_mgr.get_statement_list')
     @patch('shift_left.core.statement_mgr.post_flink_statement')
@@ -301,8 +302,6 @@ class TestStatementManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = mock_post_statement
         mock_get_statement_results.side_effect = mock_statement_results
 
-
-        
         result = statement_mgr.show_flink_table_structure(_table_name)
         
         self.assertIsNotNone(result)

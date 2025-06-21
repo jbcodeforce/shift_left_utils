@@ -234,7 +234,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                     break
             _save_statement_list(_statement_list_cache)
             stop_time = time.perf_counter()
-            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements in {stop_time - start_time} seconds")
+            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
     return _statement_list_cache.statement_list
 
 

@@ -352,7 +352,7 @@ class ConfluentCloudClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
-            return None
-     
+            logger.error(f"Response: {response.text}")
+            return None    
 
 
