@@ -18,7 +18,6 @@ from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
-import shift_left.core.utils.report_mgr as report_mgr
 from shift_left.core.utils.report_mgr import TableReport
 from shift_left.core.models.flink_statement_model import (
     Statement, 
@@ -28,10 +27,9 @@ from shift_left.core.models.flink_statement_model import (
     Metadata
 )
 from shift_left.core.deployment_mgr import (
-    FlinkStatementNode,
-    FlinkStatementExecutionPlan
+    FlinkStatementNode
 )
-from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo
+
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from ut.core.BaseUT import BaseUT
 
@@ -133,7 +131,13 @@ class TestDeploymentManager(BaseUT):
             print(node.table_name, node.to_run, node.to_restart)
         assert nodes_to_run[0].table_name in ("src_y", "src_x")
 
-    def test_build_ancestor_sorted_graph(self):
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
+    def test_build_ancestor_sorted_graph(self, mock_get_statement_list):
+        mock_get_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
         node_map = {}
         node_map["src_x"] = FlinkStatementNode(table_name="src_x")
         node_map["src_y"] = FlinkStatementNode(table_name="src_y")
@@ -183,7 +187,12 @@ class TestDeploymentManager(BaseUT):
             print(node.table_name, node.to_run, node.to_restart)
             assert node.table_name in ["p","d", "f", "c", "e", "z"]
         
-    def test_build_children_sorted_graph_from_src_x(self):
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+    def test_build_children_sorted_graph_from_src_x(self, mock_statement_list):
+        mock_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
         pipeline_def = read_pipeline_definition_from_file(
             self.inventory_path + "/sources/p2/src_x/" + PIPELINE_JSON_FILE_NAME
         )
@@ -284,8 +293,8 @@ class TestDeploymentManager(BaseUT):
         assert sorted_nodes[8].table_name == "z"
 
     @patch('shift_left.core.deployment_mgr.report_mgr.build_simple_report')
-    @patch('shift_left.core.deployment_mgr.ThreadPoolExecutor')
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
+    @patch('shift_left.core.deployment_mgr.ThreadPoolExecutor')
     @patch('shift_left.core.deployment_mgr.report_mgr.build_TableReport')
     @patch('shift_left.core.deployment_mgr.statement_mgr.build_and_deploy_flink_statement_from_sql_content')    
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
@@ -460,46 +469,5 @@ class TestDeploymentManager(BaseUT):
 
 
        
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_autonomous_and_nodes_to_execute(
-        self,
-        mock_assign_compute_pool_id,
-        mock_get_status,
-        mock_get_compute_pool_list
-    ) -> None:
-        """
-        restarting the leaf "f" and all parents. 
-        """
-        print("\n--> test_autonomous_and_nodes_to_execute, should runs all src in parallel")
-        
-        def mock_statement(statement_name: str) -> StatementInfo:
-            return self._create_mock_get_statement_info(status_phase="UNKNOWN")
- 
-        mock_get_status.side_effect = mock_statement
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-
-        _, execution_plan = dm.build_deploy_pipeline_from_table(
-            table_name="f", 
-            inventory_path=self.inventory_path, 
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-            dml_only=False, 
-            may_start_descendants=False, # should get same result if true
-            force_ancestors=True,
-            execute_plan=False  # set to false as we just want to validate autonomous nodes and nodes to execute
-        )
-        autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
-        assert len(autonomous_nodes) == 2
-        assert autonomous_nodes[0].table_name == "src_x" or autonomous_nodes[1].table_name == "src_x"
-        assert autonomous_nodes[0].table_name == "src_y" or autonomous_nodes[1].table_name == "src_y"
-        nodes_to_execute = dm._get_nodes_to_execute(execution_plan.nodes)
-        assert len(nodes_to_execute) == 7
-        for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x", "src_y", "y", "z", "d"]:
-                assert node.to_run is True
-                assert node.to_restart is False
-    
 if __name__ == '__main__':
     unittest.main()

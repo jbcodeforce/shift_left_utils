@@ -12,7 +12,6 @@ The execution plan is used to undeploy a pipeline.
 import time
 import os
 import multiprocessing
-import threading
 from datetime import datetime
 from collections import deque
 from typing import List, Any, Set, Tuple, Dict, Final
@@ -336,7 +335,9 @@ def report_running_flink_statements_for_all_from_directory(
         report_name = f"{path_parts[-2]}_{path_parts[-1]}"
     else:
         report_name = path_parts[-1]
-    nodes= []
+    nodes_to_process= []
+    count = 0
+    combined_node_map = {}
     for root, _, files in os.walk(directory):
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
@@ -344,9 +345,24 @@ def report_running_flink_statements_for_all_from_directory(
             node=pipeline_def.to_node()
             node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
             node.compute_pool_id = node.existing_statement_info.compute_pool_id
-            nodes.append(node)
-    table_report = report_mgr.build_TableReport(report_name, nodes, from_date=from_date, get_metrics=True)
-    return report_mgr.persist_table_reports(table_report, report_name)
+            nodes_to_process.append(node)
+            combined_node_map |= _build_statement_node_map(node)
+            count+=1
+    if count > 0:            
+        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+        start_node = ancestors[0]
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
+                                                                      node_map=combined_node_map, 
+                                                                      force_ancestors=False, 
+                                                                      may_start_descendants=False, 
+                                                                      cross_product_deployment=False,
+                                                                      compute_pool_id=None, 
+                                                                      table_name=start_node.table_name, 
+                                                                      expected_product_name=start_node.product_name)
+       
+        table_report = report_mgr.build_TableReport(report_name, execution_plan.nodes, from_date=from_date, get_metrics=True)
+        return report_mgr.persist_table_reports(table_report, report_name)
+    return "Nothing run. Do you have a pipeline_definition.json files?"
 
   
 
@@ -360,7 +376,9 @@ def report_running_flink_statements_for_a_product(
     """
     report_name = f"product:{product_name}"
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-    nodes= []
+    count = 0
+    nodes_to_process = []
+    combined_node_map = {}
     for _, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref.product_name == product_name:
@@ -369,9 +387,25 @@ def report_running_flink_statements_for_a_product(
             node=pipeline_def.to_node()
             node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
             node.compute_pool_id = node.existing_statement_info.compute_pool_id
-            nodes.append(node)
-    table_report = report_mgr.build_TableReport(report_name, nodes, from_date=from_date, get_metrics=True)
-    return report_mgr.persist_table_reports(table_report, report_name) 
+            nodes_to_process.append(node)
+            combined_node_map |= _build_statement_node_map(node)
+            count+=1
+    if count > 0:            
+        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+        start_node = ancestors[0]
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
+                                                                      node_map=combined_node_map, 
+                                                                      force_ancestors=False, 
+                                                                      may_start_descendants=False, 
+                                                                      cross_product_deployment=False,
+                                                                      compute_pool_id=None, 
+                                                                      table_name=start_node.table_name, 
+                                                                      expected_product_name=start_node.product_name)
+       
+        table_report = report_mgr.build_TableReport(report_name, execution_plan.nodes, from_date=from_date, get_metrics=True)
+        return report_mgr.persist_table_reports(table_report, report_name)
+    return "Nothing run. Do you have a pipeline_definition.json files?"
+
 
 def full_pipeline_undeploy_from_table(
     sink_table_name: str, 
@@ -879,7 +913,10 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                   accept_exceptions: bool = False,
                   sequential: bool = False) -> List[Statement]:
     """Execute statements in the execution plan.
-    
+    It enables parallel deployment of Flink statements that 
+    have no dependencies (autonomous nodes), significantly 
+    speeding up the deployment process compared to sequential
+    execution
     Args:
         plan: Execution plan containing nodes to execute
         compute_pool_id: ID of the compute pool to use
@@ -894,36 +931,40 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     print(f"--- Execute for {plan.start_table_name} started ---")
     statements = []
     autonomous_nodes=[]
-    max_workers = multiprocessing.cpu_count()
     nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     print(f"{len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
         if not sequential:
             autonomous_nodes = _build_autonomous_nodes(plan.nodes)
-        if len(autonomous_nodes) > 0:
-            print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                to_process = []
+            if len(autonomous_nodes) > 0:
+                max_workers = multiprocessing.cpu_count()
                 if len(autonomous_nodes) < max_workers:
-                    max_workers = len(autonomous_nodes)
-                for idx in range(max_workers):
-                    to_process.append(autonomous_nodes[idx])
+                        max_workers = len(autonomous_nodes)
+                print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    to_process = []
 
-                futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        if result is not None:  # Only append if we got a valid result
-                            statements.append(result)
+                    for idx in range(max_workers):
+                        to_process.append(autonomous_nodes.pop(0))
 
-                    except Exception as e:
-                        logger.error(f"Failed to get result from future: {str(e)}")
-                        if not accept_exceptions:
-                            raise
-                for node in to_process:
-                    node.to_run = False
-                    node.to_restart = False  
-                    autonomous_nodes.remove(node)
+                    futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
+                    for future in as_completed(futures):
+                        try:
+                            result = future.result()
+                            if result is not None:  # Only append if we got a valid result
+                                statements.append(result)
+                                if result.status.phase == "FAILED":
+                                    print(f"Statement {result.name} failed, move to next node")
+                                    pass
+
+                        except Exception as e:
+                            logger.error(f"Failed to get result from future: {str(e)}")
+                            if not accept_exceptions:
+                                raise
+                    for node in to_process:
+                        node.to_run = False
+                        node.to_restart = False  
+
         else:
             print(f"Still {len(nodes_to_execute)} statements to execute")
             node = nodes_to_execute[0]
@@ -979,7 +1020,10 @@ def _build_autonomous_nodes(execution_plan_nodes: List[FlinkStatementNode]) -> L
 
     return autonomous_nodes
 
-def _deploy_one_node(node: FlinkStatementNode,accept_exceptions: bool = False, compute_pool_id: str = None)-> Statement:
+def _deploy_one_node(node: FlinkStatementNode,
+                     accept_exceptions: bool = False, 
+                     compute_pool_id: str = None
+)-> Statement:
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
             

@@ -12,18 +12,21 @@ from shift_left.core.models.flink_statement_model import (
     Spec,
     Metadata
 )
+from shift_left.core.deployment_mgr import (
+    FlinkStatementNode,
+    FlinkStatementExecutionPlan
+)
+import os
 
 class BaseUT(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.TEST_COMPUTE_POOL_ID_1 = "test-pool-123"
-        self.TEST_COMPUTE_POOL_ID_2 = "test-pool-120"
-        self.TEST_COMPUTE_POOL_ID_3 = "test-pool-121"
+        self.TEST_COMPUTE_POOL_ID_1 = "test-pool-121"
+        self.TEST_COMPUTE_POOL_ID_2 = "test-pool-122"
+        self.TEST_COMPUTE_POOL_ID_3 = "test-pool-123"
+        self.inventory_path = os.getenv("PIPELINES")
 
-    """
-    Base class for all unit tests
-    """
     def setUp(self):
         """
         Set up the test environment
@@ -78,3 +81,9 @@ class BaseUT(unittest.TestCase):
             current_cfu=0
         )
         return ComputePoolList(pools=[pool_1, pool_2, pool_3])
+    
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
+        """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
+        node.compute_pool_id = compute_pool_id
+        node.compute_pool_name = "test-pool"
+        return node

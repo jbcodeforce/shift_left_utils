@@ -7,7 +7,24 @@
 
 Recognizing the increasing need for real-time data processing, driven by demands for immediate insights and responsive applications (ultimately benefiting the end customer), this initiative tackles the challenging task of migrating traditional batch pipelines to modern, stream-based architectures using Apache Flink. 
 
-The approach, supported that the tools in this repository, centers around the data engineer, and Site Reliability Engineers as the "customers". By providing intelligent tooling, leveraging the power of Large Language Models and AI Agents, we aim to significantly reduce the friction and time associated with this complex refactoring. The utilities within this repository, focusing on SQL translation and Flink project organization aligned with Kimball's dimensional modeling principles, directly address the pain points of migrating and managing real-time data pipelines. This customer-centric innovation empowers data engineers to efficiently build robust and scalable real-time solutions, ultimately leading to faster delivery of data-driven value and enhanced experiences for the end users consuming the processed data.
+The approach, supported that the tools in this repository, centers around the data engineer, and Site Reliability Engineers as the "users". By providing intelligent tooling, leveraging the power of Large Language Models and AI Agents, we aim to significantly reduce time associated with this complex refactoring. The utilities within this repository, focusing on SQL translation and Flink project organization aligned with Kimball's dimensional modeling principles, to directly address the pain points of migrating and managing real-time data pipelines. 
+
+Here are the list of important features supported:
+
+* [ ] Support taking SQL / dbt sql scripts and migrate them with LLM to speed up a migration project to Apache Flink SQL. It supports understanding the static relationship between source SQL tables
+* [ ] Support defining code structure to manage Flink statements for DDL, DML, Makefile (wrapper on top of Confluent Cli), testing and metadata creation about the relationship from one Flink statement with other Flink statements.
+* [ ] Build table inventory for a project with metadata to help automate CI/CD work or supporting the shift_left tool itself
+* [ ] Create metadata about a pipeline for a given Flink Statement: those metadata includes, name, type of Flink statement (stateless, stateful), what are the direct ancestors of the flink statement, what are the children, users of the current Flink statement.
+* [ ] Build an execution plan for each pipeline to understand what needs to be started and redeployed to avoid brute force deployment. Execution plan is a topological sorted graph which helps to start Flink statements that are needed before other statements
+* [ ] Deploy execution plan, with constraints on forcing restart of ancestors (or not), update children or not.
+* [ ] Support grouping Flink statements per directory (reflecting the medallion structure of the project: sources, intermediates, dimensions, facts and views), or as a product (data as a product) as an orthogonal view of the medallion view), or as a list of table / Flink statements or a unique table/Flink statement.
+* [ ] Create Confluent Cloud Flink compute pool via REST API when needed during the execution plan deployment. This help to support less SRE involvement and dynamic definition of pool to flink assignment.
+* [ ] Select compute pool from existing running Flink statement to reuse resources.
+* [ ] Support reports of running statements using the execution plan semantic
+* [ ] Verify naming convention is respected and other best practices as topic configuration, schema parameters.
+* [ ] Support aggregating report on statements, like running Flink explain and reporting deployment errors for all statements within a Folder or for a product.
+* [ ] Support adding custom table worker to do SQL content update during deployment: this is needed to support multi-tenancy into the same Kafka Cluster and Schema Registry, or apply some table changes names. Some default transformations are available:
+* [ ] Unit tests creation from DML with test definition metadata to be able to run unit tests with mock data on Confluent Cloud, by using REST API to deploy statement.
 
 ## Introduction
 
