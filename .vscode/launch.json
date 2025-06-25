@@ -26,7 +26,7 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage-flink.yaml",
+                "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage-2b-flink.yaml",
                 "PIPELINES": "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines",
                 "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
             },

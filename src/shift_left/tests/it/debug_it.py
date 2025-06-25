@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-flink.yaml"
+os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-2b-flink.yaml"
 os.environ["PIPELINES"] =  "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status

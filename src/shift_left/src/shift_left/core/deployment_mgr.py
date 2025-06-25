@@ -935,15 +935,16 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
     print(f"{len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
         if not sequential:
-            autonomous_nodes = _build_autonomous_nodes(plan.nodes)
+            # for parallel execution split the statements to execute them into buckets for the one with no parent
+            # or all parents are running and not to be restarted.
+            autonomous_nodes = _build_autonomous_nodes(nodes_to_execute)
             if len(autonomous_nodes) > 0:
                 max_workers = multiprocessing.cpu_count()
                 if len(autonomous_nodes) < max_workers:
                         max_workers = len(autonomous_nodes)
                 print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {max_workers} workers")
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    to_process = []
-
+                    to_process = [] # need to use a separate list as we can have more elements in autonomous_nodes than max_workers
                     for idx in range(max_workers):
                         to_process.append(autonomous_nodes.pop(0))
 
@@ -955,8 +956,10 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                                 statements.append(result)
                                 if result.status.phase == "FAILED":
                                     print(f"Statement {result.name} failed, move to next node")
+                                    _modify_impacted_nodes(result, nodes_to_execute)
                                     pass
-
+                            else:
+                                logger.warning(f"Statement {result.name} not deployed, move to next node")
                         except Exception as e:
                             logger.error(f"Failed to get result from future: {str(e)}")
                             if not accept_exceptions:
@@ -964,19 +967,14 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                     for node in to_process:
                         node.to_run = False
                         node.to_restart = False  
-
-        else:
-            print(f"Still {len(nodes_to_execute)} statements to execute")
-            node = nodes_to_execute[0]
-            nodes_to_execute.remove(node)
-            statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
-            if statement:
-                statements.append(statement)
             else:
-                logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
-                continue
-            node.to_run = False
-            node.to_restart = False
+                # no possible parallel execution, so execute sequentially
+                _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, statements)
+        else:
+            _execute_statements_in_sequence(nodes_to_execute, 
+                                            accept_exceptions, 
+                                            compute_pool_id, 
+                                            statements)
         nodes_to_execute = _get_nodes_to_execute(plan.nodes)
     return statements
 
@@ -989,6 +987,24 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
         if node.to_run or node.to_restart:
             nodes_to_execute.append(node)
     return nodes_to_execute
+
+def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode], 
+                                    accept_exceptions: bool = False, 
+                                    compute_pool_id: str = None,
+                                    statements: List[Statement] = None) -> List[Statement]:
+    """
+    Execute statements in sequence.
+    """
+    print(f"Still {len(nodes_to_execute)} statements to execute")
+    node = nodes_to_execute[0]
+    nodes_to_execute.remove(node)
+    statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
+    if statement:
+        statements.append(statement)
+    else:
+        logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
+    node.to_run = False
+    node.to_restart = False
 
 def _build_autonomous_nodes(execution_plan_nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
@@ -1019,6 +1035,16 @@ def _build_autonomous_nodes(execution_plan_nodes: List[FlinkStatementNode]) -> L
                     autonomous_nodes.append(node)
 
     return autonomous_nodes
+
+def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkStatementNode]) -> None:
+    """
+    Modify the nodes to execute based on the statement result.
+    """
+
+    for node in nodes_to_execute:
+        if node.table_name in statement.affected_tables:
+            node.to_run = False
+            node.to_restart = False
 
 def _deploy_one_node(node: FlinkStatementNode,
                      accept_exceptions: bool = False, 
