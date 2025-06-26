@@ -4,10 +4,10 @@ import os
 import pathlib
 import json
 import datetime
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-#os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-stage-flink.yaml"
-#os.environ["PIPELINES"]= "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
+#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+#os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
+os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-dev.yaml"
+os.environ["PIPELINES"]= "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
         
 from shift_left.core.utils.app_config import get_config, shift_left_dir
 from shift_left.core.models.flink_statement_model import ( 
@@ -26,8 +26,10 @@ import shift_left.core.deployment_mgr as dm
 import shift_left.core.test_mgr as test_mgr
 import shift_left.core.table_mgr as table_mgr
 from shift_left.core.utils.file_search import build_inventory
+import shift_left.core.deployment_mgr as deployment_mgr
+from ut.core.BaseUT import BaseUT
 
-class TestDebugUnitTests(unittest.TestCase):
+class TestDebugUnitTests(BaseUT):
         
     @classmethod
     def setUpClass(cls) -> None:
@@ -43,7 +45,7 @@ class TestDebugUnitTests(unittest.TestCase):
       table_mgr.explain_table(table_name="aqem_dim_role", compute_pool_id="lfcp-0725o5")
     
     
-    def _test_statis_parsing_of_explain_table(self):
+    def _test_static_parsing_of_explain_table(self):
         explain_reports = []
         for root, dirs, files in os.walk(shift_left_dir):
             for file in files:
@@ -85,6 +87,18 @@ class TestDebugUnitTests(unittest.TestCase):
         )
         return ComputePoolList(pools=[pool_1])
     
+    @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
+    def test_deploy_product_using_parallel(self, mock_deploy_ddl_dml):
+        def mock_statement(statement_name: str) -> StatementInfo:
+            print(f"mock_statement {statement_name}")
+            return self._create_mock_get_statement_info(status_phase="RUNNING")
+         
+        mock_deploy_ddl_dml.side_effect = mock_statement
+        deployment_mgr.build_deploy_pipelines_from_product(product_name="qx", 
+                                                           inventory_path=self.inventory_path, 
+                                                           execute_plan=True,
+                                                           sequential=False)
+        mock_deploy_ddl_dml.assert_called_once()
    
 
 if __name__ == '__main__':

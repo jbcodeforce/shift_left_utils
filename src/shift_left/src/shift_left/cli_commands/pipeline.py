@@ -166,7 +166,7 @@ def deploy(
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
-        parallel: bool = typer.Option(True, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.")
+        parallel: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
@@ -274,6 +274,7 @@ def undeploy(
         product_name = product_name.lower()
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
+    print(result)
 
 
 @app.command()

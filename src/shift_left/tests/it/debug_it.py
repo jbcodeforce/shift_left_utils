@@ -3,7 +3,9 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-2b-flink.yaml"
+#os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-2b-flink.yaml"
+os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-dev.yaml"
+
 os.environ["PIPELINES"] =  "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
@@ -22,7 +24,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         runner = CliRunner()
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
-        result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'qx', '--may-start-descendants'])
+        result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'qx', '--parallel'])
         print(result.stdout)
 
         

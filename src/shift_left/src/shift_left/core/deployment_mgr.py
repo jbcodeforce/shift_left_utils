@@ -449,6 +449,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
     nodes_to_process = []
     combined_node_map = {}
     count=0
+    trace = ""
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     for table_name, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)

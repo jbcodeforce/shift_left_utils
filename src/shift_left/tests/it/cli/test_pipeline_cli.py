@@ -38,6 +38,14 @@ class TestPipelineCLI(unittest.TestCase):
         assert result.exit_code == 1
         assert "Table not found" in result.stdout
 
+    def test_build_execution_plan_command_success(self):
+        """Test successful execution of the build-execution-plan command"""
+
+        runner = CliRunner()
+        result = runner.invoke(app, ['build-execution-plan', '--table-name', 'p1_fct_order'])
+        assert result.exit_code == 0
+        print(result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
