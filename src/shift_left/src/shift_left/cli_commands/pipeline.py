@@ -166,7 +166,7 @@ def deploy(
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
-        sequential: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.")
+        sequential: bool = typer.Option(True, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
@@ -281,7 +281,8 @@ def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare t
             compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
        ):
     """
-    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. 
+    For deployment by adding the necessary comments and metadata.
     """
     print(f"Prepare tables using sql file {sql_file_name}")
     deployment_mgr.prepare_tables_from_sql_file(sql_file_name, compute_pool_id)
@@ -300,7 +301,7 @@ def _build_deploy_pipeline(
         may_start_descendants: bool, 
         force_ancestors: bool,
         cross_product_deployment: bool,
-        sequential: bool = False,
+        sequential: bool = True,
         execute_plan: bool=False):
     summary="Nothing done"
     try:

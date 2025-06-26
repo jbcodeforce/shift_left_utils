@@ -12,6 +12,7 @@ The execution plan is used to undeploy a pipeline.
 import time
 import os
 import multiprocessing
+import threading
 from datetime import datetime
 from collections import deque
 from typing import List, Any, Set, Tuple, Dict, Final
@@ -53,7 +54,7 @@ def build_deploy_pipeline_from_table(
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
-    sequential: bool = False
+    sequential: bool = True
 ) -> Tuple[str, FlinkStatementExecutionPlan]:
     """
     Build an execution plan from the static relationship between Flink Statements.
@@ -133,7 +134,7 @@ def build_deploy_pipelines_from_product(
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
-    sequential: bool = False
+    sequential: bool = True
 ) -> Tuple[str, TableReport]:
     """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions. 
     As each statement deployment is creating an execution plan, previously started statements will not be restarted.
@@ -195,7 +196,7 @@ def build_and_deploy_all_from_directory(
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
-    sequential: bool = False
+    sequential: bool = True
 ) -> Tuple[str, TableReport]:
     """
     Deploy all the pipelines within a directory tree. The approach is 
@@ -253,7 +254,7 @@ def build_and_deploy_all_from_table_list(
     force_ancestors: bool = False,  
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
-    sequential: bool = False
+    sequential: bool = True
 ) -> Tuple[str, TableReport]:
     """
     Deploy all the pipelines in the table list file.    
@@ -911,7 +912,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
 def _execute_plan(plan: FlinkStatementExecutionPlan, 
                   compute_pool_id: str, 
                   accept_exceptions: bool = False,
-                  sequential: bool = False) -> List[Statement]:
+                  sequential: bool = True) -> List[Statement]:
     """Execute statements in the execution plan.
     It enables parallel deployment of Flink statements that 
     have no dependencies (autonomous nodes), significantly 
@@ -959,7 +960,7 @@ def _execute_plan(plan: FlinkStatementExecutionPlan,
                                     _modify_impacted_nodes(result, nodes_to_execute)
                                     pass
                             else:
-                                logger.warning(f"Statement {result.name} not deployed, move to next node")
+                                logger.warning(f"Result from future is None")
                         except Exception as e:
                             logger.error(f"Failed to get result from future: {str(e)}")
                             if not accept_exceptions:
@@ -1040,11 +1041,8 @@ def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkSta
     """
     Modify the nodes to execute based on the statement result.
     """
-
-    for node in nodes_to_execute:
-        if node.table_name in statement.affected_tables:
-            node.to_run = False
-            node.to_restart = False
+    # TODO: implement this
+    pass
 
 def _deploy_one_node(node: FlinkStatementNode,
                      accept_exceptions: bool = False, 

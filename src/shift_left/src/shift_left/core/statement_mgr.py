@@ -54,6 +54,7 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             sql_content = f.read()
             column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
             transformer = get_or_build_sql_content_transformer()
+            print(f"{flinkStatement_to_process.table_name}  {flinkStatement_to_process.product_name}")
             _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
 
             statement= post_flink_statement(compute_pool_id, 
@@ -324,7 +325,7 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
             while result.status.phase not in ["COMPLETED", "FAILED"]:
                 time.sleep(1)
                 result = get_statement(drop_statement_name)
-                logger.debug(f"Drop table status is: {result.status.phase}")
+                logger.info(f"Drop table {table_name} status is: {result.status.phase}")
             if result.status.phase == "FAILED":
                 raise Exception(f"Drop table {table_name} failed")
     except Exception as e:

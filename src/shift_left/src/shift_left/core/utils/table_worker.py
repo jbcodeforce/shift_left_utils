@@ -6,6 +6,7 @@ Interface definition to support modifying SQL code to multiple sql statements.
 from typing import Tuple
 import re
 from shift_left.core.utils.app_config import logger, get_config
+import threading
 
 class TableWorker():
     """
@@ -149,6 +150,7 @@ class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"
     product_name="p1"
+    semaphore = threading.Semaphore(value=1)
     """
     Special worker to update schema and src topic name in sql content depending of the environment.
     It also supports adding logic to filter out records for source topics depending on the environment.
@@ -210,33 +212,34 @@ class ReplaceEnvInSqlContent(TableWorker):
 
 
     def update_sql_content(self, sql_content: str, column_to_search: str= None, product_name: str= None)  -> Tuple[bool, str]:
-        logger.debug(f"{sql_content} in {self.env}")
-        updated = False
-        if "CREATE TABLE" in sql_content or "create table" in sql_content:
-            if self.env in self.ddl_replacements:
-                for k, v in self.ddl_replacements[self.env].items():
-                    sql_content = re.sub(v["search"], v["replace"], sql_content)
+        with self.semaphore:
+            logger.debug(f"{sql_content} in {self.env}")
+            updated = False
+            if "CREATE TABLE" in sql_content or "create table" in sql_content:
+                if self.env in self.ddl_replacements:
+                    for k, v in self.ddl_replacements[self.env].items():
+                        sql_content = re.sub(v["search"], v["replace"], sql_content)
+                        updated = True
+                        logger.debug(f"{k} , {v} ")
+            else:
+                if 'clone.dev' in sql_content and self.env != 'dev':
+                    # the sql content by default may use clone.dev. as the source topic prefix
+                    # we need to remove the clone.dev. part when not on dev environment
+                    sql_content = sql_content.replace('clone.dev.', '')
                     updated = True
-                    logger.debug(f"{k} , {v} ")
-        else:
-            if 'clone.dev' in sql_content and self.env != 'dev':
-                # the sql content by default may use clone.dev. as the source topic prefix
-                # we need to remove the clone.dev. part when not on dev environment
-                sql_content = sql_content.replace('clone.dev.', '')
-                updated = True
-            if self.env == 'dev':
-                if re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
-                    replace_str=self.dml_replacements["dev"]["adapt"]["replace"].replace(self.product_name,product_name)
-                    self.dml_replacements["dev"]["adapt"]["replace"]=replace_str
-                    sql_out = re.sub(self.dml_replacements["dev"]["adapt"]["search"], replace_str, sql_content, flags=re.IGNORECASE)
-                    updated = (sql_out != sql_content)
-                    sql_content=sql_out
-                    return updated, sql_content
-            elif self.env in self.dml_replacements:
-                for k, v in self.dml_replacements[self.env].items():
-                    sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
-                    updated = (sql_out != sql_content)
-                    sql_content=sql_out
-                    logger.info(f"{k} , {v} ")
-        logger.debug(sql_content)
-        return updated, sql_content
+                if self.env == 'dev':
+                    if re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
+                        replace_str=self.dml_replacements["dev"]["adapt"]["replace"].replace(self.product_name, product_name)
+                        self.dml_replacements["dev"]["adapt"]["replace"]=replace_str
+                        sql_out = re.sub(self.dml_replacements["dev"]["adapt"]["search"], replace_str, sql_content, flags=re.IGNORECASE)
+                        updated = (sql_out != sql_content)
+                        sql_content=sql_out
+                        return updated, sql_content
+                elif self.env in self.dml_replacements:
+                    for k, v in self.dml_replacements[self.env].items():
+                        sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
+                        updated = (sql_out != sql_content)
+                        sql_content=sql_out
+                        logger.info(f"{k} , {v} ")
+            logger.debug(sql_content)
+            return updated, sql_content

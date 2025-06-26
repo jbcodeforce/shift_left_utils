@@ -20,8 +20,9 @@ class TestDebugIntegrationTests(unittest.TestCase):
 
     def test_exec_plan(self):
         runner = CliRunner()
-        result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
+        #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
+        result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'qx', '--may-start-descendants'])
         print(result.stdout)
 
         

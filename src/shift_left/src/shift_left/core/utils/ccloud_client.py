@@ -298,7 +298,7 @@ class ConfluentCloudClient:
                     logger.info(f"Statement {statement_name} is {statement.status.phase}, break")
                     break
                 else:
-                    logger.debug(f"Statement {statement_name} is {statement.status.phase}, continue")
+                    logger.info(f"Statement {statement_name} is {statement.status.phase}, continue")
                     counter+=1
                     if counter == 6:
                         timer = 30
