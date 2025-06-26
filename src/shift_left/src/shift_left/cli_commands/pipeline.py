@@ -183,7 +183,7 @@ def deploy(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
-        sequential=not parallel,
+        parallel=parallel,
         execute_plan=True)
     
     print(f"#### Pipeline deployed ####")
