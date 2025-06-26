@@ -301,7 +301,7 @@ def _build_deploy_pipeline(
         may_start_descendants: bool, 
         force_ancestors: bool,
         cross_product_deployment: bool,
-        sequential: bool = True,
+        parallel: bool = False,
         execute_plan: bool=False):
     summary="Nothing done"
     try:
@@ -316,7 +316,7 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,
-                                                        sequential=sequential,
+                                                        sequential=not parallel,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
@@ -335,7 +335,7 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,  
-                                                        sequential=sequential,
+                                                        sequential=not parallel,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for product {product_name}")
 
@@ -348,7 +348,7 @@ def _build_deploy_pipeline(
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
-                                                                    sequential=sequential,
+                                                                    sequential=not parallel,
                                                                     execute_plan=execute_plan)
         elif table_list_file_name:
             print(f"Build an execution plan for tables in {table_list_file_name}")
@@ -359,7 +359,7 @@ def _build_deploy_pipeline(
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
-                                                                    sequential=sequential,
+                                                                    sequential=not parallel,
                                                                     execute_plan=execute_plan)
         else:
             print(f"[red]Error: either table-name, product-name, dir or table-list-file-name must be provided[/red]")

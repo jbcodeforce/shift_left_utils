@@ -310,7 +310,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1270b3080&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10834b650&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -519,7 +519,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--force-ancestors / --no-force-ancestors`: When reaching table with no ancestor, this flag forces restarting running Flink statements.  [default: no-force-ancestors]
 * `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
-* `--sequential / --no-sequential`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.  [default: no-sequential]
+* `--sequential / --no-sequential`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.  [default: sequential]
 * `--help`: Show this message and exit.
 
 ### `pipeline build-execution-plan`
@@ -562,7 +562,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -584,7 +584,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -594,7 +594,8 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 ### `pipeline prepare`
 
-Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. 
+For deployment by adding the necessary comments and metadata.
 
 **Usage**:
 
