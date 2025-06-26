@@ -166,7 +166,7 @@ def deploy(
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
-        sequential: bool = typer.Option(True, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.")
+        parallel: bool = typer.Option(True, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
@@ -183,7 +183,7 @@ def deploy(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
-        sequential=sequential,
+        sequential=not parallel,
         execute_plan=True)
     
     print(f"#### Pipeline deployed ####")
