@@ -150,7 +150,7 @@ class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"
     product_name="p1"
-    semaphore = threading.Semaphore(value=1)
+    
     """
     Special worker to update schema and src topic name in sql content depending of the environment.
     It also supports adding logic to filter out records for source topics depending on the environment.
@@ -209,6 +209,7 @@ class ReplaceEnvInSqlContent(TableWorker):
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
         self.ddl_replacements["prod"]["schema-context"]["replace"] = rf"\1-{self.env}"
         self.insert_into_src=r"\s*INSERT\s+INTO\s+src_"
+        self.semaphore = threading.Semaphore(value=1)
 
 
     def update_sql_content(self, sql_content: str, column_to_search: str= None, product_name: str= None)  -> Tuple[bool, str]:

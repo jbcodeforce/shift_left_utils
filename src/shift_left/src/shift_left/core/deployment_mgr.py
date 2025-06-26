@@ -158,7 +158,7 @@ def build_deploy_pipelines_from_product(
             count+=1
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
-        start_node = ancestors[0]
+        start_node = ancestors[-1]
         execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
                                                                       node_map=combined_node_map, 
                                                                       force_ancestors=force_ancestors, 
@@ -569,7 +569,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         )
         # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
         # in the same product family as the start_node. The ancestor list is sorted so first node needs to run first
-        execution_plan = _process_ancestors(ancestors, execution_plan, force_ancestors, compute_pool_id)
+        execution_plan = _process_ancestors(ancestors, execution_plan, force_ancestors, compute_pool_id, may_start_descendants)
     
         # At this level, execution_plan.nodes has the list of ancestors from the  starting node. 
         # For each node, we need to assess if children and ancestors needs to be started. 
@@ -591,7 +591,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                             child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id)
                             child_node.parents.remove(node)  # do not reprocess current node as parent of current child
                             new_ancestors = _build_topological_sorted_parents([child_node], node_map)
-                            execution_plan = _process_ancestors(new_ancestors, execution_plan, force_ancestors, compute_pool_id)
+                            execution_plan = _process_ancestors(new_ancestors, execution_plan, force_ancestors, compute_pool_id, may_start_descendants)
                             sorted_children = _build_topological_sorted_children(child_node, node_map)
                             for _child in sorted_children:
                                 _child.to_restart = not _child.to_run
@@ -631,7 +631,8 @@ def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
 def _process_ancestors(ancestors: List[FlinkStatementNode], 
                        execution_plan: FlinkStatementExecutionPlan, 
                        force_ancestors: bool,
-                       compute_pool_id: str
+                       compute_pool_id: str,
+                       may_start_descendants: bool = False
 )-> FlinkStatementExecutionPlan:
     """
     Process the ancestors of the current node. Ancestor needs to be started
@@ -645,7 +646,7 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
         else:
             node.to_run = True
         if node.to_run and node.upgrade_mode == "Stateful": 
-            node.update_children = True
+            node.update_children = may_start_descendants
         if node.to_run and not node.compute_pool_id:
             node = _assign_compute_pool_id_to_node(node, compute_pool_id)
         if node not in execution_plan.nodes:
@@ -733,7 +734,7 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
 
 def _build_topological_sorted_parents(current_nodes: List[FlinkStatementNode], 
                                       node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
-    """Performs topological sort on a DAG of the curent node parents
+    """Performs topological sort on a DAG of the current node parents
     the node_map is a hashmap of table name and direct static relationships of the table with its parents and children
     For each node compute the subgraph to reach other nodes to compute the dependencies weights.
     """

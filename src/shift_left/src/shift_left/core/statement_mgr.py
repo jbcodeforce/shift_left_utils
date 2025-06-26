@@ -54,7 +54,7 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             sql_content = f.read()
             column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
             transformer = get_or_build_sql_content_transformer()
-            print(f"{flinkStatement_to_process.table_name}  {flinkStatement_to_process.product_name}")
+            print(f"ß{flinkStatement_to_process.table_name}  {flinkStatement_to_process.product_name}")
             _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
 
             statement= post_flink_statement(compute_pool_id, 

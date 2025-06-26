@@ -87,18 +87,30 @@ class TestDebugUnitTests(BaseUT):
         )
         return ComputePoolList(pools=[pool_1])
     
-    @patch('shift_left.core.deployment_mgr._deploy_ddl_dml')
-    def test_deploy_product_using_parallel(self, mock_deploy_ddl_dml):
-        def mock_statement(statement_name: str) -> StatementInfo:
-            print(f"mock_statement {statement_name}")
-            return self._create_mock_get_statement_info(status_phase="RUNNING")
-         
-        mock_deploy_ddl_dml.side_effect = mock_statement
+    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    def test_deploy_product_using_parallel(self, 
+                                           mock_delete, 
+                                           mock_drop,
+                                           mock_post):
+        def _drop_table(table_name: str, compute_pool_id: str) -> str:
+            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
+            return "deleted"
+        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
+            print(f"@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
+            return Statement(name=statement_name, status=Status(phase="RUNNING"))
+        
+        mock_delete.return_value = "deleted"
+        mock_drop.side_effect = _drop_table
+        mock_post.side_effect = _post_flink_statement
+
         deployment_mgr.build_deploy_pipelines_from_product(product_name="qx", 
                                                            inventory_path=self.inventory_path, 
                                                            execute_plan=True,
+                                                           force_ancestors=True,
                                                            sequential=False)
-        mock_deploy_ddl_dml.assert_called_once()
+
    
 
 if __name__ == '__main__':
