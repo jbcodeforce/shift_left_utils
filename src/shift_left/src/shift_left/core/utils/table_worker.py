@@ -230,8 +230,8 @@ class ReplaceEnvInSqlContent(TableWorker):
                     updated = True
                 if self.env == 'dev':
                     if re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
-                        replace_str=self.dml_replacements["dev"]["adapt"]["replace"].replace(self.product_name, product_name)
-                        self.dml_replacements["dev"]["adapt"]["replace"]=replace_str
+                        base_replace_str =  str(self.dml_replacements["dev"]["adapt"]["replace"])
+                        replace_str=base_replace_str.replace(self.product_name, product_name)
                         sql_out = re.sub(self.dml_replacements["dev"]["adapt"]["search"], replace_str, sql_content, flags=re.IGNORECASE)
                         updated = (sql_out != sql_content)
                         sql_content=sql_out

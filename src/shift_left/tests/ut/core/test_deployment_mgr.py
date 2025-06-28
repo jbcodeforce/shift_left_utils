@@ -50,28 +50,6 @@ class TestDeploymentManager(BaseUT):
         self.inventory_path = os.getenv("PIPELINES")
         self.count = 0  # Initialize count as instance variable
 
-    def _create_mock_statement_node(
-        self,
-        table_name: str,
-        product_name: str = "product1",
-        dml_statement_name: str = "dml1",
-        ddl_statement_name: str = "ddl1",
-        compute_pool_id: str = ""
-    ) -> FlinkStatementNode:
-        """Create a mock FlinkStatementNode object."""
-        return FlinkStatementNode(
-            table_name=table_name,
-            product_name=product_name,
-            dml_statement_name=dml_statement_name,
-            ddl_statement_name=ddl_statement_name,
-            compute_pool_id=compute_pool_id
-        )
-
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
-        """Mock function for assigning compute pool to node."""
-        node.compute_pool_id = compute_pool_id
-        node.compute_pool_name = "test-pool"
-        return node
 
     def _mock_get_and_update_node(self, node: FlinkStatementNode) -> Statement:
         """Mock function for getting and updating node statement info."""
@@ -314,6 +292,8 @@ class TestDeploymentManager(BaseUT):
                                         mock_deploy_one_node,
                                         mock_build_simple_report):
         
+        """
+        """
         def _mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
@@ -328,23 +308,13 @@ class TestDeploymentManager(BaseUT):
 
         def _build_statement(node: FlinkStatementNode, flname: str, statement_name: str) -> str:
             print(f"build_statement {statement_name}")
-            metadata = Metadata(created_at=str(datetime.now()), uid="test-uid")
-            spec = Spec(compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-                        principal="test-principal",
-                        properties={'sql.current-catalog': 'j9r-catalog', 'sql.current-database': 'j9r-database'},
-                        statement="sql statement",
-                        execution_time=5,
-                        stopped=False)
+            statement = self._create_mock_statement(name=statement_name, status_phase="RUNNING")
             if "ddl" in statement_name:
                 status = Status(phase="COMPLETED", detail="")
             else:
                 status = Status(phase="RUNNING", detail="")
-            return Statement(name=statement_name, 
-                             status=status, 
-                             spec=spec, 
-                             metadata=metadata,
-                             organization_id="org_test",
-                             environment_id="env_test")
+            statement.status = status
+            return statement
 
         mock_get_status.side_effect = _mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool

@@ -1,4 +1,5 @@
 from ut.core.BaseUT import BaseUT
+import unittest
 from unittest.mock import patch, MagicMock, call
 from datetime import datetime
 from shift_left.core.models.flink_statement_model import (
@@ -57,7 +58,6 @@ class TestParallelExecutePlan(BaseUT):
                 status_phase="RUNNING",
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
             )
-        
         return node
 
     def _create_mock_execution_plan(self, nodes: list) -> FlinkStatementExecutionPlan:
@@ -68,21 +68,6 @@ class TestParallelExecutePlan(BaseUT):
             nodes=nodes
         )
 
-    def _create_mock_statement(self, node: FlinkStatementNode, 
-                               accept_exceptions: bool = False, 
-                               compute_pool_id: str = None) -> Statement:
-        """Helper method to create a mock Statement"""
-        return Statement(
-            name=node.dml_statement_name,
-            status=Status(phase="RUNNING")
-        )
-
-    def _mock_build_autonomous_nodes(nodes: List[FlinkStatementNode], 
-                                     ) -> List[FlinkStatementNode]:
-        nodes=dm._build_autonomous_nodes(nodes)
-        for node in nodes:
-            print(node.name)
-        return nodes
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
@@ -98,10 +83,10 @@ class TestParallelExecutePlan(BaseUT):
         """
         print("\n--> test_autonomous_and_nodes_to_execute, should runs all src in parallel")
         
-        def mock_statement(statement_name: str) -> StatementInfo:
+        def mock_statement_info(statement_name: str) -> StatementInfo:
             return self._create_mock_get_statement_info(status_phase="UNKNOWN")
  
-        mock_get_status.side_effect = mock_statement
+        mock_get_status.side_effect = mock_statement_info
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 
@@ -114,7 +99,7 @@ class TestParallelExecutePlan(BaseUT):
             force_ancestors=True,
             execute_plan=False  # set to false as we just want to validate autonomous nodes and nodes to execute
         )
-        autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes)
+        autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes, started_nodes=[])
         assert len(autonomous_nodes) == 2
         assert autonomous_nodes[0].table_name == "src_x" or autonomous_nodes[1].table_name == "src_x"
         assert autonomous_nodes[0].table_name == "src_y" or autonomous_nodes[1].table_name == "src_y"
@@ -128,18 +113,21 @@ class TestParallelExecutePlan(BaseUT):
 
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
     def test_execute_plan_parallel_execution_autonomous_nodes(self, mock_deploy):
-        """Test parallel execution with 3 autonomous nodes (no dependencies)"""
+        print("\n--> test_execute_plan_parallel_execution_autonomous_nodes, Test parallel execution with 3 autonomous nodes (no dependencies)")
         # Arrange
         node1 = self._create_mock_node("table1", to_run=True)
         node2 = self._create_mock_node("table2", to_run=True)
         node3 = self._create_mock_node("table3", to_run=True)
         
+        def _mock_deploy(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None) -> Statement:
+            return self._create_mock_statement(name=node.dml_statement_name, status_phase="RUNNING")
+        
         execution_plan = self._create_mock_execution_plan([node1, node2, node3])
         
-        mock_deploy.side_effect = self._create_mock_statement
+        mock_deploy.side_effect = _mock_deploy
         
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
             sequential=False
@@ -163,12 +151,15 @@ class TestParallelExecutePlan(BaseUT):
         node3 = self._create_mock_node("table3", to_run=True, parents=[node1])  # dependent on node1
         node4 = self._create_mock_node("table4", to_run=True, parents=[node2])  # dependent on node2
         
+        def _mock_deploy(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None) -> Statement:
+            return self._create_mock_statement(name=node.dml_statement_name, status_phase="RUNNING")
+        
         execution_plan = self._create_mock_execution_plan([node1, node2, node3, node4])
         
-        mock_deploy.side_effect = self._create_mock_statement
+        mock_deploy.side_effect = _mock_deploy
         
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
             sequential=False
@@ -185,13 +176,16 @@ class TestParallelExecutePlan(BaseUT):
         node2 = self._create_mock_node("table2", to_run=True)  # needs to run
         node3 = self._create_mock_node("table3", to_restart=True, is_running=True)  # running, needs restart
         
+        def _mock_deploy(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None) -> Statement:
+            return self._create_mock_statement(name=node.dml_statement_name, status_phase="RUNNING")
+
         execution_plan = self._create_mock_execution_plan([node1, node2, node3])
         
-        mock_deploy.side_effect = self._create_mock_statement
+        mock_deploy.side_effect = _mock_deploy
         
         # Act
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
             sequential=False
@@ -215,7 +209,7 @@ class TestParallelExecutePlan(BaseUT):
         
         # Act
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=True,
             sequential=False
@@ -237,7 +231,7 @@ class TestParallelExecutePlan(BaseUT):
         # Act & Assert
         with self.assertRaises(Exception):
             dm._execute_plan(
-                plan=execution_plan,
+                execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,
                 sequential=False
@@ -266,12 +260,12 @@ class TestParallelExecutePlan(BaseUT):
         # Arrange
         node1 = self._create_mock_node("table1", to_run=True)
         node2 = self._create_mock_node("table2", to_restart=True)
-        node3 = self._create_mock_node("table3", to_run=False)  # Not to be executed
+        node3 = self._create_mock_node("table3", to_run=False, to_restart=False)  # Not to be executed
         
         nodes = [node1, node2, node3]
         
         # Act
-        result = dm._build_autonomous_nodes(nodes)
+        result = dm._build_autonomous_nodes(nodes, started_nodes=[])
         
         # Assert
         self.assertEqual(len(result), 2)
@@ -295,7 +289,7 @@ class TestParallelExecutePlan(BaseUT):
         nodes = [parent1, parent2, child1, child2, child3]
         
         # Act
-        result = dm._build_autonomous_nodes(nodes)
+        result = dm._build_autonomous_nodes(nodes, started_nodes=[])
         
         # Assert
         self.assertIn(parent1, result)  # Parent1 has no parents and needs to run
@@ -318,7 +312,7 @@ class TestParallelExecutePlan(BaseUT):
         nodes = [root1, root2, level1_1, level1_2, level2_1]
         
         # Act
-        result = dm._build_autonomous_nodes(nodes)
+        result = dm._build_autonomous_nodes(nodes, started_nodes=[])
         print(result)
         # Assert
         self.assertIn(root1, result)  # Root1 is autonomous
@@ -336,7 +330,7 @@ class TestParallelExecutePlan(BaseUT):
         
         # Act
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
             sequential=False
@@ -357,7 +351,7 @@ class TestParallelExecutePlan(BaseUT):
         
         # Act
         result = dm._execute_plan(
-            plan=execution_plan,
+            execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
             sequential=False
@@ -367,4 +361,5 @@ class TestParallelExecutePlan(BaseUT):
         self.assertEqual(len(result), 0)  # None results are not added to the list
         self.assertEqual(mock_deploy.call_count, 1)
 
-    
+if __name__ == '__main__':
+    unittest.main()

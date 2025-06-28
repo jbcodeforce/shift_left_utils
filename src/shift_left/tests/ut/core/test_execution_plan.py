@@ -613,6 +613,7 @@ class TestExecutionPlan(BaseUT):
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
+
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
@@ -753,7 +754,7 @@ class TestExecutionPlan(BaseUT):
         print("Table\t\tStatement\t\tTo Restart")
         for table in report.tables:
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
-            assert table.to_restart is True@patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+            assert table.to_restart is True
     
     
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')

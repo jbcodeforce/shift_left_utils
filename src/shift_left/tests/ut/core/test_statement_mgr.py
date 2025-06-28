@@ -381,28 +381,12 @@ class TestStatementManager(BaseUT):
         def mock_post_statement(compute_pool_id, statement_name, sql_content) -> Statement:
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
-            status = Status(
-                phase= "COMPLETED", 
-                detail= ""
-            )
-            metadata = Metadata(
-                created_at="2025-04-20T10:15:02.853006",
-                labels={},
-                resource_version="1",
-                self="https://test-url",
-                uid="test-uid",
-                updated_at="2025-04-20T10:15:02.853006"
-            )
-            spec = Spec(
-                compute_pool_id=compute_pool_id,
-                principal="principal_sa",
-                statement=sql_content,
-                properties={"sql.current-catalog":  config['flink']['catalog_name'], 
-                            "sql.current-database":  config['flink']['database_name']},
-                stopped=False
-            )
-            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
-        
+            statement= self._create_mock_statement(name=statement_name, 
+                                               status_phase="COMPLETED")
+            statement.spec.compute_pool_id = compute_pool_id
+            statement.spec.statement = sql_content
+            return statement
+           
         mock_post_flink_statement.side_effect = mock_post_statement
         mock_get_statement_list.return_value = self._statement_list
 

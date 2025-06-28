@@ -54,7 +54,6 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             sql_content = f.read()
             column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
             transformer = get_or_build_sql_content_transformer()
-            print(f"ß{flinkStatement_to_process.table_name}  {flinkStatement_to_process.product_name}")
             _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
 
             statement= post_flink_statement(compute_pool_id, 
@@ -352,6 +351,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
     """
     Map the statement info, result of the REST call to the StatementInfo model
     """
+
     if info and isinstance(info, dict):
         if 'properties' in info.get('spec') and info.get('spec').get('properties'):
             catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
@@ -368,7 +368,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
                                     created_at= info.get('metadata').get('created_at', 'UNKNOWN'),
                                     sql_catalog=catalog,
                                     sql_database=database)
-    elif info and isinstance(info, Statement):
+    elif info and isinstance(info, Statement) and info.spec:
         catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
         database = info.spec.properties.get('sql.current-database','UNKNOWN')
         return StatementInfo(name=info.name,
