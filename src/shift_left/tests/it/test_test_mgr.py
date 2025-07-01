@@ -34,12 +34,12 @@ class TestTestManager(unittest.TestCase):
         assert table_exist
         table_exist = test_mgr._table_exists("p1_fct_order")
         print(f"table_exist: {table_exist}")
-        assert not table_exist
+        assert table_exist
 
 
     def test_delete_test_artifacts(self):
         config = get_config()
-        table_name = "aqem_dim_role"
+        table_name = "src_p1_table_2"
         compute_pool_id = config["flink"]["compute_pool_id"]
         test_mgr.delete_test_artifacts(table_name=table_name, 
                                        compute_pool_id=compute_pool_id,

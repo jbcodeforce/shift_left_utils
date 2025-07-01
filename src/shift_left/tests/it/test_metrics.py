@@ -20,11 +20,9 @@ import json
 Integration tests for metrics. The config.yaml used needs to get the correct credentials to access the Confluent Cloud
 and should not be committed to git.
 """
-TEST_TABLE_NAME = "src_mx_data_capture"
+TEST_TABLE_NAME = "p1_fct_order"
 STATEMENT_NAME = TEST_TABLE_NAME.replace("_", "-")
-STATEMENT_NAME = "stage-mx-dml-src-mx-data-capture"
-COMPUTE_POOL_ID = "lfcp-jy0djw"
-#get_config()["flink"]["compute_pool_id"]
+COMPUTE_POOL_ID = get_config()["flink"]["compute_pool_id"]
 
 def get_topic_message_count(topic_name) -> int:
     """
@@ -140,8 +138,11 @@ class TestConfluentMetrics(unittest.TestCase):
 
     def _test_get_retention_size(self):
         print("test_get_retention_size")
-        table_name = TEST_TABLE_NAME
+        table_name = "src_aqem_recordconfiguration_form_element"
         retention_size = metric_mgr.get_retention_size(table_name)
+        config = get_config()
+        print(f"[DEBUG] Kafka bootstrap.servers: {config['kafka']['bootstrap.servers']}")
+        print(f"[DEBUG] Topic name: {table_name}")
         print(f"retention_size: {retention_size}")
         assert retention_size > 0
     

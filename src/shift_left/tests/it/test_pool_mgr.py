@@ -36,11 +36,13 @@ class TestPoolManager(unittest.TestCase):
 
     def test_get_compute_pool_list(self):
         config = get_config()
-        pools = cpm.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
-        self.assertGreater(len(pools), 0)
-        assert pools[0].get('name')
-        assert pools[0].get('env_id') == config.get('confluent_cloud').get('environment_id')
-        print(json.dumps(pools, indent=2))
+        pool_list = cpm.get_compute_pool_list(config.get('confluent_cloud').get('environment_id'))
+        self.assertGreater(len(pool_list.pools), 0)
+        first_pool = pool_list.pools[0]
+        assert getattr(first_pool, 'name', None)
+        assert getattr(first_pool, 'env_id', None) == config.get('confluent_cloud').get('environment_id')
+        # Optionally, print as dicts for readability
+        print(json.dumps([p.model_dump() for p in pool_list.pools], indent=2))
 
     def test_validate_a_pool(self):
         config = get_config()

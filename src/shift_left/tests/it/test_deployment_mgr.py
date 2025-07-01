@@ -15,6 +15,8 @@ import shift_left.core.deployment_mgr as dm
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition, FlinkStatementNode
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
+from datetime import datetime, timedelta, timezone
+
 
 """
 This test suite is used to test the deployment manager with connection to Confluent Cloud.
@@ -77,7 +79,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan
         print(summary)
         print("Validating running dml")
-        result = dm.report_running_flink_statements(table_name, inventory_path)
+        result = dm.report_running_flink_statements_for_a_table(table_name, inventory_path)
         assert result
         print(result)
         
@@ -98,7 +100,7 @@ class TestDeploymentManager(unittest.TestCase):
         assert execution_plan
         print(summary)
         print("Validating running dml")
-        result = dm.report_running_flink_statements(table_name, inventory_path)
+        result = dm.report_running_flink_statements_for_a_table(table_name, inventory_path)
         assert result
         print(result)
 
@@ -125,7 +127,8 @@ class TestDeploymentManager(unittest.TestCase):
                                                force_ancestors=False)
         print(summary)
         assert execution_plan
-        report = dm.report_running_flink_statements_for_a_product('p2', os.getenv("PIPELINES"))
+        from_date = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        report = dm.report_running_flink_statements_for_a_product('p2', os.getenv("PIPELINES"), from_date)
         assert report
         print(report)
         
@@ -164,7 +167,8 @@ class TestDeploymentManager(unittest.TestCase):
 
     def test_9_report_running_flink_statements_for_all_from_product(self):
         os.environ["PIPELINES"]= str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
-        result = dm.report_running_flink_statements_for_a_product('p1', os.getenv("PIPELINES"))
+        from_date = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        result = dm.report_running_flink_statements_for_a_product('p1', os.getenv("PIPELINES"), from_date)
         assert result
         print(result)
 
