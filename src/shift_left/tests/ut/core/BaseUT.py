@@ -63,7 +63,7 @@ class BaseUT(unittest.TestCase):
                 self="https://test-url",
                 uid="test-uid")
         status = Status(phase=status_phase,detail="test-detail")
-        return Statement(name=name, status=status, spec=spec, metadata=metadata)
+        return Statement(name=name, status=status, environment_id="test-env-123", spec=spec, metadata=metadata)
 
 
     def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:

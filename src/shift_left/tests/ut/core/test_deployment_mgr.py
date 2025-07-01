@@ -8,7 +8,7 @@ import pathlib
 from datetime import datetime
 import uuid
 from typing import Tuple
-
+import time
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
@@ -270,92 +270,104 @@ class TestDeploymentManager(BaseUT):
         assert sorted_nodes[4].table_name in ["x", "y", "a", "b"]
         assert sorted_nodes[8].table_name == "z"
 
-    @patch('shift_left.core.deployment_mgr.report_mgr.build_simple_report')
-    @patch('shift_left.core.deployment_mgr._deploy_one_node')
-    @patch('shift_left.core.deployment_mgr.ThreadPoolExecutor')
-    @patch('shift_left.core.deployment_mgr.report_mgr.build_TableReport')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.build_and_deploy_flink_statement_from_sql_content')    
-    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_deploy_pipeline_from_table(self, 
-                                        mock_assign_compute_pool_id, 
-                                        mock_get_status, 
-                                        mock_get_compute_pool_list,
-                                        mock_delete,
-                                        mock_drop,
-                                        mock_build_and_deploy_flink_statement_from_sql_content,
-                                        mock_build_tableReport,
-                                        mock_thread_pool_executor,
-                                        mock_deploy_one_node,
-                                        mock_build_simple_report):
+    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    def test_deploy_table_pipeline(self, 
+                                           mock_delete, 
+                                           mock_drop,
+                                           mock_post,
+                                           mock_get_status,
+                                           mock_get_compute_pool_list):
+    
         
         """
+        start src_x, src_y, x, y, z, d
         """
-        def _mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x"]:  
+        def _drop_table(table_name: str, compute_pool_id: str) -> str:
+            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
+            time.sleep(1)
+            return "deleted"
+        
+        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
+            print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
+            time.sleep(1)
+            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x","dev-p2-dml-d"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
-                return self._create_mock_get_statement_info(status_phase="RUNNING")
+                return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
+            elif "ddl" in statement_name:  
+                return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
             else:
                 print(f"mock_ get statement info: {statement_name} -> UNKNOWN")
-                return self._create_mock_get_statement_info(status_phase="UNKNOWN")
- 
+                return self._create_mock_statement(name=statement_name, status_phase="UNKNOWN")
+            
+        def _get_status(statement_name: str) -> StatementInfo:
+            print(f"@@@@ get status {statement_name}")
+            if statement_name in ["dev-p2-dml-src-y", "dev-p2-dml-src-x"]:  
+                return self._create_mock_get_statement_info(name=statement_name, status_phase="RUNNING")
+            return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN")
+        
+        def _delete_statement(statement_name: str):
+            print(f"@@@@ delete statement {statement_name}")
+            time.sleep(1)
+            return "deleted"
+        
+        mock_get_status.side_effect = _get_status 
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_delete.side_effect = _delete_statement
+        mock_drop.side_effect = _drop_table
+        mock_post.side_effect = _post_flink_statement
+        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
+                                    inventory_path=self.inventory_path, 
+                                    compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
+                                    dml_only=False, 
+                                    execute_plan=True,
+                                    may_start_descendants=False,
+                                    force_ancestors=False)
+        assert execution_plan.start_table_name == "d"
+        assert len(execution_plan.nodes) == 6
+        assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
+        assert execution_plan.nodes[2].table_name in ["x", "y"]
+        print(f"summary: {summary}")
+        print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    def test_deploy_product_using_parallel(self, 
+                                           mock_delete, 
+                                           mock_drop,
+                                           mock_post):
         def _drop_table(table_name: str, compute_pool_id: str) -> str:
-            print(f"drop_table {table_name} {compute_pool_id}")
+            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
+            time.sleep(1)
+            return "deleted"
+        
+        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
+            print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
+            time.sleep(1)
+            if "ddl" in statement_name:
+                return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
+            return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
+        
+        def _delete_statement(statement_name: str):
+            print(f"@@@@ delete statement {statement_name}")
+            time.sleep(1)
             return "deleted"
 
-        def _build_statement(node: FlinkStatementNode, flname: str, statement_name: str) -> str:
-            print(f"build_statement {statement_name}")
-            statement = self._create_mock_statement(name=statement_name, status_phase="RUNNING")
-            if "ddl" in statement_name:
-                status = Status(phase="COMPLETED", detail="")
-            else:
-                status = Status(phase="RUNNING", detail="")
-            statement.status = status
-            return statement
-
-        mock_get_status.side_effect = _mock_statement
-        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        mock_delete.return_value = "deleted"
+        mock_delete.side_effect = _delete_statement
         mock_drop.side_effect = _drop_table
-        mock_build_and_deploy_flink_statement_from_sql_content.side_effect = _build_statement
-        mock_build_tableReport.return_value = TableReport(table_name="d", 
-                                                          statement_name="dev-p2-dml-z", 
-                                                          status="RUNNING", 
-                                                          compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-                                                          created_at=datetime.now(), 
-                                                          pending_records=10, 
-                                                          num_records_out=100)
-        mock_build_simple_report.return_value = "simple_report"
-        mock_future1 = MagicMock()
-        mock_future2 = MagicMock()
-        mock_future3 = MagicMock()
-        mock_future1.result.return_value = _build_statement(None, None, "dev-p2-dml-z")
-        mock_future2.result.return_value = _build_statement(None, None, "dev-p2-dml-y")
-        mock_future3.result.return_value = _build_statement(None, None, "dev-p2-dml-x")
-        mock_executor = MagicMock()
-        mock_executor.__enter__.return_value = mock_executor
-        mock_executor.submit.side_effect = [mock_future1, mock_future2, mock_future3]
-        mock_thread_pool_executor.return_value = mock_executor
-        with patch('shift_left.core.deployment_mgr.as_completed') as mock_as_completed:
-            mock_as_completed.return_value = [mock_future1, mock_future2, mock_future3]
-            summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
-                                       inventory_path=self.inventory_path, 
-                                       compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-                                       dml_only=False, 
-                                       execute_plan=True,
-                                       may_start_descendants=False,
-                                       force_ancestors=False)
-            assert execution_plan.start_table_name == "d"
-            assert len(execution_plan.nodes) == 6
-            assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
-            assert execution_plan.nodes[2].table_name in ["x", "y"]
-            print(f"summary: {summary}")
-            print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+        mock_post.side_effect = _post_flink_statement
 
+        dm.build_deploy_pipelines_from_product(product_name="qx", 
+                                                           inventory_path=self.inventory_path, 
+                                                           execute_plan=True,
+                                                           force_ancestors=True,
+                                                           sequential=False)
+        
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
@@ -404,8 +416,7 @@ class TestDeploymentManager(BaseUT):
         """
         Test the prepare table
         """
-
-        
+ 
         def mock_post_statement(compute_pool_id, statement_name, sql_content):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")

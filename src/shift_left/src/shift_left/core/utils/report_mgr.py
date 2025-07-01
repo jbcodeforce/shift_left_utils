@@ -52,6 +52,7 @@ class TableInfo(BaseModel):
     message_count: int = 0
     pending_records: float = 0
     num_records_out: int = 0
+    num_records_in: int = 0
 
 class TableReport(BaseModel):
     report_name: str = ""
@@ -99,10 +100,12 @@ def build_TableReport(report_name: str,
         compute_pool_ids = [node.compute_pool_id for node in nodes]
         pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date=from_date)
         num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids,from_date=from_date)
+        num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids,from_date=from_date)
         for node in nodes:
             table_info = build_TableInfo(node,get_metrics=get_metrics)
             table_info.pending_records = pending_records.get(node.existing_statement_info.name, 0)
             table_info.num_records_out = num_records_out.get(node.existing_statement_info.name, 0)
+            table_info.num_records_in = num_records_in.get(node.existing_statement_info.name, 0)
             table_report.tables.append(table_info)
     else:
         for node in nodes:
@@ -139,16 +142,18 @@ def build_TableInfo(node: FlinkStatementNode, from_date: str = None, get_metrics
     return table_info
 
 def build_simple_report(execution_plan: FlinkStatementExecutionPlan, from_date: str = None) -> str:
-    report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15}\t{'Created At':<16} {'Pending_msgs':<10} {'Num_records_out':<10}\n"
+    report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15} {'Created At':<16} {'Pending_msgs':<12} {'Num_msg_in':<11} {'Num_msg_out':<11}\n"
     report+=f"-"*165 + "\n"
     compute_pool_ids = [node.compute_pool_id for node in execution_plan.nodes]
     pending_records = metrics_mgr.get_pending_records(compute_pool_ids)
     num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids)
+    num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids)
     for node in execution_plan.nodes:
         if node.existing_statement_info:
             pending_records_value = pending_records.get(node.existing_statement_info.name, 0)
             num_records_out_value = num_records_out.get(node.existing_statement_info.name, 0)
-            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)}\t{pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)} {pad_or_truncate(pending_records_value,10)} {pad_or_truncate(num_records_out_value,10)}\n"
+            num_records_in_value = num_records_in.get(node.existing_statement_info.name, 0)
+            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)} {pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)}\t{pad_or_truncate(pending_records_value,12)} {pad_or_truncate(num_records_in_value,11)} {pad_or_truncate(num_records_out_value,11)}\n"
     return report
 
 
@@ -232,14 +237,14 @@ def persist_table_reports(table_report: TableReport, base_file_name):
     table_count=0
     running_count=0
     non_running_count=0
-    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records,num_records_out\n"
+    csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records,num_records_in,num_records_out\n"
     for table in table_report.tables:
-        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at.strftime('%Y-%m-%d %H:%M:%S')},{table.retention_size},{table.message_count},{table.pending_records},{table.num_records_out}\n"   
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at.strftime('%Y-%m-%d %H:%M:%S')},{table.retention_size},{table.message_count},{table.pending_records},{table.num_records_in},{table.num_records_out}\n"   
         if table.status == 'RUNNING':
             running_count+=1
         else:
             non_running_count+=1
-        print(f"Table info: {report_mgr.pad_or_truncate(table.table_name, 40)} {report_mgr.pad_or_truncate(table.status, 10)} created: {report_mgr.pad_or_truncate(table.created_at.strftime('%Y-%m-%dT%H:%M:%S'), 20)} pool: {report_mgr.pad_or_truncate(table.compute_pool_id, 10)} pending records: {table.pending_records} num records out: {table.num_records_out}")
+        print(f"Table info: {report_mgr.pad_or_truncate(table.table_name, 40)} {report_mgr.pad_or_truncate(table.status, 10)} created: {report_mgr.pad_or_truncate(table.created_at.strftime('%Y-%m-%dT%H:%M:%S'), 20)} pool: {report_mgr.pad_or_truncate(table.compute_pool_id, 10)} pending records: {table.pending_records} sum records in: {table.num_records_in} sum records out: {table.num_records_out}")
         
         table_count+=1
     print(f"Writing report to {shift_left_dir}/{base_file_name}_report.csv and {shift_left_dir}/{base_file_name}_report.json")

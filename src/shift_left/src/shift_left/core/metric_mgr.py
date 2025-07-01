@@ -109,6 +109,8 @@ def get_pending_records(compute_pool_ids: list[str], from_date: str = None) -> d
 def get_num_records_out(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_out", from_date)
     
+def get_num_records_in(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+    return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_in", from_date)
 
 def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: str = None) -> dict[str,int]:
     config = get_config()
