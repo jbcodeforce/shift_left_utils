@@ -10,8 +10,10 @@ nav:
     - Recipes: recipes.md
     - CLI References: command.md
     - Test Harness: test_harness.md
-    - Pipeline management: pipeline_mgr.md
+    - Pipeline Management: pipeline_mgr.md
+    - Blue/Green Deployment: blue_green_deploy.md
     - Performance Testing: perf_test.md
+    - Flink SQL best practices: https://jbcodeforce.github.io/flink-studies/coding/flink-sql/
   - For Contributors:
       - Contributing: contributing.md
       - Code structure: coding/index.md

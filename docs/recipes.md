@@ -83,7 +83,7 @@ To use the CLI, be sure to follow the [setup instructions.](./setup.md)
 
 ### The config.yaml file
 
-The `config.yaml` file is crucial to set up and is using by the tool via the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables). This file should be setup per Confluent Cloud environment.
+The `config.yaml` file is crucial to set up and is used by the tool via the CONFIG_FILE environment variable. [See instructions](./setup.md/#environment-variables). This file should be setup per Confluent Cloud environment. The `shift_left` tool run simple validation of this config_file during the starting phase.
 
 ???- example "Practices"
     Define one config.yaml per environment (dev, stage, prod) and save them in the `$HOME/.shift_left` folder.
@@ -492,7 +492,7 @@ shift_left table update-all-makefiles $PIPELINES
 
 As of now the template is in the source folder: `shift_left_utils/src/shift_left/src/shift_left/core/templates/makefile_ddl_dml_tmpl.jinja`.
 
-### Migrate SQL tables from source to staging
+### Migrate Spark SQL tables
 
 As presented in the [introduction](./index.md/#shift_left-tooling), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
 
