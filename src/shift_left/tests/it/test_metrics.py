@@ -133,7 +133,6 @@ class TestConfluentMetrics(unittest.TestCase):
         retention_size = metric_mgr.get_retention_size(table_name)
         config = get_config()
         print(f"[DEBUG] Kafka bootstrap.servers: {config['kafka']['bootstrap.servers']}")
-        print(f"[DEBUG] Topic name: {table_name}")
         print(f"retention_size: {retention_size}")
         assert retention_size > 0
     
