@@ -1,7 +1,16 @@
 
 # Blue/Green Deployment Testing
 
-In a classical blue-green deployment for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data product, switches to new content. 
+The goals of the process presented in this note are to:
+
+1. Reduce the impact on continuously running Flink statements: do not redeploy them when not necessary
+1. Reduce the cost of dual environments, and running parallel logic
+1. Simplify the overall deployment of Flink statement changes, and authorize quicker deployment time
+1. Avoid redeploying stateful processing with big state to construct
+
+## Context
+
+In a classical blue-green deployment for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data products, switches to new content. 
 
 The following figure illustrates this approach at a high level:
 
@@ -12,10 +21,9 @@ The following figure illustrates this approach at a high level:
 
 The processing includes reloading the data from the CDC output topics, using S3 Sink Connector to new bucket folder, then re-run the batch processing to create the gold records for consumption by the query engine to serve data to the business intelligence dashboard. When the blue data set is ready the query engine uses another location.
 
-
 While in real-time processing the concept of blue-green deployment should be limited to the Flink pipeline impacted, as presented in [the pipeline management chapter](./pipeline_mgr.md).
 
-The following figure presents a steady state of running Flink statements processing data in a source, intermediates, facts tables. The raw data comes from Change Data Capture on transactional database or from the event-driven microservice using the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Due to the amount of data ingected in those raw topics, and the fact that historical data needs to be kept for a long period, those topics should be rarely re-created. 
+The following figure illustrates a steady state of Flink statements processing data across source, intermediate, and fact tables. Raw data originates from Change Data Capture on a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the necessity of retaining historical data for extended periods, these topics should be rarely re-created.
 
 <figure markdown="span">
 ![](./images/bg_2_1.drawio.png)
@@ -24,16 +32,17 @@ The following figure presents a steady state of running Flink statements process
 
 *To simplify the diagram above the sink connectors to the bucket and Iceberg or Delta Lake format are not presented, but it is assumed that they support upsert semantic.* 
 
-The Iceberg or Delta Lake tables are in Apache Parquet format and directly queried by the query engine. Each pipeline is writing records in table format, with an object storage like S3 bucket. Tables are partitioned within folders. 
+Iceberg or Delta Lake tables, stored in Apache Parquet format, are directly queried by the query engine. Each pipeline writes records in table format to object storage, such as an S3 bucket, with tables partitioned within folders.
 
-As an example, the goal is to modify the purple statements and only redeploy them as part of the blue green deployment. The general strategy for query evolution is to replace the existing statement and the corresponding tables it maintains with a new statement and new tables. A simple approach is to use a release branch, for a short time period, modify the purple Flink statements, perform the deployments to dev, test, staging then production. Validated statements can be merged to `main` branch. 
+
+For example, the goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short period, modify the purple Flink statements, and then deploy them to development, testing, staging, and production environments. Once validated, these statements can be merged into the `main` branch.
 
 <figure markdown="span">
 ![](./images/bg_2_2_branch.drawio.png)
 <caption>**Figure 3**:Branching for Flink Statement updates</caption>
 </figure>
 
-Once unit tested, the pipeline deployment tool can deploy all the impacted Flink statements without impacting existing green statements. The figure below illustrates change to the internal logic to one intermediate statement, and fact creation statements. It can apply to dimension creation statement too. 
+Once unit tested, the pipeline deployment tool can deploy all impacted Flink statements without affecting existing "green" statements. The figure below illustrates changes to the internal logic of one intermediate statement and the fact creation statements. This approach can also be applied to dimension creation statements.
 
 <figure markdown="span">
 ![](./images/bg_2_3.drawio.png)
@@ -83,7 +92,7 @@ An other example, related to schema evolution occurs when the transactional data
 <caption>**Figure 5**: Transactional data change: schema evolution</caption>
 </figure>
 
-The CDC topic will have records with old and new schemas. The first Flink statement, used to create source topic, using deduplication logic, filtering, primary key re-definition, field encryption... is impacted as it needs to process new columns, but is able to process schema in previous version with the new version. As this statement is creating new records and will reload from the earliest offset then it create a version 2 of its output table and therefore all its descendants will be impacted.
+The CDC topic will contain records with both old and new schemas. The initial Flink statement, responsible for creating the source topic, is affected as it must now process new columns. This statement, which handles deduplication, filtering, primary key redefinition, and field encryption, is designed to process both the previous and new schema versions. Since this statement creates new records and reloads from the earliest offset, it will generate a version 2 of its output table, consequently impacting all its downstream dependencies.
 
 ???- info "Shift left commands to support the b/g deployment"
     * get config.yaml files for each target environment
@@ -101,10 +110,13 @@ The CDC topic will have records with old and new schemas. The first Flink statem
 1. Create a branch in git to support statement modification
 1. Change intermediate statements to add a simple field or computation. It should create a v2.
 1. Deploy from this branch to the target Confluent Cloud environment using `shift_left pipeline deploy --table-list-file-name statements-to-deploy.txt`
-
-    * Test parallel deployment of new version
-    * Verify zero-downtime deployment
-    * Test rollback procedures
-    * Validate state migration between versions
+1. Verify no duplicate records are created from the new deployment in the output tables
 
 ### End to end update (Fig. 5)
+
+This use case addresses schema modification from the source transactional database.
+
+1. Change source SQL table by adding a column with default value, and with real value
+1. Verify the CDC inject new records 
+
+### Test rollback procedures
