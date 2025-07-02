@@ -1,16 +1,16 @@
 foundations:
-- table_name: src_x
-  ddl_for_test: ./tests/ddl_src_x.sql
 - table_name: src_p2_a
   ddl_for_test: ./tests/ddl_src_p2_a.sql
+- table_name: src_x
+  ddl_for_test: ./tests/ddl_src_x.sql
 test_suite:
 - name: test_a_1
   inputs:
-  - table_name: src_x
-    file_name: ./tests/insert_src_x_1.sql
-    file_type: sql
   - table_name: src_p2_a
     file_name: ./tests/insert_src_p2_a_1.sql
+    file_type: sql
+  - table_name: src_x
+    file_name: ./tests/insert_src_x_1.sql
     file_type: sql
   outputs:
   - table_name: a
@@ -18,11 +18,11 @@ test_suite:
     file_type: sql
 - name: test_a_2
   inputs:
-  - table_name: src_x
-    file_name: ./tests/insert_src_x_2.csv
-    file_type: csv
   - table_name: src_p2_a
     file_name: ./tests/insert_src_p2_a_2.csv
+    file_type: csv
+  - table_name: src_x
+    file_name: ./tests/insert_src_x_2.csv
     file_type: csv
   outputs:
   - table_name: a

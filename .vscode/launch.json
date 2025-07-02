@@ -14,7 +14,7 @@
             "cwd": "${fileDirname}",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src"
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
@@ -26,9 +26,9 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage-flink.yaml",
+                "CONFIG_FILE": "/Users/jerome/.shift_left/config-dev.yaml",
                 "PIPELINES": "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines",
-                "PYTHONPATH": "${workspaceFolder}/src/shift_left/src"
+                "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
             },
              "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
@@ -41,7 +41,7 @@
             "cwd": "${fileDirname}",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src"
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },

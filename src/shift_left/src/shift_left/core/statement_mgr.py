@@ -234,7 +234,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                     break
             _save_statement_list(_statement_list_cache)
             stop_time = time.perf_counter()
-            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements in {stop_time - start_time} seconds")
+            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
     return _statement_list_cache.statement_list
 
 
@@ -324,7 +324,7 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
             while result.status.phase not in ["COMPLETED", "FAILED"]:
                 time.sleep(1)
                 result = get_statement(drop_statement_name)
-                logger.debug(f"Drop table status is: {result.status.phase}")
+                logger.info(f"Drop table {table_name} status is: {result.status.phase}")
             if result.status.phase == "FAILED":
                 raise Exception(f"Drop table {table_name} failed")
     except Exception as e:
@@ -351,6 +351,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
     """
     Map the statement info, result of the REST call to the StatementInfo model
     """
+
     if info and isinstance(info, dict):
         if 'properties' in info.get('spec') and info.get('spec').get('properties'):
             catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
@@ -367,7 +368,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
                                     created_at= info.get('metadata').get('created_at', 'UNKNOWN'),
                                     sql_catalog=catalog,
                                     sql_database=database)
-    elif info and isinstance(info, Statement):
+    elif info and isinstance(info, Statement) and info.spec:
         catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
         database = info.spec.properties.get('sql.current-database','UNKNOWN')
         return StatementInfo(name=info.name,

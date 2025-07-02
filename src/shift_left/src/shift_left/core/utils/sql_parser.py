@@ -47,7 +47,8 @@ class SQLparser:
     def extract_table_references(self, sql_content) -> Set[str]:
         """
         Extract the table reference from the sql_content, using different reg expressions to
-        do not consider CTE name and kafka topic name. To extract kafka topic name, it remove name with mulitple '.' in it.
+        do not consider CTE name and kafka topic name. To extract kafka topic name, it removes 
+        name with mulitple '.' in it.
         """
         sql_content=self._normalize_sql(sql_content)
         #regex = r'{{\s*ref\([\'"]([^\']+)[\'"]\)\s*}}'

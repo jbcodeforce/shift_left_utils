@@ -44,10 +44,14 @@ app:
   src_table_name_prefix: src_
   logging: INFO
   products: ["p1", "p2", "p3"]
+  accepted_common_products: ['common', 'seeds']
   cache_ttl: 120 # in seconds
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
   translator_to_flink_sql_agent: shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent
   dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
   compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
+  data_limit_where_condition : rf"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})"
+  data_limit_replace_from_reg_ex: r"\s*select\s+\*\s+from\s+final\s*;?"
+  data_limit_table_type: source
   data_limit_column_name_to_select_from: tenant_id
  

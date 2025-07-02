@@ -36,7 +36,7 @@ Shift Left Utils is a comprehensive pipeline management system designed to handl
 ### 1. Smart Deployment
 - **Execution Planning**: Automatically determines the correct order of statement execution
 - **Dependency Resolution**: Handles complex parent-child relationships between tables
-- **State Management**: Properly manages stateful operations and their dependencies
+- **State Management**: Properly manages stateful flink statement redeployment and their descendant dependencies
 
 ### 2. Validation and Compliance
 - **Naming Conventions**: Enforces consistent naming patterns for tables and files
@@ -60,42 +60,19 @@ Shift Left Utils is a comprehensive pipeline management system designed to handl
 1. Pipeline Definition → Execution Plan Generation
 2. Execution Plan → Statement Deployment
 3. Statement Deployment → Table Creation/Modification
-4. Table Operations → Pipeline Validation
+4. Table Operations → Pipeline Metrics
 
 ## Usage Patterns
 
-### 1. Pipeline Deployment
-```python
-deploy_pipeline_from_table(
-    table_name: str,
-    inventory_path: str,
-    compute_pool_id: str,
-    dml_only: bool = False,
-    force_children: bool = False
-)
-```
+See [Recipes chapter](./docs/recipes.md)
 
-### 2. Pipeline Undeployment
-```python
-full_pipeline_undeploy_from_table(
-    table_name: str,
-    inventory_path: str
-)
-```
-
-### 3. Table Management
-```python
-create_table(table_name: str, ddl_content: str, compute_pool_id: Optional[str] = None)
-drop_table(table_name: str, compute_pool_id: Optional[str] = None)
-get_table_structure(table_name: str, compute_pool_id: Optional[str] = None)
-```
 
 ## Future Considerations
 
 ### 1. Enhanced Monitoring
-- Add comprehensive monitoring of pipeline execution
+- [x] Add comprehensive monitoring of pipeline execution
 - Implement alerting for pipeline failures
-- Add performance metrics collection
+- [x] Add performance metrics collection
 
 ### 2. Advanced Features
 - Support for dynamic pipeline modification
@@ -124,5 +101,3 @@ get_table_structure(table_name: str, compute_pool_id: Optional[str] = None)
    - Monitor resource consumption
    - Plan for scalability
 
-## Conclusion
-Shift Left Utils provides a robust framework for managing Flink SQL pipelines, with a focus on reliability, maintainability, and scalability. The system's architecture allows for complex pipeline management while maintaining simplicity in deployment and operation. 

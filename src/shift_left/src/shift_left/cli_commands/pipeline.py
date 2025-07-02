@@ -76,6 +76,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     Generate a report showing the static pipeline hierarchy for a given table using its pipeline_definition.json
     """
     console = Console()
+    table_name = table_name.lower()
     print(f"Generating pipeline report for table {table_name}")
     try:
         parent_only = not children_too
@@ -165,7 +166,7 @@ def deploy(
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
-        sequential: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in sequential.")
+        parallel: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
@@ -182,7 +183,7 @@ def deploy(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
-        sequential=sequential,
+        parallel=parallel,
         execute_plan=True)
     
     print(f"#### Pipeline deployed ####")
@@ -239,6 +240,7 @@ def report_running_statements(
                                                                                            inventory_path,
                                                                                            from_date)
         elif product_name:
+            product_name = product_name.lower()
             results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, 
                                                                                   inventory_path, 
                                                                                   from_date)
@@ -269,8 +271,10 @@ def undeploy(
         print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     elif product_name:
+        product_name = product_name.lower()
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
+    print(result)
 
 
 @app.command()
@@ -278,7 +282,8 @@ def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare t
             compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
        ):
     """
-    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. 
+    For deployment by adding the necessary comments and metadata.
     """
     print(f"Prepare tables using sql file {sql_file_name}")
     deployment_mgr.prepare_tables_from_sql_file(sql_file_name, compute_pool_id)
@@ -297,12 +302,13 @@ def _build_deploy_pipeline(
         may_start_descendants: bool, 
         force_ancestors: bool,
         cross_product_deployment: bool,
-        sequential: bool = False,
+        parallel: bool = False,
         execute_plan: bool=False):
     summary="Nothing done"
     try:
         report=None
         if table_name:
+            table_name = table_name.lower()
             print(f"Build an execution plan for table {table_name}")
             summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
@@ -311,7 +317,7 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,
-                                                        sequential=sequential,
+                                                        sequential=not parallel,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
@@ -321,6 +327,7 @@ def _build_deploy_pipeline(
             print(f"\n" + "-"*30 + "\n")
 
         elif product_name:
+            product_name = product_name.lower()
             print(f"Build an execution plan for product {product_name}")
             summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
                                                         inventory_path=inventory_path,
@@ -329,7 +336,7 @@ def _build_deploy_pipeline(
                                                         may_start_descendants=may_start_descendants,
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,  
-                                                        sequential=sequential,
+                                                        sequential=not parallel,
                                                         execute_plan=execute_plan)
             print(f"Execution plan built and persisted for product {product_name}")
 
@@ -342,7 +349,7 @@ def _build_deploy_pipeline(
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
-                                                                    sequential=sequential,
+                                                                    sequential=not parallel,
                                                                     execute_plan=execute_plan)
         elif table_list_file_name:
             print(f"Build an execution plan for tables in {table_list_file_name}")
@@ -353,7 +360,7 @@ def _build_deploy_pipeline(
                                                                     may_start_descendants=may_start_descendants,
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
-                                                                    sequential=sequential,
+                                                                    sequential=not parallel,
                                                                     execute_plan=execute_plan)
         else:
             print(f"[red]Error: either table-name, product-name, dir or table-list-file-name must be provided[/red]")

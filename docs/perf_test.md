@@ -75,29 +75,7 @@ As an example, we will take a classical shift left processing architecture with 
 * Number of message per second processed per Flink statement
 * Time stamp from source to destination for a given transaction
 
-### 4. Blue/Green Deployment Testing
-
-The classical blue-green deployment for ETL jobs change everything and once the batch is done, the consumer of the data product, switch to new content. The following figure illustrates the approach at a high level:
-
-<figure markdown="span">
-![](./images/bg_current.drawio.png)
-</figure>
-
-While in real-time processing the concept of blue-green deployment should be very limited and in the context of a pipeline, as presented in [the pipeline management chapter](./pipeline_mgr.md)
-
-<figure markdown="span">
-![](./images/bg.drawio.png)
-</figure>
-
-* Deployment Strategy
-
-    * Test parallel deployment of new version
-    * Verify zero-downtime deployment
-    * Test rollback procedures
-    * Validate state migration between versions
-
-
-### 5. Pipeline Management Testing
+### 4. Pipeline Management Testing
 
 * Monitoring and Alerting
 
@@ -113,7 +91,7 @@ While in real-time processing the concept of blue-green deployment should be ver
     * Test job scaling operations
     * Validate backup and recovery procedures
 
-### 6. Confluent Cloud Specific Testing
+### 5. Confluent Cloud Specific Testing
 
 * Cloud Integration
 
@@ -129,7 +107,7 @@ While in real-time processing the concept of blue-green deployment should be ver
     * Evaluate cost-effective configurations
     * Test resource cleanup procedures
 
-### 7. Security Testing
+### 6. Security Testing
 
 * Authentication and Authorization
 
@@ -138,7 +116,7 @@ While in real-time processing the concept of blue-green deployment should be ver
     * Test security configurations
     * Validate audit logging
 
-### 8. Disaster Recovery Testing
+### 7. Disaster Recovery Testing
 
 * Failure Scenarios
 

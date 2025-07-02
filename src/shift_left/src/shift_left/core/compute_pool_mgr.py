@@ -52,7 +52,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
             _save_compute_pool_list(_compute_pool_list)
             logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
             stop_time = time.perf_counter()
-            print(f"Compute pool list has {len(_compute_pool_list.pools)} pools in {stop_time - start_time} seconds")
+            print(f"Compute pool list has {len(_compute_pool_list.pools)} pools in {int(stop_time - start_time)} seconds")
     return _compute_pool_list
 
 

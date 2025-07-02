@@ -98,19 +98,21 @@ def _process_results(statement_result: StatementResult, result: int) -> int:
         result = previous_result
     return result
 
-def get_pending_records(statement_name: str, compute_pool_id: str, from_date: str = None) -> int:
+def get_pending_records(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
     """
     Get the pending records for a statement using the REST API metrics endpoint.
     Metric data points are typically available for query in the API within 5 minutes of their origination at the source.
     """
-    return _get_int_metric(statement_name, compute_pool_id, "io.confluent.flink/pending_records", from_date)
+    return _get_int_metric(compute_pool_ids, "io.confluent.flink/pending_records", from_date)
 
 
-def get_num_records_out(statement_name: str, compute_pool_id: str, from_date: str = None) -> int:
-    return _get_int_metric(statement_name, compute_pool_id, "io.confluent.flink/num_records_out", from_date)
+def get_num_records_out(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+    return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_out", from_date)
     
+def get_num_records_in(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+    return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_in", from_date)
 
-def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str, from_date: str = None) -> int:
+def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: str = None) -> dict[str,int]:
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
@@ -121,38 +123,42 @@ def _get_int_metric(statement_name: str, compute_pool_id: str, metric_name: str,
         from_date_local = pytz.timezone(config['app']['timezone']).localize(datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S"))
         # Convert to UTC-1
         now = from_date_local.astimezone(pytz.UTC)
-        #now=datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
     else:
-        #now = datetime.now(pytz.UTC)
         now= datetime.now()
     now_minus_60_minutes = now - timedelta(minutes=60)
     interval = f"{now_minus_60_minutes.strftime('%Y-%m-%dT%H:%M:%S')}/{now.strftime('%Y-%m-%dT%H:%M:%S')}"
+    filters = []
+    if compute_pool_ids and len(compute_pool_ids) > 0:
+        for cpoolid in compute_pool_ids:
+            filters.append({"field":"resource.compute_pool.id","op":"EQ","value": cpoolid})
+        group_by = ["resource.compute_pool.id","resource.flink_statement.name"]
+    else:
+        raise Exception("No compute pool ids provided")
     query= {"aggregations":[
             {"metric": metric_name}
         ],
-          "filter": {"op":"AND",
-                     "filters":[{"field":"resource.compute_pool.id","op":"EQ","value": compute_pool_id},
-                                {"field":"resource.flink_statement.name","op":"EQ","value": statement_name}
-                                ]},
+          "filter": {"op":"OR",
+                     "filters": filters},
                     "granularity":"PT1M",
                     "format": "GROUPED",
-                    "grouped_by": ["resource.compute_pool.id", "resource.flink_statement.name"],
+                    "group_by": group_by,
                     "intervals":[interval],
                     "limit":1000}
     try:
         logger.info(f"query: {json.dumps(query)}")
         metrics = ccloud_client.get_metrics(dataset, qtype, json.dumps(query))
-        logger.info(f"{statement_name} metrics: {metrics}")
-        sum= 0
+        logger.debug(f"-> metrics: {metrics}")
+        results = {}
         for metric in metrics.get("data", []):
+            sum= 0
             if "points" in metric:
                 for point in metric.get("points", []):
                     sum += point["value"]
-                if len(metric.get("points", [])) > 0:
-                    sum = round(sum/len(metric.get("points")))
             else:
                 sum += metric.get("value", 0)
-        return int(sum)
+            if metric.get("resource.flink_statement.name"):
+                results[metric.get("resource.flink_statement.name")] = int(sum)
+        return results
     except Exception as e:
-        logger.error(f"Error getting pending records for {statement_name}: {e}")
-        return 0
+        logger.error(f"Error getting {metric_name}: {e}")
+        return {}

@@ -2,45 +2,35 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import os
 import pathlib
-from datetime import datetime
-import uuid
-from typing import Tuple
+
 
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 import shift_left.core.pipeline_mgr as pm
-from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
-from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
-import shift_left.core.utils.report_mgr as report_mgr
 from shift_left.core.models.flink_statement_model import (
     Statement, 
     StatementInfo,
     Status
 )
-from shift_left.core.deployment_mgr import (
-    FlinkStatementNode,
-    FlinkStatementExecutionPlan
-)
+
 from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo,TableReport
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
+from ut.core.BaseUT import BaseUT
 
-class TestExecutionPlan(unittest.TestCase):
+class TestExecutionPlan(BaseUT):
     """
     validate the different scenario to build the execution plan.
     See the topology of flink statements https://github.com/jbcodeforce/shift_left_utils/blob/main/docs/images/flink_pipeline_for_test.drawio.png 
     """
     
     TEST_COMPUTE_POOL_ID_1 = "lfcp-121"
-    TEST_COMPUTE_POOL_ID_2 = "lfcp-122"
-    TEST_COMPUTE_POOL_ID_3 = "lfcp-123"
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -49,50 +39,6 @@ class TestExecutionPlan(unittest.TestCase):
         pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
         cls.inventory_path = os.getenv("PIPELINES")
 
-    # Following set of methods are used to create reusable mock objects and functions
-    def _create_mock_get_statement_info(
-        self, 
-        name: str = "statement_name",
-        status_phase: str = "UNKNOWN",
-        compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
-    ) -> StatementInfo:
-        """Mock the call to get statement info"""
-        return StatementInfo(
-            name=name,
-            status_phase=status_phase,
-            compute_pool_id=compute_pool_id
-        )
-    
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
-        """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
-        node.compute_pool_id = compute_pool_id
-        node.compute_pool_name = "test-pool"
-        return node
-    
-    def _create_mock_compute_pool_list(self, env_id: str = "test-env-123", region: str = "test-region-123") -> ComputePoolList:
-        """Create a mock ComputePoolList object."""
-        pool_1 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_1,
-            name="test-pool-1",
-            env_id=env_id,
-            max_cfu=100,
-            current_cfu=50
-        )
-        pool_2 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_2,
-            name="test-pool-2",
-            env_id=env_id,
-            max_cfu=100,
-            current_cfu=50
-        )
-        pool_3 = ComputePoolInfo(
-            id=self.TEST_COMPUTE_POOL_ID_3,
-            name="dev-p1-fct-order",
-            env_id=env_id,
-            max_cfu=10,
-            current_cfu=0
-        )
-        return ComputePoolList(pools=[pool_1, pool_2, pool_3])
     
     # ------------ TESTS ------------
     
@@ -564,6 +510,9 @@ class TestExecutionPlan(unittest.TestCase):
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
+    # ---- --dir options to build execution plan using directory
+    # validate only needed sources or intermediates are restarted
+    # enforced-ancestors T/F and may-start-descendants T/F
 
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
@@ -571,7 +520,7 @@ class TestExecutionPlan(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    def test_deploy_pipeline_for_non_running_sources(self, 
+    def test_deploy_pipeline_for_non_running_sources_with_dir(self, 
                                         mock_get_status,
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
@@ -583,7 +532,7 @@ class TestExecutionPlan(unittest.TestCase):
          taking into account the running statements.
         should restart only the non running src_ tables
         """
-        print("test_deploy_pipeline_for_non_running_sources should get all tables created for p2")
+        print("test_deploy_pipeline_for_non_running_sources_with_dir should get all source tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
@@ -612,15 +561,19 @@ class TestExecutionPlan(unittest.TestCase):
             if table.table_name in ["src_p2_a", "src_b"]:
                 assert table.to_restart is True
             else:
+                # all src_ tables that are running should not be restarted. 
+                # non src_ tables should not be restarted.
                 assert table.to_restart is False
 
-    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+
+  
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    def test_deploy_pipeline_for_all_sources(self, 
+    def test_deploy_pipeline_for_all_sources_using_dir(self, 
                                         mock_get_status,
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
@@ -629,9 +582,9 @@ class TestExecutionPlan(unittest.TestCase):
                                         mock_get_num_records_out) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
-        As it forces to restart
+        with forces to restart
         """
-        print("test_deploy_pipeline_for_all_sources should get all tables created for p2")
+        print("test_deploy_pipeline_for_all_sources_using_dir should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
@@ -660,13 +613,14 @@ class TestExecutionPlan(unittest.TestCase):
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
+
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
-    def test_deploy_pipeline_for_all_sources_and_children(self, 
+    def test_deploy_pipeline_for_all_sources_and_children_using_dir(self, 
                                         mock_get_status,
                                         mock_get_compute_pool_list,
                                         mock_assign_compute_pool_id,
@@ -677,12 +631,13 @@ class TestExecutionPlan(unittest.TestCase):
         Test deploying pipeline from a directory, like all sources, as may_start_descendants is true
         it should restart all tables and children of stateful tables
         """
-        print("test_deploy_pipeline_for_all_sources should get all tables created for p2")
+        print("test_deploy_pipeline_for_all_sources_and_children_using_dir should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
             if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
-                return self._create_mock_get_statement_info(status_phase="RUNNING")
+                return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
-                return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
+                
+                return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN") 
         
         mock_get_status.side_effect = mock_statement
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -705,7 +660,148 @@ class TestExecutionPlan(unittest.TestCase):
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
             assert table.to_restart is True
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    def test_deploy_intermediate_with_children_using_dir(self, 
+                                        mock_get_status,
+                                        mock_get_compute_pool_list,
+                                        mock_assign_compute_pool_id,
+                                        mock_get_retention_size,
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
+        """
+        Test deploying pipeline from a directory, like all sources, as may_start_descendants is true
+        it should restart all tables and children of stateful tables
+        """
+        print("test_deploy_intermediate_with_children_using_dir should get all children of z")
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in [ "dev-p2-dml-src-x", "dev-p2-dml-src-y", "dev-p2-dml-src-p2-a", "dev-p2-dml-src-b", "dev-p2-dml-b"]:  
+                return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
+            else:
+                
+                return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN") 
+        
+        mock_get_status.side_effect = mock_statement
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_retention_size.return_value = 100000
+        mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
+        summary, report = dm.build_and_deploy_all_from_directory(
+            directory=self.inventory_path + "/intermediates/p2",
+            inventory_path=self.inventory_path,
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
+            execute_plan=False,
+            may_start_descendants=True,
+            force_ancestors=False
+        )
+        print(f"{summary}\n")
+        assert len(report.tables) == 13
+        print("Table\t\tStatement\t\tTo Restart")
+        for table in report.tables:
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            if table.table_name not in ["src_p2_a", "src_b", "src_x", "src_y", "b"]:
+                assert table.to_restart is True
+            else:
+                assert table.to_restart is False
 
+    
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    def test_deploy_pipeline_for_all_sources_using_dir(self, 
+                                        mock_get_status,
+                                        mock_get_compute_pool_list,
+                                        mock_assign_compute_pool_id,
+                                        mock_get_retention_size,
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
+        """
+        Test deploying pipeline from a directory, like all sources,
+        with forces to restart
+        """
+        print("test_deploy_pipeline_for_all_sources_using_dir should get all tables created for p2")
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+            else:
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
+        
+        mock_get_status.side_effect = mock_statement
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_retention_size.return_value = 100000
+        mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
+
+        summary, report = dm.build_and_deploy_all_from_directory(
+            directory=self.inventory_path + "/sources/p2",
+            inventory_path=self.inventory_path,
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
+            execute_plan=False,
+            may_start_descendants=False,
+            force_ancestors=True
+        )
+        print(f"{summary}\n")
+        assert len(report.tables) == 4
+        print("Table\t\tStatement\t\tTo Restart")
+        for table in report.tables:
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            assert table.to_restart is True
+    
+    
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    def test_deploy_pipeline_for_facts_using_dir(self, 
+                                        mock_get_status,
+                                        mock_get_compute_pool_list,
+                                        mock_assign_compute_pool_id,
+                                        mock_get_retention_size,
+                                        mock_get_pending_records,
+                                        mock_get_num_records_out) -> None:
+        """
+        Test deploying pipeline from a directory, like all sources,
+        with forces to restart
+        """
+        print("test_deploy_pipeline_for_facts_using_dir should get all tables restarted for p2")
+        def mock_statement(statement_name: str) -> StatementInfo:
+            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+                return self._create_mock_get_statement_info(status_phase="RUNNING")
+            else:
+                return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
+        
+        mock_get_status.side_effect = mock_statement
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_retention_size.return_value = 100000
+        mock_get_pending_records.return_value = 10000
+        mock_get_num_records_out.return_value = 100000
+
+        summary, report = dm.build_and_deploy_all_from_directory(
+            directory=self.inventory_path + "/facts/p2",
+            inventory_path=self.inventory_path,
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
+            execute_plan=False,
+            may_start_descendants=False,
+            force_ancestors=True
+        )
+        print(f"{summary}\n")
+        assert len(report.tables) == 12 # a and src_a are not started.
+        print("Table\t\tStatement\t\tTo Restart")
+        for table in report.tables:
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            assert table.to_restart is True
 
 if __name__ == '__main__':
     unittest.main()

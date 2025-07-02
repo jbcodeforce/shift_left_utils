@@ -9,6 +9,7 @@ import pathlib
 from datetime import datetime
 import json
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["PIPELINES"] =  str(pathlib.Path(__file__).parent.parent.parent /  "data/flink-project/pipelines")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import (
     Statement, 
@@ -22,20 +23,18 @@ from shift_left.core.models.flink_statement_model import (
     OpRow, 
     Metadata)
 import  shift_left.core.statement_mgr as statement_mgr 
+from ut.core.BaseUT import BaseUT
 
-class TestStatementManager(unittest.TestCase):
-    
-    def setUp(self):
-        """Set up test fixtures before each test method."""
-        # Remove cached statement list file if it exists
-        if os.path.exists(statement_mgr.STATEMENT_LIST_FILE):
-            os.remove(statement_mgr.STATEMENT_LIST_FILE)
-        
+class TestStatementManager(BaseUT):
+    """
+    Verify basic statement manager functionality
+    """
+    def setUp(self):        
         # Reset any cached data in the statement manager
         statement_mgr._statement_list_cache = None
         statement_mgr._statement_compute_pool_map = None
         
-    _statement_list = {
+    _statement_list = { # mockup of the statement list
         'dev-ddl-src-table-1': StatementInfo(
                 name="dev-ddl-src-table-1",
                 status_phase="COMPLETED",
@@ -59,15 +58,6 @@ class TestStatementManager(unittest.TestCase):
                 sql_database="default"
             ) 
     }
-
-    def _create_mock_statement(
-        self, 
-        name: str = "statement_name",
-        status_phase: str = "UNKNOWN"
-    ) -> Statement:
-        """Create a mock Statement object."""
-        status = Status(phase=status_phase)
-        return Statement(name=name, status=status)
 
 
     @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
@@ -120,7 +110,7 @@ class TestStatementManager(unittest.TestCase):
             }
         }
 
-        # Setup mock client
+        # Setup mock client: 1/ instance of the client, 2/ mock the make_request and build_flink_url_and_auth_header methods
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.build_flink_url_and_auth_header.return_value = "https://test-url"
@@ -151,8 +141,13 @@ class TestStatementManager(unittest.TestCase):
         mock_client_instance.make_request.assert_called_once()
         mock_client_instance.build_flink_url_and_auth_header.assert_called_once()
      
+
+
     @patch('shift_left.core.statement_mgr.get_statement_list')
     def test_get_statement_status(self, mock_get_statement_list):
+        """
+        Test the get_statement_status_with_cache method
+        """
         mock_get_statement_list.return_value = {
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
             "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
@@ -194,7 +189,6 @@ class TestStatementManager(unittest.TestCase):
         }
         mock_client.make_request.return_value = mock_response
 
-        # Execute test
         result = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_content)
 
         # Verify results
@@ -226,6 +220,8 @@ class TestStatementManager(unittest.TestCase):
         MockConfluentCloudClient.assert_called_once()
         mock_client_instance.delete_flink_statement.assert_called_once_with(sname)
        
+
+
     def test_get_sql_content_transformer(self):
         sql_in="""
         CREATE TABLE table_1 (
@@ -249,6 +245,8 @@ class TestStatementManager(unittest.TestCase):
         print(sql_out)
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
         
+
+
     @patch('shift_left.core.statement_mgr.get_statement_results')
     @patch('shift_left.core.statement_mgr.get_statement_list')
     @patch('shift_left.core.statement_mgr.post_flink_statement')
@@ -304,8 +302,6 @@ class TestStatementManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = mock_post_statement
         mock_get_statement_results.side_effect = mock_statement_results
 
-
-        
         result = statement_mgr.show_flink_table_structure(_table_name)
         
         self.assertIsNotNone(result)
@@ -385,28 +381,12 @@ class TestStatementManager(unittest.TestCase):
         def mock_post_statement(compute_pool_id, statement_name, sql_content) -> Statement:
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
-            status = Status(
-                phase= "COMPLETED", 
-                detail= ""
-            )
-            metadata = Metadata(
-                created_at="2025-04-20T10:15:02.853006",
-                labels={},
-                resource_version="1",
-                self="https://test-url",
-                uid="test-uid",
-                updated_at="2025-04-20T10:15:02.853006"
-            )
-            spec = Spec(
-                compute_pool_id=compute_pool_id,
-                principal="principal_sa",
-                statement=sql_content,
-                properties={"sql.current-catalog":  config['flink']['catalog_name'], 
-                            "sql.current-database":  config['flink']['database_name']},
-                stopped=False
-            )
-            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
-        
+            statement= self._create_mock_statement(name=statement_name, 
+                                               status_phase="COMPLETED")
+            statement.spec.compute_pool_id = compute_pool_id
+            statement.spec.statement = sql_content
+            return statement
+           
         mock_post_flink_statement.side_effect = mock_post_statement
         mock_get_statement_list.return_value = self._statement_list
 
