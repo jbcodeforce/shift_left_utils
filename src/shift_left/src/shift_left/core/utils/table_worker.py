@@ -169,6 +169,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 #"replace": rf".\1{topic_prefix}.{env}.\2-{env}.\3"
             }
         },
+        "cbt": {
+            "adapt": {
+                "search": r"^(.*?)(ap-.*?)-(dev)\.",
+                "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
+            }
+        },
         "dev": {
             "adapt": {
                 "search": r"\s*select\s+\*\s+from\s+final\s*;?",
@@ -188,6 +194,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "search": rf"(.flink)-(dev)",
                 # Replaces .flink-dev with .flink-{env} in schema context
                 # For example: .flink-dev -> .flink-stage in staging environment
+                "replace": rf"\1-{env}"
+            }
+        },
+        "cbt": {
+            "schema-context": {
+                "search": rf"(.flink)-(dev)",
                 "replace": rf"\1-{env}"
             }
         },
