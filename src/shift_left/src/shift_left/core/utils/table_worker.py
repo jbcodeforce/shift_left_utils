@@ -173,6 +173,10 @@ class ReplaceEnvInSqlContent(TableWorker):
             "adapt": {
                 "search": r"^(.*?)(ap-.*?)-(dev)\.",
                 "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
+            },
+            "clone": {
+                "search": r"(clone\.)(.*?)(\.[\w.]+)",
+                "replace": rf"\1{env}\3"
             }
         },
         "dev": {
