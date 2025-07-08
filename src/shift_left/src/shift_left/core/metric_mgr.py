@@ -124,7 +124,7 @@ def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: st
         # Convert to UTC-1
         now = from_date_local.astimezone(pytz.UTC)
     else:
-        now= datetime.now()
+        now= datetime.now(pytz.UTC)
     now_minus_60_minutes = now - timedelta(minutes=60)
     interval = f"{now_minus_60_minutes.strftime('%Y-%m-%dT%H:%M:%S')}/{now.strftime('%Y-%m-%dT%H:%M:%S')}"
     filters = []
@@ -150,14 +150,15 @@ def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: st
         logger.debug(f"-> metrics: {metrics}")
         results = {}
         for metric in metrics.get("data", []):
-            sum= 0
+            # Changing the variable name from sum to metrics_sum
+            metrics_sum= 0
             if "points" in metric:
                 for point in metric.get("points", []):
-                    sum += point["value"]
+                    metrics_sum += point["value"]
             else:
-                sum += metric.get("value", 0)
+                metrics_sum += metric.get("value", 0)
             if metric.get("resource.flink_statement.name"):
-                results[metric.get("resource.flink_statement.name")] = int(sum)
+                results[metric.get("resource.flink_statement.name")] = int(metrics_sum)
         return results
     except Exception as e:
         logger.error(f"Error getting {metric_name}: {e}")
