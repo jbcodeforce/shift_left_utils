@@ -17,3 +17,4 @@ set_test_env
 set_stage_env
 **to_investigate.md
 **/data/ksql-project/
+.idea/
