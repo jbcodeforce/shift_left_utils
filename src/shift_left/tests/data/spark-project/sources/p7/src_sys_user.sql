@@ -1,4 +1,4 @@
-with sys_user as (select * from {{ source('p7','sys_user') }})
+with sys_user as (select * from {{ source('p7','cdc.users_db.sys_user') }})
 
 ,final as (
 

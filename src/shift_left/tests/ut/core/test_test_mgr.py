@@ -4,9 +4,9 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 import pathlib
 import unittest
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, ANY
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.models.flink_statement_model import (
@@ -14,11 +14,10 @@ from shift_left.core.models.flink_statement_model import (
     StatementResult, 
     Data, 
     OpRow, 
-    StatementError,
-    StatementInfo,
-    ErrorData)
+    StatementInfo)
 import shift_left.core.test_mgr as test_mgr
 from shift_left.core.utils.file_search import build_inventory
+from shift_left.core.utils.app_config import reset_all_caches
 from shift_left.core.test_mgr import (
     SLTestDefinition,
     SLTestCase,
@@ -32,10 +31,12 @@ class TestTestManager(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        cls.data_dir = pathlib.Path(__file__).parent.parent / "data"
+        cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
+        reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
     
     def setUp(self):
+
         self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
     
     # ---- Mock functions to be used in tests to avoid calling remote services ----

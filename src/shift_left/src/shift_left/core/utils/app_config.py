@@ -12,7 +12,7 @@ import string
 
 _config = None
 
-def generate_session_id() -> str:
+def generate_session_id() -> tuple[str, str]:
     """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
     date_str = datetime.datetime.now().strftime("%m-%d-%y-%H-%M-%S")
     random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
@@ -146,7 +146,7 @@ def _validate_config(config: dict) -> None:
     exit()
 
 @lru_cache
-def get_config() -> dict[str, str] | None:
+def get_config() -> dict | None:
   """_summary_
   reads the client configuration from config.yaml
   Args:
@@ -164,4 +164,51 @@ def get_config() -> dict[str, str] | None:
   return _config
 
 
-logger.setLevel(get_config()["app"]["logging"])
+def reset_config_cache() -> None:
+  """Reset the configuration cache for testing purposes."""
+  global _config
+  _config = None
+
+
+def reset_all_caches() -> None:
+  """Reset all module-level caches for testing purposes."""
+  reset_config_cache()
+  
+  # Reset statement manager caches
+  try:
+    import shift_left.core.statement_mgr as statement_mgr
+    statement_mgr._statement_list_cache = None
+    statement_mgr._runner_class = None
+  except (ImportError, AttributeError):
+    pass
+  
+  # Reset compute pool manager caches
+  try:
+    import shift_left.core.compute_pool_mgr as compute_pool_mgr
+    compute_pool_mgr._compute_pool_list = None
+    compute_pool_mgr._compute_pool_name_modifier = None
+  except (ImportError, AttributeError):
+    pass
+  
+  # Reset file search caches
+  try:
+    import shift_left.core.utils.file_search as file_search
+    file_search._statement_name_modifier = None
+  except (ImportError, AttributeError):
+    pass
+  
+  # Reset translator caches
+  try:
+    import shift_left.core.utils.translator_to_flink_sql as translator
+    translator._agent_class = None
+  except (ImportError, AttributeError):
+    pass
+
+
+try:
+    config = get_config()
+    if config and config.get("app") and config["app"].get("logging"):
+        logger.setLevel(config["app"]["logging"])
+except Exception:
+    # If config loading fails during module import, use default level
+    logger.setLevel(logging.INFO)

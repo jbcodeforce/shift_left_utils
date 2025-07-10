@@ -226,14 +226,16 @@ def get_statement_list() -> dict[str, StatementInfo]:
                     for info in resp.get('data'):
                         statement_info = map_to_statement_info(info)
                         _statement_list_cache.statement_list[info['name']] = statement_info
-                if "metadata" in resp and "next" in resp["metadata"]:
+                if resp and "metadata" in resp and "next" in resp["metadata"]:
                     next_page_token = resp["metadata"]["next"]
                     if not next_page_token:
                         break
                 else:
+                    logger.warning(f"resp is not valid: {resp}")
                     break
             _save_statement_list(_statement_list_cache)
             stop_time = time.perf_counter()
+            logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
             print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
     return _statement_list_cache.statement_list
 

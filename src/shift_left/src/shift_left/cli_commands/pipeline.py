@@ -298,10 +298,10 @@ def _build_deploy_pipeline(
         table_list_file_name: str,
         inventory_path: str, 
         compute_pool_id: str, 
-        dml_only: bool, 
-        may_start_descendants: bool, 
-        force_ancestors: bool,
-        cross_product_deployment: bool,
+        dml_only: bool = False, 
+        may_start_descendants: bool = False, 
+        force_ancestors: bool = False,
+        cross_product_deployment: bool = False,
         parallel: bool = False,
         execute_plan: bool=False):
     summary="Nothing done"

@@ -16,9 +16,8 @@ import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
-from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
-from shift_left.core.utils.report_mgr import TableReport
+
 from shift_left.core.models.flink_statement_model import (
     Statement, 
     StatementInfo,
@@ -59,36 +58,7 @@ class TestDeploymentManager(BaseUT):
         return node
 
     #  ----------- TESTS -----------
-    def test_build_node_map(self) -> None:
-        """Test building node map from pipeline definition.
-        
-        Loading a pipeline definition for an intermediate table should get all reachable 
-        related tables. Direct descendants and ancestors should be included.
-        """
-        print("test_build node_map")
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME
-        )
-        node_map = dm._build_statement_node_map(pipeline_def.to_node())
-        
-        assert len(node_map) == 14
-        for node in node_map.values():
-            print(node.table_name, node.upgrade_mode, node.dml_statement_name)
-            
-        assert node_map["src_y"].upgrade_mode == "Stateful"
-        assert node_map["src_x"].upgrade_mode == "Stateful"
-        assert node_map["src_b"].upgrade_mode == "Stateful"
-        assert node_map["src_p2_a"].upgrade_mode == "Stateless"
-        assert node_map["x"].upgrade_mode == "Stateful"
-        assert node_map["y"].upgrade_mode == "Stateless"
-        assert node_map["z"].upgrade_mode == "Stateful"
-        assert node_map["d"].upgrade_mode == "Stateful"
-        assert node_map["c"].upgrade_mode == "Stateless"
-        assert node_map["p"].upgrade_mode == "Stateless"
-        assert node_map["a"].upgrade_mode == "Stateful"
-        assert node_map["b"].upgrade_mode == "Stateful"
-        assert node_map["e"].upgrade_mode == "Stateless"
-        assert node_map["f"].upgrade_mode == "Stateless"
+   
 
     def test_build_topological_sorted_parents(self) -> None:
         """Test building topologically sorted parents.

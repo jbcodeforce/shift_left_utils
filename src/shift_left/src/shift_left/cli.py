@@ -17,7 +17,12 @@ app.add_typer(table.app, name="table")
 app.add_typer(pipeline.app, name="pipeline")
 
 #__version__ = toml.load(open("pyproject.toml"))["project"]["version"]
-__version__ = "0.1.17"
+__version__ = "0.1.27"
+
+@app.command()
+def version():
+    """Display the current version of shift-left CLI."""
+    typer.echo(f"shift-left CLI version: {__version__}")
 
 
 if __name__ == "__main__":
