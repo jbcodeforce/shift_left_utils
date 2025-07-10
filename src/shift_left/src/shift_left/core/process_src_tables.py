@@ -40,18 +40,27 @@ def migrate_one_file(table_name: str,
                     sql_src_file: str, 
                     staging_target_folder: str, 
                     src_folder_path: str,
-                    process_parents: bool = False):
+                    process_parents: bool = False,
+                    source_type: str = "spark"):
     """ Process one source sql file to extract code from and migrate to Flink SQL """
     logger.debug(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
-    if sql_src_file.endswith(".sql"):
-        create_folder_if_not_exist(staging_target_folder)
-        product_name= extract_product_name(sql_src_file)
-        if sql_src_file.find("source") > 0:
-            _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name)
+    if source_type in ['dbt', 'spark']:
+        if sql_src_file.endswith(".sql"):
+            create_folder_if_not_exist(staging_target_folder)
+            product_name= extract_product_name(sql_src_file)
+            if sql_src_file.find("source") > 0:
+                _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name)
+            else:
+                _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
         else:
-            _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
+            raise Exception("Error: the sql_src_file parameter needs to be a sql file")
+    elif source_type == "ksql":
+        if sql_src_file.endswith(".ksql"):
+            _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder)
+        else:
+            raise Exception("Error: the sql_src_file parameter needs to be a ksql file")
     else:
-        raise Exception("Error: the first parameter needs to be a sql file")
+        raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
         
 
 def process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
@@ -296,3 +305,11 @@ def _find_sub_string(table_name, topic_name) -> bool:
             all_present=False
             break
     return all_present
+
+def _process_ksql_sql_file(table_name: str, sql_src_file: str, staging_target_folder: str):
+    """
+    Process a ksql sql file to Flink SQL.
+    """
+    print(f"process ksql SQL file {sql_src_file} to {staging_target_folder}")
+    table_folder, internal_table_name = build_folder_structure_for_table(table_name, staging_target_folder, None)
+    print("to continue")

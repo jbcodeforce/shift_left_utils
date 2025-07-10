@@ -8,12 +8,12 @@
    "state_form": "Stateful",
    "parents": [
       {
-         "table_name": "src_p1_table_3",
-         "product_name": "p1",
+         "table_name": "src_table_1",
+         "product_name": "",
          "type": "source",
-         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
-         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
-         "path": "pipelines/sources/p1/src_table_3",
+         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
+         "path": "pipelines/sources/src_table_1",
          "state_form": "Stateful",
          "parents": [],
          "children": [
@@ -31,12 +31,12 @@
          ]
       },
       {
-         "table_name": "src_table_1",
-         "product_name": "",
+         "table_name": "src_p1_table_3",
+         "product_name": "p1",
          "type": "source",
-         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
-         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
-         "path": "pipelines/sources/src_table_1",
+         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
+         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
+         "path": "pipelines/sources/p1/src_table_3",
          "state_form": "Stateful",
          "parents": [],
          "children": [

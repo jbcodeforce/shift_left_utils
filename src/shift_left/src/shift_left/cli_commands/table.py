@@ -74,6 +74,7 @@ def migrate(
         table_name: Annotated[str, typer.Argument(help= "the name of the table once migrated.")],
         sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
         target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
+        source_type: str = typer.Option(default="spark", help="the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc."),
         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
     """
     Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
@@ -87,7 +88,7 @@ def migrate(
         print("[red]Error: SRC_FOLDER and STAGING environment variables need to be defined.[/red]")
         exit(1)
     print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
-    migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive)
+    migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive, source_type)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 
 @app.command()

@@ -29,6 +29,7 @@ class KsqlTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     
     def translate_to_flink_sqls(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[str, str]:
         logger.info(f"Start translating ksql to flink sql for table {table_name}")
+        print(f"Start translating ksql to flink sql for table {table_name}")
         agent = KsqlToFlinkSqlAgent()
         translated_sql, _ = agent.translate_from_ksql_to_flink_sql(ksql, validate=validate)
         return translated_sql, ''

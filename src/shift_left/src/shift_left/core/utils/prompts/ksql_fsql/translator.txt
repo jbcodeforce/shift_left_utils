@@ -5,9 +5,10 @@ Do not include any explanations or conversational text in your output, only the 
 
 * Do not use VARCHAR, prefer STRING. 
 * Use CREATE TABLE IF NOT EXISTS instead of CREATE TABLE or CREATE STREAM
+* respect column name case: keep camelcase if using such case.
 * Use an INSERT INTO statement to continuously write to the table when the source is a stream
-* EMIT CHANGES is a specific clause of ksqlDB's continuous query semantics. In Flink SQL, an INSERT INTO statement is used to continuously write to the table.
-* When the sql contains LATEST_BY_OFFSET(column_name), it should be translated to column_name in a DML statement
+* EMIT CHANGES is a specific clause of ksqlDB's query semantics. In Flink SQL, an INSERT INTO statement is used to continuously write to the table.
+* When the sql contains LATEST_BY_OFFSET(column_name), it should be translated to column_name in a DML statement and use ROW_NUMBER() for deduplication.
 * Flink SQL uses LOCATE(substring, string, [start_position]) which is similar to ksqlDB's INSTR, but it doesn't have the occurrence parameter.
 * To find the n-th occurrence, you'd typically need to nest LOCATE calls or use regular expressions.
 * The ksqlDB INSTR(field_name, ' ',-1, 1) looks for the last space. In Flink SQL, you can achieve this by searching from the end of the string. 

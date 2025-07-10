@@ -45,7 +45,7 @@ class TestFileSearch(unittest.TestCase):
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent.parent.parent / "./data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
+        os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
 
     def test_table_ref_equality(self):
         ref1 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })

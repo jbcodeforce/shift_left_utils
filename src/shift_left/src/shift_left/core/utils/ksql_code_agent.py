@@ -118,9 +118,9 @@ class KsqlToFlinkSqlAgent:
         """
         agent_history = []
         translated_sql, ddl_sql = self._translator_agent(ksql)
-        print(f"Done with translator agent:\n {translated_sql}\n{ddl_sql}")
+        print(f"Done with translator agent, the flink sql is:\n {translated_sql}\n{ddl_sql}")
         translated_sql = self._mandatory_validation_agent(translated_sql)
-        print(f"Done with mandatory validation agent:\n {translated_sql}\n")
+        print(f"Done with mandatory validation agent updated flink sql:\n {translated_sql}\n")
         ddl_sql = "" # as of now
         if validate:
             print("Start validating the flink sql, do you want to continue? (y/n)")
