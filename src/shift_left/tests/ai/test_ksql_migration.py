@@ -58,22 +58,22 @@ class TestKsqlMigration(unittest.TestCase):
         print("Should generate a flink dml file in the staging folder")
         print("It may take some time....")
         ksql_src_file = "ddl-latest-offset-table.ksql"
-        content=self._process_one_ksql_file("latest_offset_table", ksql_src_file, validate=True)
+        content=self._process_one_ksql_file("latest_offset", ksql_src_file, validate=True)
         assert content is not None
 
-    def _test_ksql_stream_to_table_migration(self):
-        ksql_src_file = "ddl-c.ksql"
-        content=self._process_one_ksql_file("",ksql_src_file)
+    def test_ksql_filtering(self):
+        ksql_src_file = "ddl-filtering.ksql"
+        content=self._process_one_ksql_file("filtering",ksql_src_file)
         assert content is not None
 
-    def _test_ksql_where_clause_migration(self):
-        ksql_src_file = "ddl-d.ksql"
-        content=self._process_one_ksql_file("",ksql_src_file)
+    def test_ksql_map_location_migration(self):
+        ksql_src_file = "ddl-map_substr.ksql"
+        content=self._process_one_ksql_file("map_location",ksql_src_file)
         assert content is not None
 
-    def _test_ksql_f(self):
-        ksql_src_file = "ddl-f.ksql"
-        content=self._process_one_ksql_file("",ksql_src_file)
+    def _test_ksql_bigger_file(self):
+        ksql_src_file = "ddl-bigger-file.ksql"
+        content=self._process_one_ksql_file("equipment",ksql_src_file)
         assert content is not None
 
     def _test_ksql_g(self):

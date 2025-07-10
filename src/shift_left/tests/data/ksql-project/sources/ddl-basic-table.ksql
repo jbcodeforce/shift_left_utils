@@ -1,0 +1,10 @@
+CREATE STREAM BASIC_TABLE_STREAM (
+  kpiName VARCHAR,
+  kpiStatus VARCHAR,
+  highMetricThreshold INT,
+  lowMetricThreshold INT
+) WITH (
+  kafka_topic = 'stage.kpi_config',
+  value_format = 'JSON',
+  partitions = 1
+);

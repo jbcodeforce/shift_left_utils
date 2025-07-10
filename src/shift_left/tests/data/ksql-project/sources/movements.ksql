@@ -1,0 +1,2 @@
+create stream movements (person varchar key, location varchar) 
+with (value_format='JSON', partitions=1, kafka_topic='movements')
