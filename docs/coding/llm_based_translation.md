@@ -60,7 +60,30 @@ Flink SQL has more advanced windowing capabilities. For example:
 
 ### ksqlDB to Flink SQL
 
-kSQLDB has some SQL construct but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompt needs to support migration examples outside of the classical select and create table.
+Be sure to have a virtual environment and the `uv` package manager.
 
-See the translator 
+kSQLDB has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompt needs to support migration examples outside of the classical select and create table.
 
+For kSQL the approach is to use 3 agents with different prompt and the Confluent Cloud for Flink REST API to deploy the translated SQL for validation.
+
+| Agent | Scope| Prompt |
+| --- | --- | --- |
+| Translator | Take ksql content and do a first raw translation to Flink SQL | core/utils/prompts/ksql_fsql/translator.txt |
+| Validation | Validate import Flink constructs | core/utils/prompts/ksql_fsql/mandatory_validation.txt |
+| Refinement | Fix potential Flink statement deployment error | core/utils/prompts/ksql_fsql/refinement.txt |
+
+See the translator class [src/shift_left/core/utils/ksql_code_agent.py](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/ksql_code_agent.py).
+
+The code uses the multi-agent with human in the loop to validate the SQL on Confluent Cloud for Flink. The flow looks like:
+
+![](./images/ai_agent_new_flow.drawio.png)
+
+#### Running unit testing
+
+The ksql source files to validate migration, are under `src/shift_left/tests/data/ksql-project/sources` folder.
+
+```sh
+uv run pytest -s tests/ai/test_ksql_migration.py
+```
+
+The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksql-project/staging/data_product` folder.
