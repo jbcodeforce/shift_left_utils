@@ -10,7 +10,7 @@ from io import StringIO
 # Set up config file path for testing
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 
-from shift_left.core.utils.app_config import _validate_config
+from shift_left.core.utils.app_config import _validate_config, get_config
 
 
 class TestValidateConfig(unittest.TestCase):
@@ -397,6 +397,15 @@ class TestValidateConfig(unittest.TestCase):
             assert "Configuration app.logging must be a valid log level" in error_message
             assert "Configuration app.products must be a list" in error_message
             
+
+    def test_get_config(self):
+        """Test that get_config returns a dictionary"""
+        config = get_config()
+        assert isinstance(config, dict)
+        assert config.get("app") is not None
+        assert config.get("app").get("logging") is not None
+        assert config.get("app").get("logging") == "INFO"
+        assert "lkc" in config.get("kafka").get("cluster_id")
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ import datetime
 import random
 import string
 
-_config = None
+_config: dict[str, dict[str,str]] = {}
 
 def generate_session_id() -> tuple[str, str]:
     """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
@@ -146,7 +146,7 @@ def _validate_config(config: dict) -> None:
     exit()
 
 @lru_cache
-def get_config() -> dict | None:
+def get_config() -> dict[str,str]:
   """_summary_
   reads the client configuration from config.yaml
   Args:
@@ -154,7 +154,7 @@ def get_config() -> dict | None:
   return: a key-value map
   """
   global _config
-  if _config is None:
+  if _config.__len__() == 0:
       CONFIG_FILE = os.getenv("CONFIG_FILE",  "./config.yaml")
       if CONFIG_FILE:
         with open(CONFIG_FILE) as f:
@@ -164,10 +164,10 @@ def get_config() -> dict | None:
   return _config
 
 
-def reset_config_cache() -> None:
+def reset_config_cache():
   """Reset the configuration cache for testing purposes."""
   global _config
-  _config = None
+  _config = {}
 
 
 def reset_all_caches() -> None:
@@ -207,8 +207,8 @@ def reset_all_caches() -> None:
 
 try:
     config = get_config()
-    if config and config.get("app") and config["app"].get("logging"):
-        logger.setLevel(config["app"]["logging"])
+    if config and config.get("app"):
+        logger.setLevel(config.get("app").get("logging", logging.INFO))
 except Exception:
     # If config loading fails during module import, use default level
     logger.setLevel(logging.INFO)

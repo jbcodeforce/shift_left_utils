@@ -81,13 +81,13 @@ def migrate(
     The command uses the SRC_FOLDER to access to src_path folder.
     """
     print("#" * 30 + f" Migrate source SQL Table defined in {sql_src_file_name}")
-    if not sql_src_file_name.endswith(".sql"):
-        print("[red]Error: the sql_src_file_name parameter needs to be a dml sql file[/red]")
+    if not sql_src_file_name.endswith(".sql") and not sql_src_file_name.endswith(".ksql"):
+        print("[red]Error: the sql_src_file_name parameter needs to be a dml sql file or a ksql file[/red]")
         exit(1)
     if not os.getenv("SRC_FOLDER") and not os.getenv("STAGING"):
         print("[red]Error: SRC_FOLDER and STAGING environment variables need to be defined.[/red]")
         exit(1)
-    print(f"Migrate source SQL Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
+    print(f"Migrate source {source_type} Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
     migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive, source_type)
     print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
 

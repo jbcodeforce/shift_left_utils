@@ -79,4 +79,4 @@ FROM TABLE(
 
 Use back quote character like ` around column name which is one of the SQL keyword. As an example a column name should be `name`. 
 
-generate in json format. 
+Generate in json format. Trying to separate create statement in the ddl output, and the insert into in the dml output.
