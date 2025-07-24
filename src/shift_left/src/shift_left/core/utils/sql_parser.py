@@ -90,6 +90,19 @@ class SQLparser:
             return tb
         return "No-Table"
     
+    def extract_table_name_from_create_statement(self, sql_content) -> str:
+        sql_content=self._normalize_sql(sql_content)
+        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        tbname = re.findall(regex, sql_content, re.IGNORECASE)
+        if len(tbname) > 0:
+            #logger.debug(tbname[0][1])
+            if tbname[0][1] and '`' in tbname[0][1]:   
+                tb=tbname[0][1].replace("`","")
+            else:
+                tb=tbname[0][1]
+            return tb
+        return "No-Table"
+
     def parse_file(self, file_path):
         """
         Parse SQL file and extract table names

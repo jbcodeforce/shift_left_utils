@@ -1,0 +1,10 @@
+CREATE TABLE KPI_CONFIG_TABLE WITH (KAFKA_TOPIC='stage.kpi_config_table', VALUE_FORMAT='JSON_SR') AS SELECT dbTable,
+   dbTable,
+   LATEST_BY_OFFSET(kpiName) AS kpiName,
+   LATEST_BY_OFFSET(kpiStatus) AS kpiStatus,
+   LATEST_BY_OFFSET(networkService) AS networkService,
+	LATEST_BY_OFFSET(elementType) AS elementType,
+	LATEST_BY_OFFSET(interfaceName) AS interfaceName
+FROM BASIC_TABLE_STREAM
+GROUP BY dbTable
+EMIT CHANGES;

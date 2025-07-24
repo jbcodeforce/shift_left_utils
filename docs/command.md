@@ -14,9 +14,24 @@ $ [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
+* `version`: Display the current version of shift-left...
 * `project`
 * `table`
 * `pipeline`
+
+## `version`
+
+Display the current version of shift-left CLI.
+
+**Usage**:
+
+```console
+$ version [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
 
 ## `project`
 
@@ -35,7 +50,6 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
-* `clear-logs`: Clear the CLI logs to start from a white...
 * `clean-completed-failed-statements`: Delete all statements that are failed and...
 
 ### `project init`
@@ -97,20 +111,6 @@ $ project list-compute-pools [OPTIONS]
 
 * `--environment-id TEXT`: Environment_id to return all compute pool
 * `--region TEXT`: Region_id to return all compute pool
-* `--help`: Show this message and exit.
-
-### `project clear-logs`
-
-Clear the CLI logs to start from a white page.
-
-**Usage**:
-
-```console
-$ project clear-logs [OPTIONS]
-```
-
-**Options**:
-
 * `--help`: Show this message and exit.
 
 ### `project clean-completed-failed-statements`
@@ -232,6 +232,7 @@ $ table migrate [OPTIONS] TABLE_NAME SQL_SRC_FILE_NAME TARGET_PATH
 
 **Options**:
 
+* `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc.  [default: spark]
 * `--recursive`: Indicates whether to process recursively up to the sources. (default is False)
 * `--help`: Show this message and exit.
 
@@ -310,7 +311,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x11a4b78c0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x108aa8b90&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -562,7 +563,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: tests/data/ksql-project/flink-references/]
 
 **Options**:
 
@@ -584,7 +585,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: tests/data/ksql-project/flink-references/]
 
 **Options**:
 

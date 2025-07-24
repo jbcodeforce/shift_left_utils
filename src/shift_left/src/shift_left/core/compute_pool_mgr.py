@@ -140,6 +140,8 @@ def is_pool_valid(compute_pool_id) -> bool:
 def create_compute_pool(table_name: str) -> Tuple[str, str]:
     config = get_config()
     spec = _build_compute_pool_spec(table_name, config)
+    logger.info(f"Create compute pool {spec['display_name']} for {table_name} ... it may take a while")
+    print(f"Create compute pool {spec['display_name']} for {table_name} ... it may take a while")
     client = ConfluentCloudClient(get_config())
     try:
         result= client.create_compute_pool(spec)

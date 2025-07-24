@@ -14,9 +14,7 @@ import shift_left.core.pipeline_mgr as pm
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
-    StatementInfo,
-    Status
+    StatementInfo
 )
 
 from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo,TableReport
@@ -27,7 +25,13 @@ from ut.core.BaseUT import BaseUT
 class TestExecutionPlan(BaseUT):
     """
     validate the different scenario to build the execution plan.
-    See the topology of flink statements https://github.com/jbcodeforce/shift_left_utils/blob/main/docs/images/flink_pipeline_for_test.drawio.png 
+    See the topology of flink statements https://github.com/jbcodeforce/shift_left_utils/blob/main/docs/images/flink_pipeline_for_test.drawio.png
+    src_y ---> y -->  d -> f
+                 \   /
+    src_x ---> x - z -> p
+          \          \
+    src_a -> a        \
+    src_b -> b ------>  c -> e
     """
     
     TEST_COMPUTE_POOL_ID_1 = "lfcp-121"
@@ -54,8 +58,7 @@ class TestExecutionPlan(BaseUT):
         """
         when direct parent d is running 
         restarting the leaf "f"
-        Should restart only current table f which has one parent d.
-        f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
+        Should restart only current table f which has one parent d as all other ancestors are running.
         """
         print("\n--> test_build_execution_plan_for_one_table_while_parents_running should start node f only")
         
@@ -98,7 +101,12 @@ class TestExecutionPlan(BaseUT):
         when direct parent d is not running  
         restarting the leaf "f"
         Should restart d then f 
-        f has one parent d. f-> d -> [y, z], z -> x, y-> src_y and x -> src_x.
+        src_y ---> y -->  d -> f
+                 \   /
+        src_x ---> x - z -> p -> c -> e -> f
+              \          \
+        src_a -> a        \
+        src_b -> b ------>  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_direct_parent_not_running should start nodes d and f")
         
@@ -143,11 +151,17 @@ class TestExecutionPlan(BaseUT):
         mock_get_status,
         mock_get_compute_pool_list
     ) -> None:
-        """ when y, src_y ancestors are not running, so z not running too
+        """ when [y, src_y] ancestors are not running, so z not running too
             restarting the leaf "f"
-            Should lead to restart src_y, y, d, z, f
-            BUT Z is restarted and its statefull so p,c,e needs to be restarted too
+            Should lead to restart src_y, y, [d, z (any order)] f
+            BUT as Z is restarted and it is stateful then p, c, e needs to be restarted too as may_start_descendants is True
             as C has src_b and b running, it can be started too
+            src_y ---> y -->  d -> f
+                        \   /
+            src_x ---> x - z -> p
+                   \        \
+            src_a -> a       \
+            src_b -> b ---->  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running should start nodes src_y, y, z, d, c, p, e and f")
         
@@ -177,11 +191,13 @@ class TestExecutionPlan(BaseUT):
             if node.table_name in ["src_x", "x", "src_b", "b"]: 
                 assert node.to_run is False
                 assert node.to_restart is False
-            if node.table_name in  ["src_y", "y", "d", "z", "p"]:
+            if node.table_name in  ["src_y", "y", "d", "z"]:
                 assert node.to_run is True
                 assert node.to_restart is False
-            if node.table_name in ["f", "e"]:
+            if node.table_name in ["e", "c", "p", "f"]:
                 assert node.to_restart is True
+                assert node.to_run is False
+
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
@@ -245,7 +261,7 @@ class TestExecutionPlan(BaseUT):
         restart z
         should restart the 5 nodes
         """
-        print("\n--> test_execution_plan_for_z__restart_all_ancestors should start node src_x, src_y, x, y, z, src_a, a, d, p, src_b, b c, f, e")
+        print("\n--> test_execution_plan_for_z__restart_all_ancestors should start node src_x, src_y, x, y, z")
         
         def mock_statement(statement_name: str) -> StatementInfo:
             return self._create_mock_get_statement_info(status_phase="RUNNING")
@@ -268,12 +284,12 @@ class TestExecutionPlan(BaseUT):
             if node.table_name in ["src_x", "x" , "src_y" , "y"]:
                 assert node.to_restart is False
                 assert node.to_run is True
-            if node.table_name == "z":
-                assert node.to_run is True
-                assert node.to_restart is True
             if node.table_name in ["e","f"]:
                 assert node.to_run is False
                 assert node.to_restart is False
+            if node.table_name in ["z"]:
+                assert node.to_run is False
+                assert node.to_restart is True
 
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
@@ -287,9 +303,8 @@ class TestExecutionPlan(BaseUT):
     ) -> None:
         """
         when starting z without forcing ancestors and may_start_descendants=True
-        should not start z ancestors but restart its children
-        z children needs to be restarted. d -> [y, z], p -> z, c -> [z,b] f-> d, e-> c.
-         
+        should not start z ancestors but restart z children (d,p,c then f, e) and z itself
+   
         """
         print("\n--> test_build_execution_plan_for_table_z_ancestor_running_restart_children_of_z_only should start node z, d,f,p,c,e")
         
@@ -317,10 +332,10 @@ class TestExecutionPlan(BaseUT):
             if node.table_name in ["src_x", "x", "src_y", "y" , "x", "src_b", "b"]:
                 assert node.to_run is False
                 assert node.to_restart is False
-            if node.table_name in ["d", "c"]:
-                assert node.to_run is True
-                assert node.to_restart is False
-            if node.table_name in ["z", "f", "p", "e"]:
+            if node.table_name in ["z"]:
+                assert node.to_run is False
+                assert node.to_restart is True
+            if node.table_name in ["f", "p", "e", "d", "c"]:
                 assert node.to_run is False
                 assert node.to_restart is True
         
@@ -336,8 +351,9 @@ class TestExecutionPlan(BaseUT):
     ) -> None:
         """
         when starting z with forcing ancestors and may_start_descendants=True
-        should start z ancestors and children of z
-        z childrent needs to be restarted. d -> [y, z], p -> z, c -> [z,b] f-> d, e-> c.
+        should start z ancestors (src_x, src_y, x, y) and children of z (d,p,c, then e, f)
+        z children (d,p,c, then e, f) needs to be restarted. 
+        as restarting src_x with may_start_descendants will restart a so src_a. 
         """
         print("\n--> test_build_execution_plan_for_table_z_ancestors_and_children_of_z_restarted should start node src_x, src_y, x,y, z, d,f,p,c,e")
         
@@ -360,13 +376,10 @@ class TestExecutionPlan(BaseUT):
         print(f"{summary}")
         assert len(execution_plan.nodes) == 14  
         for node in execution_plan.nodes:
-            if node.table_name in ["src_x", "x" , "src_y" ,"y", "src_b", "b", "src_p2_a", "a", "c"]:
+            if node.table_name in ["src_x", "x" , "src_y" ,"y", "src_b", "b", "src_p2_a"]:
                 assert node.to_run is True
                 assert node.to_restart is False
-            if node.table_name == "z":
-                assert node.to_run is True
-                assert node.to_restart is True
-            if node.table_name in ["e","f"]:
+            if node.table_name in ["a", "c", "e","f", "d", "p", "z"]:
                 assert node.to_run is False
                 assert node.to_restart is True
     
@@ -413,7 +426,7 @@ class TestExecutionPlan(BaseUT):
                 assert node.to_run is True
                 assert node.to_restart is False
             if node.table_name == "e":
-                assert node.to_run is True
+                assert node.to_run is False
                 assert node.to_restart is True
 
 

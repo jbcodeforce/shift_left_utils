@@ -1,0 +1,18 @@
+{
+    "BASIC_TABLE_STREAM": {
+        "table_name": "BASIC_TABLE_STREAM",
+        "product_name": "flink-references",
+        "type": "unknown-type",
+        "dml_ref": "tests/data/ksql-project/flink-references/basic_table_stream/sql-scripts/dml.basic_table_stream.sql",
+        "ddl_ref": "tests/data/ksql-project/flink-references/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql",
+        "table_folder_name": "tests/data/ksql-project/flink-references/basic_table_stream"
+    },
+    "KPI_CONFIG_TABLE": {
+        "table_name": "KPI_CONFIG_TABLE",
+        "product_name": "flink-references",
+        "type": "unknown-type",
+        "dml_ref": "tests/data/ksql-project/flink-references/kpi_config_table/sql-scripts/dml.kpi_config_table.sql",
+        "ddl_ref": "tests/data/ksql-project/flink-references/kpi_config_table/sql-scripts/ddl.kpi_config_table.sql",
+        "table_folder_name": "tests/data/ksql-project/flink-references/kpi_config_table"
+    }
+}

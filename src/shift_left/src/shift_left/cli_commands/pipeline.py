@@ -18,9 +18,14 @@ import shift_left.core.pipeline_mgr as pipeline_mgr
 
 """
 Manage a pipeline entity:
-- build the inventory of tables
-- build the inventory of tables
-- generate pipeline reports
+- build the pipeline definition from a dml file
+- delete all pipeline definition json files from a given folder path
+- build the pipeline definition for all tables in a given folder path
+- generate a pipeline report for a given table
+- deploy a pipeline from a given table name, product name or a directory
+- build an execution plan for a given table, product name or a directory
+- report the running statements for a given table, product name or a directory
+- undeploy a pipeline from a given table name, product name or a directory
 """
 app = typer.Typer(no_args_is_help=True)
 
@@ -49,8 +54,9 @@ def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argumen
     """
     Delete all pipeline definition json files from a given folder path
     """
-    print(f"Delete pipeline definition from {path_from_where_to_delete}")
+    print(f"Delete pipeline definitions from {path_from_where_to_delete}")
     pipeline_mgr.delete_all_metada_files(path_from_where_to_delete)
+    print(f"Done")
 
 
 @app.command()
@@ -298,10 +304,10 @@ def _build_deploy_pipeline(
         table_list_file_name: str,
         inventory_path: str, 
         compute_pool_id: str, 
-        dml_only: bool, 
-        may_start_descendants: bool, 
-        force_ancestors: bool,
-        cross_product_deployment: bool,
+        dml_only: bool = False, 
+        may_start_descendants: bool = False, 
+        force_ancestors: bool = False,
+        cross_product_deployment: bool = False,
         parallel: bool = False,
         execute_plan: bool=False):
     summary="Nothing done"

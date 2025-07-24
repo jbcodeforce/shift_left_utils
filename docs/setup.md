@@ -24,61 +24,43 @@ To create this EC2 machine, Terraform configurations are defined in [the IaC fol
 * All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
 
 * Clone this repository (this will not be necessary once the CLI will be available in pypi): 
-
-```sh
-git clone  https://github.com/jbcodeforce/shift_left_utils.git
-cd shift_left_utils
-```
+  ```sh
+  git clone  https://github.com/jbcodeforce/shift_left_utils.git
+  cd shift_left_utils
+  ```
 
 * Create a Python virtual environment:
-
-```sh
-python -m venv .venv
-```
+  ```sh
+  python -m venv .venv
+  ```
 
 * Activate the environment:
-
-```sh
-source .venv/bin/activate
-```
+  ```sh
+  source .venv/bin/activate
+  ```
 
 * Be sure to use the pip install in the virtual environment:
+  ```sh
+  python -m pip --version
+  # if pip not present
+  python -m ensurepip
+  # install requirements
+  python -m pip install -r requirements.txt
+  ```
 
-```sh
-python -m pip --version
-# if pip not present
-python -m ensurepip
-# install requirements
-python -m pip install -r requirements.txt
-```
+* Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the wheel, they are under the `src/shift_left/dist` folder
+  ```sh
+  pip install src/shift_left/dist/shift_left-0.1.28-py3-none-any.whl
+  ```
 
-* Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the wheel, thery are under the `src/shift_left/dist` folder, the last version as of 4/11 is 0.1.8 but it will change, so the documentation may not reflect the last version.
-
-```sh
-pip install src/shift_left/dist/shift_left-0.1.25-py3-none-any.whl
-```
-
-
-### Specific install for the shift_left developers using uv
-
-The installation is simpler with the following commands:
-
-```sh
-uv tool list
-uv tool uninstall shift_left
-uv tool install shift_left@src/shift_left/dist/shift_left-0.1.25-py3-none-any.whl
-```
-
-
-### Set up configuration yaml file
+## Set up configuration yaml file
 
 The configuration file has to be named config.yaml and will be referenced by the environment variables: CONFIG_FILE.
 
 * Copy the  `config.yaml` template file to keep some important parameters for the CLI. 
-
-```sh
-cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
-```
+  ```sh
+  cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
+  ```
 
 * Modify the `config.yaml`, with the corresponding values. Some sections are mandatory
 
@@ -107,9 +89,9 @@ Those declarations are loaded by the Kafka Producer and Consumer and with tools 
 
 
 ???- warning "Security access"
-    The config.yaml file is ignored in Git. So having the keys in this file is not a major concern as it used by the developer only. But it can be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
+    The config.yaml file is ignored in Git. So having the keys in this file is not a major concern, as it is used by the developers only. But it may be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 
-### Environment variables
+## Environment variables
 
 
 Ensure the following environment variables are set: in a `set_env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
@@ -139,7 +121,7 @@ To get the environment variables configured for your Terminal session do:
 source set_env
 ```
 
-### Validate the CLI
+## Validate the CLI
 
 ```sh
 shift_left --help

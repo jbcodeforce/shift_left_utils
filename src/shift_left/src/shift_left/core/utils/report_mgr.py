@@ -176,7 +176,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     
     # Separate nodes into parents and children
     parents = [node for node in execution_plan.nodes if (node.to_run or node.is_running())]
-    children = [node for node in execution_plan.nodes if node.to_restart and not node.to_run]
+    children = [node for node in execution_plan.nodes if node.to_restart]
     
     # Build parent section
     if parents:

@@ -41,6 +41,7 @@ def update_all_makefiles(pipeline_folder_path: Annotated[str, typer.Argument(hel
         """
         Update the makefile with a new template. Not yet implemented
         """
+        print("Not implemented yet")
         pass
 
 @app.command()
@@ -66,14 +67,6 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
-@app.command()
-def clear_logs():
-       """
-       Clear the CLI logs to start from a white page.
-       """
-       import os
-       os.remove(log_file_path)
-       print(f"{log_file_path} removed !")
 
 @app.command()
 def clean_completed_failed_statements():

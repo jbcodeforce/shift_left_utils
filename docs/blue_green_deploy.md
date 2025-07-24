@@ -34,7 +34,6 @@ The following figure illustrates a steady state of Flink statements processing d
 
 Iceberg or Delta Lake tables, stored in Apache Parquet format, are directly queried by the query engine. Each pipeline writes records in table format to object storage, such as an S3 bucket, with tables partitioned within folders.
 
-
 For example, the goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short period, modify the purple Flink statements, and then deploy them to development, testing, staging, and production environments. Once validated, these statements can be merged into the `main` branch.
 
 <figure markdown="span">

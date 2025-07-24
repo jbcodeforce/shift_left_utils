@@ -156,6 +156,7 @@ def delete_all_metada_files(root_folder: str):
                 logger.info(f"File '{file_path}' deleted successfully.")
                 count += 1
     logger.info(f"Total number of files deleted: {count}")
+    print(f"Total number of files deleted: {count}")
 
 
 

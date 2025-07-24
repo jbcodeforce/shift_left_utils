@@ -26,15 +26,22 @@ class DbtTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         return result['flink_sql'], result['derived_ddl']
 
 class KsqlTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
-    
+    """
+    ksqlDB translator to Flink SQL
+    """
     def translate_to_flink_sqls(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[str, str]:
-        logger.info(f"Start translating ksql to flink sql for table {table_name}")
+        logger.info(f"1/ Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
+        print(f"1/ Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
         agent = KsqlToFlinkSqlAgent()
-        translated_sql, _ = agent.translate_from_ksql_to_flink_sql(ksql, validate=validate)
-        return translated_sql, ''
+        ddl, dml = agent.translate_from_ksql_to_flink_sql(ksql, validate=validate)
+        return ddl, dml
 
 _agent_class = None
 def get_or_build_sql_translator_agent():
+    """
+    Factory to get the SQL translator agent using external configuration file, or
+    the default one: DbtTranslatorToFlinkSqlAgent
+    """
     global _agent_class
     if not _agent_class:
         if get_config().get('app').get('translator_to_flink_sql_agent'):

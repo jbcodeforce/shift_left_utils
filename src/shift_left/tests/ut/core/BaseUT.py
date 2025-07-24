@@ -13,7 +13,7 @@ from shift_left.core.models.flink_statement_model import (
     Spec,
     Metadata
 )
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, reset_all_caches
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
     FlinkStatementExecutionPlan
@@ -33,7 +33,8 @@ class BaseUT(unittest.TestCase):
         """
         Set up the test environment
         """
-        pass
+        # Reset all caches to ensure test isolation
+        reset_all_caches()
     
     # Following set of methods are used to create reusable mock objects and functions
     def _create_mock_get_statement_info(
@@ -56,8 +57,12 @@ class BaseUT(unittest.TestCase):
     ) -> Statement:
         """Create a mock Statement object."""
         config=get_config()
-        properties={"sql.current-catalog":  get_config()['flink']['catalog_name'], 
-                    "sql.current-database":  get_config()['flink']['database_name']}
+        if config and config.get('flink'):
+            properties={"sql.current-catalog":  config['flink']['catalog_name'], 
+                        "sql.current-database":  config['flink']['database_name']}
+        else:
+            properties={"sql.current-catalog": "default", 
+                        "sql.current-database": "default"}
         spec = Spec(compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, principal="test-principal", statement=name, properties=properties, stopped=False)
         metadata = Metadata(created_at=datetime.now().isoformat(),  resource_version="1",
                 self="https://test-url",
@@ -93,6 +98,7 @@ class BaseUT(unittest.TestCase):
     
     def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
         """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
+        
         node.compute_pool_id = compute_pool_id
         node.compute_pool_name = "test-pool"
         return node

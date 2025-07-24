@@ -1,0 +1,10 @@
+{
+    "No-Table": {
+        "table_name": "No-Table",
+        "product_name": "ut",
+        "type": "unknown-type",
+        "dml_ref": "tests/data/ksql-project/staging/ut/basic_table_stream/sql-scripts/dml.basic_table_stream.sql",
+        "ddl_ref": "tests/data/ksql-project/staging/ut/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql",
+        "table_folder_name": "tests/data/ksql-project/staging/ut/basic_table_stream"
+    }
+}

@@ -42,10 +42,17 @@ class TestProcessSrcTable(unittest.TestCase):
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
+        os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+
+    def _get_env_var(self, var_name: str) -> str:
+        """Get environment variable with proper null checking."""
+        value = os.getenv(var_name)
+        if value is None:
+            raise ValueError(f"{var_name} environment variable is not set")
+        return value
 
     @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
     def test_process_one_file(self,TranslatorToFlinkSqlAgent):
@@ -53,35 +60,42 @@ class TestProcessSrcTable(unittest.TestCase):
         mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
         mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
      
-        shutil.rmtree(os.getenv("STAGING"))
+        staging = self._get_env_var("STAGING")
+        src_folder = self._get_env_var("SRC_FOLDER")
+        
+        shutil.rmtree(staging)
         migrate_one_file("a_table",
-            os.getenv("SRC_FOLDER") + "/facts/p5/a.sql",   
-            os.getenv("STAGING"),   
-                os.getenv("SRC_FOLDER"),
+            src_folder + "/facts/p5/a.sql",   
+            staging,   
+            src_folder,
             False)
-        assert os.path.exists( os.getenv("STAGING") + "/facts/p5/")
+        assert os.path.exists(staging + "/facts/p5/")
 
     @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
     def test_process_one_file_recurring(self, TranslatorToFlinkSqlAgent):
 
         mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
         mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
-        shutil.rmtree(os.getenv("STAGING"))
+        
+        staging = self._get_env_var("STAGING")
+        src_folder = self._get_env_var("SRC_FOLDER")
+        
+        shutil.rmtree(staging)
         migrate_one_file("a_table",
-            os.getenv("SRC_FOLDER") + "/facts/p5/a.sql",   
-            os.getenv("STAGING"),   
-                os.getenv("SRC_FOLDER"),
+            src_folder + "/facts/p5/a.sql",   
+            staging,   
+            src_folder,
             True)
-        assert os.path.exists( os.getenv("STAGING") + "/sources/src_s1")
-        assert os.path.exists( os.getenv("STAGING") + "/sources/src_s2")
-        assert os.path.exists( os.getenv("STAGING") + "/sources/src_s2/sql-scripts/dml.src_s2.sql")
-        assert os.path.exists( os.getenv("STAGING") + "/sources/src_s2/sql-scripts/ddl.src_s2.sql")
-        assert os.path.exists( os.getenv("STAGING") + "/intermediates/int_p5_a")
-        assert os.path.exists( os.getenv("STAGING") + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql")
-        assert os.path.exists( os.getenv("STAGING") + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql")
-        with open(os.getenv("STAGING") + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql", "r") as f:
+        assert os.path.exists(staging + "/sources/src_s1")
+        assert os.path.exists(staging + "/sources/src_s2")
+        assert os.path.exists(staging + "/sources/src_s2/sql-scripts/dml.src_s2.sql")
+        assert os.path.exists(staging + "/sources/src_s2/sql-scripts/ddl.src_s2.sql")
+        assert os.path.exists(staging + "/intermediates/int_p5_a")
+        assert os.path.exists(staging + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql")
+        assert os.path.exists(staging + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql")
+        with open(staging + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql", "r") as f:
             assert f.read() == DML
-        with open(os.getenv("STAGING") + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql", "r") as f:
+        with open(staging + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql", "r") as f:
             assert f.read() == DDL
 
             

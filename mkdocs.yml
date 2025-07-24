@@ -6,7 +6,7 @@ nav:
   - Introduction: index.md
   - User Guide:
     - Development Process: dev_process.md 
-    - Setup: setup.md
+    - EnvironmentSetup: setup.md
     - Recipes: recipes.md
     - CLI References: command.md
     - Test Harness: test_harness.md

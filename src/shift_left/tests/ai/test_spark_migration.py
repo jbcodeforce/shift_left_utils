@@ -15,7 +15,7 @@ class TestDbtMigration(unittest.TestCase):
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging") 
-        os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
+        os.environ["SRC_FOLDER"] = str(cls.data_dir / "spark-project")
         os.makedirs(os.environ["STAGING"], exist_ok=True)   
         os.makedirs(os.environ["STAGING"] + "/data_product", exist_ok=True)
 

@@ -133,14 +133,16 @@ def get_or_build_inventory(
                 count+=1
                 if not dml_file_name:
                     continue
-                # extract table name from dml filefrom sql script   
+                # extract table name from dml file  
                 dml_sql_content=""
                 ddl_sql_content=""
                 with open(dml_file_name, "r") as f:
                     dml_sql_content = f.read()
                     table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
                 with open(ddl_file_name, "r") as f:
-                    ddl_sql_content = f.read()  
+                    ddl_sql_content = f.read()
+                    if "No-Table" ==  table_name:
+                        table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
                 upgrade_mode = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
                 directory = os.path.dirname(dml_file_name)
                 table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
@@ -254,6 +256,7 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
         FlinkTableReference for the table
     """
     if table_name not in inventory:
+        logger.error(f"Table {table_name} not in inventory.")
         raise Exception(f"Table {table_name} not in inventory.")
     entry = inventory[table_name]
     return FlinkTableReference.model_validate(entry)

@@ -54,32 +54,77 @@ We really value contributions, and to maximize the impact of code contributions,
 
 ### Github and git flow
 
-The internet is littered with guides and information on how to use and understand git.
+The following core principles for the management of this code is using the `gitflow` process with separate `main` and `develop` branches for a structured release process. 
 
-However, here's a compact guide that follows the suggested workflow that we try to follow:
+* **main Branch**: This branch always reflects the production-ready, stable code. Only thoroughly tested and finalized code is merged into `main`. Commits are tagged in `main` with version numbers for easy tracking of releases.
+* **develop Branch**: This branch serves as the integration point for all new features and ongoing development. Feature branches are created from `develop` and merged back into it after completion.
+* Creating a **Release Branch**: When a set of features in develop is deemed ready for release, a new release branch is created from `develop`. This branch allows for final testing, bug fixes, and release-specific tasks without interrupting the ongoing development work in develop.
+* **Finalizing the Release**: Only bug fixes and necessary adjustments are made on the `release` branch. New feature development is strictly avoided.
+* **Merging and Tagging**: Once the release branch is stable and ready for deployment, it's merged into two places:
 
-1. Fork the desired repo in github.
+    * `main`: The release branch is merged into main, effectively updating the production-ready code with the new release.
+    * `develop`: The release branch is also merged back into develop to ensure that any bug fixes or changes made during the release preparation are incorporated into the ongoing development work.
 
-2. Clone your repo to your local computer.
+* **Tagging**: After merging into main, the merge commit is tagged with a version number (e.g., v1.0.0) to mark the specific release point in the repository's history.
+* **Cleanup**: After the release is finalized and merged, the release branch can be safely deleted
 
-3. Add the upstream repository
+#### git commands for the different development tasks
 
-    Note: Guide for step 1-3 here: [forking a repo](https://help.github.com/articles/fork-a-repo/)
-
-4. Create new development branch off the targeted upstream branch.  This will often be `main`.
-
+1. Create a `feature` branch from  the `develop` branch
     ```sh
-    git checkout -b <my-feature-branch> main
+    git checkout -b  feature_a develop
     ```
 
-5. Do your work:
+1. Do your work:
+    - Write your code
+    - Write your unit tests and potentially your integration tests
+    - Pass your tests locally
+    - Commit your intermediate changes as you go and as appropriate to your `feature` branch
+    - Repeat until satisfied
 
-   - Write your code
-   - Write your tests
-   - Pass your tests locally
-   - Commit your intermediate changes as you go and as appropriate
-   - Repeat until satisfied
+1. Create a pull request against the same targeted upstream `develop` branch.
 
+    [Creating a pull request](https://help.github.com/articles/creating-a-pull-request/)
+
+???- info "Forked repository special treatment"
+    If you forked the main repository, once the pull request has been reviewed, accepted and merged into the `develop` branch, you should synchronize your remote and local forked github repository `main` branch with the upstream main branch. To do so:
+
+    * Pull to your local forked repository the latest changes upstream (that is, the pull request).
+        ```sh
+        git pull upstream main
+        ```
+
+    * Push those latest upstream changes pulled locally to your remote forked repository.
+        ```sh
+        git push origin main
+        ```
+
+**Release management:**
+
+1. When code is ready, create a new release branch off the `develop` branch. Run all tests and fixes on this release branch until ready for release.
+    ```sh
+    git checkout -b  v0.1.28 develop
+    ```
+
+1. Merge into main:
+    ```bash
+    git checkout main
+    git merge --no-ff v0.1.28
+    ```
+1. Tag the release: 
+    ```sh
+    git tag -a v0.1.28 -m "Release version 0.1.28"
+    ```
+1. Merge into develop:
+    ```bash
+    git checkout develop
+    git merge --no-ff v0.1.28
+    ```
+1. In gihub, create a new release referencing the newly created tag
+1. Delete the release branch: 
+    ```sh
+    git branch -d v0.1.28
+    ```
 6. Fetch latest upstream changes (in case other changes had been delivered upstream while you were developing your new feature).
 
     ```sh
@@ -95,66 +140,29 @@ However, here's a compact guide that follows the suggested workflow that we try 
 
     Instructions on how to manually resolve a conflict and commit the new change or skip your local replayed commit will be presented on screen by the git CLI.
 
-8. Push the changes to your repository
 
-    ```sh
-    git push origin <my-feature-branch>
-    ```
 
-9. Create a pull request against the same targeted upstream branch.
 
-    [Creating a pull request](https://help.github.com/articles/creating-a-pull-request/)
 
-Once the pull request has been reviewed, accepted and merged into the main github repository, you should synchronize your remote and local forked github repository `main` branch with the upstream main branch. To do so:
-
-10. Pull to your local forked repository the latest changes upstream (that is, the pull request).
-
-    ```sh
-    git pull upstream main
-    ```
-
-11. Push those latest upstream changes pulled locally to your remote forked repository.
-
-    ```sh
-    git push origin main
-    ```
-
-### What happens next?
-
-- All pull requests will be automatically built with GitHub Action, when implemented by that specific project.
-  - You can determine if a given project is enabled for GitHub Action workflow by the existence of a `./github/workflow` folder in the root of the repository or branch.
-  - When in use, unit tests must pass completely before any further review or discussion takes place.
-- The repository maintainer will then inspect the commit and, if accepted, will pull the code into the upstream branch.
-- Should a maintainer or reviewer ask for changes to be made to the pull request, these can be made locally and pushed to your forked repository and branch.
-- Commits passing this stage will make it into the next release cycle for the given project.
-
-## Environment set up
+## Environment set up for developers
 
 We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. See [uv installation documentation](https://docs.astral.sh/uv/getting-started/installation/) then follow the next steps to set your environment for development:
 
-* Clone this repository: 
+* Fork the `https://github.com/jbcodeforce/shift_left_utils` repo in your github account.
+* Clone your repo to your local computer.
+* Add the upstream repository: see guide for step 1-3 here: [forking a repo](https://help.github.com/articles/fork-a-repo/)
+* Verify you have [set up the pre-requisited](./setup.md#pre-requisites) with the below differences:
+    * Create a new virtual environment in any folder, but could be the : `uv venv`
 
-```sh
-git clone  https://github.com/jbcodeforce/shift_left_utils.git
-cd shift_left_utils
-```
-
-* Create a new virtual environment in any folder, but could be the : `uv venv`
 * Activate the environment:
 
 ```sh
 source .venv/bin/activate
 ```
-* Define a config.yaml file to keep some important parameters of the CLI. 
+* Define a config.yaml file to keep the important parameters of the CLI. 
 
 ```sh
 cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
-```
-
-* Connect to Confluent Cloud with CLI, then get the environment and compute pool identifiers:
-
-```sh
-confluent login --save
 ```
 
 * Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool, modify the config.yaml file
@@ -166,78 +174,40 @@ confluent login --save
     * confluent_cloud to manage resources at the organization level
     * flink: to manage Statement and compute pools
     * app: to define CLI parameters
-    * registry: to access schema registry
+    * registry: to access schema registry (not used)
 
     The Flink, and Confluent Cloud api keys and secrets are different.
 
-* Set the CONFIG_FILE environment variable to point to the config.yaml file. For running all the tests, the config.yaml file may be saved under the `tests` folder
+* Set the CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
 
 ```sh
-export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
+export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config-ccloud.yaml
 ```
 
 ## Development activities
 
-`uv` includes a dedicated interface for interacting with tools (cli programs). Tools can be invoked without installation using `uv tool run`
+See [the code explanation and design approach chapter.](./coding/index.md)
 
-### Understand the code
 
-The code is in three layers:
-
-* The CLI module for each entities managed: table, project, pipeline
-* The core modules for managing the entities, in a service oriented way.
-* The utils modules with common functions to be used in the core modules
-
-The cli.py is based of [typer module](https://typer.tiangolo.com/) and is the top level access to the cli execution.
-
-```sh
-└── shift_left
-│       ├── cli.py
-│       ├── cli_commands
-│       │   ├── pipeline.py
-│       │   ├── project.py
-│       │   └── table.py
-│       ├── core
-│       │   ├── deployment_mgr.py
-│       │   ├── flink_statement_model.py
-│       │   ├── pipeline_mgr.py
-│       │   ├── process_src_tables.py
-│       │   ├── project_manager.py
-│       │   ├── table_mgr.py
-│       │   ├── templates
-│       │   │   ├── common.mk
-│       │   │   ├── config_tmpl.yaml
-│       │   │   ├── create_table_skeleton.jinja
-│       │   │   ├── dedup_dml_skeleton.jinja
-│       │   │   ├── dml_src_tmpl.jinja
-│       │   │   ├── makefile_ddl_dml_tmpl.jinja
-│       │   │   ├── test_dedup_statement.jinja
-│       │   │   └── tracking_tmpl.jinja
-│       │   ├── test_mgr.py
-│       │   └── utils
-│       │       ├── app_config.py
-│       │       ├── ccloud_client.py
-│       │       ├── file_search.py
-│       │       ├── flink_sql_code_agent_lg.py
-│       │       ├── sql_parser.py
-│       │       └── table_worker.py
-```
-
-### Install dependencies and the cli as uv tool:
+### Install dependencies and the cli as uv tool
 
 * Install dependencies and tool for iterative development, under the `src/shift_left` folder (the one with the `uv.lock`  and `pyproject.toml` files)
-
-```sh
-uv tool install .
-```
+    ```sh
+    uv tool list
+    uv tool install .
+    ```
 
 * Verify it is installed locally (version will differ)
+    ```sh
+    uv tool list 
+    shift-left v0.1.28
+    ```
 
-```sh
-uv tool list 
-shift-left v0.1.1
-- shift_left
-```
+* Uninstall:
+    ```sh
+    uv tool list
+    uv tool uninstall shift_left
+    ```
 
 (The version number is specified in `pyproject.toml` file)
 
@@ -266,8 +236,6 @@ export PIPELINES=$(pwd)/tests/flink-project/pipelines
  uv run src/shift_left/cli.py
 ```
 
-
-
 * It is also possible to test the CLI with python:
 
 ```sh
@@ -286,8 +254,8 @@ Tests are executed in a virtual environment with python 3 and pytest.
 
 ```sh
 uv run pytest -s tests/it/core/test_table_mgr.py
-uv run pytest -s tests/core/test_project_mgr.py
-uv run pytest -s tests/core/test_pipeline_mgr.py
+uv run pytest -s tests/ut/core/test_project_mgr.py
+uv run pytest -s tests/ut/core/test_pipeline_mgr.py
 ```
 
 * Test the CLIs
@@ -295,8 +263,6 @@ uv run pytest -s tests/core/test_pipeline_mgr.py
 ```sh
 uv run pytest -s tests/cli/test_project_cli.py
 ```
-
-
 
 ### Debug core functions
 
