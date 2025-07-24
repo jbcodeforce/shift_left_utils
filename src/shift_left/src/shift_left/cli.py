@@ -17,7 +17,7 @@ app.add_typer(table.app, name="table")
 app.add_typer(pipeline.app, name="pipeline")
 
 #__version__ = toml.load(open("pyproject.toml"))["project"]["version"]
-__version__ = "0.1.27"
+__version__ = "0.1.28"
 
 @app.command()
 def version():

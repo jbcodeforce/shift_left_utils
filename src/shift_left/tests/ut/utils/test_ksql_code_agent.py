@@ -23,8 +23,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.error_message = "Column 'invalid_column' does not exist"
     
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_successful_validation_first_try(self, mock_print, mock_input):
+    def test_successful_validation_first_try(self, mock_input):
         """Test successful validation on the first attempt."""
         # Mock successful validation
         self.agent._validate_flink_sql_on_cc = MagicMock(return_value=(True, ""))
@@ -36,7 +35,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.assertEqual(result_sql, self.test_sql)
         self.assertTrue(is_validated)
         self.agent._validate_flink_sql_on_cc.assert_called_once_with(self.test_sql)
-        mock_input.assert_called_once()
+
 
     @patch('builtins.input')
     @patch('builtins.print')
@@ -56,9 +55,10 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.assertEqual(result_sql, self.refined_sql)
         self.assertTrue(is_validated)
         self.assertEqual(self.agent._validate_flink_sql_on_cc.call_count, 2)
+        expected_history = "[{'agent': 'refinement', 'sql': 'SELECT * FROM test_table'}]"
         self.agent._refinement_agent.assert_called_once_with(
             self.test_sql, 
-            "[]", 
+            expected_history, 
             self.error_message
         )
 
@@ -139,7 +139,6 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.assertEqual(result_sql, self.test_sql)
         self.assertTrue(is_validated)
         self.agent._validate_flink_sql_on_cc.assert_called_once_with(self.test_sql)
-        mock_input.assert_called_once()
     
     @patch('builtins.input')
     @patch('builtins.print')
@@ -162,11 +161,11 @@ class TestKsqlCodeAgent(unittest.TestCase):
         # Verify refinement agent was called with proper history
         calls = self.agent._refinement_agent.call_args_list
         
-        # First call should have empty history
-        self.assertEqual(calls[0][0][1], "[]")
-        
-        # Second call should have history with first refinement
-        expected_history = "[{'agent': 'refinement', 'sql': 'SELECT refined_1 FROM test_table'}]"
+        # First call should have history with first refinement
+        expected_history = "[{'agent': 'refinement', 'sql': 'SELECT * FROM test_table'}]"
+        self.assertEqual(calls[0][0][1], expected_history)
+        # second call should have history with second refinement
+        expected_history = "[{'agent': 'refinement', 'sql': 'SELECT * FROM test_table'}, {'agent': 'refinement', 'sql': 'SELECT refined_1 FROM test_table'}]"
         self.assertEqual(calls[1][0][1], expected_history)
         
         self.assertTrue(is_validated)

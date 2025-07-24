@@ -4,15 +4,16 @@
     * Created 12/2024
     * Updated 02/23: new pipeline helper functions to support sink to source pipeline metadata creation or source to sink.
     * Update 06/08: New features, and explanation in recipes for better manage Large Flink project.
+    * Update 07/24: v0.1.28: blue/green doc see [CHANGELOG file.](https://github.com/jbcodeforce/shift_left_utils/blob/main/CHANGELOG.md)
 
 Recognizing the increasing need for real-time data processing, driven by demands for immediate insights and responsive applications (ultimately benefiting the end customer), this initiative tackles the challenging task of migrating traditional batch pipelines to modern, stream-based architectures using Apache Flink. 
 
 The approach, supported that the tools in this repository, centers around the data engineer, and Site Reliability Engineers as the "users". By providing intelligent tooling, leveraging the power of Large Language Models and AI Agents, we aim to significantly reduce time associated with this complex refactoring. The utilities within this repository, focusing on SQL translation and Flink project organization aligned with Kimball's dimensional modeling principles, to directly address the pain points of migrating and managing real-time data pipelines. 
 
-Here are the list of important features supported:
+The list of important features supported:
 
-* [ ] Support taking SQL / dbt sql scripts and migrate them with LLM to speed up a migration project to Apache Flink SQL. It supports understanding the static relationship between source SQL tables
-* [ ] Support defining code structure to manage Flink statements for DDL, DML, Makefile (wrapper on top of Confluent Cli), testing and metadata creation about the relationship from one Flink statement with other Flink statements.
+* [x] Support taking SQL / dbt sql scripts and migrate them, using LLM to speed up a migration to Apache Flink SQL. It supports understanding the static relationship between source SQL tables
+* [ ] Support defining code structure to manage Flink statements with DDL, DML, Makefile (wrapper on top of Confluent Cli), testing and metadata creation about the relationship from one Flink statement with other Flink statements (parent and descendant relationship).
 * [ ] Build table inventory for a project with metadata to help automate CI/CD work or supporting the shift_left tool itself
 * [ ] Create metadata about a pipeline for a given Flink Statement: those metadata includes, name, type of Flink statement (stateless, stateful), what are the direct ancestors of the flink statement, what are the children, users of the current Flink statement.
 * [ ] Build an execution plan for each pipeline to understand what needs to be started and redeployed to avoid brute force deployment. Execution plan is a topological sorted graph which helps to start Flink statements that are needed before other statements
@@ -68,7 +69,7 @@ At the system context level, for the tools of this repository, we can see the fo
 
 ## Shift_left tool
 
-The following diagram illustrates the development environment which, mainly, uses two docker container containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
+The following diagram illustrates the development environment which, mainly, uses two docker containers, or when not using docker, the ollama cli and a python virtual environment with needed modules.
 
 <figure markdown='span'>
 ![](./images/environment.drawio.png)

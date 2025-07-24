@@ -1,6 +1,14 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.28
+* Support getting the name of the table from DDL if not found in DML
+* Improve may-start-descendants processing and cross-product deployment constraint
+* Documentation update: Blue/green deployment
+* Add version to cli: shift_left --version
+* Clean reports consistency
+* Add more unit tests to validate execution-plan for Flink statements
+
 v0.1.27
 * dbt to Flink statement migration
 * project management
@@ -15,11 +23,3 @@ v0.1.27
 * support dynamic update of Flink SQL content to drive the deployment into different environments or within a multiple tenants Kafka Cluster. The code can be extended by users to adapt to their deployment strategy
 * documentation per user profile, recipe oriented.
 
-v0.1.28
-* Support getting the name of the table from DDL if not found in DML
-* KSQL migration agentic solution, with 3 prompts and call to Confluent POST statement to validate the migrated statement.
-* Improve may-start-descendants processing
-* Documentation update: Blue/green deployment, ksql migration
-* Add version to cli: shift_left --version
-* Clean reports
-* Add more tests to validate execution-plan for Flink statements
