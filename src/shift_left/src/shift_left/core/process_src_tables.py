@@ -313,10 +313,11 @@ def _process_ksql_sql_file(table_name: str,
     Process a ksql sql file to Flink SQL.
     """
     logger.info(f"Process ksql SQL file {ksql_src_file} to {staging_target_folder}")
-    table_folder, internal_table_name = build_folder_structure_for_table(table_name, staging_target_folder, None)
+    table_folder = table_name.lower()
+    table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, None)
     agent = KsqlTranslatorToFlinkSqlAgent()
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
-        dml_content, ddl_content = agent.translate_to_flink_sqls(table_name, ksql_content, validate=True)
+        ddl_content, dml_content  = agent.translate_to_flink_sqls(table_name, ksql_content, validate=True)
         _save_dml_ddl(table_folder, internal_table_name, dml_content, ddl_content)
         return ddl_content, dml_content

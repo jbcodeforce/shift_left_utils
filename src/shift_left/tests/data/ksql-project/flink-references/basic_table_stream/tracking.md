@@ -1,4 +1,4 @@
-## Fact Table: map_location
+## Fact Table: basic_table_stream
 
 Status date:
 

@@ -8,8 +8,12 @@ from typing import List
 from shift_left.core.utils.translator_to_flink_sql import KsqlTranslatorToFlinkSqlAgent
 from shift_left.core.process_src_tables import _process_ksql_sql_file
 from unittest.mock import patch
+import shutil
 
-class TestKsqlMigration(unittest.TestCase):
+class TestKsqlMigrations(unittest.TestCase):
+    """
+    Test the ksql migration to Flink SQLs.
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -17,7 +21,9 @@ class TestKsqlMigration(unittest.TestCase):
         os.environ["CONFIG_FILE"] = str(cls.data_dir / "config-ccloud.yaml")
         os.environ["STAGING"] = str(cls.data_dir / "ksql-project/staging/ut")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "ksql-project/sources")
-        os.makedirs(os.environ["STAGING"], exist_ok=True)   
+        shutil.rmtree(os.environ["STAGING"], ignore_errors=True)
+        os.makedirs(os.environ["STAGING"], exist_ok=True) 
+        
 
     def setUp(self):
         print("Should generate a flink ddl file in the staging/ut folder")
@@ -34,26 +40,39 @@ class TestKsqlMigration(unittest.TestCase):
     
     # -- test methods --
     @patch('builtins.input')
-    def test_ksql_table_declaration_migration(self, mock_input):
+    def test_1_basic_table(self, mock_input):
+        """
+        Test a basic table ksql create table migration. 
+        The table BASIC_TABLE_STREAM will be used to other tables.
+        """
         ksql_src_file = "ddl-basic-table.ksql"
-        mock_input.return_value = "n"
-        ddl, dml = _process_ksql_sql_file(table_name="basic_table", 
-            ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-        staging_target_folder=os.environ["STAGING"])
-        assert os.path.exists(os.environ["STAGING"] + "/basic_table/sql-scripts/ddl.basic_table.sql")
-        assert os.path.exists(os.environ["STAGING"] + "/basic_table/sql-scripts/dml.basic_table.sql")
+        mock_input.return_value = "y"
+        ddl, dml = _process_ksql_sql_file(table_name="BASIC_TABLE_STREAM", 
+                                          ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                                          staging_target_folder=os.environ["STAGING"]) 
+        assert ddl is not None
+        assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/dml.basic_table_stream.sql")
 
     @patch('builtins.input')
-    def test_ksql_table_with_latest_offset(self, mock_input):
-        ksql_src_file = "ddl-latest-offset-table.ksql"
+    def test_2_kpi_config_table_with_latest_offset(self, mock_input):
+        ksql_src_file = "ddl-kpi-config-table.ksql"
         mock_input.return_value = "n"
-        ddl, dml = _process_ksql_sql_file(table_name="latest_offset", 
-        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-        staging_target_folder=os.environ["STAGING"])
-        assert os.path.exists(os.environ["STAGING"] + "/latest_offset/sql-scripts/ddl.latest_offset.sql")
-        assert os.path.exists(os.environ["STAGING"] + "/latest_offset/sql-scripts/dml.latest_offset.sql")
+        ddl, dml = _process_ksql_sql_file(table_name="KPI_CONFIG_TABLE", 
+                ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                staging_target_folder=os.environ["STAGING"])
+        assert ddl is not None
+        assert dml is not None
+        assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/ddl.kpi_config_table.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/dml.kpi_config_table.sql")
 
-    def _test_ksql_filtering(self):
+    @patch('builtins.input')
+    def test_3_ksql_filtering(self, mock_input):
+        """
+        Test a filtering ksql create table migration.
+        The table FILTERING will be used to other tables.
+        """
+        mock_input.return_value = "n"
         ksql_src_file = "ddl-filtering.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="filtering", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 

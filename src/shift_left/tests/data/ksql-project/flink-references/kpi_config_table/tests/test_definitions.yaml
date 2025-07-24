@@ -1,0 +1,22 @@
+foundations:
+- table_name: BASIC_TABLE_STREAM
+  ddl_for_test: ./tests/ddl_BASIC_TABLE_STREAM.sql
+test_suite:
+- name: test_KPI_CONFIG_TABLE_1
+  inputs:
+  - table_name: BASIC_TABLE_STREAM
+    file_name: ./tests/insert_BASIC_TABLE_STREAM_1.sql
+    file_type: sql
+  outputs:
+  - table_name: KPI_CONFIG_TABLE
+    file_name: ./tests/validate_KPI_CONFIG_TABLE_1.sql
+    file_type: sql
+- name: test_KPI_CONFIG_TABLE_2
+  inputs:
+  - table_name: BASIC_TABLE_STREAM
+    file_name: ./tests/insert_BASIC_TABLE_STREAM_2.csv
+    file_type: csv
+  outputs:
+  - table_name: KPI_CONFIG_TABLE
+    file_name: ./tests/validate_KPI_CONFIG_TABLE_2.sql
+    file_type: sql

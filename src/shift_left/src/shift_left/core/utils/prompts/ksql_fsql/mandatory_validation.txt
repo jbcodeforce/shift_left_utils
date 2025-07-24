@@ -4,10 +4,11 @@ Modify the input Flink ddl and dml SQl scripts to ensure the following rules are
 * The create table need a primary key unforced, use the column used for 'distributed by' as primary key, or the first column declaration as a primary key
 * remove any "'topic' ="  declaration in the WITH section
 * do not remove 'distributed by'
+* be sure to have a "PRIMARY KEY() NOT ENFORCED" as last column declaration. Use the first column as primary key.
 * ensure each line for column declaration finishes with ,
 * validate the script is a Apache Flink SQL syntax
 * if there is declaration like   'connector' = 'kafka', and 'properties.bootstrap.servers' = 'localhost:9092', replace them with: 
-   'changelog.mode' = 'upsert',
+   'changelog.mode' = 'append',
   'key.avro-registry.schema-context' = '.flink-dev',
   'value.avro-registry.schema-context' = '.flink-dev',
   'key.format' = 'avro-registry',
@@ -18,5 +19,7 @@ Modify the input Flink ddl and dml SQl scripts to ensure the following rules are
   'scan.startup.mode' = 'earliest-offset',
   'value.fields-include' = 'all'
 
-
+* when the value format is json, use the declaration: " 'value.format' = 'json-registry'"
+* when the key format is json, use the declaration: " 'key.format' = 'json-registry'", if not do not specify "key.format"
+* Be sure to integrate Flink distribution for the partition with: ") DISTRIBUTED BY HASH() INTO 1 BUCKETS" after last column and before WITH. Use the defined PRIMARY KEY as argument to the HASH() function.
 generate in json format clearly separating the input and output statements. 

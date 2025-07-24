@@ -24,7 +24,7 @@ class TestKsqlMigration(unittest.TestCase):
     def test_migrate_basic_table(self):
         runner = CliRunner()
         try :
-            result = runner.invoke(app, ["migrate", "basic_table", os.getenv("SRC_FOLDER") + "/ddl-basic-table.ksql", os.getenv("STAGING") + "/ut", "--source-type", "ksql"])
+            result = runner.invoke(app, ["migrate", "basic_table_stream", os.getenv("SRC_FOLDER") + "/ddl-basic-table.ksql", os.getenv("STAGING"), "--source-type", "ksql"])
             assert result.exit_code == 0
         except Exception as e:
             print(e)

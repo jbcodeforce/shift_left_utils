@@ -16,7 +16,7 @@ What needs to be added is validation agents that execute syntatic validation and
 
 ## Future work
 
-For any language translation we need to start with a corpus of code source. It can be done programmatically from the source language, then for each generated implement the semantically equivalent Flink SQL counterparts. As an example taking ksqlDB or Spark SQL as source language.
+For any language translation, we need to start with a corpus of code source. It can be done programmatically from the source language, then for each generated code implement the semantically equivalent Flink SQL counterparts. 
 
 The goal of this corpus creation is to identify common ksqlDB or Spark SQL constructs (joins, aggregations, window functions, UDFs, etc.), then manually translate a smaller, diverse set of queries to establish translation rules. Then using these rules, we can generate permutations and variations of queries. It is crucial to test the generated Flink SQL against a test dataset to ensure semantic equivalence.
 
@@ -60,9 +60,11 @@ Flink SQL has more advanced windowing capabilities. For example:
 
 ### ksqlDB to Flink SQL
 
-Be sure to have a virtual environment and the `uv` package manager.
+The prompts are defined in the [src/shift_left/core/utils/prompts/ksql_fsql folder](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/prompts)
 
-kSQLDB has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompt needs to support migration examples outside of the classical select and create table.
+Be sure to have a Python virtual environment created and the `uv` package manager (see [setup instructions](https://jbcodeforce.github.io/shift_left_utils/contributing/#environment-set-up) for developers). Use a config file with all the necessary setting and the environment variable CONFIG_FILE to point to this file.
+
+kSQLdb has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompts need to support migration examples outside of the classical select and create table.
 
 For kSQL the approach is to use 3 agents with different prompt and the Confluent Cloud for Flink REST API to deploy the translated SQL for validation.
 
@@ -78,12 +80,35 @@ The code uses the multi-agent with human in the loop to validate the SQL on Conf
 
 ![](./images/ai_agent_new_flow.drawio.png)
 
+#### Test Data Set
+
+The [tests/data/ksql-project](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/tests/data/ksql-project/sources) folder includes a set of ksql scripts to be used as benchmark for migration. The matching Flink SQL is in the `flink-references` folder.
+
 #### Running unit testing
 
-The ksql source files to validate migration, are under `src/shift_left/tests/data/ksql-project/sources` folder.
+To execute the migration use the following command:
 
 ```sh
 uv run pytest -s tests/ai/test_ksql_migration.py
 ```
 
-The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksql-project/staging/data_product` folder.
+The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksql-project/staging/ut` folder using the table structure defined in shift_left tool.
+
+#### Demonstration
+
+* Set environment variables:
+  ```sh
+  export CONFIG_FILE=tests/config-ccloud.yaml
+  export PIPELINES=tests/data/ksql-project/staging/ut
+  export STAGING=tests/data/ksql-project/staging/ut
+  export SRC_FOLDER=tests/data/ksql-project/sources
+  ```
+
+* Migrate the basic table with:
+  ```sh
+  shift_left table migrate basic_table_stream $SRC_FOLDER/ddl-basic-table.ksql $STAGING --source-type ksql
+  ```
+
+* Create synthetic data for this basic table:
+  ```sh
+  ```

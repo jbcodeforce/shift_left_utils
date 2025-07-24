@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- latest_offset
-TABLE_NAME=latest_offset
+# --- kpi_config_table
+TABLE_NAME=kpi_config_table
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_latest_offset: create_flink_ddl  create_flink_dml
+create_kpi_config_table: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_latest_offset: 
+drop_table_kpi_config_table: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_latest_offset
+delete_data: delete_schemas delete_topic_kpi_config_table

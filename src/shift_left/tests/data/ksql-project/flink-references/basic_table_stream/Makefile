@@ -1,7 +1,7 @@
-include ../../../common.mk
+include ../../common.mk
 
-# --- basic_table
-TABLE_NAME=basic_table
+# --- basic_table_stream
+TABLE_NAME=basic_table_stream
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -10,10 +10,10 @@ DROP_DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-drop-$(SCRIPT_POST_KEBAB)
 DDL_SCRIPT=./sql-scripts/ddl.$(TABLE_NAME).sql
 DML_STATEMENT=$(SCRIPT_PRE_KEBAB)-dml-$(SCRIPT_POST_KEBAB)
 DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
-DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
+
 
 # --- Entry point
-create_basic_table: create_flink_ddl  create_flink_dml
+create_basic_table_stream: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_basic_table: 
+drop_table_basic_table_stream: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -62,4 +62,13 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_basic_table
+delete_data: delete_schemas delete_topic_basic_table_stream
+
+DML_TESTS_SCRIPT=./tests/insert_BASIC_TABLE_STREAM_1.sql
+TEST_STATEMENT=$(SCRIPT_PRE_KEBAB)-test-1-$(SCRIPT_POST_KEBAB)
+
+create_ut_test_1:
+	$(call create_flink_statement, $(TEST_STATEMENT), $(DML_TESTS_SCRIPT)) 
+
+delete_ut_test_1:
+	$(call delete_flink_statement, $(TEST_STATEMENT))

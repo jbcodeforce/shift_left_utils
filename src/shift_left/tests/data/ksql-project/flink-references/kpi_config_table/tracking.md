@@ -1,4 +1,4 @@
-## Fact Table: basic_table
+## Fact Table: kpi_config_table
 
 Status date:
 

@@ -209,12 +209,12 @@ class TestKsqlCodeAgent(unittest.TestCase):
     def test_translate_without_validation(self, mock_print, mock_input):
         """Test basic translation without validation (validate=False)."""
         # Mock the agent methods
-        self.agent._translator_agent = MagicMock(return_value=("DML_SQL", "DDL_SQL"))
-        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
+        self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
+        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=False)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=False)
         
         # Assertions
         self.assertEqual(result_dml, "UPDATED_DML")
@@ -228,19 +228,18 @@ class TestKsqlCodeAgent(unittest.TestCase):
         mock_input.assert_not_called()
     
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_translate_with_validation_user_declines(self, mock_print, mock_input):
+    def test_translate_with_validation_user_declines(self, mock_input):
         """Test translation with validation=True but user chooses not to continue."""
         # Mock the agent methods
-        self.agent._translator_agent = MagicMock(return_value=("DML_SQL", "DDL_SQL"))
-        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
+        self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
+        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
         
         # User chooses not to continue validation
         mock_input.return_value = "n"
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
         self.assertEqual(result_dml, "UPDATED_DML")
@@ -258,7 +257,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
     def test_translate_with_validation_full_success(self, mock_print, mock_input, mock_iterate_validation):
         """Test translation with validation where both DDL and DML validate successfully."""
         # Mock the agent methods
-        self.agent._translator_agent = MagicMock(return_value=("DML_SQL", "DDL_SQL"))
+        self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
         
@@ -273,7 +272,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
         self.assertEqual(result_dml, "SEMANTIC_VALIDATED_DML")
@@ -300,7 +299,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
     def test_translate_with_validation_ddl_success_dml_fail(self, mock_print, mock_input, mock_iterate_validation):
         """Test translation with validation where DDL succeeds but DML fails validation."""
         # Mock the agent methods
-        self.agent._translator_agent = MagicMock(return_value=("DML_SQL", "DDL_SQL"))
+        self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
         
@@ -315,7 +314,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
         self.assertEqual(result_dml, "FAILED_DML")  # DML not semantically processed due to failure
@@ -332,8 +331,8 @@ class TestKsqlCodeAgent(unittest.TestCase):
     def test_translate_with_validation_ddl_fails(self, mock_print, mock_input, mock_iterate_validation):
         """Test translation with validation where DDL validation fails."""
         # Mock the agent methods
-        self.agent._translator_agent = MagicMock(return_value=("DML_SQL", "DDL_SQL"))
-        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
+        self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
+        self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
         
         # User chooses to continue validation
@@ -344,7 +343,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
         self.assertEqual(result_dml, "UPDATED_DML")  # Original DML returned
@@ -371,7 +370,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._mandatory_validation_agent = MagicMock(return_value=("", ""))
         
         # Test with empty KSQL input
-        result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql("", validate=False)
+        result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql("", validate=False)
         self.assertEqual(result_dml, "")
         self.assertEqual(result_ddl, "")
         
@@ -379,7 +378,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         for user_input in ["n", "N", "no", "quit", "", "anything_not_y"]:
             with self.subTest(user_input=user_input):
                 mock_input.return_value = user_input
-                result_dml, result_ddl = self.agent.translate_from_ksql_to_flink_sql("TEST", validate=True)
+                result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql("TEST", validate=True)
                 self.assertEqual(result_dml, "")
                 self.assertEqual(result_ddl, "")
     
@@ -393,7 +392,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         
         def translator_side_effect(ksql):
             call_order.append("translator_agent")
-            return ("DML", "DDL")
+            return ("DDL", "DML")
         
         def mandatory_validation_side_effect(ddl, dml):
             call_order.append("mandatory_validation_agent")

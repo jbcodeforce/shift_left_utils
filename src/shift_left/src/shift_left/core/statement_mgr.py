@@ -138,7 +138,7 @@ def delete_statement_if_exists(statement_name) -> str | None:
         config = get_config()
         client = ConfluentCloudClient(config)
         result = client.delete_flink_statement(statement_name)
-
+        logger.info(f"Delete statement {statement_name} result: {result}")
     else: # not found in cache, do remote API call
         logger.info(f"{statement_name} not found in cache")
         config = get_config()

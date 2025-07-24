@@ -1,4 +1,4 @@
-## Fact Table: latest_offset
+## Fact Table: basic_table_stream
 
 Status date:
 
