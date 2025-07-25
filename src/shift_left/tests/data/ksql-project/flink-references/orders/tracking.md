@@ -1,4 +1,4 @@
-## Fact Table: basic_table_stream
+## Fact Table: orders
 
 Status date:
 

@@ -75,6 +75,7 @@ def migrate(
         sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
         target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
         source_type: str = typer.Option(default="spark", help="the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc."),
+        validate: bool = typer.Option(False, "--validate", help="Validate the migrated sql using Confluent Cloud for Flink."),
         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
     """
     Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 

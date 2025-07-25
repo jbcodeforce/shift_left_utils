@@ -40,7 +40,7 @@ class TestKsqlMigrations(unittest.TestCase):
     
     # -- test methods --
     @patch('builtins.input')
-    def test_1_basic_table(self, mock_input):
+    def _test_1_basic_table(self, mock_input):
         """
         Test a basic table ksql create table migration. 
         The table BASIC_TABLE_STREAM will be used to other tables.

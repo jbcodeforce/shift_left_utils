@@ -40,7 +40,8 @@ def migrate_one_file(table_name: str,
                     staging_target_folder: str, 
                     src_folder_path: str,
                     process_parents: bool = False,
-                    source_type: str = "spark"):
+                    source_type: str = "spark",
+                    validate: bool = False):
     """ Process one source sql file to extract code from and migrate to Flink SQL """
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
@@ -48,13 +49,13 @@ def migrate_one_file(table_name: str,
         if sql_src_file.endswith(".sql"):
             product_name= extract_product_name(sql_src_file)
             if sql_src_file.find("source") > 0:
-                _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name)
+                _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name, validate)
             else:
-                _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents)
+                _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents, validate)
         else:
             raise Exception("Error: the sql_src_file parameter needs to be a sql or ksqlfile")
     elif source_type == "ksql":
-        _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder)
+        _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
         
@@ -194,7 +195,8 @@ def _search_table_in_processed_tables(table_name: str) -> bool:
 def _process_source_sql_file(table_name: str,
                             src_file_name: str, 
                              target_path: str, 
-                             product_name: str):
+                             product_name: str,
+                             validate: bool = False):
     """
     Transform the source file content to the new Flink SQL format within the source_target_path.
     It creates a tests folder.
@@ -216,7 +218,8 @@ def _process_non_source_sql_file(table_name: str,
                                 sql_src_file_name: str, 
                                 target_path: str, 
                                 src_folder_path: str,
-                                walk_parent: bool = False):
+                                walk_parent: bool = False,
+                                validate: bool = False):
     """
     Transform intermediate or fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -225,6 +228,7 @@ def _process_non_source_sql_file(table_name: str,
     :param target_path 
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
+    :param validate: Assess if it needs to validate the sql using Confluent Cloud for Flink
     """
     logger.debug(f"process SQL file {sql_src_file_name}")
     product_path = os.path.dirname(sql_src_file_name).replace(src_folder_path, "",1)[1:]
@@ -238,7 +242,7 @@ def _process_non_source_sql_file(table_name: str,
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        dml, ddl = translator_agent.translate_to_flink_sqls(table_name, sql_content)
+        dml, ddl = translator_agent.translate_to_flink_sqls(table_name, sql_content, validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dml, ddl)
     if walk_parent:
         parents=_remove_already_processed_table(parents)
@@ -307,7 +311,8 @@ def _find_sub_string(table_name, topic_name) -> bool:
 
 def _process_ksql_sql_file(table_name: str, 
                            ksql_src_file: str, 
-                           staging_target_folder: str
+                           staging_target_folder: str,
+                           validate: bool = False
                            ) -> Tuple[str, str]:
     """
     Process a ksql sql file to Flink SQL.
@@ -318,6 +323,6 @@ def _process_ksql_sql_file(table_name: str,
     agent = KsqlTranslatorToFlinkSqlAgent()
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
-        ddl_content, dml_content  = agent.translate_to_flink_sqls(table_name, ksql_content, validate=True)
+        ddl_content, dml_content  = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dml_content, ddl_content)
         return ddl_content, dml_content

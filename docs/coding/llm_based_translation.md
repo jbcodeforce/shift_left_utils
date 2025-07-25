@@ -86,13 +86,17 @@ The [tests/data/ksql-project](https://github.com/jbcodeforce/shift_left_utils/bl
 
 #### Running unit testing
 
-To execute the migration use the following command:
-
-```sh
-uv run pytest -s tests/ai/test_ksql_migration.py
-```
+* To execute all the ksql migrations, use the following command:
+  ```sh
+  uv run pytest -s tests/ai/test_ksql_migration.py
+  ```
 
 The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksql-project/staging/ut` folder using the table structure defined in shift_left tool.
+
+* To test a specific migration:
+  ```sh
+  uv run pytest -s tests/ai/test_ksql_migration.py::test_2_kpi_config_table_with_latest_offset
+  ```
 
 #### Demonstration
 
@@ -109,6 +113,18 @@ The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksq
   shift_left table migrate basic_table_stream $SRC_FOLDER/ddl-basic-table.ksql $STAGING --source-type ksql
   ```
 
-* Create synthetic data for this basic table:
+???- info "An already migrated example"
+  The code under `tests/data/ksql-project/flink-references` includes migrated code with some test values to be able to deploy them with make and confluent cli. For example for the basic_table_stream table we can do:
+  ```sh
+  make create_flink_ddl: 
+  ``` 
+  and then populate some test records with
+  ```sh
+  make create_ut_test_1
+  ```
+  Verify in the console the table content.
+
+* Migrate a complex table:
   ```sh
   ```
+

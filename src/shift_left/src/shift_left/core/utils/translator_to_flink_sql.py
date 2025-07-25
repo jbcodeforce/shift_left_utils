@@ -18,7 +18,7 @@ class TranslatorToFlinkSqlAgent(BaseModel):
 
 
 class DbtTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
-    def translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = False) -> Tuple[str, str]:
+    def  translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = False) -> Tuple[str, str]:
         logger.info(f"Start translating dbt to flink sql for table {table_name}")
         app = define_flink_sql_agent()
         inputs = {"sql_input": sql, "table_name" : table_name}
@@ -30,8 +30,8 @@ class KsqlTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     ksqlDB translator to Flink SQL
     """
     def translate_to_flink_sqls(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[str, str]:
-        logger.info(f"1/ Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
-        print(f"1/ Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
+        logger.info(f"Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
+        print(f"Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
         agent = KsqlToFlinkSqlAgent()
         ddl, dml = agent.translate_from_ksql_to_flink_sql(ksql, validate=validate)
         return ddl, dml
