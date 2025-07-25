@@ -145,7 +145,16 @@ class Change_SchemaContext(TableWorker):
                     sql_out+=line + "\n"
         logger.debug(f"SQL transformed to {sql_out}")
         return updated, sql_out
-     
+
+class NoChangeDoneToSqlContent(TableWorker):
+    def update_sql_content(self, 
+                        sql_content: str, 
+                        column_to_search: str= None, 
+                        product_name: str= None,
+                        string_to_change_from: str= None, 
+                        string_to_change_to: str= None)  -> Tuple[bool, str]:
+        return False, sql_content
+    
 class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"

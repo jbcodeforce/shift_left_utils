@@ -32,7 +32,8 @@ from shift_left.core.models.flink_statement_model import (
 from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
-from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
+from shift_left.core.utils.table_worker import NoChangeDoneToSqlContent
+
 STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
@@ -346,7 +347,7 @@ def get_or_build_sql_content_transformer():
             mod = import_module(module_path)
             _runner_class = getattr(mod, class_name)()
         else:
-            _runner_class = ReplaceEnvInSqlContent()
+            _runner_class = NoChangeDoneToSqlContent()
     return _runner_class
 
 def map_to_statement_info(info: Statement) -> StatementInfo:
