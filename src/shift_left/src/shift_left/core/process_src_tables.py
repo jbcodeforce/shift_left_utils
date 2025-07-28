@@ -23,7 +23,7 @@ from shift_left.core.utils.file_search import (
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions, get_long_table_name
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 TMPL_FOLDER="templates"
@@ -154,17 +154,24 @@ def _save_one_file(fname: str, content: str):
 
 def _save_dml_ddl(content_path: str, 
                   internal_table_name: str, 
-                  dml: str, 
-                  ddl: str):
+                  dmls: List[str], 
+                  ddls: List[str]):
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
-    ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{internal_table_name}.sql"
-    _save_one_file(ddl_fn, ddl)
-    _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
-    dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{internal_table_name}.sql"
-    _save_one_file(dml_fn,dml)
-
+    idx=0
+    for ddl in ddls:
+        table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+        ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
+        _save_one_file(ddl_fn, ddl)
+        _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
+        idx+=1
+    idx=0
+    for dml in dmls:
+        table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+        dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql"
+        _save_one_file(dml_fn,dml)
+        idx+=1
 
 def _remove_already_processed_table(parents: list[str]) -> list[str]:
     """
@@ -313,7 +320,7 @@ def _process_ksql_sql_file(table_name: str,
                            ksql_src_file: str, 
                            staging_target_folder: str,
                            validate: bool = False
-                           ) -> Tuple[str, str]:
+                           ) -> Tuple[List[str], List[str]]:
     """
     Process a ksql sql file to Flink SQL.
     """

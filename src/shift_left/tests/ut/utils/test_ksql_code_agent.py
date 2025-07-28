@@ -9,7 +9,7 @@ import os
 # Set up test environment
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 
-from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent, _iterate_on_validation
+from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent, KsqlTableDetection
 
 
 class TestKsqlCodeAgent(unittest.TestCase):
@@ -22,6 +22,108 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.refined_sql = "SELECT id, name FROM test_table"
         self.error_message = "Column 'invalid_column' does not exist"
     
+    def test_clean_ksql_input(self):
+        """
+        Test the _clean_ksql_input function to ensure it properly removes
+        DROP TABLE statements and comment lines starting with '--'
+        """
+        # Create an instance of the agent for testing
+        agent = KsqlToFlinkSqlAgent()
+        
+        # Test case 1: Simple DROP TABLE removal
+        ksql_input = """
+DROP TABLE IF EXISTS old_table;
+CREATE TABLE new_table (
+    id INT,
+    name STRING
+) WITH (
+    'connector' = 'kafka',
+    'topic' = 'my-topic'
+);
+"""
+        expected_output = """
+CREATE TABLE new_table (
+    id INT,
+    name STRING
+) WITH (
+    'connector' = 'kafka',
+    'topic' = 'my-topic'
+);
+"""
+        result = agent._clean_ksql_input(ksql_input)
+        self.assertEqual(result, expected_output)
+        
+        # Test case 2: Comment lines removal
+        ksql_input = """
+-- This is a comment
+CREATE TABLE test_table (
+    id INT,
+    -- Another comment
+    name STRING
+) WITH (
+    'connector' = 'kafka'
+);
+-- Final comment
+"""
+        expected_output = """
+CREATE TABLE test_table (
+    id INT,
+    name STRING
+) WITH (
+    'connector' = 'kafka'
+);
+"""
+        result = agent._clean_ksql_input(ksql_input)
+        self.assertEqual(result, expected_output)
+        
+        # Test case 3: Mixed DROP TABLE and comments (case insensitive)
+        ksql_input = """
+-- Header comment
+drop table if exists temp_table;
+DROP TABLE another_table;
+CREATE STREAM my_stream (
+    -- Field comment
+    event_id STRING,
+    timestamp BIGINT
+) WITH (
+    'kafka.topic' = 'events'
+);
+-- End comment
+"""
+        expected_output = """
+CREATE STREAM my_stream (
+    event_id STRING,
+    timestamp BIGINT
+) WITH (
+    'kafka.topic' = 'events'
+);
+"""
+        result = agent._clean_ksql_input(ksql_input)
+        self.assertEqual(result, expected_output)
+        
+        # Test case 4: No changes needed
+        ksql_input = """
+CREATE TABLE clean_table (
+    id INT,
+    data STRING
+) WITH (
+    'connector' = 'kafka'
+);
+"""
+        result = agent._clean_ksql_input(ksql_input)
+        self.assertEqual(result, ksql_input)
+        
+        # Test case 5: Empty and whitespace handling
+        ksql_input = """
+
+CREATE TABLE spaced_table (
+    id INT
+);
+
+"""
+        result = agent._clean_ksql_input(ksql_input)
+        self.assertEqual(result, ksql_input)
+
     @patch('builtins.input')
     def test_successful_validation_first_try(self, mock_input):
         """Test successful validation on the first attempt."""
@@ -29,7 +131,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._validate_flink_sql_on_cc = MagicMock(return_value=(True, ""))
         mock_input.return_value = "y"
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertEqual(result_sql, self.test_sql)
@@ -38,8 +140,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
 
 
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_validation_fails_then_succeeds_after_refinement(self, mock_print, mock_input):
+    def test_validation_fails_then_succeeds_after_refinement(self, mock_input):
         """Test validation fails first, succeeds after refinement."""
         # Mock validation: fails first, succeeds second
         self.agent._validate_flink_sql_on_cc = MagicMock(side_effect=[
@@ -49,7 +150,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._refinement_agent = MagicMock(return_value=self.refined_sql)
         mock_input.return_value = "y"
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertEqual(result_sql, self.refined_sql)
@@ -76,7 +177,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         ])
         mock_input.return_value = "y"
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertFalse(is_validated)
@@ -94,7 +195,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._refinement_agent = MagicMock(return_value=self.refined_sql)
         mock_input.return_value = "n"  # User chooses to stop
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertEqual(result_sql, self.refined_sql)
@@ -116,7 +217,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         # User continues first time, stops second time
         mock_input.side_effect = ["y", "n"]
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertEqual(result_sql, "SELECT refined_2 FROM test_table")
@@ -133,7 +234,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._validate_flink_sql_on_cc = MagicMock(return_value=(True, ""))
         mock_input.return_value = "n"  # User chooses to stop
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Assertions
         self.assertEqual(result_sql, self.test_sql)
@@ -156,7 +257,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         ])
         mock_input.return_value = "y"
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
         
         # Verify refinement agent was called with proper history
         calls = self.agent._refinement_agent.call_args_list
@@ -179,7 +280,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._validate_flink_sql_on_cc = MagicMock(return_value=(True, ""))
         mock_input.return_value = "y"
         
-        result_sql, is_validated = _iterate_on_validation(self.agent, empty_sql)
+        result_sql, is_validated = self.agent._iterate_on_validation(empty_sql)
         
         self.assertEqual(result_sql, empty_sql)
         self.assertTrue(is_validated)
@@ -194,7 +295,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         for user_input in ["n", "N", "no", "quit", "", "anything_else"]:
             with self.subTest(user_input=user_input):
                 mock_input.return_value = user_input
-                result_sql, is_validated = _iterate_on_validation(self.agent, self.test_sql)
+                result_sql, is_validated = self.agent._iterate_on_validation(self.test_sql)
                 self.assertEqual(result_sql, self.test_sql)
                 self.assertTrue(is_validated)
 
@@ -210,14 +311,15 @@ class TestKsqlCodeAgent(unittest.TestCase):
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=False)
         
         # Assertions
-        self.assertEqual(result_dml, "UPDATED_DML")
-        self.assertEqual(result_ddl, "UPDATED_DDL")
+        self.assertEqual(result_dml, ["UPDATED_DML"])
+        self.assertEqual(result_ddl, ["UPDATED_DDL"])
         
         # Verify method calls
         self.agent._translator_agent.assert_called_once_with(ksql_input)
@@ -232,7 +334,7 @@ class TestKsqlCodeAgent(unittest.TestCase):
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
-        
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         # User chooses not to continue validation
         mock_input.return_value = "n"
         
@@ -241,8 +343,8 @@ class TestKsqlCodeAgent(unittest.TestCase):
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
-        self.assertEqual(result_dml, "UPDATED_DML")
-        self.assertEqual(result_ddl, "UPDATED_DDL")
+        self.assertEqual(result_dml, ["UPDATED_DML"])
+        self.assertEqual(result_ddl, ["UPDATED_DDL"])
         
         # Verify method calls
         self.agent._translator_agent.assert_called_once_with(ksql_input)
@@ -250,32 +352,31 @@ class TestKsqlCodeAgent(unittest.TestCase):
         mock_input.assert_called_once()
         
     
-    @patch('shift_left.core.utils.ksql_code_agent._iterate_on_validation')
+
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_translate_with_validation_full_success(self, mock_print, mock_input, mock_iterate_validation):
+    def test_translate_with_validation_full_success(self, mock_input):
         """Test translation with validation where both DDL and DML validate successfully."""
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
-        
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         # User chooses to continue validation
         mock_input.return_value = "y"
         
         # Mock successful validation for both DDL and DML
-        mock_iterate_validation.side_effect = [
+        self.agent._iterate_on_validation= MagicMock(side_effect = [
             ("VALIDATED_DDL", True),   # DDL validation succeeds
             ("VALIDATED_DML", True)    # DML validation succeeds
-        ]
-        
+        ])
+   
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
-        self.assertEqual(result_dml, "SEMANTIC_VALIDATED_DML")
-        self.assertEqual(result_ddl, "SEMANTIC_VALIDATED_DDL")
+        self.assertEqual(result_dml, ["SEMANTIC_VALIDATED_DML"])
+        self.assertEqual(result_ddl, ["SEMANTIC_VALIDATED_DDL"])
         
         # Verify method calls
         self.agent._translator_agent.assert_called_once_with(ksql_input)
@@ -283,77 +384,73 @@ class TestKsqlCodeAgent(unittest.TestCase):
         mock_input.assert_called_once()
         
         # Verify _iterate_on_validation was called for both DDL and DML
-        self.assertEqual(mock_iterate_validation.call_count, 2)
-        mock_iterate_validation.assert_any_call(self.agent, "UPDATED_DDL")
-        mock_iterate_validation.assert_any_call(self.agent, "UPDATED_DML")
+        self.assertEqual(self.agent._iterate_on_validation.call_count, 2)
+        self.agent._iterate_on_validation.assert_any_call("UPDATED_DDL")
+        self.agent._iterate_on_validation.assert_any_call("UPDATED_DML")
         
         # Verify semantic validation was called for both
         self.assertEqual(self.agent._process_semantic_validation.call_count, 2)
         self.agent._process_semantic_validation.assert_any_call("VALIDATED_DDL")
         self.agent._process_semantic_validation.assert_any_call("VALIDATED_DML")
     
-    @patch('shift_left.core.utils.ksql_code_agent._iterate_on_validation')
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_translate_with_validation_ddl_success_dml_fail(self, mock_print, mock_input, mock_iterate_validation):
+    def test_translate_with_validation_ddl_success_dml_fail(self, mock_input):
         """Test translation with validation where DDL succeeds but DML fails validation."""
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DML", "UPDATED_DDL"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
-        
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         # User chooses to continue validation
         mock_input.return_value = "y"
         
         # Mock validation: DDL succeeds, DML fails
-        mock_iterate_validation.side_effect = [
+        self.agent._iterate_on_validation= MagicMock(side_effect = [
             ("VALIDATED_DDL", True),   # DDL validation succeeds
             ("FAILED_DML", False)      # DML validation fails
-        ]
+        ])
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
-        self.assertEqual(result_dml, "FAILED_DML")  # DML not semantically processed due to failure
-        self.assertEqual(result_ddl, "SEMANTIC_VALIDATED_DDL")  # DDL was semantically processed
+        self.assertEqual(result_dml, ["FAILED_DML"])  # DML not semantically processed due to failure
+        self.assertEqual(result_ddl, ["SEMANTIC_VALIDATED_DDL"])  # DDL was semantically processed
         
         # Verify method calls
-        self.assertEqual(mock_iterate_validation.call_count, 2)
+        self.assertEqual(self.agent._iterate_on_validation.call_count, 2)
         # Verify semantic validation was called only for DDL (since DML failed)
         self.agent._process_semantic_validation.assert_called_once_with("VALIDATED_DDL")
     
-    @patch('shift_left.core.utils.ksql_code_agent._iterate_on_validation')
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_translate_with_validation_ddl_fails(self, mock_print, mock_input, mock_iterate_validation):
+    def test_translate_with_validation_ddl_fails(self, mock_input):
         """Test translation with validation where DDL validation fails."""
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("DDL_SQL", "DML_SQL"))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("UPDATED_DDL", "UPDATED_DML"))
         self.agent._process_semantic_validation = MagicMock(side_effect=lambda x: f"SEMANTIC_{x}")
-        
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         # User chooses to continue validation
         mock_input.return_value = "y"
         
         # Mock DDL validation failure
-        mock_iterate_validation.return_value = ("FAILED_DDL", False)
+        self.agent._iterate_on_validation= MagicMock(return_value = ("FAILED_DDL", False))
         
         ksql_input = "CREATE STREAM test AS SELECT * FROM source"
         
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql(ksql_input, validate=True)
         
         # Assertions
-        self.assertEqual(result_dml, "UPDATED_DML")  # Original DML returned
-        self.assertEqual(result_ddl, "FAILED_DDL")   # Failed DDL returned
+        self.assertEqual(result_dml, ["UPDATED_DML"])  # Original DML returned
+        self.assertEqual(result_ddl, ["FAILED_DDL"])   # Failed DDL returned
         
         # Verify method calls
         self.agent._translator_agent.assert_called_once_with(ksql_input)
         self.agent._mandatory_validation_agent.assert_called_once_with("DDL_SQL", "DML_SQL")
         
         # Verify _iterate_on_validation was called only once (for DDL)
-        mock_iterate_validation.assert_called_once_with(self.agent, "UPDATED_DDL")
+        self.agent._iterate_on_validation.assert_called_once_with("UPDATED_DDL")
         
         # Verify no semantic validation occurred
         self.agent._process_semantic_validation.assert_not_called()
@@ -367,24 +464,23 @@ class TestKsqlCodeAgent(unittest.TestCase):
         # Mock the agent methods
         self.agent._translator_agent = MagicMock(return_value=("", ""))
         self.agent._mandatory_validation_agent = MagicMock(return_value=("", ""))
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         
         # Test with empty KSQL input
         result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql("", validate=False)
-        self.assertEqual(result_dml, "")
-        self.assertEqual(result_ddl, "")
+        self.assertEqual(result_dml, [''])
+        self.assertEqual(result_ddl, [''])
         
         # Test with various user inputs for validation prompt
         for user_input in ["n", "N", "no", "quit", "", "anything_not_y"]:
             with self.subTest(user_input=user_input):
                 mock_input.return_value = user_input
                 result_ddl, result_dml = self.agent.translate_from_ksql_to_flink_sql("TEST", validate=True)
-                self.assertEqual(result_dml, "")
-                self.assertEqual(result_ddl, "")
+                self.assertEqual(result_dml, [''])
+                self.assertEqual(result_ddl, [''])
     
-    @patch('shift_left.core.utils.ksql_code_agent._iterate_on_validation')
     @patch('builtins.input')
-    @patch('builtins.print')
-    def test_translate_method_call_order(self, mock_print, mock_input, mock_iterate_validation):
+    def test_translate_method_call_order(self, mock_input):
         """Test that methods are called in the correct order during translation."""
         # Mock the agent methods with side effects to track call order
         call_order = []
@@ -404,13 +500,13 @@ class TestKsqlCodeAgent(unittest.TestCase):
         self.agent._translator_agent = MagicMock(side_effect=translator_side_effect)
         self.agent._mandatory_validation_agent = MagicMock(side_effect=mandatory_validation_side_effect)
         self.agent._process_semantic_validation = MagicMock(side_effect=semantic_validation_side_effect)
-        
+        self.agent._table_detection_agent = MagicMock(return_value=KsqlTableDetection(has_multiple_tables=False, table_statements=[], description=""))
         # User continues with validation
         mock_input.return_value = "y"
-        mock_iterate_validation.side_effect = [
+        self.agent._iterate_on_validation= MagicMock(side_effect = [
             ("VALIDATED_DDL", True),
             ("VALIDATED_DML", True)
-        ]
+        ])
         
         self.agent.translate_from_ksql_to_flink_sql("TEST", validate=True)
         

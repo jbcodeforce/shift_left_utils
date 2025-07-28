@@ -3,7 +3,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 
 from pydantic import BaseModel
-from typing import Tuple
+from typing import Tuple, List  
 import os
 import importlib.resources 
 
@@ -39,7 +39,41 @@ class FlinkSqlForRefinement(BaseModel):
 
 class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
 
+    def _clean_ksql_input(self, ksql: str) -> str:
+        """
+        Clean KSQL input by removing DROP TABLE statements and comment lines starting with '--'
         
+        Args:
+            ksql (str): The raw KSQL string to clean
+            
+        Returns:
+            str: Cleaned KSQL string with DROP TABLE statements and comments removed
+        """
+        lines = ksql.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            stripped_line = line.strip()
+            
+            # Skip empty lines
+            if not stripped_line:
+                cleaned_lines.append(stripped_line)
+                continue
+                
+            # Skip comment lines starting with --
+            if stripped_line.startswith('--'):
+                continue
+                
+            # Skip DROP TABLE statements (case insensitive)
+            if stripped_line.upper().startswith('DROP TABLE'):
+                continue
+            # Skip DROP STREAM statements (case insensitive)
+            if stripped_line.upper().startswith('DROP STREAM'):
+                continue
+            cleaned_lines.append(line)
+        
+        return '\n'.join(cleaned_lines)
+    
     def _load_prompts(self):
         fname = importlib.resources.files("shift_left.core.utils.prompts.ksql_fsql").joinpath("translator.txt")
         with fname.open("r") as f:
@@ -144,10 +178,17 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         """
         return sql
 
-    def translate_from_ksql_to_flink_sql(self, ksql: str, validate: bool = False) -> Tuple[str, str]:
+    def translate_from_ksql_to_flink_sql(self, ksql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
         """
         Entry point to translate ksql to flink sql using LLM Agents. This is the workflow implementation.
         """
+        
+        # Step 0: Clean the KSQL input by removing DROP TABLE statements and comments
+        print("0/ Cleaning KSQL input by removing DROP TABLE statements and comment lines...")
+        logger.info("Starting KSQL input cleaning")
+        ksql = self._clean_ksql_input(ksql)
+        print(f"Cleaned KSQL input: {ksql[:200]}...")
+        logger.info("KSQL input cleaning completed")
         
         # Step 1: Detect if there are multiple CREATE TABLE statements
         print("1/ Analyzing KSQL input for multiple CREATE TABLE statements...")
@@ -181,33 +222,38 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
                     all_dml_statements.append(dml_sql)
             
             # Combine all statements
-            final_ddl = "\n\n".join(all_ddl_statements)
-            final_dml = "\n\n".join(all_dml_statements) if all_dml_statements else ""
+            final_ddl = all_ddl_statements
+            final_dml = all_dml_statements
             
         else:
-            # Single statement processing (original workflow)
+            # Single statement processing
             print("2/ Processing single KSQL statement...")
             ddl_sql, dml_sql = self._translator_agent(ksql)
             print(f"Done with translator agent, the flink DDL sql is:\n {ddl_sql}\nand DML: {dml_sql if dml_sql else 'empty'}\n3/ Start mandatory validation agent...")
             logger.info(f"Done with translator agent, the flink DDL sql is:\n {ddl_sql}\nand DML: {dml_sql if dml_sql else 'empty'}")
-            final_ddl, final_dml = self._mandatory_validation_agent(ddl_sql, dml_sql)
-            print(f"Done with mandatory validation agent updated flink DDL sql is:\n {final_ddl}\nand DML: {final_dml if final_dml else 'empty'}")
-            logger.info(f"Done with mandatory validation agent, updated flink DDL sql is:\n {final_ddl}\nand DML: {final_dml if final_dml else 'empty'}")
+            ddl, dml = self._mandatory_validation_agent(ddl_sql, dml_sql)
+            print(f"Done with mandatory validation agent updated flink DDL sql is:\n {ddl}\nand DML: {dml if dml else 'empty'}")
+            logger.info(f"Done with mandatory validation agent, updated flink DDL sql is:\n {ddl}\nand DML: {dml if dml else 'empty'}")
+            final_ddl = [ddl]
+            final_dml = [dml]
         
         if validate:
             print("4/ Start validating the flink SQLs using Confluent Cloud for Flink, do you want to continue? (y/n)")
             answer = input()
-            if answer != "y":
-                return final_ddl, final_dml
-            final_ddl, validated = self._iterate_on_validation(final_ddl)
-            if validated:
-                final_ddl = self._process_semantic_validation(final_ddl)
-                final_dml, validated = self._iterate_on_validation(final_dml)
-                if validated:
-                    final_dml = self._process_semantic_validation(final_dml)
-                    return final_ddl, final_dml
-                else:
-                    return final_ddl, final_dml   
+            if answer == "y":
+                validated_ddls = []
+                validated_dmls = []
+                for ddl, dml in zip(final_ddl, final_dml):
+                    ddl, validated = self._iterate_on_validation(ddl)
+                    if validated:
+                        ddl = self._process_semantic_validation(ddl)
+                        dml, validated = self._iterate_on_validation(dml)
+                        if validated:
+                            dml = self._process_semantic_validation(dml)
+                    validated_ddls.append(ddl)
+                    validated_dmls.append(dml)
+                final_ddl = validated_ddls
+                final_dml = validated_dmls
         return final_ddl, final_dml
 
 

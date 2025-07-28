@@ -6,6 +6,7 @@ import pathlib
 import os
 from typing import List
 from shift_left.core.utils.translator_to_flink_sql import KsqlTranslatorToFlinkSqlAgent
+from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
 from shift_left.core.process_src_tables import _process_ksql_sql_file
 from unittest.mock import patch
 import shutil
@@ -39,8 +40,9 @@ class TestKsqlMigrations(unittest.TestCase):
 
     
     # -- test methods --
+
     @patch('builtins.input')
-    def _test_1_basic_table(self, mock_input):
+    def test_1_basic_table(self, mock_input):
         """
         Test a basic table ksql create table migration. 
         The table BASIC_TABLE_STREAM will be used to other tables.
@@ -50,7 +52,7 @@ class TestKsqlMigrations(unittest.TestCase):
         ddl, dml = _process_ksql_sql_file(table_name="BASIC_TABLE_STREAM", 
                                           ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
                                           staging_target_folder=os.environ["STAGING"]) 
-        assert ddl is not None
+        assert ddl[0] is not None
         assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql")
         assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/dml.basic_table_stream.sql")
 
@@ -61,8 +63,8 @@ class TestKsqlMigrations(unittest.TestCase):
         ddl, dml = _process_ksql_sql_file(table_name="KPI_CONFIG_TABLE", 
                 ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
                 staging_target_folder=os.environ["STAGING"])
-        assert ddl is not None
-        assert dml is not None
+        assert ddl[0] is not None
+        assert dml[0] is not None
         assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/ddl.kpi_config_table.sql")
         assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/dml.kpi_config_table.sql")
 
@@ -77,8 +79,24 @@ class TestKsqlMigrations(unittest.TestCase):
         ddl, dml = _process_ksql_sql_file(table_name="filtering", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
                                         staging_target_folder=os.environ["STAGING"])
-        assert ddl is not None
-        assert dml is not None
+        assert ddl[0] is not None
+        assert dml[0] is not None
+        assert os.path.exists(os.environ["STAGING"] + "/filtering/sql-scripts/ddl.filtering.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/filtering/sql-scripts/dml.filtering.sql")
+
+    @patch('builtins.input')
+    def test_11_w2_processing(self, mock_input):
+        """
+        Test a filtering ksql create table migration.
+        The table FILTERING will be used to other tables.
+        """
+        mock_input.return_value = "n"
+        ksql_src_file = "w2_processing.ksql"
+        ddl, dml = _process_ksql_sql_file(table_name="w2_processing", 
+                                        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                                        staging_target_folder=os.environ["STAGING"])
+        assert ddl[0] is not None
+        assert dml[0] is not None
 
     def _test_ksql_map_location_migration(self):
         print("test_ksql_map_location_migration")
@@ -86,25 +104,32 @@ class TestKsqlMigrations(unittest.TestCase):
         ddl, dml = _process_ksql_sql_file(table_name="map_location", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
                                         staging_target_folder=os.environ["STAGING"])
-        assert ddl is not None
-        assert dml is not None
+        assert ddl[0] is not None
+        assert dml[0] is not None
 
-    def _test_ksql_bigger_file(self):
+    def test_ksql_bigger_file(self):
         ksql_src_file = "ddl-bigger-file.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="equipment", 
         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
         staging_target_folder=os.environ["STAGING"])
-        assert ddl is not None
-        assert dml is not None
+        assert ddl[0] is not None
+        assert dml[0] is not None
 
-    def _test_ksql_g(self):
+    def test_ksql_g(self):
         ksql_src_file = "ddl-g.ksql"
-        ddl, dml = _process_ksql_sql_file(table_name="g", 
+        ddl, dml = _process_ksql_sql_file(table_name="table_struct", 
         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
         staging_target_folder=os.environ["STAGING"])
-        assert ddl is not None
-        assert dml is not None
+        assert ddl[0] is not None
+        assert dml[0] is not None
 
+    def test_ksql_geolocation(self):
+        ksql_src_file = "ddl-geo.ksql"
+        ddl, dml = _process_ksql_sql_file(table_name="geolocation", 
+        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+        staging_target_folder=os.environ["STAGING"])
+        assert ddl[0] is not None
+        assert dml[0] is not None
 
 
 if __name__ == '__main__':

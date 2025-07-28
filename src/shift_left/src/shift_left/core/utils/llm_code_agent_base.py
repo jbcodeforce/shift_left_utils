@@ -66,29 +66,29 @@ class AnySqlToFlinkSqlAgent:
         print("To implement")
         return final_ddl, final_dml
 
-def _refinement_agent(self, sql: str, 
-                              history: str,
-                              error_message: str) -> str:
-        print("To implement")
-        return sql
+    def _refinement_agent(self, sql: str, 
+                                history: str,
+                                error_message: str) -> str:
+            print("To implement")
+            return sql
 
-def _iterate_on_validation(self, translated_sql: str) -> Tuple[str, bool]:
-    sql_validated = False
-    iteration_count = 0
-    agent_history = [{"agent": "refinement", "sql": translated_sql}]
-    while not sql_validated and iteration_count < 3:
-        iteration_count += 1
-        sql_validated, status_detail = self._validate_flink_sql_on_cc(translated_sql)
-        if not sql_validated:
-            print(f"\n\n--> Error: {status_detail}")
-            print(f"Process with refinement agent {iteration_count}")
-            translated_sql = self._refinement_agent(translated_sql, str(agent_history), status_detail)
-            print(f"Refined sql:\n {translated_sql}")
-            agent_history.append({"agent": "refinement", "sql": translated_sql})
-            print("do you want to continue? (y/n) or you continue with the generated sql?")
-            answer = input()
-            if answer != "y":
-                return translated_sql, sql_validated
-    return translated_sql, sql_validated
+    def _iterate_on_validation(self, translated_sql: str) -> Tuple[str, bool]:
+        sql_validated = False
+        iteration_count = 0
+        agent_history = [{"agent": "refinement", "sql": translated_sql}]
+        while not sql_validated and iteration_count < 3:
+            iteration_count += 1
+            sql_validated, status_detail = self._validate_flink_sql_on_cc(translated_sql)
+            if not sql_validated:
+                print(f"\n\n--> Error: {status_detail}")
+                print(f"Process with refinement agent {iteration_count}")
+                translated_sql = self._refinement_agent(translated_sql, str(agent_history), status_detail)
+                print(f"Refined sql:\n {translated_sql}")
+                agent_history.append({"agent": "refinement", "sql": translated_sql})
+                print("do you want to continue? (y/n) or you continue with the generated sql?")
+                answer = input()
+                if answer != "y":
+                    return translated_sql, sql_validated
+        return translated_sql, sql_validated
 
 

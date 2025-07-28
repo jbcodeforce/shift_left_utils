@@ -146,7 +146,7 @@ def _validate_config(config: dict) -> None:
     exit()
 
 @lru_cache
-def get_config() -> dict[str,str]:
+def get_config() -> dict[str,dict[str,str]]:
   """_summary_
   reads the client configuration from config.yaml
   Args:
@@ -208,7 +208,7 @@ def reset_all_caches() -> None:
 try:
     config = get_config()
     if config and config.get("app"):
-        logger.setLevel(config.get("app").get("logging", logging.INFO))
+        logger.setLevel(config.get("app",{}).get("logging", logging.INFO))
 except Exception:
     # If config loading fails during module import, use default level
     logger.setLevel(logging.INFO)

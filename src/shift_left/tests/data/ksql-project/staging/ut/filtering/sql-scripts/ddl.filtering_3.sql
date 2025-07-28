@@ -1,11 +1,9 @@
-CREATE TABLE IF NOT EXISTS FORM_W2 (
-    form_w2_id INT PRIMARY KEY,
-    return_id BIGINT,
-    employee_id BIGINT,
-    employee_ssn STRING,
-    WATERMARK FOR employee_ssn AS TIMESTAMPDIFF(SECOND, 5, PROCTIME()),
-) 
-DISTRIBUTED BY HASH(form_w2_id) INTO 1 BUCKETS
+CREATE TABLE IF NOT EXISTS etf_hub_users (
+    `user_id` STRING,
+    email_address STRING,
+    contact_name STRING,
+    PRIMARY KEY(`user_id`) NOT ENFORCED
+) DISTRIBUTED BY HASH(`user_id`) INTO 1 BUCKETS
 WITH (
     'changelog.mode' = 'append',
     'key.avro-registry.schema-context' = '.flink-dev',
@@ -15,6 +13,5 @@ WITH (
     'kafka.retention.time' = '0',
     'kafka.producer.compression.type' = 'snappy',
     'scan.bounded.mode' = 'unbounded',
-    'scan.startup.mode' = 'earliest-offset',
-    'value.fields-include' = 'all'
-);
+    'scan.startup.mode' = 'earliest-offset'
+)

@@ -14,6 +14,11 @@ Rules:
 * Include any INSERT INTO statements that follow CREATE statements as part of the same logical statement block
 * Provide a brief description of what was found
 
+### Preprocessing Rules:
+* Remove any lines containing "DROP TABLE" statements (case-insensitive)
+* Remove any lines that are SQL comments starting with '--'
+* Filter out empty lines after comment removal
+
 CRITICAL: Return ONLY valid JSON. Do not include any explanations, comments, or additional text before or after the JSON.
 
 Output format should be JSON with:
