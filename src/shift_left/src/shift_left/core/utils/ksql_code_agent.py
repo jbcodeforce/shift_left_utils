@@ -187,20 +187,18 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         print("0/ Cleaning KSQL input by removing DROP TABLE statements and comment lines...")
         logger.info("Starting KSQL input cleaning")
         ksql = self._clean_ksql_input(ksql)
-        print(f"Cleaned KSQL input: {ksql[:200]}...")
+        print(f"Cleaned KSQL input: {ksql[:400]}...")
         logger.info("KSQL input cleaning completed")
         
         # Step 1: Detect if there are multiple CREATE TABLE statements
-        print("1/ Analyzing KSQL input for multiple CREATE TABLE statements...")
+        print(f"1/ Analyzing KSQL input for multiple CREATE TABLE statements using: {self.model_name} ")
         logger.info("Starting table detection analysis")
         table_detection = self._table_detection_agent(ksql)
         print(f"Table detection result: {table_detection.description}")
         logger.info(f"Table detection result: {table_detection.description}")
         
         if table_detection.has_multiple_tables:
-            print(f"Found {len(table_detection.table_statements)} separate CREATE statements. Processing each separately...")
-            logger.info(f"Processing {len(table_detection.table_statements)} separate statements")
-            
+            print(f"Found {len(table_detection.table_statements)} separate CREATE statements. Processing each separately...")          
             all_ddl_statements = []
             all_dml_statements = []
             
@@ -238,7 +236,7 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             final_dml = [dml]
         
         if validate:
-            print("4/ Start validating the flink SQLs using Confluent Cloud for Flink, do you want to continue? (y/n)")
+            print("3/ Start validating the flink SQLs using Confluent Cloud for Flink, do you want to continue? (y/n)")
             answer = input()
             if answer == "y":
                 validated_ddls = []

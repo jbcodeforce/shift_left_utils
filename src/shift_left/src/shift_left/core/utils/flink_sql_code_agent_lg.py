@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import os, argparse
-from typing import TypedDict, Tuple
+from typing import TypedDict, Tuple, List
 
 from pathlib import Path
 from langgraph.graph import END, StateGraph
@@ -27,38 +27,47 @@ Create Flink SQL with a set of agents working within the following workflow
 4. Generate the matching DDL for the dml
 """
 
-
-
-
 model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
+model_name="cogito:32b"
 llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 
 
-translator_prompt_template = """
-you are qwen-coder, a code assistant, expert in Apache Flink SQL and  DBT (Data Build Tool). 
-Translate the following DML SQL batch script into Apache Flink SQL for real-time processing.
-Replace dbt utility functions with equivalent Flink SQL functions.
-Maintain the original logic and functionality.
+translator_prompt_template = """# Role
+You are an expert SQL migration specialist focused on converting DBT Spark SQL to Apache Flink SQL.
 
-* Keep all the select statements defined with the WITH keyword.
-* Do not add suggestions or explanations in the response, just return the structured Flink sql output.
-* Do not use VARCHAR prefer STRING. 
-* Transform the dbt function `surrogate_key` to a MD5(CONCAT_WS()) equivalent.  
-* Start the contact argument with the char , as a first field to concat with, as an example: MD5(CONCAT_WS(','))
-* end each line with , for the select part of the query. Do not start a row content with ','
-* change left anti join to left join with where condition on the right side key. For example: 
-the SQL: "left anti join left_table on right_table.role_id = left_table.role_id and  right_table.__db = left_table.tenant_id"
-should be changed to: "left join left_table on right_table.role_id = left_table.role_id and  right_table.__db = left_table.tenant_id where right_table.role_id is null or right_table.__db is null"
-* for any '_pk_fk substring change to '_sid' 
-* remove line with the string: ```sql
-* remove line with  ``` string
+# Task
+Convert the provided DBT SQL script to Apache Flink SQL for real-time stream processing while preserving all business logic.
 
-Start the generated code with:
+# Key Transformations Required
 
-INSERT INTO {table_name}
+## DBT to Flink Conversions:
+- Remove `{{{{ ref('table_name') }}}}` → Use direct table names
+- Replace `{{{{ dbt_utils.surrogate_key(['col1', 'col2']) }}}}` → Use `MD5(CONCAT_WS(',', col1, col2))`
+- Change `column::datatype` → Use `CAST(column AS datatype)`
 
-Question: {sql_input}
+## Data Type Mappings:
+- VARCHAR → STRING
+- Any column ending with '_pk_fk' → Change to '_sid'
+
+## Join Transformations:
+- LEFT ANTI JOIN → Convert to LEFT JOIN with WHERE clause checking for NULL values
+  Example: `LEFT ANTI JOIN table2 ON t1.id = t2.id` becomes `LEFT JOIN table2 ON t1.id = t2.id WHERE t2.id IS NULL`
+
+## Syntax Rules:
+- Preserve all WITH clause CTEs exactly as structured
+- Use STRING data type instead of VARCHAR
+- Remove any markdown code blocks (```sql and ```)
+- Proper comma placement in SELECT lists (end each line with comma, never start with comma)
+
+# Output Format Requirements
+1. Start output with: `INSERT INTO {table_name}`
+2. Return ONLY the Flink SQL code - no explanations, comments, or markdown
+3. Ensure syntactically correct Flink SQL
+4. Maintain original query structure and logic
+
+# Input SQL:
+{sql_input}
 """
 
 flink_sql_syntaxic_template="""
@@ -94,7 +103,7 @@ Remove column named: dl_landed_at, __ts_ms, __source_ms within create table or s
 Finish the statement with the following declaration:
    PRIMARY KEY(sid) NOT ENFORCED -- VERIFY KEY
 ) WITH ( 
-   'changelog.mode' = 'retract',
+   'changelog.mode' = 'append',
    'kafka.cleanup-policy'= 'compact',
    'key.avro-registry.schema-context' = '.flink-dev',
    'value.avro-registry.schema-context' = '.flink-dev',
@@ -153,7 +162,7 @@ def define_flink_sql_agent():
         """
         change the sql_input string to the matching flink sql statement, and keep in state.flink_sql
         """
-        print(f"\n--- Start the SQL `translator` AI agent ---")
+        print(f"\n--- Start the SQL `translator` AI agent with model {model_name}---")
         prompt = ChatPromptTemplate.from_template(translator_prompt_template) 
         chain = prompt | model 
         llm_out = chain.invoke(state)
@@ -204,26 +213,3 @@ def define_flink_sql_agent():
     app = workflow.compile()
     return app
 
-
-def translate_to_flink_sqls(table_name: str, sql_content: str) -> Tuple[str,str]:
-    app = define_flink_sql_agent()
-    inputs = {"sql_input": sql_content, "table_name" : table_name}
-    result=app.invoke(inputs)
-    return result['flink_sql'], result['derived_ddl']
- 
-
-
-if __name__ == "__main__":
-    args = parser.parse_args()
-    source_path=args.file_path
-    the_path= Path(source_path)
-    table_name = the_path.stem
-    with open(source_path) as f:
-        sql_content= f.read()
-        print(f"--- Input file {source_path} read ")
-        a,b=translate_to_flink_sqls(table_name,sql_content)
-        #print(a)
-        #print(" ----- ")
-        print(b)
-    print("-"*40)
-    print("done !")

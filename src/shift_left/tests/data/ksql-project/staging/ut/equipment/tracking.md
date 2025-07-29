@@ -1,4 +1,4 @@
-## Fact Table: filtering
+## Fact Table: equipment
 
 Status date:
 

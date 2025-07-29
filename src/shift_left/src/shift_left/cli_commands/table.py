@@ -88,9 +88,8 @@ def migrate(
     if not os.getenv("SRC_FOLDER") and not os.getenv("STAGING"):
         print("[red]Error: SRC_FOLDER and STAGING environment variables need to be defined.[/red]")
         exit(1)
-    print(f"Migrate source {source_type} Table defined in {sql_src_file_name} to {target_path} {'with ancestors' if recursive else ''}")
-    migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive, source_type)
-    print(f"Migrated content to folder {target_path} for the table {sql_src_file_name}")
+    migrate_one_file(table_name, sql_src_file_name, target_path, os.getenv("SRC_FOLDER"), recursive, source_type, validate)
+
 
 @app.command()
 def update_makefile(

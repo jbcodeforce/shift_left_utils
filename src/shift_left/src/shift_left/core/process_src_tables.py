@@ -43,6 +43,7 @@ def migrate_one_file(table_name: str,
                     source_type: str = "spark",
                     validate: bool = False):
     """ Process one source sql file to extract code from and migrate to Flink SQL """
+    print(f"Migrate source {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:

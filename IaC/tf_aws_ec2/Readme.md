@@ -1,8 +1,8 @@
 # AWS EC2 for Ollama and Shift Left tools
 
-Using Ollama enables local access to large language models like Llama 2, , Mistral to ensure data privacy and security. For the Shift Left project we may want to run the migration, sink table by sink table, so a maximum of 2 days of work so having an EC2 with enough resources will be the best approach.
+Using Ollama enables local access to large language models like Llama 4, qwen, Cogito, Mistral to ensure data privacy and security. For the Shift Left project, we may want to run the migration, sink table by sink table, using an EC2 with enough resources.
 
-qwen2.5-coder seems to have the best performance among open-source models on multiple popular code generation benchmarks. It gaves quite good results for transforming SQL to Flink SQL. A future solution will include tuned model for Flink SQL as a target, or RAG. The full characteristic of the model [is nere](https://ollama.com/library/qwen2.5-coder:32b/blobs/ac3d1ba8aa77).
+cogito:32b or qwen2.5-coder seem to have the best performance among open-source models on multiple popular code generation benchmarks. It gaves quite good results for transforming Spark or Flink SQL to Flink SQL. A future solution will include tuned model for Flink SQL as a target, or RAG. The full characteristic of the model [is nere](https://ollama.com/library/qwen2.5-coder:32b/blobs/ac3d1ba8aa77).
 
 As AWS has limited EC2 types and VRAM sizing that are suitable to run LLM, even if Ollama offers convenient way to deploy multiple different LLM models, we deploy one LLM model per EC2 instance. This architecture decision is due to the EC2 VRAM limits, and the fact that loading a new model can take some time. For the shift left use case we do not need more than one model, but in the future, as the Agent workflow may involve more models we may change this configuration to run multiple EC2 instance. 
 

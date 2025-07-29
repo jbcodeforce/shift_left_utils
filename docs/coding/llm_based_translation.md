@@ -100,6 +100,18 @@ The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksq
 
 #### Demonstration
 
+* Create a Kimball project for the Flink project
+  ```sh
+  shift_left project init <project_name> <target_folder>
+  # example
+  shift_left project init ksql-project tests/data
+  ```
+
+* Optional copy the ksql under a sources folder to isolate the migration:
+  ```
+  cp *.ksql tests/data/ksql-project/sources
+  ```
+
 * Set environment variables:
   ```sh
   export CONFIG_FILE=tests/config-ccloud.yaml
@@ -112,6 +124,13 @@ The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksq
   ```sh
   shift_left table migrate basic_table_stream $SRC_FOLDER/ddl-basic-table.ksql $STAGING --source-type ksql
   ```
+
+* Deploy with Confluent cli
+  ```
+  make 
+  ```
+
+* Validate in the console.
 
 ???- info "An already migrated example"
   The code under `tests/data/ksql-project/flink-references` includes migrated code with some test values to be able to deploy them with make and confluent cli. For example for the basic_table_stream table we can do:
