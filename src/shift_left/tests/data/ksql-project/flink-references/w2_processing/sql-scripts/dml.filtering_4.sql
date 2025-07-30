@@ -1,0 +1,1 @@
+INSERT INTO "ETF_RECIPIENT_T"  WITH dedup_data AS (  SELECT "recipient_id", email_address, recipient_telephone_no, fax_number, ROW_NUMBER() OVER (PARTITION BY "recipient_id" ORDER BY $rowtime DESC) as row_num FROM ETF_RECIPIENT ) SELECT "recipient_id", email_address, recipient_telephone_no, fax_number  FROM dedup_data WHERE row_num = 1;

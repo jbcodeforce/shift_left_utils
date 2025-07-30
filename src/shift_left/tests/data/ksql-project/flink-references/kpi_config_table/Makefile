@@ -1,4 +1,4 @@
-include ../../../common.mk
+include ../../common.mk
 
 # --- kpi_config_table
 TABLE_NAME=kpi_config_table

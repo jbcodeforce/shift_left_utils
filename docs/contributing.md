@@ -33,7 +33,7 @@ The more explicit and thorough you are in opening GitHub Issues, the more effici
 
 ## Code contributions
 
-We really value contributions, and to maximize the impact of code contributions, we request that any contributions follow the guidelines below.  If you are new to open source contribution and would like some more pointers or guidance, you may want to check out [**Your First PR**](http://yourfirstpr.github.io/) and [**First Timers Only**](https://www.firsttimersonly.com/).  These are a few projects that help on-board new contributors to the overall process.
+We really value contributions, and to maximize the impact of code contributions, we request that any contributions follow the guidelines below.  If you are new to open source contribution and would like some more pointers or guidance, you may want to check out [**Your First PR**](http://yourfirstpr.github.io/) and [**First Timers Only**](https://www.firsttimersonly.com/).  These are few projects that help on-board new contributors to the overall process.
 
 ### Coding and Pull Requests best practices
 
@@ -111,11 +111,12 @@ The following core principles for the management of this code is using the `gitf
     git checkout main
     git merge --no-ff v0.1.28
     ```
-1. Tag the release: 
+1. Tag the main branch: 
     ```sh
-    git tag -a v0.1.28 -m "Release version 0.1.28"
+    git tag -a 0.1.28 -m "Release version 0.1.28"
+    git push origin 0.1.28
     ```
-1. Merge into develop:
+1. Merge into the `develop` branch:
     ```bash
     git checkout develop
     git merge --no-ff v0.1.28
@@ -125,23 +126,6 @@ The following core principles for the management of this code is using the `gitf
     ```sh
     git branch -d v0.1.28
     ```
-6. Fetch latest upstream changes (in case other changes had been delivered upstream while you were developing your new feature).
-
-    ```sh
-    git fetch upstream
-    ```
-
-7. Rebase to the latest upstream changes, resolving any conflicts. This will 'replay' your local commits, one by one, after the changes delivered upstream while you were locally developing, letting you manually resolve any conflict.
-
-    ```sh
-    git branch --set-upstream-to=upstream/main
-    git rebase
-    ```
-
-    Instructions on how to manually resolve a conflict and commit the new change or skip your local replayed commit will be presented on screen by the git CLI.
-
-
-
 
 
 ## Environment set up for developers

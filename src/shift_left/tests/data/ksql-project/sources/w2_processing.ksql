@@ -1,0 +1,459 @@
+
+DROP TABLE FORM_W2_T DELETE TOPIC;
+DROP TABLE ETF_HUB_BUSINESS_T DELETE TOPIC;
+DROP TABLE ETF_HUB_USERS_T DELETE TOPIC;
+DROP TABLE ETF_RECIPIENT_T DELETE TOPIC;
+DROP TABLE ETF_RETURNS_T DELETE TOPIC;
+
+DROP STREAM FORM_W2 DELETE TOPIC;
+DROP STREAM ETF_HUB_BUSINESS DELETE TOPIC;
+DROP STREAM ETF_HUB_USERS DELETE TOPIC;
+DROP STREAM ETF_RECIPIENT DELETE TOPIC;
+DROP STREAM ETF_RETURNS DELETE TOPIC;
+
+
+
+--## FORM_W2
+--##   Form_w2_id bigint
+--##   return_id bigint
+--##   employee_id bigint
+--##   employee_ssn varchar
+
+SET 'auto.offset.reset'='earliest';
+CREATE OR REPLACE STREAM FORM_W2 (
+  form_w2_id int KEY,
+  return_id bigint,
+  employee_id bigint,
+  employee_ssn varchar
+) WITH (
+  KAFKA_TOPIC = 'form_w2',
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+);
+
+--## 
+--## ETF_RETURNS
+--##   return_id bigint
+--##   tax_year varchar
+--##   business_id varchar
+--##   recipient_id int
+--##   correction_type varchar
+--##   filing_status_id varchar
+--##   pdf_status boolean
+--## 
+
+CREATE OR REPLACE STREAM ETF_RETURNS (
+  return_id bigint KEY,
+  tax_year varchar,
+  business_id varchar,
+  recipient_id int,
+  correction_type varchar,
+  filing_status_id varchar,
+  pdf_status boolean
+) WITH (
+  KAFKA_TOPIC = 'etf_returns',
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+);
+
+--## ETF_HUB_BUSINESS
+--##   business_id varchar
+--##   dba_name varchar
+--##   user_id varchar
+--##   email_address varchar
+--## 
+
+CREATE OR REPLACE STREAM ETF_HUB_BUSINESS (
+  business_id varchar KEY,
+  dba_name varchar,
+  user_id varchar,
+  recipient_id int,
+  email_address varchar
+) WITH (
+  KAFKA_TOPIC = 'etf_hub_business',
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+);
+
+--## ETF_HUB_USERS
+--##   user_id varchar
+--##   email_address varchar
+--##   contact_name varchar
+--## 
+
+CREATE OR REPLACE STREAM ETF_HUB_USERS (
+  user_id varchar KEY,
+  email_address varchar,
+  contact_name varchar
+) WITH (
+  KAFKA_TOPIC = 'etf_hub_users',
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+);
+
+--## ETF_RECIPIENT
+--##   recipient_id int
+--##   email_address varchar
+--##   recipient_telephone_no varchar
+--##   fax_number varchar
+
+CREATE OR REPLACE STREAM ETF_RECIPIENT (
+  recipient_id int KEY,
+  email_address varchar,
+  recipient_telephone_no varchar,
+  fax_number varchar
+) WITH (
+  KAFKA_TOPIC = 'etf_recipient',
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+);
+
+
+
+
+
+--## Create tables
+
+CREATE OR REPLACE TABLE FORM_W2_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    form_w2_id,
+    LATEST_BY_OFFSET(return_id) AS return_id,
+    LATEST_BY_OFFSET(employee_id) AS employee_id,
+    LATEST_BY_OFFSET(employee_ssn) AS employee_ssn
+  FROM FORM_W2
+  GROUP BY form_w2_id
+EMIT CHANGES;
+
+
+CREATE OR REPLACE TABLE ETF_RETURNS_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    return_id,
+    LATEST_BY_OFFSET(tax_year) AS tax_year,
+    LATEST_BY_OFFSET(business_id) AS business_id,
+    LATEST_BY_OFFSET(recipient_id) AS recipient_id,
+    LATEST_BY_OFFSET(correction_type) AS correction_type,
+    LATEST_BY_OFFSET(filing_status_id) AS filing_status_id,
+    LATEST_BY_OFFSET(pdf_status) AS pdf_status
+  FROM ETF_RETURNS
+  GROUP BY return_id
+EMIT CHANGES;
+
+
+CREATE OR REPLACE TABLE ETF_HUB_BUSINESS_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    business_id,
+    LATEST_BY_OFFSET(dba_name) AS dba_name,
+    LATEST_BY_OFFSET(user_id) AS user_id,
+    LATEST_BY_OFFSET(recipient_id) AS recipient_id,
+    LATEST_BY_OFFSET(email_address) AS email_address
+  FROM ETF_HUB_BUSINESS
+  GROUP BY business_id
+EMIT CHANGES;
+
+CREATE OR REPLACE TABLE ETF_HUB_USERS_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    user_id,
+    LATEST_BY_OFFSET(email_address) AS email_address,
+    LATEST_BY_OFFSET(contact_name) AS contact_name
+  FROM ETF_HUB_USERS
+  GROUP BY user_id
+EMIT CHANGES;
+
+CREATE OR REPLACE TABLE ETF_RECIPIENT_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    recipient_id,
+    LATEST_BY_OFFSET(email_address) AS email_address,
+    LATEST_BY_OFFSET(recipient_telephone_no) AS recipient_telephone_no,
+    LATEST_BY_OFFSET(fax_number) AS fax_number
+  FROM ETF_RECIPIENT
+  GROUP BY recipient_id
+EMIT CHANGES;
+
+
+--## Data
+
+
+INSERT INTO etf_hub_users (user_id, email_address, contact_name) VALUES ('guid-51', 'user1@user.com', 'User One');
+
+INSERT INTO etf_recipient ( recipient_id, email_address, recipient_telephone_no, fax_number ) VALUES (81, 'recipient1@user.com', '111-222-3333', '111-222-4444');
+
+INSERT INTO etf_hub_business ( business_id, dba_name, user_id, recipient_id, email_address ) VALUES ('guid-101', 'HUKO',  'guid-51',  81, 'email@huko.com');
+
+INSERT INTO etf_returns (return_id, tax_year, business_id, recipient_id, correction_type, filing_status_id, pdf_status) VALUES (501, '2021', 'guid-101', 81, null, 'status-na', true); 
+
+INSERT INTO FORM_W2 (form_w2_id, return_id, employee_id, employee_ssn) VALUES (901, 501, 631, '555-666-8888');
+
+
+
+SELECT
+  form_w2_id,
+  STRUCT(
+    employee := STRUCT(
+      employee_id := w2.employee_id,
+      ssn := w2.employee_ssn
+    )
+  ) AS return_data
+FROM FORM_W2_T w2
+;
+
+SELECT
+  w2.form_w2_id,
+  w2.*,
+  returns.*,
+  STRUCT(
+    `submissionDetails` := STRUCT(
+      `taxYear` := returns.tax_year
+    ),
+    `returnData` := STRUCT(
+      `business` := MAP(
+        'businessId' := returns.business_id
+      ),
+      `employee` := STRUCT(
+        `employeeId` := w2.employee_id,
+        `ssn` := w2.employee_ssn
+      ),
+      `states` := Array[
+        'a',
+        'b'
+      ]
+    )
+  ),
+  TO_JSON_STRING(STRUCT(
+    `submissionDetails` := STRUCT(
+      `taxYear` := returns.tax_year
+    ),
+    `returnData` := STRUCT(
+      `business` := MAP(
+        'businessId' := returns.business_id
+      ),
+      `employee` := STRUCT(
+        `employeeId` := w2.employee_id,
+        `ssn` := w2.employee_ssn
+      ),
+      `states` := Array[
+        'a',
+        'b'
+      ]
+    )
+  ))
+FROM FORM_W2_T w2
+JOIN ETF_RETURNS_T returns
+  ON w2.return_id = returns.return_id
+EMIT CHANGES;
+
+--DROP TABLE W2_RETURNS_T DELETE TOPIC;
+CREATE OR REPLACE TABLE W2_RETURNS_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='avro',
+  VALUE_FORMAT='avro'
+) AS
+  SELECT
+    w2.*,
+    returns.*,
+    STRUCT(
+      `submissionDetails` := STRUCT(
+        `taxYear` := returns.tax_year
+      ),
+      `returnData` := STRUCT(
+        `business` := MAP(
+          'businessId' := returns.business_id
+        ),
+        `employee` := STRUCT(
+          `employeeId` := w2.employee_id,
+          `ssn` := w2.employee_ssn
+        )
+      )
+    ) AS structured
+FROM FORM_W2_T w2
+JOIN ETF_RETURNS_T returns
+  ON w2.return_id = returns.return_id
+EMIT CHANGES;
+
+--DROP TABLE W2_RETURNS_T DELETE TOPIC;
+CREATE OR REPLACE TABLE W2_RETURNS2_T WITH (
+  PARTITIONS=3,
+  REPLICAS=3,
+  KEY_FORMAT='json_sr',
+  VALUE_FORMAT='json_sr'
+) AS
+  SELECT
+    w2.*,
+    returns.*,
+    STRUCT(
+      `submissionDetails` := STRUCT(
+        `taxYear` := returns.tax_year
+      ),
+      `returnData` := STRUCT(
+        `business` := MAP(
+          'businessId' := returns.business_id
+        ),
+        `employee` := STRUCT(
+          `employeeId` := w2.employee_id,
+          `ssn` := w2.employee_ssn
+        ),
+        `states` := Array[
+          'a',
+          'b'
+        ]
+      )
+    ) AS structured
+FROM FORM_W2_T w2
+JOIN ETF_RETURNS_T returns
+  ON w2.return_id = returns.return_id
+EMIT CHANGES;
+
+SELECT * FROM W2_RETURNS_T;
+
+SELECT
+  w2r.*,
+  hub_biz.*
+FROM W2_RETURNS_T w2r
+LEFT JOIN ETF_HUB_BUSINESS_T hub_biz
+  ON w2r.RETURNS_BUSINESS_ID = hub_biz.business_id
+EMIT CHANGES;
+
+--## NOTE - need to break this up - can't do multi - joins
+SELECT
+  w2r.*,
+  hub_biz.*,
+  recip.*
+FROM W2_RETURNS_T w2r
+LEFT JOIN ETF_HUB_BUSINESS_T hub_biz
+  ON w2r.RETURNS_BUSINESS_ID = hub_biz.business_id
+LEFT JOIN ETF_RECIPIENT_T recip
+  ON w2r.RETURNS_RECIPIENT_ID = recip.recipient_id
+EMIT CHANGES;
+
+SELECT
+  w2.form_w2_id,
+  --TO_JSON_STRING(
+    STRUCT(
+      `submissionDetails` := STRUCT(
+        `taxYear` := returns.tax_year
+      ),
+      `returnData` := STRUCT(
+        `business` := MAP(
+          'businessId' := returns.business_id,
+          'email' := hub_biz.email_address
+        ),
+        `employee` := STRUCT(
+          `employeeId` := w2.employee_id,
+          `ssn` := w2.employee_ssn
+        )
+      )
+    --)
+  ) AS return_data_as_json
+FROM ETF_RETURNS_T returns
+JOIN FORM_W2_T w2
+  ON returns.return_id = w2.return_id
+LEFT JOIN ETF_HUB_BUSINESS_T hub_biz
+  ON returns.business_id = hub_biz.business_id
+EMIT CHANGES;
+
+SELECT
+  w2.form_w2_id,
+  --TO_JSON_STRING(
+    STRUCT(
+      `submissionDetails` := STRUCT(
+        `taxYear` := returns.tax_year
+      ),
+      `returnData` := STRUCT(
+        `business` := MAP(
+          'businessId' := returns.business_id,
+          'email' := hub_biz.email_address
+        ),
+        `employee` := STRUCT(
+          `employeeId` := w2.employee_id,
+          `ssn` := w2.employee_ssn
+        )
+      )
+    --)
+  ) AS return_data_as_json
+FROM ETF_RETURNS_T returns
+JOIN FORM_W2_T w2
+  ON returns.return_id = w2.return_id
+LEFT JOIN ETF_HUB_BUSINESS_T hub_biz
+  ON returns.business_id = hub_biz.business_id
+EMIT CHANGES;
+
+SELECT
+  w2.form_w2_id,
+  --TO_JSON_STRING(
+    STRUCT(
+      `submissionDetails` := STRUCT(
+        `taxYear` := returns.tax_year
+      ),
+      `returnData` := STRUCT(
+        `business` := MAP(
+          'businessId' := returns.business_id,
+          'email' := hub_biz.email_address
+        ),
+        `employee` := STRUCT(
+          `employeeId` := w2.employee_id,
+          `ssn` := w2.employee_ssn
+        )
+      )
+    --)
+  ) AS return_data_as_json
+FROM ETF_RETURNS_T returns
+JOIN FORM_W2_T w2
+  ON returns.return_id = w2.return_id
+LEFT JOIN ETF_HUB_BUSINESS_T hub_biz
+  ON returns.business_id = hub_biz.business_id
+EMIT CHANGES;
+
+
+
+select 
+Struct (
+bool1 := (employee_id > 600),
+  str1 := CASE employee_id > 600 
+  ) AS s1,
+* from  FORM_W2 
+EMIT CHANGES;
+
+select 
+Struct (
+bool1 := (employee_id > 600),
+  str1 := CASE when employee_id > 600 then 'TRUE' else 'FALSE' END
+  ) AS s1,
+* from  FORM_W2 
+EMIT CHANGES;
+
+

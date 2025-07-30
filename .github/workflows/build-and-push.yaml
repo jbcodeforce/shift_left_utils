@@ -2,6 +2,7 @@ name: Build & Push docs
 on: 
   push:
     branches:
+      - develop
       - main
 jobs:
     build:

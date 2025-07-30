@@ -46,7 +46,7 @@ print("-" * 80)
 #logger.addHandler(console_handler)
 
 
-def _validate_config(config: dict) -> None:
+def validate_config(config: dict[str,dict[str,str]]) -> None:
   """Validate the configuration"""
   errors = []
   
@@ -140,13 +140,14 @@ def _validate_config(config: dict) -> None:
   check_placeholders(config)
   
   # If there are any errors, raise them all at once
-  if errors:
+  if len(errors) > 0:
     error_message = "Configuration validation failed with the following errors:\n" + "\n".join(f"  - {error}" for error in errors)
     print(error_message)
+    logger.error(error_message)
     exit()
 
 @lru_cache
-def get_config() -> dict[str,str]:
+def get_config() -> dict[str,dict[str,str]]:
   """_summary_
   reads the client configuration from config.yaml
   Args:
@@ -159,7 +160,7 @@ def get_config() -> dict[str,str]:
       if CONFIG_FILE:
         with open(CONFIG_FILE) as f:
           _config=yaml.load(f,Loader=yaml.FullLoader)
-          _validate_config(_config)
+          validate_config(_config)
 
   return _config
 
@@ -208,7 +209,7 @@ def reset_all_caches() -> None:
 try:
     config = get_config()
     if config and config.get("app"):
-        logger.setLevel(config.get("app").get("logging", logging.INFO))
+        logger.setLevel(config.get("app",{}).get("logging", logging.INFO))
 except Exception:
     # If config loading fails during module import, use default level
     logger.setLevel(logging.INFO)
