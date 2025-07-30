@@ -10,58 +10,83 @@ The goals of the process presented in this note are to:
 
 ## Context
 
-In a classical blue-green deployment for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data products, switches to new content. 
-
-The following figure illustrates this approach at a high level:
+In a classical blue-green deployment for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data products, switches to new content. The following figure illustrates this approach at a high level:
 
 <figure markdown="span">
 ![](./images/bg_current.drawio.png)
 <caption>**Figure 1**: Blue-Green for batch processing</caption>
 </figure>
 
-The processing includes reloading the data from the CDC output topics, using S3 Sink Connector to new bucket folder, then re-run the batch processing to create the gold records for consumption by the query engine to serve data to the business intelligence dashboard. When the blue data set is ready the query engine uses another location.
+The processing includes reloading the data from the CDC output topics (clone topics), using S3 Sink Connector to new bucket folders, then re-run the batch processing to create the bronze, silver and gold records for consumption by the query engine to serve data to the business intelligence dashboard. When the blue data set is ready the query engine uses another location.
 
 While in real-time processing the concept of blue-green deployment should be limited to the Flink pipeline impacted, as presented in [the pipeline management chapter](./pipeline_mgr.md).
 
-The following figure illustrates a steady state of Flink statements processing data across source, intermediate, and fact tables. Raw data originates from Change Data Capture on a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the necessity of retaining historical data for extended periods, these topics should be rarely re-created.
+The following figure illustrates Flink statements processing data across source, intermediate, and fact tables. Raw data originates from Change Data Capture on a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the necessity of retaining historical data for extended periods, these topics should be rarely re-created.
 
 <figure markdown="span">
 ![](./images/bg_2_1.drawio.png)
 <caption>**Figure 2**:Real-time processing with Apache Flink within a Data Stream Plarform</caption>
 </figure>
 
-*To simplify the diagram above the sink connectors to the bucket and Iceberg or Delta Lake format are not presented, but it is assumed that they support upsert semantic.* 
+*To simplify the diagram above the sink Kafka connectors to the object storage buckets and Iceberg or Delta Lake format are not presented, but it is assumed that they support upsert semantic.* 
 
 Iceberg or Delta Lake tables, stored in Apache Parquet format, are directly queried by the query engine. Each pipeline writes records in table format to object storage, such as an S3 bucket, with tables partitioned within folders.
 
-For example, the goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short period, modify the purple Flink statements, and then deploy them to development, testing, staging, and production environments. Once validated, these statements can be merged into the `main` branch.
+### Git flow process
+
+As an example, the new code release goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short time period, modify the purple Flink statements, and then deploy those statements to development, testing, staging, environments. Once validated, these statements can be merged into the `main` branch. The gitflow process may look like:
+
+* **main Branch**: This branch always reflects the production-ready, stable code. Only thoroughly tested and finalized code is merged into `main`. Commits are tagged in `main` with version numbers for easy tracking of releases.
+* **develop Branch**: This branch serves as the integration point for all new features and ongoing development. **Feature branches** are created from the `develop` branch and merged back into it after completion.
+* Creating a **Release Branch**: When a set of features in develop is deemed ready for release, a new release branch is created from `develop`. This branch allows for final testing, bug fixes, and release-specific tasks without interrupting the ongoing development work in develop.
+* **Finalizing the Release**: Only bug fixes and necessary adjustments are made on the `release` branch. New feature development is strictly avoided.
+* **Merging and Tagging**: Once the release branch is stable and ready for production deployment, it's merged into two places:
+
+    * `main`: The release branch is merged into main, effectively updating the production-ready code with the new release.
+    * `develop`: The release branch is also merged back into develop to ensure that any bug fixes or changes made during the release preparation are incorporated into the ongoing development work.
+
+* **Tagging**: After merging into main, the merge commit is tagged with a version number (e.g., v1.0.0) to mark the specific release point in the repository's history.
+* **Cleanup**: After the release is finalized and merged, the release branch can be safely deleted
+
 
 <figure markdown="span">
 ![](./images/bg_2_2_branch.drawio.png)
 <caption>**Figure 3**:Branching for Flink Statement updates</caption>
 </figure>
 
-Once unit tested, the pipeline deployment tool can deploy all impacted Flink statements without affecting existing "green" statements. The figure below illustrates changes to the internal logic of one intermediate statement and the fact creation statements. This approach can also be applied to dimension creation statements.
+### Flink pipelines deployment
+
+Once unit tested, the pipeline deployment tool can deploy all impacted Flink statements without affecting existing "green" statements. The list of changed flink statements can be assessed via git commands like:
+    
+```sh
+git status --porcelain 
+# get the list of commits
+git log --oneline -b <release_branch>
+# get the list of file impacted
+git show --stat <commit_id> -b <release_branch>
+```
+
+The figure below illustrates changes to the internal logic of one intermediate statement, one the fact statement and one added view: the blue statements. 
 
 <figure markdown="span">
-![](./images/bg_2_3.drawio.png)
+![](./images/bg_2_3.drawio.png){ width=800 }
 <caption>**Figure 4**:Flink logic update and impacted statements</caption>
 </figure>
 
-The Flink statement to create the intermediate table needs to have a new table name for the output processing. Both DDL and DML are changed. 
+The Flink statement to create the intermediate table needs to have a new table name for the output table (e.g. int_3_v2). Both DDL and DML are changed. 
 
 ```sql
 --- DDL intermediate table
-create table int_sometable_v2 (
+create table int_3_v2 (
     --- all columns, new columns, ...
 )
 ```
 
-and the from and joins use existing source tables:
+and the from and joins are still using existing source tables:
 
 ```sql
 -- DML intermediate table
-insert into int_sometable_v2 
+insert into int_3_v2 
 select 
 ...
 from src_a ...
@@ -69,22 +94,30 @@ join src_b ...
 join src_c  ...
 ```
 
-The Flink Fact creation statement needs to modify the input table names and the output table names as join statements are stateful, and descendants needs to be modified. 
+The new Flink Fact statement needs to modify the input table names and the output table names as join statements are stateful, and descendants needs to be modified. 
 
 ```sql
 --- DML Fact table
-insert into fact_table_name_v2
+insert into fact_3_v2
 select 
 ...
-from int_sometable_v2 
-join int_table_name
+from int_3_v2 
+join int_1
 ```
 
-For the 'view' creation, the Flink statement may be impacted as one of its source table is modified. So the same logic, as above, applies.
+For the 'view' creation, the Flink statement may be impacted as one of its source table is modified. So the same deployment logic applies.
 
-As a Data engineer during the tuning on the impacted statements, the pipeline dependencies can help assessing which statements to change. (e.g. `shift_left pipeline build-execution-plan --table-name <flink-intermediate> --may-start-descendants`) or the command: 
+During the tuning on the impacted statements, the pipeline dependencies can help assessing which statements to change. (e.g. `shift_left pipeline build-execution-plan --table-name <flink-intermediate> --may-start-descendants`).
 
-An other example, related to schema evolution occurs when the transactional data source changes. In this case, it is assumed the modifications are schema compatible with Full Transitive semantic. 
+The list of impacted table can be specified in a text file and specified as parameter to the deployment:
+
+```sh
+shift_left pipeline deploy --table-list-file-name statement_list.txt --may-start-descendants
+```
+
+### Source schema evolution 
+
+In this example, we consider source schema evolution occurs when the transactional data source changes. In this case, it is assumed the modifications are schema compatible with Full Transitive semantic. 
 
 <figure markdown="span">
 ![](./images/bg_2_4.drawio.png)
@@ -102,20 +135,37 @@ The CDC topic will contain records with both old and new schemas. The initial Fl
 
 ## Testing the blue/green deployment
 
-### Intermediate statement update (Fig. 4)
+### Pre-deployment activities
 
-1. Deploy a data product with n statements from source to facts and views
-1. Send a sample of synthetic test data to source topics, validate they reach sink tables
-1. Create a branch in git to support statement modification
-1. Change intermediate statements to add a simple field or computation. It should create a v2.
-1. Deploy from this branch to the target Confluent Cloud environment using `shift_left pipeline deploy --table-list-file-name statements-to-deploy.txt`
-1. Verify no duplicate records are created from the new deployment in the output tables
+* Get the **list of PR** to integrate in the release
+* Get the **list of Flink modified table** cross PRs to work on using git commands
+* **Create release branch**
+* Modify each Flink statement for the modified table so the DDL and `insert into` of the dml use a new version postfix
+* Propagate to the children Flink Statement to consume from the new versioned tables, continue recursively to the sink Kafka Connector.
+* Get the list of table impacted, review execution plan
+* Verify resource (cmompute pool and CFU usage) availability
+* Deploy to stage environment: an environment with existing Flink statements already running
+    ```sh
+    shift_left pipeline deploy --table-list-file-name statements-to-deploy.txt`
+    ```
 
-### End to end update (Fig. 5)
+###  Data Quality Validation
 
-This use case addresses schema modification from the source transactional database.
+The tools and practices need to address:
 
-1. Change source SQL table by adding a column with default value, and with real value
-1. Verify the CDC inject new records 
+* **Schema Compatibility Checks:** Validate that new table versions maintain backward compatibility
+* **Data Lineage Validation:** Ensure data flows correctly through the new pipeline versions
+* **Record Count Validation:** Compare record counts between blue/green versions
+* **Data Freshness Checks:** Validate that data processing latency hasn't increased
+
+### Integration tests
+
+Generate comprehensive test data for blue-green validation
+
+* Send a sample of synthetic test data to source topics, validate they reach sink tables
+* Verify no duplicate records are created from the new deployment in the output tables
+* Validate all source records are processed
+* Compare aggregations between blue/green versions
+* Ensure event time processing remains consistent
 
 ### Test rollback procedures

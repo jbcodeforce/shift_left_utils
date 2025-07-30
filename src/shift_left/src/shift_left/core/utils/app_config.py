@@ -46,7 +46,7 @@ print("-" * 80)
 #logger.addHandler(console_handler)
 
 
-def _validate_config(config: dict) -> None:
+def validate_config(config: dict[str,dict[str,str]]) -> None:
   """Validate the configuration"""
   errors = []
   
@@ -140,9 +140,10 @@ def _validate_config(config: dict) -> None:
   check_placeholders(config)
   
   # If there are any errors, raise them all at once
-  if errors:
+  if len(errors) > 0:
     error_message = "Configuration validation failed with the following errors:\n" + "\n".join(f"  - {error}" for error in errors)
     print(error_message)
+    logger.error(error_message)
     exit()
 
 @lru_cache
@@ -159,7 +160,7 @@ def get_config() -> dict[str,dict[str,str]]:
       if CONFIG_FILE:
         with open(CONFIG_FILE) as f:
           _config=yaml.load(f,Loader=yaml.FullLoader)
-          _validate_config(_config)
+          validate_config(_config)
 
   return _config
 

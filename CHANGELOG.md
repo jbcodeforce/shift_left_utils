@@ -1,6 +1,21 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.29
+* Enhanced KSQL to Flink SQL migration with improved LLM-based translation
+* Added vLLM support for KSQL code agents with new prompts and validation
+* Added table detection functionality for KSQL statements to handle multiple CREATE TABLE scenarios
+* Added comprehensive test coverage for KSQL migration functionality with real-world examples
+* Added Spark SQL code agent and migration examples for Spark to Flink SQL translation
+* Fixed naming conflict in validate_config CLI command that was causing recursive function calls
+* Added comprehensive tests for configuration validation including valid/invalid scenarios, placeholder detection, and data type validation
+* Enhanced configuration validation error messages and handling
+* Improved test data structure and organization with better separation of concerns
+* Added validation scripts for different SQL dialects (KSQL, Spark, DBT)
+* Enhanced documentation for LLM-based translation methodology
+* Cleaned up legacy utility files and improved project structure
+* Updated dependencies and project configuration
+
 v0.1.28
 * Support getting the name of the table from DDL if not found in DML
 * Improve may-start-descendants processing and cross-product deployment constraint

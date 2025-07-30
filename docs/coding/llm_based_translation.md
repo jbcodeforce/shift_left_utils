@@ -1,37 +1,24 @@
-# SQL translation methodology
+# SQL Translation Methodology
 
-The current implementation from dbt / Spark SQL to Flink SQL is prompt based. There are a better approach to improve the quality of the translation.
+The current implementation from dbt/Spark SQL to Flink SQL is prompt-based using LLM agents. This document covers the methodology, setup, and usage of the `shift_left` tool for automated SQL migration.
 
-The core idea of the current implementation is to leverage LLM to understand the SQL semantic and translate to the target Flink SQL. Using the `qwen2.5-coder` model, it was assumed there are Flink SQL source code used to train the model, which seems to be a valid assumption. 
+The core idea leverages LLM to understand SQL semantics and translate to target Flink SQL. Using the `qwen2.5-coder` model, we assume Flink SQL source code was used during training, which appears to be a valid assumption.
 
-## Current approach
+## Migration Context
 
-LLM alone might not be sufficuent to address complex translations and as part of an automated process. Agents should help as we can specialized them for a certain step of the process. Feedback loop and retries can be done. The current workflow is the basiest one:
+For any programming language translation, we need to start with a corpus of code source. It can be done programmatically from the source language, then for each generated code implement the semantically equivalent Flink SQL counterparts.
 
-1. Translate the given sql content
-1. Verify the syntax
-1. Generate the DDL derived from the DML.
+The goal of the corpus creation is to identify common ksqlDB or Spark SQL constructs (joins, aggregations, window functions, UDFs, etc.), then manually translate a smaller, diverse set of queries to establish translation rules. Then using these rules, we can generate permutations and variations of queries. It is crucial to test the generated Flink SQL against a test dataset to ensure semantic equivalence.
 
-What needs to be added is validation agents that execute syntatic validation and automatic deployment, using a feedback loop when the validation fails to inject error message to the translator agent.
-
-## Future work
-
-For any language translation, we need to start with a corpus of code source. It can be done programmatically from the source language, then for each generated code implement the semantically equivalent Flink SQL counterparts. 
-
-The goal of this corpus creation is to identify common ksqlDB or Spark SQL constructs (joins, aggregations, window functions, UDFs, etc.), then manually translate a smaller, diverse set of queries to establish translation rules. Then using these rules, we can generate permutations and variations of queries. It is crucial to test the generated Flink SQL against a test dataset to ensure semantic equivalence.
-
-Build a query pair to represent the source to target set if example as corpus. For each query pair, include the relevant table schemas. This is vital for the LLM to understand data types, column names, and relationships. It is not recommended to have different prompts for different part of a SQL, as the LLM strength comes from the entire context. But still there will be problem for sql scripts that have a lot of line of code, as a 200 lines script will reach thosand of tokens. 
+Build a query pair to represent the source to target set as corpus. For each query pair, include the relevant table schemas. This is vital for the LLM to understand data types, column names, and relationships. It is not recommended to have different prompts for different part of a SQL, as the LLM strength comes from the entire context. But still there will be problem for sql scripts that have a lot of line of code, as a 200+ lines script will reach thousand of tokens.
 
 To improve result accuracy, it is possible to use Supervised Fine-tuning techniques:
 
-* Fine-tune the chosen LLM on the parallel corpus generated bove. The goal is for the LLM to learn the translation patterns and nuances between ksqlDB or Spark SQL and Flink SQL.
+* Fine-tune the chosen LLM on the generated code. The goal is for the LLM to learn the translation patterns and nuances between ksqlDB or Spark SQL and Flink SQL.
 * Prompt Engineering: Experiment with different prompt structures during fine-tuning and inference. A good prompt will guide the LLM effectively. The current implementation leverage this type of prompts: e.g., "Translate the following Spark SQL query to Flink SQL, considering the provided schema. Ensure semantic equivalence and valid Flink syntax."
+* To assess the evaluation it is recommended to add a step to the agentic workflow to validate the syntax of the generated Flink SQL. A better validation, is to assess semantic equivalence by assessing if the Flink SQL query produces the same results as the or ksqlDB, Spark SQL query on a given dataset.
 
-To assess the evaluation it is recommended to add a step to the agentic workflow to validate the syntax of the generated Flink SQL. 
-
-The better validation, is to assess semantic equivalence by assessing if the Flink SQL query produces the same results as the or ksqlDB, Spark SQL query on a given dataset.
-
-For validation it may be relevant to have a knowledge base of common translation error. When the Validation Agent reports an error, the Refinement Agent attempts to correct the Flink SQL. It might feed the error message back to the LLM with instructions to fix it. The knowledgebBase should be populated with human-curated rules for common translation pitfalls.
+For validation it may be relevant to have a knowledge base of common translation error. When the Validation Agent reports an error, the Refinement Agent attempts to correct the Flink SQL. It might feed the error message back to the LLM with instructions to fix it. The knowledge Base should be populated with human-curated rules for common translation pitfalls.
 
 It may be important to explain why translation was done a certain way to better tune prompts. For complex queries or failures, a human review ("human in the loop") and correction mechanism will be essential, with the system learning from these corrections.
 
@@ -41,109 +28,182 @@ LLMs won't magically translate custom UDFs. This will likely require manual inte
 
 Flink excels at stateful stream processing. Spark SQL's batch orientation means translating stateful Spark operations (if they exist) to their Flink streaming counterparts would be highly complex and likely require significant human oversight or custom rules.
 
-
 ### Spark SQL to Flink SQL
 
-While **Spark SQL** is primarily designed for batch processing, it also supports streaming. As part of shifting the processing more to real time, we consider migrating batch processing. Both SQL systems support standard SQL, but there are differences in their extensions and functions. Most basic SQL syntax (SELECT, FROM, WHERE, JOIN) is similar between Spark and Flink.
+While Spark SQL is primarily designed for batch processing, even if it also supports streaming via micro-batching. Most basic SQL syntax (SELECT, FROM, WHERE, JOIN) is similar between Spark and Flink.
 
 Flink SQL has more advanced windowing capabilities. For example:
-    ```sql
-     -- Spark SQL (using DataFrame API)
-     val windowedDF = df.withWatermark("timestamp", "1 minute")
-       .groupBy(window(col("timestamp"), "5 minutes"))
-       .count()
 
-     -- Flink SQL
-     SELECT COUNT(*) FROM users
-     GROUP BY TUMBLE(timestamp, INTERVAL '5' MINUTE);
-    ```
+```sql
+-- Spark SQL (using DataFrame API)
+val windowedDF = df.withWatermark("timestamp", "1 minute") .groupBy(window(col("timestamp"), "5 minutes")) .count()
+
+-- Flink SQL
+SELECT COUNT(*) FROM users
+GROUP BY TUMBLE(timestamp, INTERVAL '5' MINUTE);
+```
 
 ### ksqlDB to Flink SQL
 
-The prompts are defined in the [src/shift_left/core/utils/prompts/ksql_fsql folder](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/prompts)
+ksqldb has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompts need to support migration examples outside of the classical select and create table.
 
-Be sure to have a Python virtual environment created and the `uv` package manager (see [setup instructions](https://jbcodeforce.github.io/shift_left_utils/contributing/#environment-set-up) for developers). Use a config file with all the necessary setting and the environment variable CONFIG_FILE to point to this file.
+## Current Approach
 
-kSQLdb has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompts need to support migration examples outside of the classical select and create table.
+LLM alone might not be sufficient to address complex translations in an automated process. Agents help by specializing in specific steps with feedback loops and retries. The current workflow includes:
 
-For kSQL the approach is to use 3 agents with different prompt and the Confluent Cloud for Flink REST API to deploy the translated SQL for validation.
+1. **Translate** the given SQL content
+2. **Validate** the syntax and semantics
+3. **Generate** DDL derived from DML
+4. **Deploy** and test with validation agents
 
-| Agent | Scope| Prompt |
+The system uses validation agents that execute syntactic validation and automatic deployment, with feedback loops injecting error messages back to translator agents when validation fails.
+
+## Architecture Overview
+
+The multi-agent system with human-in-the-loop validation uses Confluent Cloud for Flink:
+
+![AI Agent Flow](./images/ai_agent_new_flow.drawio.png)
+
+### Agent Roles
+
+| Agent | Scope | Prompt File |
 | --- | --- | --- |
-| Translator | Take ksql content and do a first raw translation to Flink SQL | core/utils/prompts/ksql_fsql/translator.txt |
-| Validation | Validate import Flink constructs | core/utils/prompts/ksql_fsql/mandatory_validation.txt |
-| Refinement | Fix potential Flink statement deployment error | core/utils/prompts/ksql_fsql/refinement.txt |
+| **Translator** | Raw KSQL to Flink SQL translation | `core/utils/prompts/ksql_fsql/translator.txt` |
+| **Table Detection** | Identify multiple CREATE statements | `core/utils/prompts/ksql_fsql/table_detection.txt` |
+| **Validation** | Validate Flink SQL constructs | `core/utils/prompts/ksql_fsql/mandatory_validation.txt` |
+| **Refinement** | Fix deployment errors | `core/utils/prompts/ksql_fsql/refinement.txt` |
 
-See the translator class [src/shift_left/core/utils/ksql_code_agent.py](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/ksql_code_agent.py).
+## Prerequisites and Setup
 
-The code uses the multi-agent with human in the loop to validate the SQL on Confluent Cloud for Flink. The flow looks like:
+### Environment Setup
 
-![](./images/ai_agent_new_flow.drawio.png)
+1. **Python Environment**: Ensure Python 3.8+ and create a virtual environment
+   ```bash
+   python3 -m venv shift_left_env
+   source shift_left_env/bin/activate  # On Windows: shift_left_env\Scripts\activate
+   ```
 
-#### Test Data Set
+2. **Install Dependencies**: Use `uv` package manager (recommended)
+   ```bash
+   # Install uv if not already installed
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Install project dependencies
+   uv sync
+   ```
 
-The [tests/data/ksql-project](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/tests/data/ksql-project/sources) folder includes a set of ksql scripts to be used as benchmark for migration. The matching Flink SQL is in the `flink-references` folder.
+3. **Install shift_left Tool**:
+   ```bash
+   # Development installation
+   pip install -e .
+   
+   # Verify installation
+   shift_left --help
+   ```
 
-#### Running unit testing
+### Configuration File Setup
 
-* To execute all the ksql migrations, use the following command:
-  ```sh
-  uv run pytest -s tests/ai/test_ksql_migration.py
-  ```
+Create a configuration file (e.g., `config-ccloud.yaml`) with the following structure:
 
-The migrated Flink SQL statements are saved under `src/shift_left/tests/data/ksql-project/staging/ut` folder using the table structure defined in shift_left tool.
+```yaml
+# Confluent Cloud Configuration
+confluent:
+  api_key: "YOUR_API_KEY"
+  api_secret: "YOUR_API_SECRET"
+  cluster_id: "YOUR_CLUSTER_ID"
+  environment_id: "YOUR_ENVIRONMENT_ID"
+flink:
+  compute_pool_id: "YOUR_COMPUTE_POOL_ID"
+  region: "YOUR_REGION"
+```
 
-* To test a specific migration:
-  ```sh
-  uv run pytest -s tests/ai/test_ksql_migration.py::test_2_kpi_config_table_with_latest_offset
-  ```
+### Required Environment Variables
 
-#### Demonstration
+Set the following environment variables before using the tool:
 
-* Create a Kimball project for the Flink project
-  ```sh
-  shift_left project init <project_name> <target_folder>
-  # example
-  shift_left project init ksql-project tests/data
-  ```
+```bash
+# Core Configuration
+export CONFIG_FILE="/path/to/your/config-ccloud.yaml"
 
-* Optional copy the ksql under a sources folder to isolate the migration:
-  ```
-  cp *.ksql tests/data/ksql-project/sources
-  ```
+# Project Structure
+export FLINK_PROJECT="/path/to/your/project"
+export SRC_FOLDER="${FLINK_PROJECT}/sources"
+export STAGING="${FLINK_PROJECT}/staging"
+export PIPELINES="${FLINK_PROJECT}/pipelines"
+```
 
-* Set environment variables:
-  ```sh
-  export CONFIG_FILE=tests/config-ccloud.yaml
-  export PIPELINES=tests/data/ksql-project/staging/ut
-  export STAGING=tests/data/ksql-project/staging/ut
-  export SRC_FOLDER=tests/data/ksql-project/sources
-  ```
 
-* Migrate the basic table with:
-  ```sh
-  shift_left table migrate basic_table_stream $SRC_FOLDER/ddl-basic-table.ksql $STAGING --source-type ksql
-  ```
+## Migration Workflow
 
-* Deploy with Confluent cli
-  ```
-  make 
-  ```
+### 1. Project Initialization
 
-* Validate in the console.
+Create a new migration project:
 
-???- info "An already migrated example"
-  The code under `tests/data/ksql-project/flink-references` includes migrated code with some test values to be able to deploy them with make and confluent cli. For example for the basic_table_stream table we can do:
-  ```sh
-  make create_flink_ddl: 
-  ``` 
-  and then populate some test records with
-  ```sh
-  make create_ut_test_1
-  ```
-  Verify in the console the table content.
+```bash
+# Initialize project structure
+shift_left project init your-project /path/to/workspace
+```
 
-* Migrate a complex table:
-  ```sh
-  ```
+### 2. Prepare Source Files
 
+* Copy your KSQL files to the sources directory:
+
+```bash
+# Copy KSQL files
+cp *.ksql ${SRC_FOLDER}/
+```
+
+* Validate config.yaml
+
+```bash
+shift_left config validate
+```
+
+
+
+### 4. Migration Execution
+
+#### Basic Table Migration
+
+```bash
+# Migrate a simple table
+shift_left table migrate basic_user_table \
+  ${SRC_FOLDER}/user-table.ksql \
+  ${STAGING} \
+  --source-type ksql 
+
+# The command generates:
+# ├── staging/basic_user_table/sql-scripts
+# │   ├── ddl.basic_user_table.sql     # Flink DDL
+# │   ├── dml.basic_user_table.sql     # Flink DML (if any
+```
+
+### 5. Validation and Deployment
+
+```bash
+# Deploy to Confluent Cloud for Flink
+cd ${STAGING}/basic_user_table
+
+# Deploy DDL statements
+make create_flink_ddl
+
+# Deploy DML statements  
+make create_flink_dml
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Configuration Errors
+
+**Problem**: `CONFIG_FILE not found`
+```bash
+# Solution: Verify file path and permissions
+ls -la ${CONFIG_FILE}
+shift_left config validate
+```
+
+#### 2. Migration Errors
+
+Having empty ddl or dml may come from a wrong prompt or not enough memory for the local ollama.

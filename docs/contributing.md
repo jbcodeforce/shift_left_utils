@@ -33,7 +33,7 @@ The more explicit and thorough you are in opening GitHub Issues, the more effici
 
 ## Code contributions
 
-We really value contributions, and to maximize the impact of code contributions, we request that any contributions follow the guidelines below.  If you are new to open source contribution and would like some more pointers or guidance, you may want to check out [**Your First PR**](http://yourfirstpr.github.io/) and [**First Timers Only**](https://www.firsttimersonly.com/).  These are a few projects that help on-board new contributors to the overall process.
+We really value contributions, and to maximize the impact of code contributions, we request that any contributions follow the guidelines below.  If you are new to open source contribution and would like some more pointers or guidance, you may want to check out [**Your First PR**](http://yourfirstpr.github.io/) and [**First Timers Only**](https://www.firsttimersonly.com/).  These are few projects that help on-board new contributors to the overall process.
 
 ### Coding and Pull Requests best practices
 
