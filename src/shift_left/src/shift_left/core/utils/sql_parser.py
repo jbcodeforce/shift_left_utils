@@ -78,11 +78,12 @@ class SQLparser:
         return matches
 
     def extract_table_name_from_insert_into_statement(self, sql_content) -> str:
+        logger.debug(f"sql_content: {sql_content}")
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*INSERT INTO)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        regex=r'\b(\s*INSERT INTO)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
+        logger.info(f"table name: {tbname}")
         if len(tbname) > 0:
-            #logger.debug(tbname[0][1])
             if tbname[0][1] and '`' in tbname[0][1]:   
                 tb=tbname[0][1].replace("`","")
             else:
@@ -92,7 +93,7 @@ class SQLparser:
     
     def extract_table_name_from_create_statement(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS)\s+(\s*([`a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
         if len(tbname) > 0:
             #logger.debug(tbname[0][1])

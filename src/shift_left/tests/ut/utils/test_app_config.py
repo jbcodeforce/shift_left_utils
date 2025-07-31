@@ -3,14 +3,12 @@ import os
 import unittest
 import pytest
 import pathlib
-from unittest.mock import patch, mock_open, MagicMock
-
-from io import StringIO
+from unittest.mock import patch
 
 # Set up config file path for testing
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 
-from shift_left.core.utils.app_config import _validate_config, get_config
+from shift_left.core.utils.app_config import validate_config, get_config
 
 
 class TestValidateConfig(unittest.TestCase):
@@ -70,19 +68,19 @@ class TestValidateConfig(unittest.TestCase):
         """Test that a valid configuration passes validation"""
         # Should not call exit() or print error messages
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(self.valid_config)
+            validate_config(self.valid_config)
             mock_print.assert_not_called()
             mock_exit.assert_not_called()
 
     def test_empty_config_fails(self):
         """Test that empty configuration fails"""
         with pytest.raises(ValueError, match="Configuration is empty"):
-            _validate_config({})
+            validate_config({})
 
     def test_none_config_fails(self):
         """Test that None configuration fails"""
         with pytest.raises(ValueError, match="Configuration is empty"):
-            _validate_config(None)
+            validate_config(None)
 
     def test_missing_main_sections_fail(self):
         """Test that missing main sections cause validation to fail"""
@@ -93,7 +91,7 @@ class TestValidateConfig(unittest.TestCase):
             del config[section]
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_called_once()
                 mock_exit.assert_called_once()
                 error_message = mock_print.call_args[0][0]
@@ -104,7 +102,7 @@ class TestValidateConfig(unittest.TestCase):
         config = {"kafka": self.valid_config["kafka"]}  # Only kafka section present
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -122,7 +120,7 @@ class TestValidateConfig(unittest.TestCase):
             del config["kafka"][field]
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_called_once()
                 mock_exit.assert_called_once()
                 error_message = mock_print.call_args[0][0]
@@ -143,7 +141,7 @@ class TestValidateConfig(unittest.TestCase):
             del config["confluent_cloud"][field]
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_called_once()
                 mock_exit.assert_called_once()
                 error_message = mock_print.call_args[0][0]
@@ -158,7 +156,7 @@ class TestValidateConfig(unittest.TestCase):
             del config["flink"][field]
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_called_once()
                 mock_exit.assert_called_once()
                 error_message = mock_print.call_args[0][0]
@@ -184,7 +182,7 @@ class TestValidateConfig(unittest.TestCase):
             del config["app"][field]
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_called_once()
                 mock_exit.assert_called_once()
                 error_message = mock_print.call_args[0][0]
@@ -197,7 +195,7 @@ class TestValidateConfig(unittest.TestCase):
         config["app"]["delta_max_time_in_min"] = "not-a-number"
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -209,7 +207,7 @@ class TestValidateConfig(unittest.TestCase):
         config["app"]["logging"] = "INVALID_LEVEL"
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -224,7 +222,7 @@ class TestValidateConfig(unittest.TestCase):
             config["app"]["logging"] = level
             
             with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-                _validate_config(config)
+                validate_config(config)
                 mock_print.assert_not_called()
                 mock_exit.assert_not_called()
 
@@ -234,7 +232,7 @@ class TestValidateConfig(unittest.TestCase):
         config = self.valid_config.copy()
         config["app"]["max_cfu"] = "not-a-number"
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -244,7 +242,7 @@ class TestValidateConfig(unittest.TestCase):
         config = self.valid_config.copy()
         config["app"]["max_cfu_percent_before_allocation"] = "not-a-number"
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -257,7 +255,7 @@ class TestValidateConfig(unittest.TestCase):
         config["confluent_cloud"]["environment_id"] = "<TO_FILL>"
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -270,14 +268,14 @@ class TestValidateConfig(unittest.TestCase):
         # Test integer
         config["app"]["delta_max_time_in_min"] = 10
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_not_called()
             mock_exit.assert_not_called()
         
         # Test float
         config["app"]["delta_max_time_in_min"] = 10.5
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_not_called()
             mock_exit.assert_not_called()
 
@@ -287,7 +285,7 @@ class TestValidateConfig(unittest.TestCase):
         config = self.valid_config.copy()
         config["app"]["products"] = "not-a-list"
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -297,7 +295,7 @@ class TestValidateConfig(unittest.TestCase):
         config = self.valid_config.copy()
         config["app"]["accepted_common_products"] = "not-a-list"
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -309,7 +307,7 @@ class TestValidateConfig(unittest.TestCase):
         config["kafka"]["src_topic_prefix"] = ""
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -321,7 +319,7 @@ class TestValidateConfig(unittest.TestCase):
         config["kafka"]["src_topic_prefix"] = None
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -339,7 +337,7 @@ class TestValidateConfig(unittest.TestCase):
         config["flink"]["api_secret"] = "<TO_FILL>"  # Placeholder value
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(config)
+            validate_config(config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]
@@ -376,7 +374,7 @@ class TestValidateConfig(unittest.TestCase):
         }
         
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            _validate_config(bad_config)
+            validate_config(bad_config)
             mock_print.assert_called_once()
             mock_exit.assert_called_once()
             error_message = mock_print.call_args[0][0]

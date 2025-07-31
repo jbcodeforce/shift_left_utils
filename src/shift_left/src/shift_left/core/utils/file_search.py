@@ -19,7 +19,7 @@ Provides a set of function to search files from a given folder path for source p
 
 INVENTORY_FILE_NAME: Final[str] = "inventory.json"
 SCRIPTS_DIR: Final[str] = "sql-scripts"
-PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
+PIPELINE_FOLDER_NAME: Final[str] = os.path.basename(os.getenv("PIPELINES", "pipelines"))
 PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
 
 # ------ Public APIs ------
@@ -131,22 +131,34 @@ def get_or_build_inventory(
                 ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
                 logger.info(f"Processing file {dml_file_name}")
                 count+=1
-                if not dml_file_name:
+                if not dml_file_name and not ddl_file_name:
                     continue
                 # extract table name from dml file  
                 dml_sql_content=""
                 ddl_sql_content=""
-                with open(dml_file_name, "r") as f:
-                    dml_sql_content = f.read()
-                    table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
-                with open(ddl_file_name, "r") as f:
-                    ddl_sql_content = f.read()
-                    if "No-Table" ==  table_name:
+                if dml_file_name:
+                    with open(dml_file_name, "r") as f:
+                        dml_sql_content = f.read()
+                        table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
+                    if "No-Table" ==  table_name and ddl_file_name:
+                        with open(ddl_file_name, "r") as f:
+                            ddl_sql_content = f.read()
+                            table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
+                    if not table_name:
+                        logger.error(f"No table name found in {dml_file_name} or {ddl_file_name}")
+                        continue
+                    upgrade_mode = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+                    directory = os.path.dirname(dml_file_name)
+                    table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
+                    table_type = get_table_type_from_file_path(dml_file_name)
+                else:
+                    directory = os.path.dirname(ddl_file_name)
+                    table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
+                    table_type = get_table_type_from_file_path(ddl_file_name)
+                    with open(ddl_file_name, "r") as f:
+                        ddl_sql_content = f.read()
                         table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
-                upgrade_mode = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
-                directory = os.path.dirname(dml_file_name)
-                table_folder = from_absolute_to_pipeline(os.path.dirname(directory))
-                table_type = get_table_type_from_file_path(dml_file_name)
+                
                 product_name = extract_product_name(table_folder)
                 ref = FlinkTableReference.model_validate({
                     "table_name": table_name,
@@ -302,8 +314,8 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
         logger.error(f"No DDL file found in the directory: {base_scripts}")
         raise Exception(f"No DDL file found in the directory: {base_scripts}")
     if dml_file_name is None:
-        logger.error(f"No DML file found in the directory: {base_scripts}")
-        raise Exception(f"No DML file found in the directory: {base_scripts}")
+        logger.warning(f"No DML file found in the directory: {base_scripts}")
+        #raise Exception(f"No DML file found in the directory: {base_scripts}")
     return ddl_file_name, dml_file_name
 
 @lru_cache

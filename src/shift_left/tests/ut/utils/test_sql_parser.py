@@ -365,6 +365,43 @@ class TestSQLParser(unittest.TestCase):
         assert columns['type'] == {'name': 'type', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         print(columns)
 
+    def test_extract_table_name_from_create_statement_quoted(self):
+        parser = SQLparser()
+        query="""CREATE TABLE IF NOT EXISTS `identity_metadata` (
+            `id` VARCHAR(2147483647) NOT NULL,
+            `key` VARCHAR(2147483647) NOT NULL,
+            `value` VARCHAR(2147483647) NOT NULL,
+            `tenant_id` VARCHAR(2147483647) NOT NULL,
+            `description` VARCHAR(2147483647)
+        """
+        table_name = parser.extract_table_name_from_create_statement(query)
+        assert table_name == "identity_metadata"
+
+
+    def test_extract_table_name_from_insert_into_statement_quoted(self):
+        parser = SQLparser()
+        query="""INSERT INTO `identity_metadata` (
+            `id` VARCHAR(2147483647) NOT NULL,
+            `key` VARCHAR(2147483647) NOT NULL,
+            `value` VARCHAR(2147483647) NOT NULL,
+            `tenant_id` VARCHAR(2147483647) NOT NULL,
+            `description` VARCHAR(2147483647)
+        """
+        table_name = parser.extract_table_name_from_insert_into_statement(query)
+        assert table_name == "identity_metadata"
+
+    def test_extract_table_name_from_insert_into_statement_start_with_number_and_quoted(self):
+        parser = SQLparser()
+        query="""INSERT INTO `75_identity_metadata` (
+            `id` VARCHAR(2147483647) NOT NULL,
+            `key` VARCHAR(2147483647) NOT NULL,
+            `value` VARCHAR(2147483647) NOT NULL,
+            `tenant_id` VARCHAR(2147483647) NOT NULL,
+            `description` VARCHAR(2147483647)
+        """
+        table_name = parser.extract_table_name_from_insert_into_statement(query)
+        assert table_name == "75_identity_metadata"
+
     def test_build_columns_from_sql_content_quoted_column_names(self):
         parser = SQLparser()
         query="""CREATE TABLE IF NOT EXISTS  `identity_metadata` (

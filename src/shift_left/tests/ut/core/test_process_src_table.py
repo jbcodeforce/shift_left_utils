@@ -58,34 +58,41 @@ class TestProcessSrcTable(unittest.TestCase):
     def test_process_one_file(self,TranslatorToFlinkSqlAgent):
 
         mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
-        mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
+        mock_translator_agent.translate_to_flink_sqls.return_value = ([DML], [DDL])
      
         staging = self._get_env_var("STAGING")
         src_folder = self._get_env_var("SRC_FOLDER")
         
         shutil.rmtree(staging)
-        migrate_one_file("a_table",
-            src_folder + "/facts/p5/a.sql",   
+        migrate_one_file("fct_users",
+            src_folder + "/facts/p5/fct_users.sql",   
             staging,   
             src_folder,
-            False)
-        assert os.path.exists(staging + "/facts/p5/")
+            process_parents=False,
+            source_type="spark",
+            validate=False)
+        assert os.path.exists(staging + "/facts/p5/fct_users")
+        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/dml.fct_users.sql")
+        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/ddl.fct_users.sql")
+        
 
-    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
+    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")  
     def test_process_one_file_recurring(self, TranslatorToFlinkSqlAgent):
 
         mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
-        mock_translator_agent.translate_to_flink_sqls.return_value = (DML, DDL)
+        mock_translator_agent.translate_to_flink_sqls.return_value = ([DML], [DDL])
         
         staging = self._get_env_var("STAGING")
         src_folder = self._get_env_var("SRC_FOLDER")
         
         shutil.rmtree(staging)
         migrate_one_file("a_table",
-            src_folder + "/facts/p5/a.sql",   
+            src_folder + "/facts/p5/fct_users.sql",   
             staging,   
             src_folder,
-            True)
+            process_parents=True,
+            source_type="spark",
+            validate=False)
         assert os.path.exists(staging + "/sources/src_s1")
         assert os.path.exists(staging + "/sources/src_s2")
         assert os.path.exists(staging + "/sources/src_s2/sql-scripts/dml.src_s2.sql")

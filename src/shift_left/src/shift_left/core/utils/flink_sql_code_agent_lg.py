@@ -11,13 +11,6 @@ from langchain_ollama.llms import OllamaLLM
 
 import re
 
-
-parser = argparse.ArgumentParser(
-    prog=os.path.basename(__file__),
-    description='Test Flink sql generation from a dbt sql file'
-)
-parser.add_argument('-n', '--file_path', required=True, help="name of the file path with the sql file to process")
-
 """
 Create Flink SQL with a set of agents working within the following workflow
 

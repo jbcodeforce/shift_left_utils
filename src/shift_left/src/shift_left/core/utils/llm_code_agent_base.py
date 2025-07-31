@@ -25,6 +25,7 @@ class AnySqlToFlinkSqlAgent:
         self.model_name=self.qwen_model_name
         self.llm_base_url=os.getenv("SL_LLM_BASE_URL","http://localhost:11434/v1")
         self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_test_key")
+        print(f"Using {self.model_name} with {self.llm_base_url} and {self.llm_api_key[:25]}...")
         self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
         self._load_prompts()
 

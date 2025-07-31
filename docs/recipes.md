@@ -75,7 +75,7 @@ This use case applies only when the source project is available and based on dbt
 
 ![](./images/migration_comp.drawio.png)
 
-* [Migrate existing SQL source file to Flink SQL using AI.](#migrate-sql-tables-from-source-to-staging)
+* [Migrate existing SQL source file to Flink SQL using AI.](#migrate-spark-sql-tables)
 
 ## Setup
 
@@ -494,7 +494,7 @@ As of now the template is in the source folder: `shift_left_utils/src/shift_left
 
 ### Migrate Spark SQL tables
 
-As presented in the [introduction](./index.md/#shift_left-tooling), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
+As presented in the [introduction](./index.md/#shift_left-tool), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
 
 * Process one table
 

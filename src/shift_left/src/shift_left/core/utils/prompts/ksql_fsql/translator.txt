@@ -8,13 +8,14 @@ Your task is to convert ksqlDB streaming SQL into equivalent Apache Flink SQL wi
 * ksqlDB TABLE → Flink TABLE (with appropriate primary key constraints)
 * Both represent unbounded data streams in Flink
 * The connector property named `KAFKA_TOPIC` becomes the name of the table for the DDL
+* Use lowercase table name
 
 ### Data Types:
 * Replace VARCHAR → STRING
 * Replace BIGINT → BIGINT (maintain precision)
 * Use TIMESTAMP(3) for millisecond precision timestamps
 * Use DECIMAL(p,s) for precise numeric operations
-* Preserve column name casing (camelCase, snake_case, etc.)
+* Preserve column name casing (camelCase, snake_case, etc.) or use lowercase
 * Do not use explicit: `$rowtime TIMESTAMP(3) METADATA FROM 'timestamp'` as it is in Confluent Cloud for Flink
 
 ### Function Transformations:
