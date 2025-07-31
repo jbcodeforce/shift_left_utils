@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_int_p2_c: 
+drop_table: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 

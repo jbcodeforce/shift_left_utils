@@ -16,6 +16,7 @@ In a classical blue-green deployment for ETL jobs, the CI/CD process updates eve
 ![](./images/bg_current.drawio.png)
 <caption>**Figure 1**: Blue-Green for batch processing</caption>
 </figure>
+*Blue is the **production**, Green is the new logic to deploy*
 
 The processing includes reloading the data from the CDC output topics (clone topics), using S3 Sink Connector to new bucket folders, then re-run the batch processing to create the bronze, silver and gold records for consumption by the query engine to serve data to the business intelligence dashboard. When the blue data set is ready the query engine uses another location.
 
@@ -48,10 +49,16 @@ As an example, the new code release goal is to modify only the purple statements
 * **Tagging**: After merging into main, the merge commit is tagged with a version number (e.g., v1.0.0) to mark the specific release point in the repository's history.
 * **Cleanup**: After the release is finalized and merged, the release branch can be safely deleted
 
-
 <figure markdown="span">
 ![](./images/bg_2_2_branch.drawio.png)
-<caption>**Figure 3**:Branching for Flink Statement updates</caption>
+<caption>**Figure 3**:GitFlow branching for Flink Statement updates</caption>
+</figure>
+
+An alternate approach is to work directly to main branch:
+
+<figure markdown="span">
+![](./images/bg_2_2_main_branch.drawio.png)
+<caption>**Figure 3-bis**:Branching from main, for Flink Statement updates</caption>
 </figure>
 
 ### Flink pipelines deployment
@@ -137,13 +144,13 @@ The CDC topic will contain records with both old and new schemas. The initial Fl
 
 ### Pre-deployment activities
 
-* Get the **list of PR** to integrate in the release
-* Get the **list of Flink modified table** cross PRs to work on using git commands
-* **Create release branch**
-* Modify each Flink statement for the modified table so the DDL and `insert into` of the dml use a new version postfix
-* Propagate to the children Flink Statement to consume from the new versioned tables, continue recursively to the sink Kafka Connector.
-* Get the list of table impacted, review execution plan
-* Verify resource (cmompute pool and CFU usage) availability
+* Get the **list of Pull Requests** to integrate in the release. (` git ls-remote origin 'pull/*/head'`)
+* Get the **list of Flink modified tables** cross PRs to work on, using git commands
+* **Create release branch** ('git checkout -b v1.0.1)
+* Modify each Flink statement for the modified table so the DDLs and `insert into` of the DLMs use the new version postfix
+* Propagate to the children Flink Statements to consume from the new versioned tables, continue recursively to the sink Kafka Connector.
+* Get the list of tables impacted, review execution plan
+* Verify resource (compute pool and CFU usage) availability
 * Deploy to stage environment: an environment with existing Flink statements already running
     ```sh
     shift_left pipeline deploy --table-list-file-name statements-to-deploy.txt`
