@@ -15,7 +15,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 
 from pydantic import BaseModel
-from typing import Tuple, List  
+from typing import Tuple, List, Optional  
 import os
 import importlib.resources 
 
@@ -38,8 +38,8 @@ class KsqlFlinkSql(BaseModel):
         flink_dml_output: Generated Flink SQL DML statements (INSERT, SELECT, etc.)
     """
     ksql_input: str
-    flink_ddl_output: str
-    flink_dml_output: str
+    flink_ddl_output:  Optional[str] = None
+    flink_dml_output:  Optional[str] = None
 
 
 class KsqlTableDetection(BaseModel):
@@ -67,15 +67,15 @@ class FlinkSql(BaseModel):
     is syntactically correct and follows best practices.
     
     Attributes:
-        ddl_sql_input: Input DDL statements for validation
-        dml_sql_input: Input DML statements for validation
-        flink_ddl_output: Validated and potentially corrected DDL output
-        flink_dml_output: Validated and potentially corrected DML output
+        ddl_sql_input: Input DDL statements for validation (optional)
+        dml_sql_input: Input DML statements for validation (optional)
+        flink_ddl_output: Validated and potentially corrected DDL output (optional)
+        flink_dml_output: Validated and potentially corrected DML output (optional)
     """
-    ddl_sql_input: str
-    dml_sql_input: str
-    flink_ddl_output: str
-    flink_dml_output: str
+    ddl_sql_input: Optional[str] = None
+    dml_sql_input: Optional[str] = None
+    flink_ddl_output: Optional[str] = None
+    flink_dml_output: Optional[str] = None
 
 
 class FlinkSqlForRefinement(BaseModel):
@@ -90,9 +90,9 @@ class FlinkSqlForRefinement(BaseModel):
         error_message: Error message received from Flink
         flink_output: Refined SQL statement that should resolve the error
     """
-    sql_input: str
-    error_message: str
-    flink_output: str
+    sql_input: Optional[str] = None
+    error_message: Optional[str] = None
+    flink_output: Optional[str] = None
 
 
 class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
@@ -460,12 +460,12 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
                     ddl, validated = self._iterate_on_validation(ddl)
                     if validated:
                         ddl = self._process_semantic_validation(ddl)
-                        dml, validated = self._iterate_on_validation(dml)
-                        if validated:
-                            dml = self._process_semantic_validation(dml)
-                    
+                        if dml:
+                            dml, validated = self._iterate_on_validation(dml)
+                            if validated:
+                                dml = self._process_semantic_validation(dml)
+                            validated_dmls.append(dml)
                     validated_ddls.append(ddl)
-                    validated_dmls.append(dml)
                     _snapshot_ddl_dml(table_name, ddl, dml)
                 # Use validated results
                 final_ddl = validated_ddls

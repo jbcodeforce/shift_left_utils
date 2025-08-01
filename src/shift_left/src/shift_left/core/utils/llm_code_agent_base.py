@@ -3,10 +3,9 @@ Copyright 2024-2025 Confluent, Inc.
 """
 
 from openai import OpenAI
-from pydantic import BaseModel
 from typing import Tuple
 import os
-import importlib.resources 
+
 
 from shift_left.core.utils.app_config import get_config, logger
 from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
@@ -41,11 +40,9 @@ class AnySqlToFlinkSqlAgent:
             print(f"CC Flink Statement: {statement}")
             logger.info(f"CC Flink Statement: {statement}")
             if statement and statement.status:
-                if statement.status.phase == "RUNNING":
-                    # Stop the statement as not needed anymore
+                if statement.status.phase in ["RUNNING", "COMPLETED"]:
+                    # Stop the statement as it is not needed anymore
                     delete_statement_if_exists(statement_name)
-                    return True, ""
-                elif statement.status.phase == "COMPLETED":
                     return True, statement.status.detail
                 else:
                     return False, statement.status.detail
@@ -91,6 +88,8 @@ class AnySqlToFlinkSqlAgent:
                 answer = input()
                 if answer != "y":
                     return translated_sql, sql_validated
+            else:
+                print(f"SQL is valid and runs on CC after {iteration_count} iterations")
         return translated_sql, sql_validated
 
 

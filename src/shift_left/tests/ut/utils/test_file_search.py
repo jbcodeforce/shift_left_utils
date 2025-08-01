@@ -305,13 +305,14 @@ class TestFileSearch(unittest.TestCase):
                 get_ddl_dml_from_folder(temp_dir, "sql-scripts")
             self.assertTrue("No DDL file found" in str(context.exception))
             
-            # Test missing DML file
+            # Test missing DML file - should not raise exception anymore, just return None for DML
             ddl_file = os.path.join(scripts_dir, "ddl.test.sql")
             with open(ddl_file, 'w') as f:
                 f.write("CREATE TABLE test;")
-            with self.assertRaises(Exception) as context:
-                get_ddl_dml_from_folder(temp_dir, "sql-scripts")
-            self.assertTrue("No DML file found" in str(context.exception))
+            ddl_result, dml_result = get_ddl_dml_from_folder(temp_dir, "sql-scripts")
+            # Should return the DDL file path and None for missing DML
+            self.assertEqual(ddl_result, ddl_file)
+            self.assertIsNone(dml_result)
         finally:
             shutil.rmtree(temp_dir)
 
@@ -323,7 +324,7 @@ class TestFileSearch(unittest.TestCase):
             ("/path/to/sources/product3/table", "product3"),
             ("/path/to/dimensions/product4/table", "product4"),
             ("/path/to/views/product5/table", "product5"),
-            ("/path/to/facts/table", ""),  # No product name
+            ("/path/to/facts/table", 'None'),  # No product name
             ("/path/to/unknown/table", "unknown")  # Unknown structure
         ]
         

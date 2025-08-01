@@ -69,9 +69,10 @@ GROUP BY TUMBLE(timestamp, INTERVAL '5' MINUTE);
 
 ksqldb has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompts need to support migration examples outside of the classical select and create table.
 
-```sh
-shift_left table migrate w2_processing $SRC_FOLDER/w2processing.ksql $STAGING --source-type ksql
-```
+* Example of command to migrate a kSQL
+  ```sh
+  shift_left table migrate w2_processing $SRC_FOLDER/w2processing.ksql $STAGING --source-type ksql 
+  ```
 
 ## Current Approach
 
@@ -137,6 +138,8 @@ Same approach for spark SQL with the prompts being in the `core/utils/prompts/sp
 1. **Install shift_left Tool**:
    ```bash
    # under src/shift_left
+   ls -al dist/
+   # select the last version, for example:
    uv tool install dist/shift_left-0.1.28-py3-none-any.whl
    # Verify installation
    shift_left --help
@@ -150,7 +153,7 @@ Same approach for spark SQL with the prompts being in the `core/utils/prompts/sp
 
 1. Be sure to be logged in Confluent Cloud, and have defined at least one compute pool.
 
-1. Create an Openrouter.ai api_key: [https://openrouter.ai/](https://openrouter.ai/), the model used is `qwen/qwen3-coder:free` which is free to use.
+
 
 ### Configuration File Setup
 
@@ -226,7 +229,7 @@ my-flink-app
 └── staging
 ```
 
-### 2. Prepare Source Files
+### 2. Specific Setup
 
 * Copy your KSQL files to the sources directory:
 
@@ -234,6 +237,17 @@ my-flink-app
 # Copy KSQL files
 cp *.ksql ${SRC_FOLDER}/
 ```
+
+* *Optional* To run locally on smaller model, download [ollama](https://ollama.com/download), then install the qwen2.5-coder model:
+  ```sh
+  # select the size of the model according to your memory
+  ollama pull qwen2.5-coder:32b
+  ollama list
+  ```
+
+* Create an Openrouter.ai api_key: [https://openrouter.ai/](https://openrouter.ai/), to get access to bigger models, like `qwen/qwen3-coder:free` which is free to use.
+
+* Set environment variables:
 
 ### 3. Migration Execution
 
