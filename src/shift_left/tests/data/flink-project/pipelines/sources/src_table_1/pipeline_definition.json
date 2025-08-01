@@ -1,6 +1,6 @@
 {
    "table_name": "src_table_1",
-   "product_name": "",
+   "product_name": "None",
    "type": "source",
    "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
    "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",

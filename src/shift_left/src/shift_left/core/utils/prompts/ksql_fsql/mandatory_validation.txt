@@ -14,6 +14,7 @@ You are an expert Apache Flink SQL validator. Your task is to validate and fix F
 * Ensure proper data type declarations
 * Maintain consistent column naming conventions
 * Remove `$rowtime TIMESTAMP(3) METADATA FROM 'timestamp',`
+* Add `` around column name that are SQL reserved word as time, period, database
 
 ### 3. Table Distribution:
 * Every table must include: `DISTRIBUTED BY HASH(primary_key_column) INTO 1 BUCKETS`

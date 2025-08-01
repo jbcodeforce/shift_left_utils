@@ -1,0 +1,20 @@
+export CONFIG_FILE=./tests/config-ccloud.yaml
+
+export FLINK_PROJECT=./tests/data/flink-project
+export PIPELINES=$FLINK_PROJECT/pipelines
+export STAGING=$FLINK_PROJECT/staging
+export SRC_FOLDER=./tests/data/spark-project
+
+export TOPIC_LIST_FILE=$FLINK_PROJECT/src_topic_list.txt 
+
+export CCLOUD_ENV_ID=env-<>
+export CCLOUD_ENV_NAME=j9r-env
+export CCLOUD_KAFKA_CLUSTER=j9r-kafka
+export CLOUD_REGION=us-west-2
+export CLOUD_PROVIDER=aws
+export CCLOUD_CONTEXT=login-<>@confluent.io-https://confluent.cloud
+export CCLOUD_COMPUTE_POOL_ID=lfcp-xvrvmz
+
+export SL_LLM_BASE_URL=https://openrouter.ai/api/v1
+export SL_LLM_MODE=qwen/qwen3-coder:free
+export SL_LLM_API_KEY

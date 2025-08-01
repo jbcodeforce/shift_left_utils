@@ -87,7 +87,7 @@ def build_pipeline_definition_from_ddl_dml_content(
                                               state_form=state_form,
                                               table_folder=None,
                                               dml_file_name=from_absolute_to_pipeline(dml_file_name),
-                                              ddl_file_name=None, 
+                                              ddl_file_name=from_absolute_to_pipeline(ddl_file_name), 
                                               parents=parent_references, 
                                               children=set())
     node_to_process.append(current_node)
@@ -101,7 +101,7 @@ def build_all_pipeline_definitions(pipeline_path: str):
         if path.exists():
             count=_process_table_folder(path, pipeline_path, count)
     if count == 0:
-        # it is possible the pipeline path is not a kimball structure
+        # it is possible the pipeline path is not a kimball structure but a flat structure
         count=_process_table_folder(Path(pipeline_path), pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
     print(f"Total number of pipeline definitions created: {count}")
@@ -184,20 +184,24 @@ def _build_pipeline_definitions_from_sql_content(
         Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition)
     """
     try:
-        if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
-            dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
-        if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
-            ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
         dml_sql_content = ""
         ddl_sql_content = ""
-        with open(dml_file_name) as f:
-            dml_sql_content = f.read()
-        with open(ddl_file_name) as f:
-            ddl_sql_content = f.read()
+        referenced_table_names = set()
         parser = SQLparser()
-        current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
+        if dml_file_name:
+            if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
+                dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
+            with open(dml_file_name) as f:
+                dml_sql_content = f.read()
+            current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
+            referenced_table_names = parser.extract_table_references(dml_sql_content)
+        if ddl_file_name:
+            if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
+                ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
+            with open(ddl_file_name) as f:
+                ddl_sql_content = f.read()
+            current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)          
         dependencies = set()
-        referenced_table_names = parser.extract_table_references(dml_sql_content)
         state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
         if referenced_table_names:
             if current_table_name in referenced_table_names:
@@ -211,7 +215,7 @@ def _build_pipeline_definitions_from_sql_content(
                     continue
                 table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
-                if table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
+                if table_ref.dml_ref and table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
                     table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
                     _dml_sql_content=""
                     _ddl_sql_content=""
@@ -241,13 +245,12 @@ def _build_pipeline_definitions_from_sql_content(
         return ERROR_TABLE_NAME, set(), None
 
     
-def _process_table_folder(parent_folder_path, pipeline_path, count: int):
+def _process_table_folder(parent_folder_path, pipeline_path, count: int) -> int:
     for sql_scripts_path in parent_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
         if sql_scripts_path.is_dir():
             dml_file_name = ""
             ddl_file_name = ""
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
-
                 if file_path.is_file() and file_path.name.startswith("dml"):
                     logger.debug(f"Process the dml {file_path}")
                     dml_file_name = str(file_path.resolve())
@@ -282,7 +285,7 @@ def _build_pipeline_definition(
     logger.debug(f"parameters dml: {dml_file_name}, table_name: {table_name},  parents: {parents}, children: {children})")
     if not table_type:
         table_type = get_table_type_from_file_path(dml_file_name)
-    sql_scripts_directory = os.path.dirname(dml_file_name)
+    sql_scripts_directory = os.path.dirname(dml_file_name if dml_file_name else ddl_file_name)
     if not table_folder:
         table_folder = os.path.dirname(sql_scripts_directory)
     if not ddl_file_name:

@@ -60,9 +60,18 @@ SELECT COUNT(*) FROM users
 GROUP BY TUMBLE(timestamp, INTERVAL '5' MINUTE);
 ```
 
+* Example of command to migrate a Spark SQL
+  ```sh
+  shift_left table migrate customer_journey $SRC_FOLDER/src_customer_journey.sql $STAGING --source-type spark
+  ```
+  
 ### ksqlDB to Flink SQL
 
 ksqldb has some SQL constructs but this is not a ANSI SQL engine. It is highly integrated with Kafka and uses keyword to define such integration. The migration and prompts need to support migration examples outside of the classical select and create table.
+
+```sh
+shift_left table migrate w2_processing $SRC_FOLDER/w2processing.ksql $STAGING --source-type ksql
+```
 
 ## Current Approach
 
@@ -99,7 +108,12 @@ Same approach for spark SQL with the prompts being in the `core/utils/prompts/sp
 
 ### Environment Setup
 
-1. Use [uv](https://github.com/astral-sh/uv) for python package management
+1. Clone the [shift_left_utils git repository](https://github.com/jbcodeforce/shift_left_utils)
+  ```sh
+  git clone https://github.com/jbcodeforce/shift_left_utils
+  ```
+
+1. Install and [uv](https://github.com/astral-sh/uv) for python package management
     ```sh
     # Install uv if not already installed
     curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -113,63 +127,103 @@ Same approach for spark SQL with the prompts being in the `core/utils/prompts/sp
    source .venv/bin/activate  # On Windows WSL: .venv\Scripts\activate
    ```
 
-2. **Install Dependencies**: Use `uv` package manager (recommended)
+1. **Install Dependencies**: Use `uv` package manager (recommended)
    ```bash
+   cd src/shift_left
    # Install project dependencies
    uv sync
    ```
 
-3. **Install shift_left Tool**:
+1. **Install shift_left Tool**:
    ```bash
    # under src/shift_left
-   uv build .
    uv tool install dist/shift_left-0.1.28-py3-none-any.whl
    # Verify installation
    shift_left --help
+   shift_left version
    ```
+
+    you can use `pip`, too if you have an existing python environment:
+    ```sh
+    pip install src/shift_left/dist/shift_left-0.1.28-py3-none-any.whl
+    ```
+
+1. Be sure to be logged in Confluent Cloud, and have defined at least one compute pool.
+
+1. Create an Openrouter.ai api_key: [https://openrouter.ai/](https://openrouter.ai/), the model used is `qwen/qwen3-coder:free` which is free to use.
 
 ### Configuration File Setup
 
-Create a configuration file (e.g., `config-ccloud.yaml`) with the following structure:
+* Create a configuration file (e.g., `config-ccloud.yaml`):
+  ```sh
+  cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config-ccloud.yaml
+  ```
+* Update the content of the config-ccloud.yaml to reflect your Confluent Cloud environment. (for the commands used for migration you do not need kafka setting, )
+  ```yaml
+  # Confluent Cloud Configuration
+  confluent_cloud:
+    api_key: "YOUR_API_KEY"
+    api_secret: "YOUR_API_SECRET"
+    organization_id: "YOUR_CLUSTER_ID"
+    environment_id: "YOUR_ENVIRONMENT_ID"
+    url_scope: public
+    region: "YOUR_REGION"
+    provider: aws
+  flink:
+    flink_url: flink....confluent.cloud
+    compute_pool_id: "YOUR_COMPUTE_POOL_ID"
+    api_key: "YOUR_API_KEY"
+    api_secret: "YOUR_API_SECRET"
+    catalog_name: "envionment_name"
+    database_name: "kafka_cluster_name"
+  ```
 
-```yaml
-# Confluent Cloud Configuration
-confluent:
-  api_key: "YOUR_API_KEY"
-  api_secret: "YOUR_API_SECRET"
-  cluster_id: "YOUR_CLUSTER_ID"
-  environment_id: "YOUR_ENVIRONMENT_ID"
-flink:
-  compute_pool_id: "YOUR_COMPUTE_POOL_ID"
-  region: "YOUR_REGION"
-```
 
+* Set the following environment variables before using the tool can be done by :
+    ```sh
+    cp src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
+    ```
 
-### Required Environment Variables
+    modify the CONFIG_FILE, FLINK_PROJECT, SRC_FOLDER, SL_LLM_* variables
 
-Set the following environment variables before using the tool:
+* source it:
+    ```sh
+    source set_env
+    ```
+
+* Validate config-ccloud.yaml
 
 ```bash
-# Core Configuration
-export CONFIG_FILE="/path/to/your/config-ccloud.yaml"
-
-# Project Structure
-export FLINK_PROJECT="/path/to/your/project"
-export SRC_FOLDER="${FLINK_PROJECT}/sources"
-export STAGING="${FLINK_PROJECT}/staging"
-export PIPELINES="${FLINK_PROJECT}/pipelines"
+shift_left project validate-config
 ```
-
 
 ## Migration Workflow
 
 ### 1. Project Initialization
 
-Create a new migration project:
+Create a new target project to keep your flink statements and pipelines (e.g. my-flink-app):
 
 ```bash
 # Initialize project structure
-shift_left project init your-project /path/to/your/project
+shift_left project init <your-project> </path/to/your/folder>
+# example 
+shift_left project init my-flink-app $HOME/Code
+```
+
+You should get:
+```sh
+my-flink-app
+├── README.md
+├── docs
+├── pipelines
+│   ├── common.mk
+│   ├── dimensions
+│   ├── facts
+│   ├── intermediates
+│   ├── sources
+│   └── views
+├── sources
+└── staging
 ```
 
 ### 2. Prepare Source Files
@@ -181,30 +235,23 @@ shift_left project init your-project /path/to/your/project
 cp *.ksql ${SRC_FOLDER}/
 ```
 
-* Validate config.yaml
-
-```bash
-shift_left project validate-config
-```
-
-### 4. Migration Execution
+### 3. Migration Execution
 
 #### Basic Table Migration
 
 ```bash
 # Migrate a simple table
-shift_left table migrate basic_user_table \
-  $SRC_FOLDER/user-table.ksql \
-  $STAGING \
-  --source-type ksql 
+shift_left table migrate basic_user_table $SRC_FOLDER/user-table.ksql $STAGING --source-type ksql 
+```
 
-# The command generates:
+The command generates:
+```sh
 # ├── staging/basic_user_table/sql-scripts
 # │   ├── ddl.basic_user_table.sql     # Flink DDL
 # │   ├── dml.basic_user_table.sql     # Flink DML (if any
 ```
 
-### 5. Validation and Deployment
+### 4. Validation and Deployment
 
 ```bash
 # Deploy to Confluent Cloud for Flink
@@ -217,19 +264,55 @@ make create_flink_ddl
 make create_flink_dml
 ```
 
-## Troubleshooting
+### 5. Prepare for pipeline management
 
-### Common Issues
+Flink statements have dependencies, so it is important to use shift_left to manage those dependencies:
 
-#### 1. Configuration Errors
+* Run after new table are created
+  ```sh
+  shift_left table build-inventory
+  ```
 
-**Problem**: `CONFIG_FILE not found`
-```bash
-# Solution: Verify file path and permissions
-ls -la ${CONFIG_FILE}
-shift_left config validate
-```
+* Build all the metadata
+  ```sh
+  shift_left pipeline build-all-metadata 
+  ```
 
-#### 2. Migration Errors
 
-Having empty ddl or dml may come from a wrong prompt or not enough memory for the local ollama.
+* Verify an execution plan
+  ```sh
+  shift_left pipeline build-execution-plan --table-name <>
+  ```
+
+
+### 6. Next
+
+* Organize the Flink statement into a pipeline folder may be using sources, intermediates, dimensions and facts classification. Think about data product. So a candidate hierarchy may look like
+  ```sh
+  my-flink-app
+
+  ├── pipelines
+  │   ├── common.mk
+  │   ├── dimensions
+  │   │   ├── data_product_a
+  │   ├── facts
+  │   │   ├── data_product_a
+  │   ├── intermediates
+  │   │   ├── data_product_a
+  │   ├── sources
+  │   │   ├── data_product_a
+  │   │       ├── src_stream
+  │   │       │   ├── Makefile
+  │   │       │   ├── pipeline_definition.json
+  │   │       │   ├── sql-scripts
+  │   │       │   │   ├── ddl.src_stream.sql
+  │   │       │   │   └── dml.src_stream.sql
+  │   │       │   ├── tests
+  │   ├── views
+          └── data_product_a
+  
+  ```
+
+* Add unit tests per table (at least for the complex DML ones) ([see test harness](../test_harness.md))
+* Add source data into the first tables of the pipeline 
+* Verify the created records within the sink tables.

@@ -358,11 +358,20 @@ def extract_product_name(existing_path: str) -> str:
     """
     Given an existing folder path, get the name of the folder below one of the structural folder as it is the name of the data product.
     """
+    # extract parent of the existing path
     parent_folder=os.path.dirname(existing_path).split("/")[-1]
+    
     if parent_folder not in ["facts", "intermediates", "sources", "dimensions", "views"]:
+        # Verify parent_folder is not the same as the first folder of the existing_path
+        # The first folder is the first non-empty part of the path
+        path_parts = [p for p in existing_path.strip("/").split("/") if p]
+        if path_parts:
+            first_folder = path_parts[0]
+            if parent_folder == first_folder:
+                return "None"
         return parent_folder
     else:
-        return ""
+        return "None"
     
 def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     """

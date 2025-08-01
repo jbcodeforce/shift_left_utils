@@ -25,9 +25,9 @@ confluent_cloud:
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
   page_size: 100
-  url_scope: private
+  url_scope: public
 flink:
-  flink_url: <>.confluent.cloud
+  flink_url: flink.<TO_FILL>.confluent.cloud
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
   compute_pool_id: lfcp- <TO_FILL>
