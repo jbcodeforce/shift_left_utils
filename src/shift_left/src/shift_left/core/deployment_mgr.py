@@ -516,14 +516,17 @@ def prepare_tables_from_sql_file(sql_file_name: str,
     config = get_config()
     compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
     transformer = statement_mgr.get_or_build_sql_content_transformer()
+    stmnt_suffix = datetime.now().strftime("%Y%m%d%H%M%S")
     with open(sql_file_name, "r") as f:
         idx=0
         for line in f:
+            if line.lstrip().startswith('--'):
+                continue
             _, sql_out= transformer.update_sql_content(line, 
                                                        "", 
                                                        "")
             print(sql_out)
-            statement_name = f"prepare-table-{idx}"
+            statement_name = f"prepare-table-{stmnt_suffix}-{idx}"
             statement = statement_mgr.post_flink_statement(compute_pool_id, 
                                                            statement_name, 
                                                            sql_out)
