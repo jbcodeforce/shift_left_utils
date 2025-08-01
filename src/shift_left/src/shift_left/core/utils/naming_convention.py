@@ -18,7 +18,7 @@ class DmlNameModifier(DefaultDmlNameModifier):
     Modifier to change the name of the dml statement
     """
     def modify_statement_name(self, node: FlinkStatementNode,  statement_name: str, prefix: str) -> str:
-        if node.product_name:
+        if node.product_name and node.product_name != "None":
             if prefix:
                 statement_name = prefix + "-" + node.product_name + "-" + statement_name
             else:

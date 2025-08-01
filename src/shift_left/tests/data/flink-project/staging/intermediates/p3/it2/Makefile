@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- p5_fct_a_table
-TABLE_NAME=p5_fct_a_table
-SCRIPT_PRE_KEBAB=dev
+# --- int_p3_it2
+TABLE_NAME=int_p3_it2
+SCRIPT_PRE_KEBAB=stage
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_p5_fct_a_table: create_flink_ddl  create_flink_dml
+create_int_p3_it2: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_p5_fct_a_table
+delete_data: delete_schemas delete_topic_int_p3_it2

@@ -6,6 +6,9 @@ import unittest
 import shutil
 from unittest.mock import patch
 import os, pathlib
+# need to be before the import of migrate_one_file
+data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
+os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
 from shift_left.core.process_src_tables import migrate_one_file
 
 DDL="""
@@ -40,11 +43,11 @@ def mock_llm_result():
 class TestProcessSrcTable(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
+        
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
+       
         os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
 
     def _get_env_var(self, var_name: str) -> str:
@@ -63,7 +66,8 @@ class TestProcessSrcTable(unittest.TestCase):
         staging = self._get_env_var("STAGING")
         src_folder = self._get_env_var("SRC_FOLDER")
         
-        shutil.rmtree(staging)
+        if os.path.exists(staging):
+            shutil.rmtree(staging)        
         migrate_one_file("fct_users",
             src_folder + "/facts/p5/fct_users.sql",   
             staging,   
@@ -72,8 +76,8 @@ class TestProcessSrcTable(unittest.TestCase):
             source_type="spark",
             validate=False)
         assert os.path.exists(staging + "/facts/p5/fct_users")
-        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/dml.fct_users.sql")
-        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/ddl.fct_users.sql")
+        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/dml.p5_fct_users.sql")
+        assert os.path.exists(staging + "/facts/p5/fct_users/sql-scripts/ddl.p5_fct_users.sql")
         
 
     @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")  
@@ -86,23 +90,19 @@ class TestProcessSrcTable(unittest.TestCase):
         src_folder = self._get_env_var("SRC_FOLDER")
         
         shutil.rmtree(staging)
-        migrate_one_file("a_table",
+        migrate_one_file("fct_users",
             src_folder + "/facts/p5/fct_users.sql",   
             staging,   
             src_folder,
             process_parents=True,
             source_type="spark",
             validate=False)
-        assert os.path.exists(staging + "/sources/src_s1")
-        assert os.path.exists(staging + "/sources/src_s2")
-        assert os.path.exists(staging + "/sources/src_s2/sql-scripts/dml.src_s2.sql")
-        assert os.path.exists(staging + "/sources/src_s2/sql-scripts/ddl.src_s2.sql")
-        assert os.path.exists(staging + "/intermediates/int_p5_a")
-        assert os.path.exists(staging + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql")
-        assert os.path.exists(staging + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql")
-        with open(staging + "/intermediates/int_p5_a/sql-scripts/dml.int_p5_a.sql", "r") as f:
+        assert os.path.exists(staging + "/sources/p5/raw_active_users")
+        assert os.path.exists(staging + "/sources/p5/raw_active_users/sql-scripts/dml.src_p5_raw_active_users.sql")
+        assert os.path.exists(staging + "/sources/p5/raw_active_users/sql-scripts/ddl.src_p5_raw_active_users.sql")
+        with open(staging + "/dimensions/p5/dim_user_groups/sql-scripts/dml.p5_dim_user_groups.sql", "r") as f:
             assert f.read() == DML
-        with open(staging + "/intermediates/int_p5_a/sql-scripts/ddl.int_p5_a.sql", "r") as f:
+        with open(staging + "/dimensions/p5/dim_user_groups/sql-scripts/ddl.p5_dim_user_groups.sql", "r") as f:
             assert f.read() == DDL
 
             

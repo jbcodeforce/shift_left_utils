@@ -36,7 +36,9 @@ class TestTestManager(unittest.TestCase):
         build_inventory(os.getenv("PIPELINES"))
     
     def setUp(self):
-
+        # Ensure proper test isolation by resetting caches and rebuilding inventory
+        reset_all_caches()
+        build_inventory(os.getenv("PIPELINES"))
         self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
     
     # ---- Mock functions to be used in tests to avoid calling remote services ----
@@ -347,7 +349,8 @@ class TestTestManager(unittest.TestCase):
 
         def _mock_statement_results(statement_name):
             print(f"mock_statement_results: {statement_name}")
-            op_row = OpRow(op=0, row=["PASS"]) if statement_name == "dev-val-1-p1-fct-order-ut" else OpRow(op=0, row=["FAIL"])
+            # Return PASS for validation statements related to test_case_1, FAIL for others
+            op_row = OpRow(op=0, row=["PASS"]) if "val-1" in statement_name else OpRow(op=0, row=["FAIL"])
             data = Data(data=[op_row])
             result = StatementResult(results=data, 
                                      api_version="v1", 
@@ -460,7 +463,7 @@ class TestTestManager(unittest.TestCase):
 
         def _mock_statement_results(statement_name):
             print(f"mock_statement_results: {statement_name}")
-            op_row = OpRow(op=0, row=["PASS"]) if statement_name == "dev-val-1-p1-fct-order-ut" else OpRow(op=0, row=["FAIL"])
+            op_row = OpRow(op=0, row=["PASS"]) if "val-1" in statement_name else OpRow(op=0, row=["FAIL"])
             data = Data(data=[op_row])
             result = StatementResult(results=data, 
                                      api_version="v1", 

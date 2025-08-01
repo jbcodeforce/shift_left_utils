@@ -1,4 +1,4 @@
-## Fact Table: p5_fct_a_table
+## Fact Table: p5_dim_user_groups
 
 Status date:
 

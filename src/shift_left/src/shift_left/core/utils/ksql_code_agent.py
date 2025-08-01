@@ -464,7 +464,7 @@ class KsqlToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
                             dml, validated = self._iterate_on_validation(dml)
                             if validated:
                                 dml = self._process_semantic_validation(dml)
-                            validated_dmls.append(dml)
+                    validated_dmls.append(dml)
                     validated_ddls.append(ddl)
                     _snapshot_ddl_dml(table_name, ddl, dml)
                 # Use validated results

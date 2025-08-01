@@ -26,7 +26,7 @@ non_active_users AS (
         email,
         group_id,
         last_login_date
-    FROM raw_inactive_users
+    FROM raw_active_users
     WHERE last_login_date < CURRENT_DATE - INTERVAL 30 DAYS
 ),
 all_users AS (

@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- src_p2_a
-TABLE_NAME=src_p2_a
+# --- p5_dim_user_groups
+TABLE_NAME=p5_dim_user_groups
 SCRIPT_PRE_KEBAB=dev
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_src_p2_a: create_flink_ddl  create_flink_dml
+create_p5_dim_user_groups: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_src_p2_a
+delete_data: delete_schemas delete_topic_p5_dim_user_groups
