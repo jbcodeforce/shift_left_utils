@@ -218,7 +218,7 @@ def explain(table_name: str=  typer.Option(None,help= "Name of the table to get 
             compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
             persist_report: bool = typer.Option(False, "--persist-report", help="Persist the report in the shift_left_dir folder.")):
     """
-    Get the Flink execution plan explanations for a given table or a group of table using the product name.
+    Get the Flink execution plan explanations for a given table or a group of tables using the product name or a list of tables from a file.
     """
     
     if table_name:

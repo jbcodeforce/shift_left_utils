@@ -1,6 +1,9 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.30
+* Separate the SQL content processing in an extension python file, with class to extend TableWorker. Documentation for recipe is modified to explain how to develop the own class.
+
 v0.1.29
 * Enhanced KSQL to Flink SQL migration with improved LLM-based translation (Issue #23)
 * Added table detection functionality for KSQL statements to handle multiple CREATE TABLE scenarios

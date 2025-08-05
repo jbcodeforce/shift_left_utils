@@ -13,6 +13,20 @@ class TableWorker():
     Worker to update the content of a sql content, applying some specific logic
     """
     def update_sql_content(sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
+        """
+        Transform SQL content based on the current deployment environment.
+        Args:
+            sql_content (str): The original SQL statement to transform
+            column_to_search (Optional[str], optional): Column name to search for in tenant filtering.
+                Required for dev environment tenant filtering. Defaults to None.
+            product_name (Optional[str], optional): Product identifier for environment-specific logic.
+                Used in dev environment filtering and topic naming. Defaults to None.
+                
+        Returns:
+            Tuple[bool, str]: A tuple containing:
+                - bool: True if the SQL content was modified, False otherwise
+                - str: The transformed SQL content
+        """
         return (False, sql_content)
     
      
@@ -237,7 +251,7 @@ class ReplaceEnvInSqlContent(TableWorker):
                     # we need to remove the clone.dev. part when not on dev environment
                     sql_content = sql_content.replace('clone.dev.', '')
                     updated = True
-                if self.env == 'dev':
+                if self.env == 'dev' and product_name not in ['stage', 'common']:
                     if re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
                         base_replace_str =  str(self.dml_replacements["dev"]["adapt"]["replace"])
                         replace_str=base_replace_str.replace(self.product_name, product_name)
