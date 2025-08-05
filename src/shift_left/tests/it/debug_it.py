@@ -3,26 +3,28 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 import json
-#os.environ["CONFIG_FILE"] =  "/Users/jerome/.shift_left/config-stage-2b-flink.yaml"
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 
-os.environ["PIPELINES"] =  "/Users/jerome/Code/customers/att/staging"
-#os.environ["STAGING"] =  "/Users/jerome/Code/customers/mc/data-platform-flink/staging"
-#os.environ["SRC_FOLDER"] =  "/Users/jerome/Code/customers/mc/de-datawarehouse/models"
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
+data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
+os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
+os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
+
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.models.flink_statement_model import Statement, StatementInfo, StatementListCache, Spec, Status
 import  shift_left.core.pipeline_mgr as pipeline_mgr
-from shift_left.core.models.flink_statement_model import Statement, StatementResult, Data, OpRow
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.metric_mgr as metric_mgr
 import shift_left.core.test_mgr as test_mgr
+import shift_left.core.table_mgr as table_mgr
 from typer.testing import CliRunner
 from shift_left.cli import app
+
+import shift_left.core.statement_mgr as sm
+import shift_left.core.deployment_mgr as dm  
 
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
-    def test_exec_plan(self):
+    def _test_exec_plan(self):
         runner = CliRunner()
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
@@ -33,7 +35,28 @@ class TestDebugIntegrationTests(unittest.TestCase):
         result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
         print(result.stdout)
 
-        
+      
+    def test_6_0_deploy_by_medals_src(self):
+        """
+        """
+        os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
+        config = get_config()
+        for table in ["src_x", "src_y", "src_p2_a", "src_b"]:
+            try:
+                print(f"Dropping table {table}")
+                #sm.drop_table(table)
+                print(f"Table {table} dropped")
+            except Exception as e:
+                print(e)
+        table_mgr.build_inventory(os.getenv("PIPELINES"))
+        pipeline_mgr.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        summary, execution_plan = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/sources/p2",
+                                               inventory_path=os.getenv("PIPELINES"), 
+                                               compute_pool_id=config.get('flink').get('compute_pool_id'), 
+                                               dml_only=False, 
+                                               may_start_descendants=False,
+                                               execute_plan=True,
+                                               force_ancestors=False)
 
         
 if __name__ == '__main__':

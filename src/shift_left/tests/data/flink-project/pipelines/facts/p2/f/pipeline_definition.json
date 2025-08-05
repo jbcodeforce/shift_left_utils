@@ -1,0 +1,35 @@
+{
+   "table_name": "f",
+   "product_name": "p2",
+   "type": "fact",
+   "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f/sql-scripts/dml.f.sql",
+   "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f/sql-scripts/ddl.f.sql",
+   "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f",
+   "state_form": "Stateless",
+   "parents": [
+      {
+         "table_name": "d",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+         "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+         "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p2/d",
+         "state_form": "Stateless",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "f",
+               "product_name": "p2",
+               "type": "fact",
+               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f/sql-scripts/dml.f.sql",
+               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f/sql-scripts/ddl.f.sql",
+               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p2/f",
+               "state_form": "Stateless",
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": []
+}

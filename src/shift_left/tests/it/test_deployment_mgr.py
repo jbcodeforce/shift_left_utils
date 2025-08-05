@@ -8,6 +8,8 @@ import pathlib
 
 os.environ["CONFIG_FILE"] =   str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
+import shift_left.core.table_mgr as table_mgr
+import shift_left.core.pipeline_mgr as pipeline_mgr
 from shift_left.core.utils.app_config import get_config
 from  shift_left.core.models.flink_statement_model import *
 import shift_left.core.statement_mgr as sm
@@ -29,7 +31,9 @@ class TestDeploymentManager(unittest.TestCase):
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(cls.data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(cls.data_dir / "dbt-project")
+        os.environ["SRC_FOLDER"] = str(cls.data_dir / "spark-project")
+        table_mgr.build_inventory(os.getenv("PIPELINES"))
+        pipeline_mgr.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def test_1_clean_things(self):
         for table in ["src_table_1", "src_p1_table_2", "src_p1_table_3", "int_p1_table_2", "int_p1_table_1", "p1_fct_order"]:
@@ -113,7 +117,7 @@ class TestDeploymentManager(unittest.TestCase):
         for table in ["src_x", "src_y", "src_p2_a", "src_b"]:
             try:
                 print(f"Dropping table {table}")
-                #sm.drop_table(table)
+                sm.drop_table(table)
                 print(f"Table {table} dropped")
             except Exception as e:
                 print(e)
