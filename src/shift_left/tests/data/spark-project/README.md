@@ -6,9 +6,8 @@ This directory contains Spark SQL test scripts and a validation tool to ensure t
 
 Install PySpark:
 ```bash
-pip install pyspark>=3.5.0
-# or use the requirements file
 pip install -r requirements.txt
+or uv 
 ```
 
 ## Directory Structure

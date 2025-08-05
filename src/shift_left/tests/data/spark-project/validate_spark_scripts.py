@@ -18,14 +18,21 @@ Requirements:
 import os
 import sys
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 try:
     from pyspark.sql import SparkSession
-    from pyspark.sql.types import *
-    from pyspark.sql.functions import *
+    from pyspark.sql.types import (
+        StructType, 
+        StructField, 
+        StringType, 
+        TimestampType, 
+        DateType, 
+        DoubleType, 
+        IntegerType
+    )
 except ImportError:
     print("ERROR: PySpark not installed. Please run: pip install pyspark")
     sys.exit(1)
@@ -54,11 +61,11 @@ class SparkSQLValidator:
         
         # Sample data for product analytics
         product_events_data = [
-            ("prod_001", "electronics", "2024-01-15 10:30:00", "user_001", "page_view", 0.0),
-            ("prod_001", "electronics", "2024-01-15 10:35:00", "user_001", "purchase", 299.99),
-            ("prod_002", "clothing", "2024-01-15 11:00:00", "user_002", "page_view", 0.0),
-            ("prod_002", "clothing", "2024-01-15 11:05:00", "user_002", "add_to_cart", 0.0),
-            ("prod_003", "books", "2024-01-15 14:20:00", "user_003", "purchase", 24.99),
+            ("prod_001", "electronics", datetime.strptime("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S"), "user_001", "page_view", 0.0),
+            ("prod_001", "electronics", datetime.strptime("2024-01-15 10:35:00", "%Y-%m-%d %H:%M:%S"), "user_001", "purchase", 299.99),
+            ("prod_002", "clothing", datetime.strptime("2024-01-15 11:00:00", "%Y-%m-%d %H:%M:%S"), "user_002", "page_view", 0.0),
+            ("prod_002", "clothing", datetime.strptime("2024-01-15 11:05:00", "%Y-%m-%d %H:%M:%S"), "user_002", "add_to_cart", 0.0),
+            ("prod_003", "books", datetime.strptime("2024-01-15 14:20:00", "%Y-%m-%d %H:%M:%S"), "user_003", "purchase", 24.99),
         ]
         
         product_events_schema = StructType([
@@ -75,11 +82,11 @@ class SparkSQLValidator:
         
         # Sample data for customer journey
         web_events_data = [
-            ("user_001", "session_001", "2024-01-15 10:00:00", "page_view", "/home"),
-            ("user_001", "session_001", "2024-01-15 10:05:00", "page_view", "/products"),
-            ("user_001", "session_001", "2024-01-15 10:10:00", "purchase", "/checkout"),
-            ("user_002", "session_002", "2024-01-14 15:30:00", "page_view", "/home"),
-            ("user_002", "session_002", "2024-01-14 15:35:00", "page_view", "/cart"),
+            ("user_001", "session_001", datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/home"),
+            ("user_001", "session_001", datetime.strptime("2024-01-15 10:05:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/products"),
+            ("user_001", "session_001", datetime.strptime("2024-01-15 10:10:00", "%Y-%m-%d %H:%M:%S"), "purchase", "/checkout"),
+            ("user_002", "session_002", datetime.strptime("2024-01-14 15:30:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/home"),
+            ("user_002", "session_002", datetime.strptime("2024-01-14 15:35:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/cart"),
         ]
         
         web_events_schema = StructType([
@@ -95,9 +102,9 @@ class SparkSQLValidator:
         
         # Customer profiles
         customer_profiles_data = [
-            ("user_001", "25-34", "US", "premium", "2023-01-15"),
-            ("user_002", "35-44", "UK", "basic", "2023-06-20"),
-            ("user_003", "18-24", "CA", "premium", "2024-01-01"),
+            ("user_001", "25-34", "US", "premium", date(2023, 1, 15)),
+            ("user_002", "35-44", "UK", "basic", date(2023, 6, 20)),
+            ("user_003", "18-24", "CA", "premium", date(2024, 1, 1)),
         ]
         
         customer_profiles_schema = StructType([
@@ -113,10 +120,10 @@ class SparkSQLValidator:
         
         # Purchases
         purchases_data = [
-            ("user_001", 299.99, "2024-01-15"),
-            ("user_001", 149.99, "2024-01-10"),
-            ("user_002", 79.99, "2024-01-12"),
-            ("user_003", 24.99, "2024-01-14"),
+            ("user_001", 299.99, date(2024, 1, 15)),
+            ("user_001", 149.99, date(2024, 1, 10)),
+            ("user_002", 79.99, date(2024, 1, 12)),
+            ("user_003", 24.99, date(2024, 1, 14)),
         ]
         
         purchases_schema = StructType([
@@ -142,9 +149,9 @@ class SparkSQLValidator:
         
         # Create a simple version for raw_events (PySpark has limitations with complex nested structures in createDataFrame)
         raw_events_simple_data = [
-            ("evt_001", "user_001", "2024-01-15 10:00:00", "click"),
-            ("evt_002", "user_002", "2024-01-15 11:00:00", "purchase"),
-            ("evt_003", "user_003", "2024-01-15 12:00:00", "page_view"),
+            ("evt_001", "user_001", datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), "click"),
+            ("evt_002", "user_002", datetime.strptime("2024-01-15 11:00:00", "%Y-%m-%d %H:%M:%S"), "purchase"),
+            ("evt_003", "user_003", datetime.strptime("2024-01-15 12:00:00", "%Y-%m-%d %H:%M:%S"), "page_view"),
         ]
         
         raw_events_schema = StructType([
@@ -159,11 +166,11 @@ class SparkSQLValidator:
         
         # Sales data
         sales_data = [
-            ("electronics", "north", 1500.00, "2024-01-15"),
-            ("clothing", "south", 800.00, "2024-01-15"),
-            ("books", "east", 300.00, "2024-01-15"),
-            ("electronics", "west", 2200.00, "2024-01-14"),
-            ("clothing", "north", 950.00, "2024-01-14"),
+            ("electronics", "north", 1500.00, date(2024, 1, 15)),
+            ("clothing", "south", 800.00, date(2024, 1, 15)),
+            ("books", "east", 300.00, date(2024, 1, 15)),
+            ("electronics", "west", 2200.00, date(2024, 1, 14)),
+            ("clothing", "north", 950.00, date(2024, 1, 14)),
         ]
         
         sales_schema = StructType([
@@ -178,9 +185,9 @@ class SparkSQLValidator:
         
         # Streaming events
         streaming_events_data = [
-            ("2024-01-15 10:00:00", "premium", "purchase", "web", "user_001", "session_001", 299.99, 200, 150.5, "US", "New York", "mobile"),
-            ("2024-01-15 10:05:00", "basic", "page_view", "mobile", "user_002", "session_002", 0.0, 404, 200.0, "UK", "London", "desktop"),
-            ("2024-01-15 10:10:00", "premium", "add_to_cart", "web", "user_003", "session_003", 0.0, 200, 180.2, "CA", "Toronto", "tablet"),
+            (datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), "premium", "purchase", "web", "user_001", "session_001", 299.99, 200, 150.5, "US", "New York", "mobile"),
+            (datetime.strptime("2024-01-15 10:05:00", "%Y-%m-%d %H:%M:%S"), "basic", "page_view", "mobile", "user_002", "session_002", 0.0, 404, 200.0, "UK", "London", "desktop"),
+            (datetime.strptime("2024-01-15 10:10:00", "%Y-%m-%d %H:%M:%S"), "premium", "add_to_cart", "web", "user_003", "session_003", 0.0, 200, 180.2, "CA", "Toronto", "tablet"),
         ]
         
         streaming_events_schema = StructType([
@@ -203,9 +210,9 @@ class SparkSQLValidator:
         
         # User activities
         user_activities_data = [
-            ("user_001", "user001@email.com", "2023-01-15", "2024-01-15", "premium_feature"),
-            ("user_002", "user002@email.com", "2023-06-20", "2024-01-10", "basic_feature"),
-            ("user_003", "user003@email.com", "2024-01-01", "2024-01-14", "premium_feature"),
+            ("user_001", "user001@email.com", date(2023, 1, 15), date(2024, 1, 15), "premium_feature"),
+            ("user_002", "user002@email.com", date(2023, 6, 20), date(2024, 1, 10), "basic_feature"),
+            ("user_003", "user003@email.com", date(2024, 1, 1), date(2024, 1, 14), "premium_feature"),
         ]
         
         user_activities_schema = StructType([
@@ -236,10 +243,10 @@ class SparkSQLValidator:
         
         # User events for temporal analytics
         user_events_data = [
-            ("user_001", "2024-01-15 10:00:00", "purchase", 299.99),
-            ("user_001", "2024-01-14 15:30:00", "page_view", 0.0),
-            ("user_002", "2024-01-15 11:00:00", "purchase", 149.99),
-            ("user_003", "2024-01-13 09:15:00", "add_to_cart", 0.0),
+            ("user_001", datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), "purchase", 299.99),
+            ("user_001", datetime.strptime("2024-01-14 15:30:00", "%Y-%m-%d %H:%M:%S"), "page_view", 0.0),
+            ("user_002", datetime.strptime("2024-01-15 11:00:00", "%Y-%m-%d %H:%M:%S"), "purchase", 149.99),
+            ("user_003", datetime.strptime("2024-01-13 09:15:00", "%Y-%m-%d %H:%M:%S"), "add_to_cart", 0.0),
         ]
         
         user_events_schema = StructType([
@@ -254,11 +261,11 @@ class SparkSQLValidator:
         
         # Raw transactions for advanced transformations
         raw_transactions_data = [
-            ("txn_001", "user_001", "prod_001", "2024-01-15 10:00:00", 299.99, "USD", "electronics", "credit_card",
+            ("txn_001", "user_001", "prod_001", datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), 299.99, "USD", "electronics", "credit_card",
              '{"device": {"fingerprint": "fp001"}, "location": {"ip_address": "192.168.1.1"}, "risk_scores": {"fraud_score": "0.1"}}'),
-            ("txn_002", "user_002", "prod_002", "2024-01-15 11:00:00", 149.99, "EUR", "clothing", "paypal",
+            ("txn_002", "user_002", "prod_002", datetime.strptime("2024-01-15 11:00:00", "%Y-%m-%d %H:%M:%S"), 149.99, "EUR", "clothing", "paypal",
              '{"device": {"fingerprint": "fp002"}, "location": {"ip_address": "192.168.1.2"}, "risk_scores": {"fraud_score": "0.6"}}'),
-            ("txn_003", "user_003", "prod_003", "2024-01-15 12:00:00", 24.99, "GBP", "books", "debit_card",
+            ("txn_003", "user_003", "prod_003", datetime.strptime("2024-01-15 12:00:00", "%Y-%m-%d %H:%M:%S"), 24.99, "GBP", "books", "debit_card",
              '{"device": {"fingerprint": "fp003"}, "location": {"ip_address": "192.168.1.3"}, "risk_scores": {"fraud_score": "0.9"}}'),
         ]
         
@@ -308,9 +315,9 @@ class SparkSQLValidator:
             if row_count > 0:
                 print(f"    ✓ Query executed successfully, returned {row_count} rows")
                 # Uncomment the next line to see sample data:
-                # result_df.show(5, truncate=False)
+                result_df.show(5, truncate=False)
             else:
-                print(f"    ✓ Query executed successfully, returned 0 rows")
+                print(f"    ✓ Query executed successfully, returned 0 row")
             
             return True, f"Success: {row_count} rows returned", row_count
             

@@ -1,0 +1,81 @@
+{
+   "table_name": "int_p3_user_role",
+   "product_name": "p3",
+   "type": "intermediate",
+   "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
+   "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
+   "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role",
+   "state_form": "Stateful",
+   "parents": [
+      {
+         "table_name": "src_p3_users",
+         "product_name": "p3",
+         "type": "source",
+         "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_users/sql-scripts/dml.src_p3_users.sql",
+         "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_users/sql-scripts/ddl.src_p3_users.sql",
+         "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_users",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "int_p3_user_role",
+               "product_name": "p3",
+               "type": "intermediate",
+               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
+               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
+               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role",
+               "state_form": "Stateful",
+               "parents": [],
+               "children": []
+            }
+         ]
+      },
+      {
+         "table_name": "src_p3_tenants",
+         "product_name": "p3",
+         "type": "source",
+         "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_tenants/sql-scripts/dml.src_p3_tenants.sql",
+         "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_tenants/sql-scripts/ddl.src_p3_tenants.sql",
+         "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_tenants",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "int_p3_user_role",
+               "product_name": "p3",
+               "type": "intermediate",
+               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
+               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
+               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role",
+               "state_form": "Stateful",
+               "parents": [],
+               "children": []
+            }
+         ]
+      },
+      {
+         "table_name": "src_p3_roles",
+         "product_name": "p3",
+         "type": "source",
+         "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_roles/sql-scripts/dml.src_p3_roles.sql",
+         "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_roles/sql-scripts/ddl.src_p3_roles.sql",
+         "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/sources/p3/src_roles",
+         "state_form": "Stateful",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "int_p3_user_role",
+               "product_name": "p3",
+               "type": "intermediate",
+               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
+               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
+               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/user_role",
+               "state_form": "Stateful",
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": []
+}

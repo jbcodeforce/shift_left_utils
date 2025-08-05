@@ -43,7 +43,7 @@ class TestTableCLI(unittest.TestCase):
 
     def test_search_parents_of_table(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["search-source-dependencies", os.getenv("SRC_FOLDER") + "/facts/p5/a.sql", os.getenv("SRC_FOLDER")])
+        result = runner.invoke(app, ["search-source-dependencies", os.getenv("SRC_FOLDER") + "/facts/p5/fct_users.sql", os.getenv("SRC_FOLDER")])
         assert result.exit_code == 0
         print(result)
 

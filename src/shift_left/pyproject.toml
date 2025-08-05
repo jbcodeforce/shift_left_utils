@@ -120,3 +120,8 @@ insecure = false
 dist_glob_patterns = ["dist/*"]
 upload_to_vcs_release = true
 
+[tool.uv.workspace]
+members = [
+    "tests/data/spark-project",
+]
+
