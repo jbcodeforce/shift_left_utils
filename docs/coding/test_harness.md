@@ -18,24 +18,56 @@ delete-tests      Delete the Flink statements and kafka topics used for unit tes
 
 ## Context
 
+We should differentiate two types of testing: Flink statement developer's tests, like unit testing of one flink statement, and Flink statement integration tests which group multiple Flink statements and process data end to end.
 
-We should differentiate two types of testing: Flink statement developer's tests, like unit / component tests, and Flink statement integration tests which group multiple Flink statements and process real data streams.
-
-The objectives of a test harness for developers and system testers, is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud and therefore address the following needs:
+The objectives of a test harness for developers and system testers, is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud for Flink and therefore address the following needs:
 
 1. be able to deploy a flink statement under test (the ones we want to focus on are DMLs, or CTAS)
-1. be able to generate test data from table definition - and with developer being able to tune test data for each test cases.
-1. produce test data for the n source tables, in SQL insert statements or csv file.
-1. validate test result by looking at records in the output table(s) of the Flink statment under test and applying conditions on data to claim the test failed or succeed. 
+1. be able to generate test data from table definition and DML script content - with the developers being able to tune generated test data for each test cases.
+1. produce synthetic test data for the n source tables using SQL insert statements or via csv files.
+
+    <figure markdown="span">
+    ![1](./images/test_frwk.drawio.png)
+    </figure>
+
+1. validate test result by looking at records in the output table(s) of the Flink statement under test and applying conditions on data to claim the test failed or succeed. As an example:
+  ```sql
+  with result_table as (
+    select * from fct_orders
+    where id = 'order_id_1' and account_name = 'account of bob'
+  ) 
+  SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END from result_table;
+  ```
 1. the flow of defining input data and validation scripts is a test case. 
+  ```yaml
+  - name: test_p5_dim_event_element_1
+    inputs:
+    - table_name: tenant_dim
+      file_name: ./tests/insert_tenant_dim_1.sql
+      file_type: sql
+    ...
+    outputs:
+    - table_name: p5_dim_event_element
+      file_name: ./tests/validate_p5_dim_event_element_1.sql
+      file_type: sql
+  ```
+
 1. support multiple testcase definitions as a test suite. Test suite may be automated for non-regression testing to ensure continuous quality.
 1. Once tests are completed, tear down tables and data.
-1. Do not impact other tables that may be used to do integration tests within the same Kafka Cluster.
+  ```sh
+  shift_left table delete-tests <table-name>
+  ```
+1. Do not impact other tables that may be used to do integration tests within the same Kafka Cluster. For that there is a postfix string add to the name of the tables. This postfix is defined in the config.yaml file as:
+  ```yaml
+  app:
+    post_fix_unit_test: _ut
+  ```
+  This post_fix can be anything, but try to use very short string.
 
 The following diagram illustrates the global infrastructure deployment context:
 
 <figure markdown="span">
-![1](./images/test_frwk_infra.drawio.png){ width=750 }
+![2](./images/test_frwk_infra.drawio.png){ width=750 }
 <figcaption>Test Harness environment and scope</figcaption>
 </figure>
 
@@ -46,14 +78,12 @@ The following diagram illustrates the global infrastructure deployment context:
 * The green cylenders represent Kafka Topics which are mapped to Flink tables. They are defined specifically by the tool.
 * As any tables created view Flink on Confluent Cloud have schema defined in schema registry, then schema contest is used to avoid conflict within the same cluster. 
 
-The following diagram illustrates a  target unit testing environment:
+The following diagram illustrates the target unit testing environment:
 
 <figure markdown="span">
 ![2](./images/test_frwk_design.drawio.png){ width=750 }
 <figcaption>Deployed Flink statements for unit testing</figcaption>
 </figure>
-
-
 
 
 ## Usage and Recipe
@@ -90,7 +120,7 @@ The following diagram illustrates a  target unit testing environment:
   shift_left table init-unit-tests int_p3_user_role
   ```
 
-* For each input table, of the dml under test, there will be a ddl script file created with the numbered postfix to match the unit test it supports: `insert_src_p3_roles_1.sql` for inserting records to the table `src_p3_roles` in the context of test case # 1.  In the example below the `dml_user_role.sql` has 3 input tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`. For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix, (this is used for test isolation): `ddl_src_p3_roles.sql`, `ddl_src_p3_users.sql` and `ddl_src_p3_tenants.sql`
+* For each input table, of the dml under test, there will be ddl and dml script files created with the numbered postfix to match the unit test it supports (e.g _1 in `insert_src_p3_roles_1.sql`) for inserting records to the table `src_p3_roles` in the context of test case # 1.  In the example below the `dml_user_role.sql` has 3 input tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`. For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix (or the prefix defined in `app.post_fix_unit_test` in the config.yaml), this is used for test isolation: `ddl_src_p3_roles.sql`, `ddl_src_p3_users.sql` and `ddl_src_p3_tenants.sql`
   ```sh
   user_role
   ├── Makefile
@@ -147,7 +177,7 @@ Then 2 test cases are created as you can see in the `test_definitions.yaml`
       file_type: sql
   ```
 
-The two test cases use different approach to define the data: SQL or CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The data may come from an extract of kafka topic records.
+The two test cases use different approaches to define the data: SQL and CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The csv data may come from an extract of kafka topic records.
 
 * Data engineers update the content of the insert statements and the validation statements. Once done, try unit testing with the command:
   ```sh
@@ -177,10 +207,14 @@ Clean the tests artifacts created on Confluent Cloud with the command:
 
 ## Running with more data
 
-The second test cases created by the `shift_left table init-unit-tests ` command use a csv file to demonstrate how the tool can manage more data. It is possible to extract data from an existing topics, as json or csv content and then persist it as csv file. The tool, as of now, is transforming the rows in the csb file as insert value SQL. 
+The second test cases created by the `shift_left table init-unit-tests ` command use a csv file to demonstrate how the tool can manage more data. It is possible to extract data from an existing topics, as json or csv content and then persist it as csv file. The tool, as of now, is transforming the rows in the csv file as insert value SQL. 
 
 In the future it could direcly write to a Kafka topics that are the input tables for the dml under test.
 
 Data engineers may use the csv format to create a lot of records. Now the challenge will be to define the validation SQL script, but this is another story.
 
+## Integration tests
 
+The logic of integration tests is to validate end-to-end processing for a given pipeline and assess the time to process records from sources to facts or sink tables.
+
+To be continued...

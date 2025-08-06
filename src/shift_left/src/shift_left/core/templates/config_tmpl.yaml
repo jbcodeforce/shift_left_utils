@@ -55,4 +55,4 @@ app:
   data_limit_table_type: source
   data_limit_column_name_to_select_from: tenant_id
   post_fix_unit_test: _ut
- 
+  post_fix_integration_test: _it

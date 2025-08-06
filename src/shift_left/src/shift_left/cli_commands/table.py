@@ -204,7 +204,7 @@ def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the ta
             with open(f"{shift_left_dir}/{table_name}-test-suite-result.json", "r") as f:
                 test_suite_result = TestSuiteResult.model_validate_json(f.read())
         except Exception as e:
-            # this could happened if file was wrong.
+            # this could happened if file content is wrong.
             test_suite_result = None
     else:
         test_suite_result = None
