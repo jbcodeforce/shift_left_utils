@@ -267,7 +267,7 @@ def get_table_ref_from_inventory(table_name: str, inventory: Dict) -> FlinkTable
     Returns:
         FlinkTableReference for the table
     """
-    if table_name not in inventory:
+    if table_name not in inventory.keys():
         logger.error(f"Table {table_name} not in inventory.")
         raise Exception(f"Table {table_name} not in inventory.")
     entry = inventory[table_name]

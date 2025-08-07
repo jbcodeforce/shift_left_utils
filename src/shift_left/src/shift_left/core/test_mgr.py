@@ -1,13 +1,14 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Final, Optional, Dict, Tuple
 import yaml
 import time
 import os
-
-from shift_left.core.utils.app_config import get_config, logger, session_id
+import json
+from datetime import datetime
+from shift_left.core.utils.app_config import get_config, logger, session_id, session_log_dir
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.models.flink_statement_model import Statement, StatementError, StatementResult
@@ -24,6 +25,7 @@ SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
 POST_FIX_UNIT_TEST: Final[str] = get_config().get('app').get('post_fix_unit_test','_ut')
+TOPIC_LIST_FILE: Final[str] = session_log_dir + "/topic_list.json"
 
 """
 Test manager defines what are test cases and test suites.
@@ -63,6 +65,10 @@ class TestSuiteResult(BaseModel):
     foundation_statements: List[Statement] = []
     test_results: Dict[str, TestResult] = {}
 
+class TopicListCache(BaseModel):
+    created_at: Optional[datetime] = Field(default=datetime.now())
+    topic_list: Optional[dict[str, str]] = Field(default={})
+
 # ----------- Public APIs  ------------------------------------------------------------
 def init_unit_test_for_table(table_name: str):
     """
@@ -99,7 +105,8 @@ def execute_one_test(
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-
+    logger.info(f"Running test case {test_case_name} for table {table_name} on compute pool {compute_pool_id}")
+    print(f"Running test case {test_case_name} for table {table_name} on compute pool {compute_pool_id}")
     try:
         print(f"1. Create table foundations for unit tests")
         test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id)
@@ -108,7 +115,7 @@ def execute_one_test(
         for idx, test_case in enumerate(test_suite_def.test_suite):
             if test_case.name == test_case_name:
                 logger.info(f"Running test case: {test_case.name}")
-                print(f"2. Create input statements for unit test {test_case.name}")
+                print(f"2. Create insert into statements for unit test {test_case.name}")
                 statements = _execute_test_inputs(test_case=test_case,
                                                 table_ref=table_ref,
                                                 prefix=prefix+"-ins-"+str(idx + 1),
@@ -167,10 +174,9 @@ def execute_all_tests(table_name: str,
         raise e
 
 def delete_test_artifacts(table_name: str, 
-                          compute_pool_id: Optional[str] = None, 
-                          test_suite_result: Optional[TestSuiteResult] = None) -> None:
+                          compute_pool_id: Optional[str] = None) -> None:
     """
-    Delete the test artifacts for a given table.
+    Delete the test artifacts (foundations, inserts, validations and statements) for a given table.
     """
     config = get_config()
     if compute_pool_id is None:
@@ -186,10 +192,15 @@ def delete_test_artifacts(table_name: str,
         for output in test_case.outputs:
             statement_name = _build_statement_name(output.table_name, prefix+"-val-"+str(idx + 1))
             statement_mgr.delete_statement_if_exists(statement_name)
+            logger.info(f"Deleted statement {statement_name}")
+            print(f"Deleted statement {statement_name}")
         for input in test_case.inputs:
             statement_name = _build_statement_name(input.table_name, prefix+"-ins-"+str(idx + 1))
             statement_mgr.delete_statement_if_exists(statement_name)
+            logger.info(f"Deleted statement {statement_name}")
+            print(f"Deleted statement {statement_name}")
     logger.info(f"Deleting ddl and dml artifacts for {table_name}")
+    print(f"Deleting ddl and dml artifacts for {table_name}")
     statement_name = _build_statement_name(table_name, prefix+"-dml")
     statement_mgr.delete_statement_if_exists(statement_name)
     statement_name = _build_statement_name(table_name, prefix+"-ddl")
@@ -279,6 +290,9 @@ def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, Flin
     except FileNotFoundError:
             print(f"No test suite definition found in {table_folder}")
             raise ValueError(f"No test suite definition found in {table_folder}/tests")
+    except Exception as e:
+        logger.error(f"Error loading test suite definition: {e}")
+        raise e
  
 
 def _execute_foundation_statements(
@@ -330,6 +344,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
         return sql_content
 
     statements = []
+    # Process DDL
     statement = _load_sql_and_execute_statement(table_name=table_name,
                                 sql_path=table_ref.ddl_ref,
                                 prefix=prefix+"-ddl",
@@ -337,6 +352,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 fct=replace_table_name)
     if statement:
         statements.append(statement)
+    # Process DML
     statement = _load_sql_and_execute_statement(table_name=table_name,
                                 sql_path=table_ref.dml_ref,
                                 prefix=prefix+"-dml",
@@ -400,7 +416,7 @@ def _execute_test_inputs(test_case: SLTestCase,
                                                       product_name=table_ref.product_name,
                                                       compute_pool_id=compute_pool_id)
         if statement and isinstance(statement, Statement) and statement.status:
-            print(f"Executed test input {statement.status}")
+            print(f"Executed test input {statement.status.phase}")
             statements.append(statement)
         else:
             logger.error(f"Error executing test input for {input_step.table_name}")
@@ -432,7 +448,7 @@ def _execute_test_validation(test_case: SLTestCase,
 def _poll_response(statement_name: str) -> Tuple[str, StatementResult]:
     #Get result from the validation query
     resp = None
-    max_retries = 10
+    max_retries = 7
     retry_delay = 10  # seconds
 
     for poll in range(1, max_retries):
@@ -591,18 +607,33 @@ def _build_data_sample(columns: Dict[str, str], idx_offset: int = 0) -> Tuple[st
     return columns_names, rows
 
 
-_topic_list = []
+_topic_list_cache = None
 def _table_exists(table_name: str) -> bool:
     """
-    Check if the table exists in the database.
+    Check if the table/topic exists in the cluster.
     """
-    global _topic_list
-    if not _topic_list:
-        ccloud = ConfluentCloudClient(get_config())
-        topics = ccloud.list_topics()
-        _topic_list = [topic['topic_name'] for topic in topics['data']]
-        logger.debug(f"Topic list: {_topic_list}")
-    return table_name in _topic_list
+    global _topic_list_cache
+    if _topic_list_cache == None:
+        reload = True
+        if os.path.exists(TOPIC_LIST_FILE):
+            try:
+                with open(TOPIC_LIST_FILE, "r") as f:
+                    _topic_list_cache = TopicListCache.model_validate(json.load(f))
+                if _topic_list_cache.created_at and (datetime.now() - datetime.strptime(_topic_list.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
+                    reload = False
+            except Exception as e:
+                logger.error(f"Error loading topic list: {e}")
+                reload = True
+                os.remove(TOPIC_LIST_FILE)
+        if reload:
+            _topic_list_cache = TopicListCache(created_at=datetime.now())
+            ccloud = ConfluentCloudClient(get_config())
+            topics = ccloud.list_topics()
+            _topic_list_cache.topic_list = [topic['topic_name'] for topic in topics['data']]
+            logger.info(f"Topic list: {_topic_list_cache}")
+            with open(TOPIC_LIST_FILE, "w") as f:
+                f.write(_topic_list_cache.model_dump_json(indent=2, warnings=False))
+    return table_name in _topic_list_cache.topic_list
 
 
 def _red_csv_file(file_path: str) -> Tuple[str, List[str]]:
@@ -634,8 +665,8 @@ def _transform_csv_to_sql(table_name: str,
     return sql_content
 
 def _build_statement_name(table_name: str, prefix: str) -> str:
-    _table_name_for_statement = table_name.replace('_', '-').replace('.', '-')
+    _table_name_for_statement = table_name
     if len(_table_name_for_statement) > 52:
         _table_name_for_statement = _table_name_for_statement[:52]    
-    statement_name = f"{prefix}-{_table_name_for_statement}-ut"
-    return statement_name
+    statement_name = f"{prefix}-{_table_name_for_statement}{POST_FIX_UNIT_TEST}"
+    return statement_name.replace('_', '-').replace('.', '-')
