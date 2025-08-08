@@ -90,7 +90,7 @@ def validate_config():
         """
         Validate the config.yaml file
         """
-        print(f"#" * 30 + f" Validate {os.getenv("CONFIG_FILE")}")
+        print(f"#" * 30 + f" Validate {os.getenv('CONFIG_FILE')}")
         config = get_config()
         validate_config_impl(config)
         print("Config.yaml validated")
