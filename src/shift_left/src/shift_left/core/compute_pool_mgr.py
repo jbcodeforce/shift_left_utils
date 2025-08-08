@@ -34,8 +34,8 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                 # keep the list if it was created in the last 60 minutes
                 reload = False
         if reload:
-            logger.info(f"Get the compute pool list for environment {env_id}, {region} using API")
-            print(f"Get the compute pool list for environment {env_id}, {region} using API")
+            logger.info(f"Get the compute pool list for environment {env_id}, {region} using API {get_config().get('confluent_cloud').get('api_key')}")
+            print(f"Get the compute pool list for environment {env_id}, {region} using API {get_config().get('confluent_cloud').get('api_key')}")
             start_time = time.perf_counter()
             client = ConfluentCloudClient(get_config())
             response: ComputePoolListResponse = client.get_compute_pool_list(env_id, region)

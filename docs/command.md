@@ -51,6 +51,8 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
 * `clean-completed-failed-statements`: Delete all statements that are failed and...
+* `validate-config`: Validate the config.yaml file
+* `list-modified-files`: Get the list of files modified in the...
 
 ### `project init`
 
@@ -127,6 +129,43 @@ $ project clean-completed-failed-statements [OPTIONS]
 
 * `--help`: Show this message and exit.
 
+### `project validate-config`
+
+Validate the config.yaml file
+
+**Usage**:
+
+```console
+$ project validate-config [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project list-modified-files`
+
+Get the list of files modified in the current git branch compared to the specified branch.
+Filters for Flink-related files (by default SQL files) and saves the list to a text file.
+This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
+
+**Usage**:
+
+```console
+$ project list-modified-files [OPTIONS] BRANCH_NAME
+```
+
+**Arguments**:
+
+* `BRANCH_NAME`: Git branch name to compare against (e.g., &#x27;main&#x27;, &#x27;origin/main&#x27;)  [required]
+
+**Options**:
+
+* `--output-file TEXT`: Output file path to save the list  [default: modified_flink_files.txt]
+* `--project-path TEXT`: Project path where git repository is located  [default: .]
+* `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
+* `--help`: Show this message and exit.
+
 ## `table`
 
 **Usage**:
@@ -150,8 +189,8 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `validate-table-names`: Go over the pipeline folder to assess if...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
-* `run-test-suite`: Run all the unit tests or a specified test...
-* `delete-tests`: Delete the Flink statements and kafka...
+* `run-unit-tests`: Run all the unit tests or a specified test...
+* `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
 ### `table init`
@@ -233,6 +272,7 @@ $ table migrate [OPTIONS] TABLE_NAME SQL_SRC_FILE_NAME TARGET_PATH
 **Options**:
 
 * `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc.  [default: spark]
+* `--validate`: Validate the migrated sql using Confluent Cloud for Flink.
 * `--recursive`: Indicates whether to process recursively up to the sources. (default is False)
 * `--help`: Show this message and exit.
 
@@ -311,13 +351,14 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x108aa8b90&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1083452e0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
 
-Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
+Initialize the unit test folder and template files for a given table. It will parse the SQL statements to create the insert statements for the unit tests.
 It is using the table inventory to find the table folder for the given table name.
+Optionally, it can also create a CSV file for the unit test data if --create-csv is set.
 
 **Usage**:
 
@@ -331,16 +372,17 @@ $ table init-unit-tests [OPTIONS] TABLE_NAME
 
 **Options**:
 
+* `--create-csv`: If set, also create a CSV file for the unit test data.
 * `--help`: Show this message and exit.
 
-### `table run-test-suite`
+### `table run-unit-tests`
 
 Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
 
 **Usage**:
 
 ```console
-$ table run-test-suite [OPTIONS] TABLE_NAME
+$ table run-unit-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -353,14 +395,14 @@ $ table run-test-suite [OPTIONS] TABLE_NAME
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
-### `table delete-tests`
+### `table delete-unit-tests`
 
 Delete the Flink statements and kafka topics used for unit tests for a given table.
 
 **Usage**:
 
 ```console
-$ table delete-tests [OPTIONS] TABLE_NAME
+$ table delete-unit-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -374,7 +416,7 @@ $ table delete-tests [OPTIONS] TABLE_NAME
 
 ### `table explain`
 
-Get the Flink execution plan explanations for a given table or a group of table using the product name.
+Get the Flink execution plan explanations for a given table or a group of tables using the product name or a list of tables from a file.
 
 **Usage**:
 
@@ -563,7 +605,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: tests/data/ksql-project/flink-references/]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -585,7 +627,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: tests/data/ksql-project/flink-references/]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 

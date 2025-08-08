@@ -18,4 +18,3 @@ The p1 data product contains all the flink statements to demonstrate the relatio
 
 ![](../../../../../../docs/images/flink_pipeline_for_test.drawio.png)
 
-The p3 product represents 

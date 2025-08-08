@@ -38,6 +38,7 @@ purchase_history AS (
     WHERE purchase_date >= CURRENT_DATE - INTERVAL 90 DAYS
     GROUP BY customer_id
 ),
+
 customer_metrics AS (
     SELECT 
         cs.customer_id,
@@ -72,3 +73,5 @@ SELECT
 FROM customer_metrics
 GROUP BY customer_segment, membership_tier, location
 ORDER BY customer_segment, membership_tier, location 
+
+

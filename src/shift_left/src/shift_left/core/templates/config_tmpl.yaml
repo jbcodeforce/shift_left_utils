@@ -35,6 +35,7 @@ flink:
   database_name:  <TO_FILL>
   max_cfu: 10
   max_cfu_percent_before_allocation: .8
+  statement_name_post_fix: None
 app:
   delta_max_time_in_min: 15  # this is to apply randomly to the event timestamp to create out of order
   report_output_dir: ./reports
@@ -55,4 +56,4 @@ app:
   data_limit_table_type: source
   data_limit_column_name_to_select_from: tenant_id
   post_fix_unit_test: _ut
- 
+  post_fix_integration_test: _it

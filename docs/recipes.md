@@ -71,11 +71,11 @@ The involved recipes are:
 
 ### Migration use cases
 
-This use case applies only when the source project is available and based on dbt or SQL. (ksql will be possible in the future)
+This use case applies only when the source project is available and based on dbt, Spark SQL or ksqlDB. The approach is to use the `shift_left table migrate` command to use an agentic workflow, using LLM models to do the translation, syntax validation, and improvement using different AI agents.
 
 ![](./images/migration_comp.drawio.png)
 
-* [Migrate existing SQL source file to Flink SQL using AI.](#migrate-spark-sql-tables)
+* See the [Migrate existing SQL to Flink SQL using AI chapter](./coding/llm_based_translation.md) for details.
 
 ## Setup
 
@@ -492,60 +492,6 @@ shift_left table update-all-makefiles $PIPELINES
 
 As of now the template is in the source folder: `shift_left_utils/src/shift_left/src/shift_left/core/templates/makefile_ddl_dml_tmpl.jinja`.
 
-### Migrate Spark SQL tables
-
-As presented in the [introduction](./index.md/#shift_left-tool), the migration involves a Local LLM running with Ollama, so developers need this environment to be able to run the following commands.
-
-* Process one table
-
-```sql
-shift_left table migrate $SRC_FOLDER/facts/aqem/aqem.fct_event.sql $STAGING
-```
-
-* Process the table and the parents up to the sources. So it will migrate recursively all the tables. This could take time if the dependencies graph is big.
-
-```sql
-shift_left table migrate $SRC_FOLDER/facts/aqem/aqem.fct_event.sql $STAGING --recursive
-```
-
-
-???- info "Example of Output"
-    ```sh
-    process SQL file ../src-dbt-project/models/facts/fct_examination_data.sql
-    Create folder fct_exam_data in ../flink-project/staging/facts/p1
-
-    --- Start translator AI Agent ---
-    --- Done translator Agent: 
-    INSERT INTO fct_examination_data
-    ...
-    --- Start clean_sql AI Agent ---
-    --- Done Clean SQL Agent: 
-    --- Start ddl_generation AI Agent ---
-    --- Done DDL generator Agent:
-    CREATE TABLE IF NOT EXISTS fct_examination_data (
-        `exam_id` STRING,
-        `perf_id` STRING,
-    ...
-    ```
-
-
-For a given table, the tool creates one folder with the table name, a Makefile to help managing the Flink Statements with Confluent cli, a `sql-scripts` folder for the Flink ddl and dml statements. A `tests` folder to add `test_definitions.yaml` (using another tool) to do some basic testing.
-
-Example of created folders:
-
-```sh
-facts
-    └── fct_examination_data
-        ├── Makefile
-        ├── sql-scripts
-        │   ├── ddl.fct_examination_data.sql
-        │   └── dml.fct_examination_data.sql
-        └── tests
-```
-
-As part of the process, developers need to validate the generated DDL and update the PRIMARY key to reflect the expected key. This information is hidden in lot of files in the dbt, and the key extraction is not yet automated by the migration tools, yet.
-
-Normally the DML is not executable until all dependent tables are created.
 
 ## Build table inventory
 
@@ -733,6 +679,69 @@ shift_left pipeline build-all-metadata $PIPELINES
 # same as env variable will be used
 shift_left pipeline build-all-metadata
 ```
+
+### Modify SQL content during deployment
+
+Sometime there are requirements to adapt the content of the SQL statement during deployment into different environments. By environment we mean Kafka cluster, Confluent Cloud environment and schema registry. The shift_left tool defines a contract via the TableWorker class with an `update_sql_content` function to implement:
+
+```python title="core.utils.table_worker.py"
+class TableWorker():
+    def update_sql_content(sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
+    """
+        Args:
+            sql_content (str): The original SQL statement to transform
+            column_to_search (Optional[str], optional): Column name to search for in tenant filtering.
+                Required for dev environment tenant filtering. Defaults to None.
+            product_name (Optional[str], optional): Product identifier for environment-specific logic.
+                Used in dev environment filtering and topic naming. Defaults to None.
+                
+        Returns:
+            Tuple[bool, str]: A tuple containing:
+                - bool: True if the SQL content was modified, False otherwise
+                - str: The transformed SQL content
+    """
+        return (False, sql_content)
+```
+
+When Data engineers or SREs need to develop specific transformations, they can create an extension class and modify the config.yaml. Here are the steps:
+
+1. Clone the shift_left git repository
+1. Under the src/shift_left/src/shift_left folder, create an extension folder (same level as core and cli_commands folder):
+    ```sh
+    └── shift_left
+    ├── dist
+    ├── src
+    │   └── shift_left
+    │       ├── cli.py
+    │       ├── cli_commands
+    │       ├── core
+    │       │   └── utils
+    │       │       ├── table_worker.py
+    │       └── extensions
+    │           ├── sql_content_processing.py
+    │           └── test_sql_content_processing.py
+    ```
+1. Add your class in a python code and a unit test module. The class needs to extends the TableWorker
+    ```python
+    class ModifySqlContentForDifferentEnv(TableWorker):
+        def __init__(self):
+            pass
+
+        def update_sql_content(self, sql_content: str, column_to_search: Optional[str] = None, product_name: Optional[str] = None) -> Tuple[bool, str]:
+            # implement logic here
+    ```
+1. Change the config.yaml to reference your class:
+    ```yaml
+    app:
+        sql_content_modifier: shift_left.extensions.sql_content_processing.ModifySqlContentForDifferentEnv
+    ```
+
+1. Build the shift_left cli, change the version in the `pyproject.toml` file:
+    ```sh
+    uv build .
+    ```
+
+This build process can be automated via a git action workflow.
 
 ### Build pipeline static reports 
 

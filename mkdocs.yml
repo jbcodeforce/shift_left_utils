@@ -9,7 +9,7 @@ nav:
     - EnvironmentSetup: setup.md
     - Recipes: recipes.md
     - CLI References: command.md
-    - Test Harness: test_harness.md
+    - Test Harness: coding/test_harness.md
     - Pipeline Management: pipeline_mgr.md
     - Blue/Green Deployment: blue_green_deploy.md
     - Performance Testing: perf_test.md

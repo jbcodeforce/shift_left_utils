@@ -1,6 +1,12 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.30
+* Separate the SQL content processing in an extension python file, with class to extend TableWorker. Documentation for recipe is modified to explain how to develop the own class.
+* Improve unit test harness framework to generate or not csv data, ensure test data match column type. Improve user feedbacks. Change command names to be: `init-unit-tests`, `run-unit-tests` and `delete-unit-tests`. 
+* Add in config.yaml the `post_fix_unit_test: _ut` to adapt post_fix on table names to avoid conflict with other Data Engineers working on different unit tests.
+* Enhance ksqlDB to Flink SQL migration.
+
 v0.1.29
 * Enhanced KSQL to Flink SQL migration with improved LLM-based translation (Issue #23)
 * Added table detection functionality for KSQL statements to handle multiple CREATE TABLE scenarios

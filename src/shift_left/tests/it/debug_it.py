@@ -4,10 +4,10 @@ import os
 import pathlib
 import json
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
-data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
-os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
+#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
+#data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
+#os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
+#os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
 
 from shift_left.core.utils.app_config import get_config
 import  shift_left.core.pipeline_mgr as pipeline_mgr
@@ -32,11 +32,12 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['table', 'migrate', 'dim_training_course', os.getenv('SRC_FOLDER','.') + '/dimensions/qx/dim_training_course.sql', os.getenv('STAGING')])
         #result = runner.invoke(app, ['table', 'init-unit-tests', 'uvs_pm_nok_stage_73xx_json_stream'])
         #result = runner.invoke(app, ['table', 'build-inventory'])
-        result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
+        #result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
+        result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
         print(result.stdout)
 
       
-    def test_6_0_deploy_by_medals_src(self):
+    def _test_6_0_deploy_by_medals_src(self):
         """
         """
         os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")

@@ -45,25 +45,61 @@ LLMs won't magically translate custom UDFs. This will likely require manual inte
 
 Flink excels at stateful stream processing. Spark SQL's batch orientation means translating stateful Spark operations (if they exist) to their Flink streaming counterparts would be highly complex and likely require significant human oversight or custom rules.
 
+
+
+
 ### Spark SQL to Flink SQL
 
 While Spark SQL is primarily designed for batch processing, even if it also supports streaming via micro-batching. Most basic SQL syntax (SELECT, FROM, WHERE, JOIN) is similar between Spark and Flink.
 
-Flink SQL has more advanced windowing capabilities. For example:
 
-```sql
--- Spark SQL (using DataFrame API)
-val windowedDF = df.withWatermark("timestamp", "1 minute") .groupBy(window(col("timestamp"), "5 minutes")) .count()
-
--- Flink SQL
-SELECT COUNT(*) FROM users
-GROUP BY TUMBLE(timestamp, INTERVAL '5' MINUTE);
-```
-
-* Example of command to migrate a Spark SQL
+* Example of command to migrate one Spark SQL scripts
   ```sh
   shift_left table migrate customer_journey $SRC_FOLDER/src_customer_journey.sql $STAGING --source-type spark
   ```
+
+* It is possible to process the table and the fact table up to the sources, the tool will migrate recursively all the tables. This could take time if the dependencies graph is big.
+  ```sql
+  shift_left table migrate $SRC_FOLDER/facts/fct_examination_data.sql $STAGING --recursive --source-type spark
+  ```
+
+???- info "Example of Output"
+    ```sh
+    process SQL file ../src-dbt-project/models/facts/fct_examination_data.sql
+    Create folder fct_exam_data in ../flink-project/staging/facts/p1
+
+    --- Start translator AI Agent ---
+    --- Done translator Agent: 
+    INSERT INTO fct_examination_data
+    ...
+    --- Start clean_sql AI Agent ---
+    --- Done Clean SQL Agent: 
+    --- Start ddl_generation AI Agent ---
+    --- Done DDL generator Agent:
+    CREATE TABLE IF NOT EXISTS fct_examination_data (
+        `exam_id` STRING,
+        `perf_id` STRING,
+    ...
+    ```
+
+For a given table, the tool creates one folder with the table name, a Makefile to help managing the Flink Statements with Confluent cli, a `sql-scripts` folder for the Flink ddl and dml statements. A `tests` folder to add `test_definitions.yaml` (using `shift_left table init-unit-tests`) to do some unit testing.
+
+Example of created folders:
+
+```sh
+facts
+    └── fct_examination_data
+        ├── Makefile
+        ├── sql-scripts
+        │   ├── ddl.fct_examination_data.sql
+        │   └── dml.fct_examination_data.sql
+        └── tests
+```
+
+As part of the process, developers need to validate the generated DDL and update the PRIMARY key to reflect the expected key. This information is hidden in lot of files in the dbt, and the key extraction is not yet automated by the migration tools.
+
+Normally the DML is not executable until all dependent tables are created.
+
   
 ### ksqlDB to Flink SQL
 
@@ -152,8 +188,6 @@ Same approach for spark SQL with the prompts being in the `core/utils/prompts/sp
     ```
 
 1. Be sure to be logged in Confluent Cloud, and have defined at least one compute pool.
-
-
 
 ### Configuration File Setup
 

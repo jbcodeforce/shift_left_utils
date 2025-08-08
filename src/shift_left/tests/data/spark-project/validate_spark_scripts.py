@@ -21,7 +21,7 @@ import traceback
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Dict, List, Tuple
-
+from test_spark_scripts import TestSparkScripts
 try:
     from pyspark.sql import SparkSession
     from pyspark.sql.types import (
@@ -58,6 +58,9 @@ class SparkSQLValidator:
     def _create_sample_data(self):
         """Create sample data for all tables referenced in the SQL scripts"""
         print("Creating sample data...")
+        TestSparkScripts._create_web_events(self)
+        TestSparkScripts._create_customer_profiles(self)
+        TestSparkScripts._create_purchases(self)
         
         # Sample data for product analytics
         product_events_data = [
@@ -80,60 +83,10 @@ class SparkSQLValidator:
         raw_product_events = self.spark.createDataFrame(product_events_data, product_events_schema)
         raw_product_events.createOrReplaceTempView("raw_product_events")
         
-        # Sample data for customer journey
-        web_events_data = [
-            ("user_001", "session_001", datetime.strptime("2024-01-15 10:00:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/home"),
-            ("user_001", "session_001", datetime.strptime("2024-01-15 10:05:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/products"),
-            ("user_001", "session_001", datetime.strptime("2024-01-15 10:10:00", "%Y-%m-%d %H:%M:%S"), "purchase", "/checkout"),
-            ("user_002", "session_002", datetime.strptime("2024-01-14 15:30:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/home"),
-            ("user_002", "session_002", datetime.strptime("2024-01-14 15:35:00", "%Y-%m-%d %H:%M:%S"), "page_view", "/cart"),
-        ]
+    
         
-        web_events_schema = StructType([
-            StructField("customer_id", StringType(), True),
-            StructField("session_id", StringType(), True),
-            StructField("event_timestamp", TimestampType(), True),
-            StructField("event_type", StringType(), True),
-            StructField("page_url", StringType(), True)
-        ])
         
-        web_events = self.spark.createDataFrame(web_events_data, web_events_schema)
-        web_events.createOrReplaceTempView("web_events")
-        
-        # Customer profiles
-        customer_profiles_data = [
-            ("user_001", "25-34", "US", "premium", date(2023, 1, 15)),
-            ("user_002", "35-44", "UK", "basic", date(2023, 6, 20)),
-            ("user_003", "18-24", "CA", "premium", date(2024, 1, 1)),
-        ]
-        
-        customer_profiles_schema = StructType([
-            StructField("customer_id", StringType(), True),
-            StructField("age_group", StringType(), True),
-            StructField("location", StringType(), True),
-            StructField("membership_tier", StringType(), True),
-            StructField("registration_date", DateType(), True)
-        ])
-        
-        customer_profiles = self.spark.createDataFrame(customer_profiles_data, customer_profiles_schema)
-        customer_profiles.createOrReplaceTempView("customer_profiles")
-        
-        # Purchases
-        purchases_data = [
-            ("user_001", 299.99, date(2024, 1, 15)),
-            ("user_001", 149.99, date(2024, 1, 10)),
-            ("user_002", 79.99, date(2024, 1, 12)),
-            ("user_003", 24.99, date(2024, 1, 14)),
-        ]
-        
-        purchases_schema = StructType([
-            StructField("customer_id", StringType(), True),
-            StructField("amount", DoubleType(), True),
-            StructField("purchase_date", DateType(), True)
-        ])
-        
-        purchases = self.spark.createDataFrame(purchases_data, purchases_schema)
-        purchases.createOrReplaceTempView("purchases")
+    
         
         # Sample data for event processing (with nested structures)
         raw_events_data = [

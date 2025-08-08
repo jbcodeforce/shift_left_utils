@@ -207,8 +207,10 @@ class ConfluentCloudClient:
         cloud_provider=self.config["confluent_cloud"]["provider"]
         pkafka_cluster=self.config["kafka"]["pkafka_cluster"]
         cluster_id=self.config["kafka"]["cluster_id"]
-        self.api_key = self.config["kafka"]["api_key"]
-        self.api_secret = self.config["kafka"]["api_secret"]
+        self.api_key = self.config.get("kafka", {}).get("api_key", self.config.get("kafka", {}).get("sasl.username", None))
+        self.api_secret = self.config.get("kafka", {}).get("api_secret", self.config.get("kafka", {}).get("sasl.password", None))
+        if not self.api_key or not self.api_secret:
+            raise Exception("API key or secret not found in config")
         self.auth_header = self._generate_auth_header()
         glb_name=self.config.get("confluent_cloud").get("glb_name", None)
         if glb_name:
@@ -243,7 +245,7 @@ class ConfluentCloudClient:
 
     def list_topics(self):
         """List the topics in the environment 
-        example of url https://pkc-00000.region.provider.confluent.cloud/kafka/v3/clusters/cluster-1/topics \
+        example of url https://lkc-23456-doqmp5.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-23456/topics \
  
         """
         url=self._build_confluent_cloud_url()

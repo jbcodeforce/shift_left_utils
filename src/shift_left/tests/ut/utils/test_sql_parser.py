@@ -163,18 +163,23 @@ class TestSQLParser(unittest.TestCase):
             assert columns['created_date'] == {'name': 'created_date', 'type': 'BIGINT', 'nullable': True, 'primary_key': False}
 
     def test_extract_keys(self):
+        parser = SQLparser()
         sql_statement_multiple = 'PRIMARY KEY(id, name) NOT ENFORCED'
-        match_multiple = re.search(r'PRIMARY KEY\((.*?)\)', sql_statement_multiple, re.IGNORECASE)
-
-        if match_multiple:
-            column_names_str_multiple = match_multiple.group(1)
-            column_names_multiple = [name.strip() for name in column_names_str_multiple.split(',')]
-            print(column_names_multiple)
-        else:
-            print("No primary key found in the statement.")
-        sql_statement = 'id STRING NOT NULL, tenant_id STRING NOT NULL, status STRING, name STRING, `type` STRING, created_by STRING, created_date BIGINT, last_modified_by STRING, PRIMARY KEY(id, tenant_id'
-        result = re.sub(r'^.*PRIMARY KEY\(', '', sql_statement, flags=re.IGNORECASE)
-        print(result)
+        primary_key = parser.extract_primary_key_from_sql_content(sql_statement_multiple)
+        assert primary_key == ['id', 'name']
+        sql_content = """
+        CREATE TABLE IF NOT EXISTS `aqem_dim_event_element` (
+            sid                     STRING NOT NULL,
+            data_value_id           INTEGER,
+            table_row_id            STRING,
+            element_name            STRING,
+            event_element_id        STRING,
+             tenant_id               STRING,
+            PRIMARY KEY(sid) NOT ENFORCED 
+        ) DISTRIBUTED BY HASH(sid) INTO 3 BUCKETS WITH (
+        """
+        primary_key = parser.extract_primary_key_from_sql_content(sql_content)
+        assert primary_key == ['sid']
 
     def test_extract_table_name_from_insert_into_statement(self):   
         parser = SQLparser()

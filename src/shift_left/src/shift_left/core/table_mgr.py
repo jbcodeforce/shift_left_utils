@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import os, re, json
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
-from typing import Optional, Tuple
+from typing import Tuple
 
 from shift_left.core.pipeline_mgr import ( 
     read_pipeline_definition_from_file, 
