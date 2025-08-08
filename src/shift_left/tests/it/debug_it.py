@@ -33,7 +33,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['table', 'init-unit-tests', 'uvs_pm_nok_stage_73xx_json_stream'])
         #result = runner.invoke(app, ['table', 'build-inventory'])
         #result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
-        result = runner.invoke(app, ['table', 'run-test-suite', 'int_aqem_recordexecution_element_data_unnest', '--test-case-name', 'test_int_aqem_recordexecution_element_data_unnest_1'])
+        result = runner.invoke(app, ['table', 'run-test-suite', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
         print(result.stdout)
 
       

@@ -234,3 +234,16 @@ class SQLparser:
         return columns
 
 
+    def extract_primary_key_from_sql_content(self, sql_content: str) -> str:
+        """
+        Extract the primary key from the sql_content
+        """
+        match_multiple = re.search(r'PRIMARY KEY\((.*?)\)', sql_content, re.IGNORECASE)
+
+        if match_multiple:
+            column_names_str_multiple = match_multiple.group(1)
+            result = [name.strip() for name in column_names_str_multiple.split(',')]
+        else:
+            result="No primary key found in the statement."
+        return result
+        
