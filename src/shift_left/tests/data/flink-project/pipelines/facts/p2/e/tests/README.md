@@ -46,6 +46,6 @@ DDL ->
 
 | UT |   Insert | Validation |
 | --- | --- | --- |
-| sql | | |
-| csv | | |
+| sql | ✅ | ✅  |
+| csv | ✅ | ✅  |
 

@@ -158,17 +158,20 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 
 
 @app.command()
-def init_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")]):
+def init_unit_tests(
+    table_name: Annotated[str, typer.Argument(help="Name of the table to unit tests.")],
+    create_csv: bool = typer.Option(False, "--create-csv", help="If set, also create a CSV file for the unit test data.")
+):
     """
-    Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
+    Initialize the unit test folder and template files for a given table. It will parse the SQL statements to create the insert statements for the unit tests.
     It is using the table inventory to find the table folder for the given table name.
+    Optionally, it can also create a CSV file for the unit test data if --create-csv is set.
     """
     print("#" * 30 + f" Unit tests initialization for {table_name}")
-    test_mgr.init_unit_test_for_table(table_name)
+    test_mgr.init_unit_test_for_table(table_name, create_csv=create_csv)
     print("#" * 30 + f" Unit tests initialization for {table_name} completed")
-
 @app.command()
-def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
@@ -181,7 +184,7 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
         # review this
         test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, 
                                             test_results={test_case_name: test_result})
-        print(f"Valdidation test: {test_result.result}")
+        print(f"Validation test: {test_result.result}")
     else:
         test_suite_result  = test_mgr.execute_all_tests(table_name, compute_pool_id)
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
@@ -193,7 +196,7 @@ def run_test_suite(  table_name: Annotated[str, typer.Argument(help= "Name of th
 
 
 @app.command()
-def delete_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                  compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
     Delete the Flink statements and kafka topics used for unit tests for a given table.

@@ -69,7 +69,7 @@ class TestTestManager(unittest.TestCase):
                 os.remove(os.path.join(test_folder, file))
             os.rmdir(test_folder)
         table_name = "e"
-        test_mgr.init_unit_test_for_table(table_name)
+        test_mgr.init_unit_test_for_table(table_name, create_csv=True)
         
         self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests"))
         self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/test_definitions.yaml"))
@@ -125,7 +125,7 @@ class TestTestManager(unittest.TestCase):
         assert "`id`, `name`, `description`, `created_at`" in cnames["src_p3_tenants"]
         assert "`user_id`, `tenant_id`, `role_id`, `status`" in cnames["src_p3_users"]
         assert "`role_id`, `role_name`" in cnames["src_p3_roles"]
-        assert "('id_1', 'name_1', 'description_1', 'created_at_1')" in table_rows["src_p3_tenants"]
+        assert "('id_1', 'name_1', 'description_1', TIMESTAMP '2021-01-01 00:00:00'" in table_rows["src_p3_tenants"]
         assert "('user_id_2', 'tenant_id_2', 'role_id_2', 'status_2')" in table_rows["src_p3_users"]
         assert "('role_id_1', 'role_name_1')" in table_rows["src_p3_roles"]
         

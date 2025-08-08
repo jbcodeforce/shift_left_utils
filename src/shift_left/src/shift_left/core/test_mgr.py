@@ -1,5 +1,14 @@
 """
 Copyright 2024-2025 Confluent, Inc.
+
+Test Manager - Automated testing framework for Flink SQL statements on Confluent Cloud.
+
+Provides testing capabilities including:
+- Unit test initialization and scaffolding for Flink tables
+- Test execution with foundation tables, input data, and validation SQL statements
+- Test artifact cleanup and management
+- Integration with Confluent Cloud Flink REST API
+- YAML-based test suite definitions and CSV test data support
 """
 from turtle import st
 from pydantic import BaseModel, Field
@@ -11,7 +20,7 @@ import json
 import re
 from jinja2 import Environment, PackageLoader
 from datetime import datetime
-from shift_left.core.utils.app_config import get_config, logger, session_id, session_log_dir
+from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.models.flink_statement_model import Statement, StatementError, StatementResult
@@ -28,7 +37,7 @@ SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
 POST_FIX_UNIT_TEST: Final[str] = get_config().get('app').get('post_fix_unit_test','_ut')
-TOPIC_LIST_FILE: Final[str] = session_log_dir + "/topic_list.json"
+TOPIC_LIST_FILE: Final[str] = shift_left_dir + "/topic_list.json"
 
 # Polling and retry configuration constants
 MAX_POLLING_RETRIES: Final[int] = 7
@@ -44,10 +53,7 @@ MAX_STATEMENT_NAME_LENGTH: Final[int] = 52  # Maximum characters for statement n
 DEFAULT_TEST_DATA_ROWS: Final[int] = 5  # Number of sample rows to generate
 DEFAULT_TEST_CASES_COUNT: Final[int] = 2  # Number of test cases to create by default
 
-"""
-Test manager defines what are test cases and test suites.
-It also defines a set of functions to run test on Confluent Cloud.
-"""
+
 
 class SLTestData(BaseModel):
     table_name: str
@@ -87,7 +93,7 @@ class TopicListCache(BaseModel):
     topic_list: Optional[dict[str, str]] = Field(default={})
 
 # ----------- Public APIs  ------------------------------------------------------------
-def init_unit_test_for_table(table_name: str) -> None:
+def init_unit_test_for_table(table_name: str, create_csv: bool = False) -> None:
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
     """
@@ -99,8 +105,9 @@ def init_unit_test_for_table(table_name: str) -> None:
     create_folder_if_not_exist(f"{test_folder_path}/tests")
     _add_test_files(table_ref=table_ref, 
                     tests_folder=f"{table_folder}/tests", 
-                    table_inventory=table_inventory)
-
+                    table_inventory=table_inventory,
+                    create_csv=create_csv)
+    
 
 def execute_one_test(
         table_name: str, 
@@ -216,15 +223,15 @@ def delete_test_artifacts(table_name: str,
             statement_mgr.delete_statement_if_exists(statement_name)
             logger.info(f"Deleted statement {statement_name}")
             print(f"Deleted statement {statement_name}")
-    logger.info(f"Deleting ddl and dml artifacts for {table_name}")
-    print(f"Deleting ddl and dml artifacts for {table_name}")
+    logger.info(f"Deleting ddl and dml artifacts for {table_name}{POST_FIX_UNIT_TEST}")
+    print(f"Deleting ddl and dml artifacts for {table_name}{POST_FIX_UNIT_TEST}")
     statement_name = _build_statement_name(table_name, prefix+"-dml")
     statement_mgr.delete_statement_if_exists(statement_name)
     statement_name = _build_statement_name(table_name, prefix+"-ddl")
     statement_mgr.delete_statement_if_exists(statement_name)
     statement_mgr.drop_table(table_name+POST_FIX_UNIT_TEST, compute_pool_id)
     for foundation in test_suite_def.foundations:
-        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}")
+        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}{POST_FIX_UNIT_TEST}")
         statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl")
         statement_mgr.delete_statement_if_exists(statement_name)
         statement_mgr.drop_table(foundation.table_name+POST_FIX_UNIT_TEST, compute_pool_id)
@@ -563,7 +570,8 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
 
 def _add_test_files(table_ref: FlinkTableReference, 
                     tests_folder: str, 
-                    table_inventory: Dict[str, FlinkTableReference]) -> SLTestDefinition:
+                    table_inventory: Dict[str, FlinkTableReference],
+                    create_csv: bool = False) -> SLTestDefinition:
     """
     Add the test files to the table/tests folder by looking at the referenced tables in the DML SQL content.
     """
@@ -582,7 +590,7 @@ def _add_test_files(table_ref: FlinkTableReference,
         raise ValueError(f"No referenced table names found in the sql_content of {file_path}")
 
     tests_folder_path = from_pipeline_to_absolute(tests_folder)
-    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_ref.table_name, referenced_table_names)
+    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_ref.table_name, referenced_table_names, create_csv)
     table_struct = _process_foundation_ddl_from_test_definitions(test_definition, tests_folder_path, table_inventory)
     
     # Create template files for each test case
@@ -646,8 +654,13 @@ def _generate_test_readme(table_ref: FlinkTableReference,
 def _build_save_test_definition_json_file(
         file_path: str, 
         table_name: str, 
-        referenced_table_names: List[str]
+        referenced_table_names: List[str],
+        create_csv: bool = False
 ) -> SLTestDefinition:
+    """
+    Build the test definition file for the unit tests.
+    When create csv then the second test has csv based input.
+    """
     test_definition :SLTestDefinition = SLTestDefinition(foundations=[], test_suite=[])
     for table in referenced_table_names:
         if table not in table_name:
@@ -655,15 +668,16 @@ def _build_save_test_definition_json_file(
             test_definition.foundations.append(foundation_table_name)
     for i in range(1, DEFAULT_TEST_CASES_COUNT + 1):
         test_case = SLTestCase(name=f"test_{table_name}_{i}", inputs=[], outputs=[])
-        output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
         for table in referenced_table_names:
             if table not in table_name:
-                if i == 1:  
+                if i % 2 == 1 or not create_csv and i%2 == 0:  
                     input = SLTestData(table_name=table, file_name=f"./tests/insert_{table}_{i}.sql",file_type="sql")
-                else:
+                    output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
+                elif create_csv:
                     input = SLTestData(table_name=table, file_name=f"./tests/insert_{table}_{i}.csv",file_type="csv")
+                    output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
                 test_case.inputs.append(input)
-        test_case.outputs.append(output)
+                test_case.outputs.append(output)
         test_definition.test_suite.append(test_case)
     
     with open(f"{file_path}/{TEST_DEFINITION_FILE_NAME}", "w") as f:
@@ -720,7 +734,7 @@ def _build_data_sample(columns: Dict[str, Dict[str, Any]], idx_offset: int = 0) 
             elif col_type == ' ARRAY<STRING>':
                 rows += f"['{column}_{idx}'], "
             elif "TIMESTAMP" in col_type:
-                rows += f"'{column}_{idx}', "
+                rows += f"TIMESTAMP '2021-01-01 00:00:00', "
             else: # string
                 rows += f"'{column}_{idx}', "
             
@@ -794,4 +808,12 @@ def _build_statement_name(table_name: str, prefix: str) -> str:
     return statement_name.replace('_', '-').replace('.', '-')
 
 
+def _add_data_consistency_with_ai(test_definition: SLTestDefinition):
+    """
+    Add data consistency with AI:
+    1/ from the dml content ask to keep integrity of the data for the joins logic and primary keys
+    2/ search for the insert sql statment and the validate sql statement and ask to keep the data consistency
+   
+    """
+    pass
 

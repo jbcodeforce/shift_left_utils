@@ -10,8 +10,8 @@ shift_left table --help
 
 # three features are available:
 init-unit-tests   Initialize the unit test folder and template files for a given table. It will parse the SQL statements to create the insert statements for the unit tests. It is using the table inventory to find the table folder for the given table name.
-run-test-suite    Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
-delete-tests      Delete the Flink statements and kafka topics used for unit tests for a given table.
+run-unit-tests    Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+delete-unit-tests      Delete the Flink statements and kafka topics used for unit tests for a given table.
 ```
 
 [See usage paragraph](#usage-and-recipe)
@@ -55,7 +55,7 @@ The objectives of a test harness for developers and system testers, is to valida
 1. support multiple testcase definitions as a test suite. Test suite may be automated for non-regression testing to ensure continuous quality.
 1. Once tests are completed, tear down tables and data.
   ```sh
-  shift_left table delete-tests <table-name>
+  shift_left table delete-unit-tests <table-name>
   ```
 1. Do not impact other tables that may be used to do integration tests within the same Kafka Cluster. For that there is a postfix string add to the name of the tables. This postfix is defined in the config.yaml file as:
   ```yaml
@@ -181,7 +181,7 @@ The two test cases use different approaches to define the data: SQL and CSV file
 
 * Data engineers update the content of the insert statements and the validation statements. Once done, try unit testing with the command:
   ```sh
-  shift_left table  run-test-suite <table_name> --test-case-name test_<table_name>_1 
+  shift_left table  run-unit-tests <table_name> --test-case-name test_<table_name>_1 
   ```
 
 A test execution may take some time as it performs the following steps:
@@ -197,12 +197,12 @@ A test execution may take some time as it performs the following steps:
 
 To run the complete suite of tests:
   ```sh
-  shift_left table  run-test-suite <table_name>
+  shift_left table  run-unit-tests <table_name>
   ```
 
 Clean the tests artifacts created on Confluent Cloud with the command:
   ```sf
-  shift_left table delete-tests <table_name>
+  shift_left table delete-unit-tests <table_name>
   ```
 
 ## Running with more data
@@ -217,4 +217,38 @@ Data engineers may use the csv format to create a lot of records. Now the challe
 
 The logic of integration tests is to validate end-to-end processing for a given pipeline and assess the time to process records from sources to facts or sink tables.
 
-To be continued...
+The approach is to keep those integration tests under the pipelines folder by per product and data product. As an example for the product p2, and the analytical data build from the `fact_users` then the hierarchy will look like:
+
+```
+pipelines
+└── tests
+    └── p2
+        └── fact_users
+```
+
+The content of the folder will include all the insert statements for the src_ of the pipeline and the validation SQLs for intermediates and facts. The following figure illustrates those principles:
+
+![](./images/test_frwk_flink_pipeline.drawio.png)
+
+The data to build is F, so integration tests will validate all the purple Flink statements. The integration tests insert data for the two input topics used to build the src_.
+Intermediate validation can be added to assess the state of the intermediate Flink statement output.
+
+The command to create a scaffolding:
+
+```sh
+shift_left pipeline init-integration-tests F
+```
+
+Running the integration tests:
+
+```sh
+shift_left pipeline run-integration-tests F
+```
+
+Tearsdown:
+
+```sh
+shift_left pipeline delete-integration-tests F
+```
+
+With this capability we can also assess the time to process records from source to sink tables.

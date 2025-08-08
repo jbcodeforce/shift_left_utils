@@ -247,11 +247,11 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
     def test_deploy_table_pipeline(self, 
-                                           mock_delete, 
-                                           mock_drop,
-                                           mock_post,
-                                           mock_get_status,
-                                           mock_get_compute_pool_list):
+                                    mock_delete, 
+                                    mock_drop,
+                                    mock_post,
+                                    mock_get_status,
+                                    mock_get_compute_pool_list):
     
         
         """
