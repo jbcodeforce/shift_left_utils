@@ -391,8 +391,12 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
 
 
 def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
-    node.dml_statement_name = _get_statement_name_modifier().modify_statement_name(node, node.dml_statement_name, get_config().get('kafka').get('cluster_type'))
-    node.ddl_statement_name = _get_statement_name_modifier().modify_statement_name(node, node.ddl_statement_name, get_config().get('kafka').get('cluster_type'))
+    cluster_type = get_config().get('kafka').get('cluster_type')
+    cloud_region = get_config().get('confluent_cloud').get('region')
+    abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')
+    prefix= cluster_type + '-' + abbv_region
+    node.dml_statement_name = _get_statement_name_modifier().modify_statement_name(node, node.dml_statement_name, prefix)
+    node.ddl_statement_name = _get_statement_name_modifier().modify_statement_name(node, node.ddl_statement_name, prefix)
     return node
 
 _statement_name_modifier = None
