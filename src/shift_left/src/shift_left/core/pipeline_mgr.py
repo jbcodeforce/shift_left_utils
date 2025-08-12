@@ -188,6 +188,7 @@ def _build_pipeline_definitions_from_sql_content(
         ddl_sql_content = ""
         referenced_table_names = set()
         parser = SQLparser()
+        current_table_name = None
         if dml_file_name:
             if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
                 dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
@@ -195,7 +196,7 @@ def _build_pipeline_definitions_from_sql_content(
                 dml_sql_content = f.read()
             current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
             referenced_table_names = parser.extract_table_references(dml_sql_content)
-        if ddl_file_name:
+        if  not current_table_name and ddl_file_name:
             if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
                 ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
             with open(ddl_file_name) as f:

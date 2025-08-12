@@ -112,7 +112,9 @@ class TestFileSearch(unittest.TestCase):
     
     def test_relative_to_pipeline(self):
         test_path = "pipelines/facts/p1/fct_order"
-        assert "flink-project/pipelines/facts/p1/fct_order"  in from_pipeline_to_absolute(test_path)
+        abs_path = from_pipeline_to_absolute(test_path)
+        assert os.path.isabs(abs_path)
+        assert abs_path.endswith(test_path)
 
     def test_build_src_inventory(self):
         """ given a source project, build the inventory of all the sql files """

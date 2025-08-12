@@ -10,7 +10,8 @@ Dedicated class to parse a SQL statement and extract elements like table name
 
 class SQLparser:
     def __init__(self):
-        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        # extract table name declared after FROM, JOIN, INNER JOIN, LEFT JOIN, CREATE TABLE IF NOT EXISTS, INSERT INTO
+        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*`?([a-zA-Z_][a-zA-Z0-9_]*\.)*[a-zA-Z_][a-zA-Z0-9_]*`?)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS+\s*\('
         self.not_wanted_words = r'\b(CROSS\s+JOIN\s+UNNEST)\s*\('
@@ -38,11 +39,11 @@ class SQLparser:
         
         return sql.strip()
 
-    def remove_junk_words(self, table_name: str) -> str:
+    def remove_junk_words(self, table_name: str, not_wanted: List[str]) -> str:
         """
         Remove words not wanted as table name
         """
-        for not_wanted_word in [' UNNEST ']:
+        for not_wanted_word in not_wanted:
             if not_wanted_word in table_name.upper():
                 return None
         return table_name.strip()
@@ -78,7 +79,7 @@ class SQLparser:
                 if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
                 if not retrieved_table in ctes1 and not retrieved_table in ctes2 and not retrieved_table in not_wanted:
-                    table_name=self.remove_junk_words(retrieved_table)
+                    table_name=self.remove_junk_words(retrieved_table, not_wanted)
                     if table_name is not None:
                         matches.add(table_name)
             return matches
@@ -100,7 +101,7 @@ class SQLparser:
     
     def extract_table_name_from_create_statement(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
+        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS|CREATE TABLE)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
         if len(tbname) > 0:
             #logger.debug(tbname[0][1])
