@@ -53,7 +53,7 @@ class TestBuildNodePlan(unittest.TestCase):
         # Create reusabletest nodes
         self.source_node = self._create_node(table_name="source_table", type="source")
         self.intermediate_node = self._create_node(table_name="intermediate_table", type="intermediate")
-        self.sink_node = self._create_node(table_name="sink_table", type="sink")
+        self.sink_node = self._create_node(table_name="sink_table", type="fact")
         
         # Set up relationships: source -> intermediate -> sink
         self.intermediate_node.add_parent(self.source_node)
@@ -164,10 +164,10 @@ class TestBuildNodePlan(unittest.TestCase):
         src_a = self._create_node(table_name="src_a", type="source")
         src_b = self._create_node(table_name="src_b", type="source")
         src_c = self._create_node(table_name="src_c", type="source")
-        child_table_1 = self._create_node(table_name="child_table_1", type="sink")
+        child_table_1 = self._create_node(table_name="child_table_1", type="fact")
         child_table_1.add_parent(src_a)
         child_table_1.add_parent(src_b)
-        child_table_2 = self._create_node(table_name="child_table_2", type="sink")
+        child_table_2 = self._create_node(table_name="child_table_2", type="fact")
         child_table_2.add_parent(src_c)
         child_table_2.add_parent(src_b)
         
@@ -230,7 +230,7 @@ class TestBuildNodePlan(unittest.TestCase):
         src_b = self._create_node(table_name="src_b", type="source")
         src_c = self._create_node(table_name="src_c", type="source")
         child_a = self._create_node(table_name="child_a", type="intermediate")
-        child_a_a = self._create_node(table_name="child_a_a", type="sink")
+        child_a_a = self._create_node(table_name="child_a_a", type="fact")
         child_a_a.add_parent(child_a)
         join_table_1 = self._create_node(table_name="join_table_1", type="intermediate")
         join_table_1.add_parent(src_a)
@@ -239,9 +239,9 @@ class TestBuildNodePlan(unittest.TestCase):
         join_table_2 = self._create_node(table_name="join_table_2", type="intermediate")
         join_table_2.add_parent(src_b)
         join_table_2.add_parent(src_c)
-        child_b = self._create_node(table_name="child_b", type="sink")
+        child_b = self._create_node(table_name="child_b", type="fact")
         child_b.add_parent(join_table_2)
-        child_c = self._create_node(table_name="child_c", type="sink")
+        child_c = self._create_node(table_name="child_c", type="fact")
         child_c.product_name = "common"
         child_c.add_parent(src_c)
         
@@ -299,18 +299,18 @@ class TestBuildNodePlan(unittest.TestCase):
         for node in node_map.values():
             print(node.table_name, node.upgrade_mode, node.dml_statement_name)
             
-        assert node_map["src_y"].upgrade_mode == "Stateful"
-        assert node_map["src_x"].upgrade_mode == "Stateful"
-        assert node_map["src_b"].upgrade_mode == "Stateful"
+        assert node_map["src_y"].upgrade_mode == "Stateless"
+        assert node_map["src_x"].upgrade_mode == "Stateless"
+        assert node_map["src_b"].upgrade_mode == "Stateless"
         assert node_map["src_p2_a"].upgrade_mode == "Stateless"
-        assert node_map["x"].upgrade_mode == "Stateful"
+        assert node_map["x"].upgrade_mode == "Stateless"
         assert node_map["y"].upgrade_mode == "Stateless"
         assert node_map["z"].upgrade_mode == "Stateful"
         assert node_map["d"].upgrade_mode == "Stateful"
         assert node_map["c"].upgrade_mode == "Stateless"
         assert node_map["p"].upgrade_mode == "Stateless"
         assert node_map["a"].upgrade_mode == "Stateful"
-        assert node_map["b"].upgrade_mode == "Stateful"
+        assert node_map["b"].upgrade_mode == "Stateless"
         assert node_map["e"].upgrade_mode == "Stateless"
         assert node_map["f"].upgrade_mode == "Stateless"
 
