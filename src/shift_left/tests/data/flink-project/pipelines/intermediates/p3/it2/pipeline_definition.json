@@ -2,9 +2,9 @@
    "table_name": "int_p3_it2",
    "product_name": "p3",
    "type": "intermediate",
-   "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/it2/sql-scripts/dml.int_p3_it2.sql",
-   "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/it2/sql-scripts/ddl.int_p3_it2.sql",
-   "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/intermediates/p3/it2",
+   "dml_ref": "pipelines/intermediates/p3/it2/sql-scripts/dml.int_p3_it2.sql",
+   "ddl_ref": "pipelines/intermediates/p3/it2/sql-scripts/ddl.int_p3_it2.sql",
+   "path": "pipelines/intermediates/p3/it2",
    "state_form": "Stateful",
    "parents": [],
    "children": []

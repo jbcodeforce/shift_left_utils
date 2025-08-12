@@ -10,10 +10,13 @@ Dedicated class to parse a SQL statement and extract elements like table name
 
 class SQLparser:
     def __init__(self):
-        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*([a-zA-Z_][a-zA-Z0-9_]*\.)?`?[a-zA-Z_][a-zA-Z0-9_]*`?)'
         self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'\s+(\w+)\s+AS+\s*\('
         self.not_wanted_words = r'\b(CROSS\s+JOIN\s+UNNEST)\s*\('
+        # Pattern to identify specific SQL functions that use FROM as a keyword (TRIM, SUBSTRING, etc.)
+        # Only target specific functions that legitimately use FROM as part of their syntax
+        self.function_from_pattern = r'\b(TRIM|OVERLAY|SUBSTRING|EXTRACT)\s*\([^)]*FROM[^)]*\)'
     
 
     def _normalize_sql(self, sql_script):
@@ -57,11 +60,15 @@ class SQLparser:
         regex=r'ref\([\'"]([^\'"]+)[\'"]\)'
         matches = re.findall(regex, sql_content, re.IGNORECASE)
         if len(matches) == 0:
+            # Remove SQL functions that contain FROM keyword (like TRIM(BOTH '[]' FROM value))
+            # to avoid false positive table name matches
+            sql_content_filtered = re.sub(self.function_from_pattern, '', sql_content, flags=re.IGNORECASE)
+            
             # look a Flink SQL references table name after from or join
-            tables = re.findall(self.table_pattern, sql_content, re.IGNORECASE)
-            ctes1 = re.findall(self.cte_pattern_1, sql_content, re.IGNORECASE)
-            ctes2 = re.findall(self.cte_pattern_2, sql_content, re.IGNORECASE)
-            not_wanted="[UNNEST]"
+            tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
+            ctes1 = re.findall(self.cte_pattern_1, sql_content_filtered, re.IGNORECASE)
+            ctes2 = re.findall(self.cte_pattern_2, sql_content_filtered, re.IGNORECASE)
+            not_wanted=['UNNEST', 'unnest']
             matches=set()
             for table in tables:
                 logger.debug(table)

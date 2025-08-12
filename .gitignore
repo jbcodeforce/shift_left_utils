@@ -17,3 +17,5 @@ set_test_env
 set_stage_env
 **to_investigate.md
 .idea/
+.gitconfig
+set_dev_env

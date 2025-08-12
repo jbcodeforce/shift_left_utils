@@ -41,7 +41,6 @@ app:
   report_output_dir: ./reports
   default_PK: __db
   timezone: America/Los_Angeles
-  src_table_name_suffix: ""
   src_table_name_prefix: src_
   logging: INFO
   products: ["p1", "p2", "p3"]

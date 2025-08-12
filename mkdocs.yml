@@ -6,7 +6,7 @@ nav:
   - Introduction: index.md
   - User Guide:
     - Development Process: dev_process.md 
-    - EnvironmentSetup: setup.md
+    - Environment Setup: setup.md
     - Recipes: recipes.md
     - CLI References: command.md
     - Test Harness: coding/test_harness.md
@@ -67,7 +67,8 @@ markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 3
-  - pymdownx.tabbed
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -80,6 +81,8 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.tilde
   - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.emoji:
