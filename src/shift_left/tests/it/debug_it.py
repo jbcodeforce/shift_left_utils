@@ -24,16 +24,17 @@ import shift_left.core.deployment_mgr as dm
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
-    def _test_exec_plan(self):
+    def test_at_cli_level(self):
         runner = CliRunner()
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'int_qx_infocard_helper_get_full_result'])
         #result = runner.invoke(app, ['table', 'migrate', 'dim_training_course', os.getenv('SRC_FOLDER','.') + '/dimensions/qx/dim_training_course.sql', os.getenv('STAGING')])
-        #result = runner.invoke(app, ['table', 'init-unit-tests', 'uvs_pm_nok_stage_73xx_json_stream'])
+        result = runner.invoke(app, ['table', 'init-unit-tests', 'aqem_fct_step_role_assignee_relation'])
         #result = runner.invoke(app, ['table', 'build-inventory'])
         #result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
-        result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
+        #result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
+        
         print(result.stdout)
 
       

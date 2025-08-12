@@ -2,9 +2,9 @@
    "table_name": "p1_fct_order",
    "product_name": "p1",
    "type": "fact",
-   "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
-   "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
-   "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order",
+   "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
+   "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
+   "path": "pipelines/facts/p1/fct_order",
    "state_form": "Stateful",
    "parents": [
       {
@@ -21,9 +21,9 @@
                "table_name": "p1_fct_order",
                "product_name": "p1",
                "type": "fact",
-               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
-               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
-               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order",
+               "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
+               "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
+               "path": "pipelines/facts/p1/fct_order",
                "state_form": "Stateful",
                "parents": [],
                "children": []
@@ -44,9 +44,9 @@
                "table_name": "p1_fct_order",
                "product_name": "p1",
                "type": "fact",
-               "dml_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
-               "ddl_ref": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
-               "path": "/Users/jerome/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/facts/p1/fct_order",
+               "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
+               "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
+               "path": "pipelines/facts/p1/fct_order",
                "state_form": "Stateful",
                "parents": [],
                "children": []

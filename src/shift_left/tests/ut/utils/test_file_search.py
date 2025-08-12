@@ -79,8 +79,8 @@ class TestFileSearch(unittest.TestCase):
         assert pipe_def.path == "src/src_table"
         assert pipe_def.state_form == "Stateful"
         node = pipe_def.to_node()
-        assert node.dml_statement_name == "dev-p1-dml-src-table"
-        assert node.ddl_statement_name == "dev-p1-ddl-src-table"
+        assert node.dml_statement_name == "dev-usw2-p1-dml-src-table"
+        assert node.ddl_statement_name == "dev-usw2-p1-ddl-src-table"
 
     
     def test_read_pipeline_definition_from_file(self):
@@ -159,8 +159,8 @@ class TestFileSearch(unittest.TestCase):
         pipe_def = read_pipeline_definition_from_file( os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
         config = get_config()
         ddl, dml = get_ddl_dml_names_from_pipe_def(pipe_def)
-        assert ddl == "dev-p1-ddl-p1-fct-order"
-        assert dml == "dev-p1-dml-p1-fct-order"
+        assert ddl == "dev-usw2-p1-ddl-p1-fct-order"
+        assert dml == "dev-usw2-p1-dml-p1-fct-order"
 
     def test_get_ddl_file_name(self):
         fname = get_ddl_file_name(os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts")
