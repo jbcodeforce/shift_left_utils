@@ -1,0 +1,246 @@
+{
+  "tools": [
+    {
+      "name": "shift_left_project_init",
+      "description": "Initialize a new Flink project structure with specified name, path, and project type. Creates directory structure for Kimball or Data Product architectures.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project_name": {
+            "type": "string",
+            "description": "Name of project to create",
+            "default": "default_data_project"
+          },
+          "project_path": {
+            "type": "string", 
+            "description": "Target path where project will be created",
+            "default": "./tmp"
+          },
+          "project_type": {
+            "type": "string",
+            "description": "Project structure type",
+            "enum": ["kimball", "data_product"],
+            "default": "kimball"
+          }
+        },
+        "required": ["project_name", "project_path"]
+      },
+      "command": "shift_left project init {project_name} {project_path} --project-type {project_type}"
+    },
+    {
+      "name": "shift_left_project_validate_config",
+      "description": "Validate the shift_left configuration file for required sections and proper formatting.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "shift_left project validate-config"
+    },
+    {
+      "name": "shift_left_project_list_topics",
+      "description": "List all Kafka topics in the configured cluster.",
+      "parameters": {
+        "type": "object", 
+        "properties": {
+          "project_path": {
+            "type": "string",
+            "description": "Path to the project directory"
+          }
+        },
+        "required": ["project_path"]
+      },
+      "command": "shift_left project list-topics {project_path}"
+    },
+    {
+      "name": "shift_left_project_list_compute_pools",
+      "description": "List available Flink compute pools in Confluent Cloud.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "environment_id": {
+            "type": "string",
+            "description": "Confluent Cloud environment ID"
+          }
+        },
+        "required": []
+      },
+      "command": "shift_left project list-compute-pools {environment_id ? '--environment-id ' + environment_id : ''}"
+    },
+    {
+      "name": "shift_left_project_list_modified_files",
+      "description": "Track modified Flink SQL files between git branches for blue-green deployment. Lists files changed between a branch and HEAD.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "branch_name": {
+            "type": "string",
+            "description": "Base branch name to compare against (e.g., 'main', 'develop')"
+          },
+          "output_file": {
+            "type": "string", 
+            "description": "Output file to save the list of modified files"
+          },
+          "file_filter": {
+            "type": "string",
+            "description": "File extension filter (e.g., '.sql')",
+            "default": ".sql"
+          },
+          "project_path": {
+            "type": "string",
+            "description": "Path to the project directory"
+          }
+        },
+        "required": ["branch_name"]
+      },
+      "command": "shift_left project list-modified-files {branch_name} {output_file ? '--output-file ' + output_file : ''} {file_filter ? '--file-filter ' + file_filter : ''} {project_path ? '--project-path ' + project_path : ''}"
+    },
+    {
+      "name": "shift_left_table_init",
+      "description": "Build a new table structure under the specified path. Creates folder structure for Flink table definitions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "table_name": {
+            "type": "string",
+            "description": "Name of the table to create"
+          },
+          "table_path": {
+            "type": "string",
+            "description": "Folder path where table structure will be created"
+          },
+          "product_name": {
+            "type": "string",
+            "description": "Product name for the table (optional)"
+          }
+        },
+        "required": ["table_name", "table_path"]
+      },
+      "command": "shift_left table init {table_name} {table_path} {product_name ? '--product-name ' + product_name : ''}"
+    },
+    {
+      "name": "shift_left_table_build_inventory",
+      "description": "Build an inventory of all tables in the project with basic metadata.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pipeline_path": {
+            "type": "string",
+            "description": "Pipeline folder path containing table definitions"
+          }
+        },
+        "required": ["pipeline_path"]
+      },
+      "command": "shift_left table build-inventory {pipeline_path}"
+    },
+    {
+      "name": "shift_left_table_migrate",
+      "description": "Migrate SQL code from various dialects (KSQL, Spark SQL, DBT) to Flink SQL using AI agents.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "table_name": {
+            "type": "string", 
+            "description": "Name of the table after migration"
+          },
+          "sql_src_file_name": {
+            "type": "string",
+            "description": "Source SQL file path to migrate"
+          },
+          "target_path": {
+            "type": "string",
+            "description": "Target path for migrated content"
+          },
+          "source_type": {
+            "type": "string",
+            "description": "Type of SQL source to migrate",
+            "enum": ["ksql", "dbt", "spark"],
+            "default": "spark"
+          },
+          "validate": {
+            "type": "boolean",
+            "description": "Validate migrated SQL using Confluent Cloud",
+            "default": false
+          },
+          "recursive": {
+            "type": "boolean", 
+            "description": "Process recursively up to sources",
+            "default": false
+          }
+        },
+        "required": ["table_name", "sql_src_file_name", "target_path"]
+      },
+      "command": "shift_left table migrate {table_name} {sql_src_file_name} {target_path} --source-type {source_type} {validate ? '--validate' : ''} {recursive ? '--recursive' : ''}"
+    },
+    {
+      "name": "shift_left_pipeline_deploy",
+      "description": "Deploy Flink SQL pipelines from table names, product names, or directories. Supports blue-green deployment with dependency management.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "inventory_path": {
+            "type": "string",
+            "description": "Path to inventory folder containing pipeline definitions"
+          },
+          "table_name": {
+            "type": "string",
+            "description": "Specific table name to deploy"
+          },
+          "product_name": {
+            "type": "string", 
+            "description": "Product name to deploy all tables from"
+          },
+          "table_list_file_name": {
+            "type": "string",
+            "description": "File containing list of tables to deploy (for blue-green)"
+          },
+          "compute_pool_id": {
+            "type": "string",
+            "description": "Flink compute pool ID"
+          },
+          "dml_only": {
+            "type": "boolean",
+            "description": "Deploy only DML (not DDL)",
+            "default": false
+          },
+          "parallel": {
+            "type": "boolean",
+            "description": "Deploy in parallel",
+            "default": false
+          }
+        },
+        "required": ["inventory_path"]
+      },
+      "command": "shift_left pipeline deploy {inventory_path} {table_name ? '--table-name ' + table_name : ''} {product_name ? '--product-name ' + product_name : ''} {table_list_file_name ? '--table-list-file-name ' + table_list_file_name : ''} {compute_pool_id ? '--compute-pool-id ' + compute_pool_id : ''} {dml_only ? '--dml-only' : ''} {parallel ? '--parallel' : ''}"
+    },
+    {
+      "name": "shift_left_pipeline_build_metadata",
+      "description": "Build pipeline metadata from DML files for Flink table definitions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "dml_file_name": {
+            "type": "string",
+            "description": "Path to the DML file"
+          },
+          "pipeline_path": {
+            "type": "string", 
+            "description": "Pipeline base path"
+          }
+        },
+        "required": ["dml_file_name", "pipeline_path"]
+      },
+      "command": "shift_left pipeline build-metadata {dml_file_name} {pipeline_path}"
+    },
+    {
+      "name": "shift_left_version",
+      "description": "Display the current version of shift-left CLI.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "command": "shift_left version"
+    }
+  ]
+}

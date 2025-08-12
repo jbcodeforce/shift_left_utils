@@ -1,335 +1,44 @@
-# Shift Left Utils - Cursor Rules
+# Shift Left Utils CLI Integration
 
-## Project Overview
+## Available CLI Commands
 
-Shift Left Utils is a comprehensive toolkit for migrating and managing data pipeline code from various SQL dialects (KSQL, Spark SQL, DBT) to Apache Flink SQL, with a focus on Confluent Cloud deployment and project management.
-
-### Core Purpose
-- **SQL Migration**: Automated translation from KSQL, Spark SQL, and DBT to Flink SQL using LLM-based agents
-- **Pipeline Management**: Build, validate, and deploy Flink SQL pipelines with dependency management
-- **Configuration Management**: Robust configuration validation and environment management
-- **Testing Framework**: Comprehensive testing for SQL migrations and pipeline validation
-- **Blue-Green Deployment**: Git-based change tracking and selective deployment strategies
-
-### Key Features
-- LLM-powered code translation with validation and refinement
-- Confluent Cloud integration for Flink compute pools and statements
-- Project scaffolding and management (Kimball, Data Product architectures)
-- Table inventory and dependency analysis
-- Blue/green deployment strategies with git integration
-- Comprehensive test coverage and validation
-
-## Architecture & Code Organization
-
-### Project Structure
-```
-src/shift_left/
-├── cli_commands/          # CLI interface (Typer-based)
-│   ├── project.py        # Project management commands
-│   ├── table.py          # Table operations and testing
-│   └── pipeline.py       # Pipeline deployment and management
-├── core/                 # Core business logic
-│   ├── utils/            # Utility modules and agents
-│   │   ├── *_code_agent.py    # LLM-based translation agents
-│   │   ├── app_config.py      # Configuration management
-│   │   └── prompts/           # LLM prompts for different dialects
-│   ├── project_manager.py     # Project scaffolding and structure
-│   ├── table_mgr.py          # Table operations and analysis
-│   ├── deployment_mgr.py     # Pipeline deployment logic
-│   └── statement_mgr.py      # Flink statement management
-└── tests/                # Comprehensive test suite
-    ├── ut/               # Unit tests
-    ├── it/               # Integration tests
-    ├── ai/               # AI/LLM migration tests
-    └── data/             # Test data and fixtures
-```
-
-### Key Components
-
-#### 1. LLM Code Agents (`core/utils/*_code_agent.py`)
-- **KsqlToFlinkSqlAgent**: KSQL to Flink SQL translation
-- **SparkSqlCodeAgent**: Spark SQL to Flink SQL translation
-- **KsqlVllmCodeAgent**: vLLM-based KSQL translation
-- Pattern: All agents inherit from `AnySqlToFlinkSqlAgent` base class
-
-#### 2. Configuration Management (`core/utils/app_config.py`)
-- Centralized YAML-based configuration
-- Validation for Kafka, Confluent Cloud, Flink, and app settings
-- Cached configuration loading with reset capabilities
-- Environment-specific overrides
-
-#### 3. CLI Interface (`cli_commands/`)
-- Typer-based command structure
-- Rich output formatting
-- Comprehensive help and documentation
-- Environment variable integration
-
-#### 4. Git Integration Commands
-- **list-modified-files**: Track changed Flink statements between git branches
-- **Blue-Green Deployment Support**: Identify impacted tables for selective deployment
-
-## Development Best Practices
-
-### 1. Code Style & Patterns
-- **Type Hints**: Use comprehensive type annotations
-- **Docstrings**: Document all public functions and classes
-- **Error Handling**: Comprehensive error handling with meaningful messages
-- **Logging**: Use the centralized logger from `app_config.py`
-- **Configuration**: Always use `get_config()` for accessing configuration
-
-### 2. Testing Guidelines
-- **Test Categories**:
-  - Unit tests (`tests/ut/`) for isolated component testing
-  - Integration tests (`tests/it/`) for CLI and end-to-end scenarios
-  - AI tests (`tests/ai/`) for LLM agent validation
-- **Mock Usage**: Use `unittest.mock.patch` for external dependencies
-- **Test Data**: Store test fixtures in `tests/data/` with realistic examples
-- **CLI Testing**: Use `typer.testing.CliRunner` for CLI command testing
-- **Subprocess Mocking**: Mock git and external commands for reliable testing
-
-### 3. Configuration Patterns
-```python
-# Always access config through get_config()
-from shift_left.core.utils.app_config import get_config
-
-config = get_config()
-flink_url = config.get('flink', {}).get('flink_url')
-```
-
-### 4. Error Handling
-```python
-# Use structured error handling with validation
-errors = []
-if not some_condition:
-    errors.append("Descriptive error message")
-
-if errors:
-    error_message = "Operation failed:\n" + "\n".join(f"  - {error}" for error in errors)
-    raise ValueError(error_message)
-```
-
-### 5. CLI Command Patterns
-```python
-@app.command()
-def command_name(
-    required_arg: Annotated[str, typer.Argument(help="Description")],
-    optional_flag: Annotated[bool, typer.Option(help="Description")] = False
-):
-    """
-    Command description for help text.
-    """
-    print("#" * 30 + f" Operation: {operation_name}")
-    # Implementation
-    print("Operation completed successfully")
-```
-
-### 6. Git Integration Patterns
-```python
-# Use subprocess for git operations with proper error handling
-import subprocess
-
-try:
-    result = subprocess.run(
-        ["git", "diff", "--name-only", f"{branch_name}...HEAD"],
-        capture_output=True,
-        text=True,
-        check=True
-    )
-    modified_files = result.stdout.strip().split('\n')
-except subprocess.CalledProcessError as e:
-    print(f"Git command failed: {e}")
-    raise typer.Exit(1)
-```
-
-### 7. LLM Agent Patterns
-- **Prompt Management**: Store prompts in `core/utils/prompts/` organized by dialect
-- **Validation**: Always validate LLM outputs before processing
-- **Refinement**: Implement iterative refinement for complex translations
-- **Table Detection**: Use table detection agents for multi-table scenarios
-
-## CLI Commands Reference
+The `shift_left` CLI is available in this project with the following main commands:
 
 ### Project Management
-```bash
-# Initialize new project
-shift_left project init <project_name> <path> --project-type kimball
+- `shift_left project init <project_name> <project_path> --project-type [kimball|data_product]` - Initialize new Flink project
+- `shift_left project validate-config` - Validate configuration file
+- `shift_left project list-topics <project_path>` - List Kafka topics
+- `shift_left project list-compute-pools [--environment-id <id>]` - List Flink compute pools
+- `shift_left project list-modified-files <branch_name> [--output-file <file>] [--file-filter <ext>] [--project-path <path>]` - Track git changes for blue-green deployment
 
-# Validate configuration
-shift_left project validate-config
+### Table Management  
+- `shift_left table init <table_name> <table_path> [--product-name <name>]` - Create table structure
+- `shift_left table build-inventory <pipeline_path>` - Build table inventory
+- `shift_left table migrate <table_name> <sql_file> <target_path> [--source-type ksql|spark|dbt] [--validate] [--recursive]` - Migrate SQL with AI
 
-# List Kafka topics
-shift_left project list-topics <project_path>
+### Pipeline Deployment
+- `shift_left pipeline deploy <inventory_path> [--table-name <name>] [--product-name <name>] [--table-list-file-name <file>] [--compute-pool-id <id>] [--dml-only] [--parallel]` - Deploy Flink pipelines
+- `shift_left pipeline build-metadata <dml_file> <pipeline_path>` - Build pipeline metadata
 
-# List compute pools
-shift_left project list-compute-pools --environment-id <env_id>
+### Table Unit Testing
+- `shift_left table init-unit-tests <table_name>` - Create test file to unit tests the table
+- `shift_left table run-unit-tests <table_name>` - Run the test suite of the given table
+- `shift_left table delete-unit-tests <table_name>` - Remove / undeploy the unit test artifacts on Confluent Cloud 
 
-# Track git changes for blue-green deployment
-shift_left project list-modified-files <branch_name> \
-    --output-file modified_files.txt \
-    --file-filter .sql \
-    --project-path ./my-project
-```
+### Utility
+- `shift_left version` - Show CLI version
 
-### Blue-Green Deployment Workflow
-```bash
-# 1. Create feature branch and make changes
-git checkout -b feature/update-tables
+## CLI Usage Patterns
 
-# 2. Track modified Flink statements
-shift_left project list-modified-files main \
-    --output-file deployment_list.txt \
-    --file-filter .sql
+When suggesting CLI commands:
+1. Always use environment variables like $PIPELINES, $SRC_FOLDER, $STAGING when available
+2. For blue-green deployment, use list-modified-files first, then deploy with --table-list-file-name
+3. Migration commands require proper source types (ksql, spark, dbt)
+4. Pipeline deployment supports both individual tables and bulk operations
+5. Configuration validation should be run before major operations
 
-# 3. Deploy only changed statements
-shift_left pipeline deploy --table-list-file-name deployment_list.txt
-
-# 4. Validate deployment
-shift_left table test --table-name <table_name>
-```
-
-## Testing Best Practices
-
-### 1. Test Structure
-- Each test class should inherit from `unittest.TestCase`
-- Use descriptive test method names: `test_validate_config_missing_sections`
-- Group related tests in the same class
-- Use `@classmethod` setup/teardown for expensive operations
-
-### 2. Mocking Guidelines
-```python
-@patch('shift_left.cli_commands.project.get_config')
-def test_with_config(self, mock_get_config):
-    mock_get_config.return_value = test_config
-    # Test implementation
-
-@patch('shift_left.cli_commands.project.subprocess.run')
-def test_git_command(self, mock_subprocess):
-    mock_subprocess.return_value = MagicMock(
-        stdout="output", stderr="", returncode=0
-    )
-    # Test git integration
-```
-
-### 3. Test Data Management
-- Store realistic test data in `tests/data/`
-- Use YAML for configuration test data
-- Create separate directories for different project types (ksql-project, spark-project, etc.)
-
-### 4. Configuration Testing
-- Always test both valid and invalid configurations
-- Test placeholder detection and replacement
-- Test data type validation
-- Test missing required fields
-
-### 5. Git Integration Testing
-- Mock subprocess calls for git commands
-- Test both success and failure scenarios
-- Verify file output generation and content
-- Test different file filters and branch comparisons
-
-## Dependencies & Technology Stack
-
-### Core Dependencies
-- **Typer**: CLI framework with rich features
-- **PyYAML**: Configuration file parsing
-- **Requests**: HTTP client for Confluent Cloud API
-- **Rich**: Terminal output formatting
-- **Jinja2**: Template processing for dynamic SQL generation
-
-### Development Dependencies
-- **pytest**: Alternative testing framework
-- **unittest.mock**: Mocking for testing
-- **typing-extensions**: Extended type hinting support
-
-### LLM Integration
-- **OpenAI API**: For GPT-based translation agents
-- **vLLM**: For local model deployment and inference
-- **Anthropic**: For Claude-based agents (when configured)
-
-## Environment Setup
-
-### Configuration Files
-- `config.yaml`: Main configuration file (use template from `core/templates/`)
-- Environment variables: `CONFIG_FILE`, `PIPELINES`, `SRC_FOLDER`, `STAGING`
-
-### Required Sections in config.yaml
-- `kafka`: Source Kafka cluster configuration
-- `confluent_cloud`: Confluent Cloud API settings
-- `flink`: Flink compute pool and database settings
-- `app`: Application-specific settings and logging
-
-## Common Patterns & Anti-Patterns
-
-### ✅ Good Practices
-- Use configuration validation before operations
-- Implement comprehensive error handling
-- Use type hints and docstrings
-- Mock external dependencies in tests
-- Store test data in dedicated fixtures
-- Use descriptive variable and function names
-- Properly handle git repository state and errors
-- Filter files appropriately for deployment scope
-
-### ❌ Anti-Patterns
-- Direct file operations without error handling
-- Hardcoded configuration values
-- Missing type annotations
-- Incomplete test coverage
-- Direct external API calls in unit tests
-- Recursive function calls due to naming conflicts
-- Assuming git repository exists without validation
-- Deploying all files instead of using selective deployment
-
-## Release Process
-
-### Version Management
-- Update `CHANGELOG.md` with new features and fixes
-- Follow semantic versioning (major.minor.patch)
-- Document breaking changes and migration paths
-- Tag releases with comprehensive release notes
-
-### Testing Before Release
-- Run full test suite: `uv run pytest tests/`
-- Test CLI commands with realistic data
-- Verify LLM agent functionality with sample inputs
-
-## Contributing Guidelines
-
-### Code Review Checklist
-- [ ] Type hints and docstrings added
-- [ ] Tests added for new functionality
-- [ ] Configuration validation updated if needed
-- [ ] Error handling implemented
-- [ ] Logging added for debugging
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated
-
-### Git Workflow
-- Use descriptive commit messages
-- Create feature branches for new functionality
-- Include tests in the same commit as features
-- Update documentation with code changes
-
-## Troubleshooting Common Issues
-
-### Configuration Issues
-- Use `validate-config` command to check configuration
-- Check for placeholder values that need replacement
-- Verify required sections and fields are present
-
-### Testing Issues
-- Use mocking for external dependencies
-- Check test data paths and permissions
-- Mock git operations for consistent testing
-
-### Git Integration Issues
-- Ensure working directory is a git repository
-- Verify branch names exist before comparison
-- Handle cases where no files match the filter
-- Check git command permissions and availability
-
-### LLM Agent Issues
-- Verify API keys and endpoints in configuration
-- Check prompt templates for syntax errors
-- Validate input data format and structure
-- Monitor token usage and rate limits 
+## Environment Variables
+- PIPELINES: Main pipeline directory path
+- SRC_FOLDER: Source SQL files directory  
+- STAGING: Staging area for migrations
+- CONFIG_FILE: Configuration file path

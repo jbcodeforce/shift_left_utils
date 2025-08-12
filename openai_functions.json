@@ -1,0 +1,45 @@
+[
+  {
+    "name": "run_shift_left_command",
+    "description": "Execute shift_left CLI commands for Flink project management, SQL migration, and pipeline deployment",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The shift_left command to execute"
+        },
+        "subcommand": {
+          "type": "string", 
+          "enum": ["project", "table", "pipeline"],
+          "description": "The main subcommand category"
+        },
+        "action": {
+          "type": "string",
+          "description": "The specific action to perform (init, deploy, migrate, etc.)"
+        },
+        "args": {
+          "type": "object",
+          "description": "Command arguments and options",
+          "properties": {
+            "project_name": {"type": "string"},
+            "project_path": {"type": "string"},
+            "project_type": {"type": "string", "enum": ["kimball", "data_product"]},
+            "table_name": {"type": "string"},
+            "table_path": {"type": "string"},
+            "sql_file": {"type": "string"},
+            "source_type": {"type": "string", "enum": ["ksql", "spark", "dbt"]},
+            "inventory_path": {"type": "string"},
+            "pipeline_path": {"type": "string"},
+            "compute_pool_id": {"type": "string"},
+            "validate": {"type": "boolean"},
+            "recursive": {"type": "boolean"},
+            "dml_only": {"type": "boolean"},
+            "parallel": {"type": "boolean"}
+          }
+        }
+      },
+      "required": ["subcommand", "action"]
+    }
+  }
+]

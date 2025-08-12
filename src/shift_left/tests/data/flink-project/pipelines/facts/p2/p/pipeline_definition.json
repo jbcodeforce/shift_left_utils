@@ -1,0 +1,35 @@
+{
+   "table_name": "p",
+   "product_name": "p2",
+   "type": "fact",
+   "dml_ref": "pipelines/facts/p2/p/sql-scripts/dml.p.sql",
+   "ddl_ref": "pipelines/facts/p2/p/sql-scripts/ddl.p.sql",
+   "path": "pipelines/facts/p2/p",
+   "state_form": "Stateless",
+   "parents": [
+      {
+         "table_name": "z",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+         "path": "pipelines/intermediates/p2/z",
+         "state_form": "Stateless",
+         "parents": [],
+         "children": [
+            {
+               "table_name": "p",
+               "product_name": "p2",
+               "type": "fact",
+               "dml_ref": "pipelines/facts/p2/p/sql-scripts/dml.p.sql",
+               "ddl_ref": "pipelines/facts/p2/p/sql-scripts/ddl.p.sql",
+               "path": "pipelines/facts/p2/p",
+               "state_form": "Stateless",
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": []
+}

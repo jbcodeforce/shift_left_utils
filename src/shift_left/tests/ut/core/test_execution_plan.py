@@ -166,7 +166,7 @@ class TestExecutionPlan(BaseUT):
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running should start nodes src_y, y, z, d, c, p, e and f")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-src-x", "dev-p2-dml-x", "dev-p2-dml-src-b", "dev-p2-dml-b"]:  
+            if statement_name in ["dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-src-b", "dev-usw2-p2-dml-b"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
@@ -215,7 +215,7 @@ class TestExecutionPlan(BaseUT):
         print("\n--> test_build_execution_plan_for_leaf_table_e_while_some_ancestors_not_running should start nodes  src_b, b, c, e")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-src-x", "dev-p2-dml-x", "dev-p2-dml-z", "dev-p2-dml-src-y", "dev-p2-dml-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-z", "dev-usw2-p2-dml-src-y", "dev-usw2 -p2-dml-y"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
@@ -235,7 +235,7 @@ class TestExecutionPlan(BaseUT):
             execute_plan=False
         )
         print(f"{summary}")
-        assert len(execution_plan.nodes) == 9
+        assert len(execution_plan.nodes) == 11
         for node in execution_plan.nodes:
             if node.table_name in ["src_x", "x", "src_y", "y", "z"]: 
                 assert node.to_run is False
@@ -309,7 +309,7 @@ class TestExecutionPlan(BaseUT):
         print("\n--> test_build_execution_plan_for_table_z_ancestor_running_restart_children_of_z_only should start node z, d,f,p,c,e")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-c", "dev-p2-dml-d", "dev-p2-dml-a"]:  
+            if statement_name in ["dev-usw2-p2-dml-c", "dev-usw2-p2-dml-d", "dev-usw2-p2-dml-a"]:  
                 return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
             else:
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
@@ -400,7 +400,7 @@ class TestExecutionPlan(BaseUT):
         print("test_build_execution_plan_for_one_table_parent_not_running")
         
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
                 return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
@@ -497,7 +497,7 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_pipeline_from_product_enforce_all_tables should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
                 return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
@@ -547,7 +547,7 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_pipeline_for_non_running_sources_with_dir should get all source tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
                 return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
@@ -646,7 +646,7 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_pipeline_for_all_sources_and_children_using_dir should get all tables created for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
                 
@@ -692,7 +692,7 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_intermediate_with_children_using_dir should get all children of z")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in [ "dev-p2-dml-src-x", "dev-p2-dml-src-y", "dev-p2-dml-src-p2-a", "dev-p2-dml-src-b", "dev-p2-dml-b"]:  
+            if statement_name in [ "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-p2-a", "dev-usw2-p2-dml-src-b", "dev-usw2-p2-dml-b"]:  
                 return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
                 
@@ -789,7 +789,7 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_pipeline_for_facts_using_dir should get all tables restarted for p2")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-x", "dev-p2-dml-y", "dev-p2-dml-src-x", "dev-p2-dml-src-y"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-x", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y"]:  
                 return self._create_mock_get_statement_info(status_phase="RUNNING")
             else:
                 return self._create_mock_get_statement_info(status_phase="UNKNOWN") 
