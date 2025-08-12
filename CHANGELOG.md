@@ -1,6 +1,12 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.31
+* Add --no-ack to the pipeline undeploy command
+* Fix issue in SQL parser to avoid getting some inner join and by passing FROM in function like SUBSTRING or TRIM
+* Support region in statement name.
+* revisit some unit tests for core to be fully isolated
+
 v0.1.30
 * Separate the SQL content processing in an extension python file, with class to extend TableWorker. Documentation for recipe is modified to explain how to develop the own class.
 * Improve unit test harness framework to generate or not csv data, ensure test data match column type. Improve user feedbacks. Change command names to be: `init-unit-tests`, `run-unit-tests` and `delete-unit-tests`. 

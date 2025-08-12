@@ -240,7 +240,8 @@ class TestDeploymentManager(BaseUT):
         assert sorted_nodes[4].table_name in ["x", "y", "a", "b"]
         assert sorted_nodes[8].table_name == "z"
 
-
+    @patch('shift_left.core.deployment_mgr.report_mgr.build_simple_report')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
@@ -251,7 +252,9 @@ class TestDeploymentManager(BaseUT):
                                     mock_drop,
                                     mock_post,
                                     mock_get_status,
-                                    mock_get_compute_pool_list):
+                                    mock_get_compute_pool_list,
+                                    mock_get_statement_list,
+                                    mock_build_simple_report):
     
         
         """
@@ -265,7 +268,7 @@ class TestDeploymentManager(BaseUT):
         def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
             print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
             time.sleep(1)
-            if statement_name in ["dev-p2-dml-z", "dev-p2-dml-y", "dev-p2-dml-src-y", "dev-p2-dml-src-x", "dev-p2-dml-x","dev-p2-dml-d"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x","dev-usw2-p2-dml-d"]:  
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
                 return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
             elif "ddl" in statement_name:  
@@ -276,7 +279,7 @@ class TestDeploymentManager(BaseUT):
             
         def _get_status(statement_name: str) -> StatementInfo:
             print(f"@@@@ get status {statement_name}")
-            if statement_name in ["dev-p2-dml-src-y", "dev-p2-dml-src-x"]:  
+            if statement_name in ["dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x"]:  
                 return self._create_mock_get_statement_info(name=statement_name, status_phase="RUNNING")
             return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN")
         
@@ -290,6 +293,9 @@ class TestDeploymentManager(BaseUT):
         mock_delete.side_effect = _delete_statement
         mock_drop.side_effect = _drop_table
         mock_post.side_effect = _post_flink_statement
+        # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
+        mock_get_statement_list.return_value = {}
+        mock_build_simple_report.return_value = "mock_build_simple_report"
         summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
                                     inventory_path=self.inventory_path, 
                                     compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
