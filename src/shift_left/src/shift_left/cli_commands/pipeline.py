@@ -263,16 +263,18 @@ def report_running_statements(
 def undeploy(
         table_name:  str = typer.Option(default= None, help="The sink table name from where the undeploy will run."),
         product_name: str =  typer.Option(default= None, help="The product name to undeploy from"),
+        no_ack: bool = typer.Option(False, help="By default the undeploy will ask for confirmation. This flag will undeploy without confirmation."),
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
     print(f"Undeploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
-    print("Are you sure you want to undeploy? (y/n)")
-    answer = input()
-    if answer != "y":
-        print("Undeploy cancelled")
-        raise typer.Exit(1)
+    if not no_ack:
+        print("Are you sure you want to undeploy? (y/n)")
+        answer = input()
+        if answer != "y":
+            print("Undeploy cancelled")
+            raise typer.Exit(1)
     if table_name:
         print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
