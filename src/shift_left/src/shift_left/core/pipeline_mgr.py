@@ -99,10 +99,10 @@ def build_all_pipeline_definitions(pipeline_path: str):
     for folder in ["dimensions", "facts", "views", "intermediates", "stage", "sources", "seeds"]:
         path = Path(pipeline_path) / folder
         if path.exists():
-            count=_process_table_folder(path, pipeline_path, count)
+            count=_process_table_folder_build_pipeline_def(path, pipeline_path, count)
     if count == 0:
         # it is possible the pipeline path is not a kimball structure but a flat structure
-        count=_process_table_folder(Path(pipeline_path), pipeline_path, count)
+        count=_process_table_folder_build_pipeline_def(Path(pipeline_path), pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
     print(f"Total number of pipeline definitions created: {count}")
 
@@ -246,7 +246,7 @@ def _build_pipeline_definitions_from_sql_content(
         return ERROR_TABLE_NAME, set(), None
 
     
-def _process_table_folder(parent_folder_path, pipeline_path, count: int) -> int:
+def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, count: int) -> int:
     for sql_scripts_path in parent_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
         if sql_scripts_path.is_dir():
             dml_file_name = ""

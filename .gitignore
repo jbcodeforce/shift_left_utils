@@ -19,3 +19,4 @@ set_stage_env
 .idea/
 .gitconfig
 set_dev_env
+.vscode/launch.json

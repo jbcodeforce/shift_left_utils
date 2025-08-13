@@ -716,25 +716,38 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
             #     ancestors[parent.table_name] = parent
     ancestors[start_node.table_name] = start_node
     # List of tuple <table_name, parent> for each parent of a node, will help to count the number of incoming edges
-    # for each node in the topological sort. The ancestor dependencies has one record per table_name, parent tuple.
+    # for each node in the topological sort. The ancestor dependencies has one record per <table_name, parent> tuple.
     # a node with 3 ancestors will have 3 records in the ancestor dependencies list.
     ancestor_dependencies = []
 
-    def _add_parent_dependencies(node: FlinkStatementNode, node_map: dict, new_ancestors: dict) -> None:
-        """Add the <table-name, parent> tuple to the ancestor dependencies list. Update the node_map to be
-        sur it gets alls the static info of the node and its parents"""
-        enriched_node = _get_static_info_update_node_map(node, node_map)
-        if enriched_node:
+    def _add_parent_dependencies(node: FlinkStatementNode, 
+                                 node_map: dict, 
+                                 new_ancestors: dict,
+                                 ancestor_dependencies: list) -> None:
+        """Iteratively add <table-name, parent> tuples to ancestor_dependencies.
+        Also update node_map and new_ancestors with static info for encountered parents.
+        """
+        stack = [node]
+        seen = set()
+        while stack:
+            current_node = stack.pop()
+            if current_node.table_name in seen:
+                continue
+            seen.add(current_node.table_name)
+            enriched_node = _get_static_info_update_node_map(current_node, node_map)
+            if not enriched_node:
+                continue
             for parent in enriched_node.parents:
-                ancestor_dependencies.append((node.table_name, parent))
-                if parent.table_name not in new_ancestors:
+                ancestor_dependencies.append((enriched_node.table_name, parent))
+                if parent.table_name not in new_ancestors.keys():
                     new_ancestors[parent.table_name] = parent
-                _add_parent_dependencies(parent, node_map, new_ancestors)
+                stack.append(parent)
 
 
     new_ancestors = ancestors.copy()
-    for node in ancestors.values():
-        _add_parent_dependencies(node, node_map, new_ancestors)
+    #for node in ancestors.values():
+    node = ancestors[start_node.table_name]
+    _add_parent_dependencies(node, node_map, new_ancestors, ancestor_dependencies)
     ancestors.update(new_ancestors)
     return ancestors, ancestor_dependencies
 
@@ -743,7 +756,7 @@ def _build_topological_sorted_parents(current_nodes: List[FlinkStatementNode],
                                       node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG of the current node parents
     the node_map is a hashmap of table name and direct static relationships of the table with its parents and children
-    For each node compute the subgraph to reach other nodes to compute the dependencies weights.
+    For each node, navigate the subgraph to reach other nodes to compute the dependencies weights.
     """
     ancestor_nodes = {}
     ancestor_dependencies = []
