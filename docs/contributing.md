@@ -105,6 +105,7 @@ The following core principles for the management of this code is using the `gitf
     ```sh
     git checkout -b  v0.1.28 develop
     ```
+1. Modify the cli.py to change the version number so `shift_left version` will return the matching version. Change the `pyproject.toml` version number and build the wheel (see [below section](#build)). Remove the `.gitignore` under the dist folder and remove the older wheel (may be keep the last 10).
 
 1. Merge into main:
     ```bash
