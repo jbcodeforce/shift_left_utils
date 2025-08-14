@@ -149,7 +149,7 @@ class FlinkStatementNode(BaseModel):
 
     def is_running(self) -> bool:
         if self.existing_statement_info and self.existing_statement_info.status_phase:
-            return (self.existing_statement_info.status_phase == "RUNNING" or self.existing_statement_info.status_phase == "COMPLETED")
+            return (self.existing_statement_info.status_phase in ["RUNNING", "PENDING", "COMPLETED"])
         else:
             return False
     

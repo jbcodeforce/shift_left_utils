@@ -1,6 +1,10 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.32
+* Fix in pipeline_definition creation to improve SQL parser to get CREATE TABLE when searching for table name.
+* Remove recursivity in one search for parent in pipeline_mgr, add more unit tests.
+
 v0.1.31
 * Add --no-ack to the pipeline undeploy command
 * Fix issue in SQL parser to avoid getting some inner join and by passing FROM in function like SUBSTRING or TRIM

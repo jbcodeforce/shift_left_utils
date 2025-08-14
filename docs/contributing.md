@@ -106,11 +106,13 @@ The following core principles for the management of this code is using the `gitf
     git checkout -b  v0.1.28 develop
     ```
 1. Modify the cli.py to change the version number so `shift_left version` will return the matching version. Change the `pyproject.toml` version number and build the wheel (see [below section](#build)). Remove the `.gitignore` under the dist folder and remove the older wheel (may be keep the last 10).
-
+1. Update the changelog.md file too, looking at the last commits with `git log`, `git diff main..develop`
+1. Commit the change
 1. Merge into main:
     ```bash
     git checkout main
     git merge --no-ff v0.1.28
+    git push
     ```
 1. Tag the main branch: 
     ```sh
@@ -121,8 +123,9 @@ The following core principles for the management of this code is using the `gitf
     ```bash
     git checkout develop
     git merge --no-ff v0.1.28
+    git push
     ```
-1. In gihub, create a new release referencing the newly created tag
+1. In gihub, create a new release referencing the newly created tag, 
 1. Delete the release branch: 
     ```sh
     git branch -d v0.1.28

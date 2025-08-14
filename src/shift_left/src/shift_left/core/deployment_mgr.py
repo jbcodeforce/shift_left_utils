@@ -441,7 +441,7 @@ def full_pipeline_undeploy_from_table(
 def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, compute_pool_id: str = None) -> str:
     """
     To undeploy we need to build an integrated execution plan for all the tables in the product.
-    Undeploy in the reverse order of the execution plan, but keep table that have other product as children
+    Undeploy in the reverse order of the execution plan, but keep table that have other product(s) as children
     """
     compute_pool_id = compute_pool_id or get_config()['flink']['compute_pool_id']
     inventory_path = inventory_path or os.getenv("PIPELINES")
@@ -453,7 +453,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     for table_name, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
-        if table_ref.product_name == product_name:
+        if table_ref and table_ref.product_name == product_name:
             node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
@@ -474,13 +474,17 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
         execution_plan.nodes.reverse()
         print(f"Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
         for node in execution_plan.nodes:
-            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {'RUNNING' if node.is_running() else 'NOT RUNNING'} {node.compute_pool_id}")
+            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {'EXISTS' if node.existing_statement_info  else 'NOT EXISTS'} {node.compute_pool_id}")
             
-        count=0
         trace = f"Full pipeline delete from product {product_name}\n"
         
         # Filter nodes that need to be processed
-        nodes_to_drop = [node for node in execution_plan.nodes if node.product_name == product_name and node.is_running()]
+        nodes_to_drop = [node for node in execution_plan.nodes if (node.product_name == product_name 
+                                                                and (node.is_running() or node.existing_statement_info))]  # 08-14 path to remove ant node
+        # nodes_to_drop = [node for node in execution_plan.nodes if node.product_name == product_name]
+        count = len(nodes_to_drop)
+        if count == 0:
+            return "No table found for product " + product_name + " in inventory " + inventory_path
         
         # Get number of CPU cores for max workers
         max_workers = multiprocessing.cpu_count()
@@ -501,7 +505,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
                     results.append(f"Failed to process {node.table_name}: {str(e)}\n")
         
         trace += "".join(results)
-        count = len(nodes_to_drop)
+        
                 
     execution_time = int(time.perf_counter() - start_time)
     print(f"Done in {execution_time} seconds to undeploy pipeline from product {product_name}")
@@ -1188,7 +1192,7 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
                         _search_parent_from_current_update_node_map(node_map, node_p, visited_nodes)
                         queue.append(node_p)  # Add new nodes to the queue for processing
                     else:
-                        logger.warning(f"Data consistency issue for {p.path}: no pipeline definition found or wrong reference in {current.table_name}. The execution plan may not deploy successfully")
+                        logger.error(f"Data consistency issue for {p.path}: no pipeline definition found or wrong reference in {current.table_name}. The execution plan may not deploy successfully")
        
 
     def _search_children_from_current(node_map: dict[str, FlinkStatementNode], 
@@ -1203,11 +1207,15 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
             if c.table_name not in node_map:
                 # a child may have been a parent of another node so do not need to process it
                 pipe_def = read_pipeline_definition_from_file( c.path + "/" + PIPELINE_JSON_FILE_NAME)
-                node_c = pipe_def.to_node()
-                if node_c not in visited_nodes:
-                    # process the child's parents to be sure they are considered before the child
-                    _search_parent_from_current_update_node_map(node_map, node_c, visited_nodes)
-                    queue.append(node_c)
+                if not pipe_def:
+                    logger.error(f"Data consistency issue for {c.path}: no pipeline definition found or wrong reference in {c.table_name}. The execution plan may not deploy successfully")
+                    continue
+                else:
+                    node_c = pipe_def.to_node()
+                    if node_c not in visited_nodes:
+                        # process the child's parents to be sure they are considered before the child
+                        _search_parent_from_current_update_node_map(node_map, node_c, visited_nodes)
+                        queue.append(node_c)
         
     _search_parent_from_current_update_node_map(node_map, current_node, visited_nodes)
     queue.append(current_node)  # need to process children of current node
