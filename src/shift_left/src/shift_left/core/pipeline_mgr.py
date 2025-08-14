@@ -29,6 +29,7 @@ from shift_left.core.utils.file_search import (
     get_table_ref_from_inventory,
     get_or_build_inventory,
     get_table_type_from_file_path,
+    create_folder_if_not_exist,
     read_pipeline_definition_from_file
 )
 
@@ -164,8 +165,31 @@ def delete_all_metada_files(root_folder: str):
 
 
 
+def init_integration_test_for_pipeline(table_name: str, pipeline_path: str):
+    """
+    For the given table name, navigate its ancestors and create an insert statement for the table without more parent,
+    and for parent with more parents, generate a validation statement.
+    """
+    table_def: FlinkTablePipelineDefinition = get_pipeline_definition_for_table(table_name, pipeline_path)
+    where_to_save_test_files = f"{pipeline_path}/tests/{table_def.product_name}/{table_name}"
+    create_folder_if_not_exist(f"{pipeline_path}/tests")
+    create_folder_if_not_exist(f"{pipeline_path}/tests/{table_def.product_name}")
+    _process_table_for_integration_test(table_def, where_to_save_test_files)
+    print(f"Test files saved in {where_to_save_test_files}")
 
 # ---- Private APIs ---- 
+
+def _process_table_for_integration_test(table_def: FlinkTablePipelineDefinition, where_to_save_test_files: str):
+    if len(table_def.parents) == 0:
+        # insert statement
+        print(f"Insert statement for {table_def.table_name}")
+        pass
+    else:
+        # generate a validation statement
+        print(f"Validation statement for {table_def.table_name}")
+        # recursively call the function for the parent 
+        for parent in table_def.parents:
+            _process_table_for_integration_test(parent, where_to_save_test_files)
 
 
 def _build_pipeline_definitions_from_sql_content(
