@@ -701,7 +701,11 @@ class TestExecutionPlan(BaseUT):
         """
         print("test_deploy_intermediate_with_children_using_dir should get all children of z")
         def mock_statement(statement_name: str) -> StatementInfo:
-            if statement_name in [ "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-p2-a", "dev-usw2-p2-dml-src-b", "dev-usw2-p2-dml-b"]:  
+            if statement_name in [ "dev-usw2-p2-dml-src-x", 
+                                "dev-usw2-p2-dml-src-y", 
+                                "dev-usw2-p2-dml-src-p2-a", 
+                                "dev-usw2-p2-dml-src-b", 
+                                "dev-usw2-p2-dml-b"]:  
                 return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
                 
@@ -726,10 +730,10 @@ class TestExecutionPlan(BaseUT):
         print("Table\t\tStatement\t\tTo Restart")
         for table in report.tables:
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
-            if table.table_name not in ["src_p2_a", "src_b", "src_x", "src_y", "b"]:
-                assert table.to_restart is True
-            else:
+            if table.table_name in ["src_p2_a", "src_b", "src_x", "src_y", "b"]:
                 assert table.to_restart is False
+            else:
+                assert table.to_restart is True
 
     
     @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')

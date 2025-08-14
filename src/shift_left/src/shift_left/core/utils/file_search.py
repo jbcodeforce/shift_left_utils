@@ -238,9 +238,14 @@ def from_absolute_to_pipeline(file_or_folder_name) -> str:
 
     if not str_file_path or str_file_path.startswith(PIPELINE_FOLDER_NAME):
         return str_file_path
-        
-    index = str_file_path.find(PIPELINE_FOLDER_NAME)
-    return str_file_path[index:] if index != -1 else str_file_path
+
+    # Use path components to avoid partial matches like 'sl_pipelines13'
+    parts = str_file_path.split(os.sep)
+    try:
+        idx = parts.index(PIPELINE_FOLDER_NAME)
+    except ValueError:
+        return str_file_path
+    return os.path.join(*parts[idx:])
 
 def from_pipeline_to_absolute(file_or_folder_name: str) -> str:
     """Convert pipeline-relative path to absolute path.
