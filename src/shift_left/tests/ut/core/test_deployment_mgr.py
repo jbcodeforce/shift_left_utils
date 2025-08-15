@@ -388,6 +388,321 @@ class TestDeploymentManager(BaseUT):
                                         compute_pool_id="lfcp-121")
 
 
+    @patch('shift_left.core.deployment_mgr._drop_node_worker')
+    @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_statement_node_map')
+    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
+    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
+    @patch('shift_left.core.deployment_mgr.get_config')
+    def test_full_pipeline_undeploy_from_product_success(
+        self,
+        mock_get_config,
+        mock_get_inventory,
+        mock_read_pipeline,
+        mock_build_node_map,
+        mock_build_sorted_parents,
+        mock_build_execution_plan,
+        mock_drop_worker
+    ):
+        """Test successful pipeline undeployment from product.
+         Two tables belong to the target product and are running, both should be dropped
+        """
+        print("test_full_pipeline_undeploy_from_product_success")
+        
+        # Setup mocks
+        mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
+        
+        # Mock inventory with tables from target product and other products
+        mock_inventory = {
+            'table1': {
+                'table_name': 'table1',
+                'product_name': 'test_product',
+                'table_folder_name': 'table1_folder',
+                'type': 'source'
+            },
+            'table2': {
+                'table_name': 'table2', 
+                'product_name': 'test_product',
+                'table_folder_name': 'table2_folder',
+                'type': 'fact'
+            },
+            'table3': {
+                'table_name': 'table3',
+                'product_name': 'other_product', 
+                'table_folder_name': 'table3_folder',
+                'type': 'source'
+            }
+        }
+        mock_get_inventory.return_value = mock_inventory
+        
+        # Mock pipeline definitions that return nodes
+        mock_pipeline_def = MagicMock()
+        mock_node1 = self._create_mock_statement_node(
+            table_name='table1',
+            product_name='test_product',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
+        )
+        mock_node1.existing_statement_info = self._create_mock_get_statement_info(
+            name='table1-dml',
+            status_phase='RUNNING'
+        )
+        
+        mock_node2 = self._create_mock_statement_node(
+            table_name='table2', 
+            product_name='test_product',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
+        )
+        mock_node2.existing_statement_info = self._create_mock_get_statement_info(
+            name='table2-dml',
+            status_phase='RUNNING'
+        )
+        
+        mock_pipeline_def.to_node.side_effect = [mock_node1, mock_node2]
+        mock_read_pipeline.return_value = mock_pipeline_def
+        
+        # Mock node map building
+        mock_node_map = {
+            'table1': mock_node1,
+            'table2': mock_node2
+        }
+        mock_build_node_map.return_value = mock_node_map
+        
+        # Mock topological sorting
+        mock_build_sorted_parents.return_value = [mock_node1, mock_node2]
+        
+        # Mock execution plan
+        mock_execution_plan = MagicMock()
+        mock_execution_plan.nodes = [mock_node2, mock_node1]  # Reverse order for undeploy
+        mock_build_execution_plan.return_value = mock_execution_plan
+        
+        # Mock drop worker to return success messages
+        mock_drop_worker.return_value = "Dropped table successfully\n"
+        
+        # Execute the function
+        result = dm.full_pipeline_undeploy_from_product(
+            product_name='test_product',
+            inventory_path='/test/inventory/path',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
+        )
+        
+        # Verify the result
+        self.assertIsInstance(result, str)
+        self.assertIn("Full pipeline delete from product test_product", result)
+        self.assertIn("Dropped table successfully", result)
+        
+        # Verify mock calls
+        mock_get_inventory.assert_called_once_with('/test/inventory/path', '/test/inventory/path', False)
+        self.assertEqual(mock_read_pipeline.call_count, 2)  # Called for table1 and table2
+        mock_build_node_map.assert_called()
+        mock_build_sorted_parents.assert_called_once()
+        mock_build_execution_plan.assert_called_once()
+        
+        # Verify drop worker was called for both nodes
+        self.assertEqual(mock_drop_worker.call_count, 2)
+
+    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
+    @patch('shift_left.core.deployment_mgr.get_config')
+    def test_full_pipeline_undeploy_from_product_no_tables_found(
+        self,
+        mock_get_config,
+        mock_get_inventory
+    ):
+        """Test when no tables are found for the specified product."""
+        print("test_full_pipeline_undeploy_from_product_no_tables_found")
+        
+        # Setup mocks
+        mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
+        
+        # Mock inventory with no tables for target product
+        mock_inventory = {
+            'table1': {
+                'table_name': 'table1',
+                'product_name': 'other_product',
+                'table_folder_name': 'table1_folder'
+            }
+        }
+        mock_get_inventory.return_value = mock_inventory
+        
+        # Execute the function
+        result = dm.full_pipeline_undeploy_from_product(
+            product_name='test_product',
+            inventory_path='/test/inventory/path'
+        )
+        
+        # Verify the result - when no tables found for product, returns empty trace
+        self.assertEqual(result, "")
+        mock_get_inventory.assert_called_once_with('/test/inventory/path', '/test/inventory/path', False)
+
+    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
+    @patch('shift_left.core.deployment_mgr.get_config')
+    def test_full_pipeline_undeploy_from_product_empty_inventory(
+        self,
+        mock_get_config,
+        mock_get_inventory
+    ):
+        """Test when inventory is empty."""
+        print("test_full_pipeline_undeploy_from_product_empty_inventory")
+        
+        # Setup mocks
+        mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
+        mock_get_inventory.return_value = {}
+        
+        # Execute the function
+        result = dm.full_pipeline_undeploy_from_product(
+            product_name='test_product',
+            inventory_path='/test/inventory/path'
+        )
+        
+        # Verify the result - empty inventory returns empty trace
+        self.assertEqual(result, "")
+
+    @patch('shift_left.core.deployment_mgr._drop_node_worker')
+    @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_statement_node_map')
+    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
+    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
+    @patch('shift_left.core.deployment_mgr.get_config')
+    def test_full_pipeline_undeploy_from_product_no_nodes_to_drop(
+        self,
+        mock_get_config,
+        mock_get_inventory,
+        mock_read_pipeline,
+        mock_build_node_map,
+        mock_build_sorted_parents,
+        mock_build_execution_plan,
+        mock_drop_worker
+    ):
+        """Test when tables exist for product but none need to be dropped (not running).
+        Tables exist but have status "UNKNOWN" (not running), so they don't qualify for deletion
+        """
+
+        print("test_full_pipeline_undeploy_from_product_no_nodes_to_drop")
+        
+        # Setup mocks
+        mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
+        
+        # Mock inventory with tables for target product
+        mock_inventory = {
+            'table1': {
+                'table_name': 'table1',
+                'product_name': 'test_product',
+                'table_folder_name': 'table1_folder',
+                'type': 'source'
+            }
+        }
+        mock_get_inventory.return_value = mock_inventory
+        
+        # Mock pipeline definition that returns a node
+        mock_pipeline_def = MagicMock()
+        mock_node1 = self._create_mock_statement_node(
+            table_name='table1',
+            product_name='test_product'
+        )
+        # Set node status to UNKNOWN so it won't be dropped
+        mock_node1.existing_statement_info = self._create_mock_get_statement_info(
+            name='table1-dml',
+            status_phase='UNKNOWN'
+        )
+        
+        mock_pipeline_def.to_node.return_value = mock_node1
+        mock_read_pipeline.return_value = mock_pipeline_def
+        
+        # Mock node map building
+        mock_node_map = {'table1': mock_node1}
+        mock_build_node_map.return_value = mock_node_map
+        
+        # Mock topological sorting
+        mock_build_sorted_parents.return_value = [mock_node1]
+        
+        # Mock execution plan
+        mock_execution_plan = MagicMock()
+        mock_execution_plan.nodes = [mock_node1]
+        mock_build_execution_plan.return_value = mock_execution_plan
+        
+        # Execute the function
+        result = dm.full_pipeline_undeploy_from_product(
+            product_name='test_product',
+            inventory_path='/test/inventory/path'
+        )
+        
+        # Verify the result - should return the "No table found" message when no nodes to drop
+        self.assertEqual(result, "No table found for product test_product in inventory /test/inventory/path")
+        
+        # Verify mocks called but drop worker should not be called
+        mock_get_inventory.assert_called_once()
+        mock_read_pipeline.assert_called_once()
+        mock_drop_worker.assert_not_called()
+
+    @patch('shift_left.core.deployment_mgr._drop_node_worker')
+    @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_statement_node_map')
+    @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
+    @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
+    @patch('shift_left.core.deployment_mgr.get_config')
+    def test_full_pipeline_undeploy_from_product_with_errors(
+        self,
+        mock_get_config,
+        mock_get_inventory,
+        mock_read_pipeline,
+        mock_build_node_map,
+        mock_build_sorted_parents,
+        mock_build_execution_plan,
+        mock_drop_worker
+    ):
+        """Test pipeline undeployment with some failures."""
+        print("test_full_pipeline_undeploy_from_product_with_errors")
+        
+        # Setup mocks similar to success test
+        mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
+        
+        mock_inventory = {
+            'table1': {
+                'table_name': 'table1',
+                'product_name': 'test_product',
+                'table_folder_name': 'table1_folder',
+                'type': 'source'
+            }
+        }
+        mock_get_inventory.return_value = mock_inventory
+        
+        mock_pipeline_def = MagicMock()
+        mock_node1 = self._create_mock_statement_node(
+            table_name='table1',
+            product_name='test_product'
+        )
+        mock_node1.existing_statement_info = self._create_mock_get_statement_info(
+            name='table1-dml',
+            status_phase='RUNNING'
+        )
+        
+        mock_pipeline_def.to_node.return_value = mock_node1
+        mock_read_pipeline.return_value = mock_pipeline_def
+        
+        mock_node_map = {'table1': mock_node1}
+        mock_build_node_map.return_value = mock_node_map
+        mock_build_sorted_parents.return_value = [mock_node1]
+        
+        mock_execution_plan = MagicMock()
+        mock_execution_plan.nodes = [mock_node1]
+        mock_build_execution_plan.return_value = mock_execution_plan
+        
+        # Mock drop worker to raise an exception
+        mock_drop_worker.side_effect = Exception("Connection failed")
+        
+        # Execute the function
+        result = dm.full_pipeline_undeploy_from_product(
+            product_name='test_product',
+            inventory_path='/test/inventory/path'
+        )
+        
+        # Verify the result contains error message
+        self.assertIsInstance(result, str)
+        self.assertIn("Full pipeline delete from product test_product", result)
+        self.assertIn("Failed to process table1: Connection failed", result)
+
        
 if __name__ == '__main__':
     unittest.main()

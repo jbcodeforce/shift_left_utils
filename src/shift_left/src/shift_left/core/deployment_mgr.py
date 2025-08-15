@@ -474,13 +474,16 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
         execution_plan.nodes.reverse()
         print(f"Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
         for node in execution_plan.nodes:
-            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {'EXISTS' if node.existing_statement_info  else 'NOT EXISTS'} {node.compute_pool_id}")
+            state = "EXISTS"
+            if node.existing_statement_info == None or node.existing_statement_info.status_phase == "UNKNOWN":
+                state = "NOT EXISTS"
+            print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {state} {node.compute_pool_id}")
             
         trace = f"Full pipeline delete from product {product_name}\n"
         
         # Filter nodes that need to be processed
         nodes_to_drop = [node for node in execution_plan.nodes if (node.product_name == product_name 
-                                                                and (node.is_running() or node.existing_statement_info))]  # 08-14 path to remove ant node
+                                                                and (node.is_running() or node.existing_statement_info.status_phase != "UNKNOWN"))]  # 08-14 path to remove ant node
         # nodes_to_drop = [node for node in execution_plan.nodes if node.product_name == product_name]
         count = len(nodes_to_drop)
         if count == 0:

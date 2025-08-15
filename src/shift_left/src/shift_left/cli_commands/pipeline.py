@@ -282,6 +282,9 @@ def undeploy(
         product_name = product_name.lower()
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
+    else:
+        print(f"[red]Error: either table-name or product-name must be provided[/red]")
+        raise typer.Exit(1)
     print(result)
 
 

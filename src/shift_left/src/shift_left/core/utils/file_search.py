@@ -295,7 +295,6 @@ def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTab
             return content
     except Exception as e:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
-        #return FlinkStatementExecutionPlan()
         return None
 
 def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):

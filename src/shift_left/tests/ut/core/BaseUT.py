@@ -112,10 +112,17 @@ class BaseUT(unittest.TestCase):
         compute_pool_id: str = ""
     ) -> FlinkStatementNode:
         """Create a mock FlinkStatementNode object."""
-        return FlinkStatementNode(
+        node = FlinkStatementNode(
             table_name=table_name,
             product_name=product_name,
             dml_statement_name=dml_statement_name,
             ddl_statement_name=ddl_statement_name,
             compute_pool_id=compute_pool_id
         )
+        # Initialize with default statement info if not set
+        if not hasattr(node, 'existing_statement_info') or node.existing_statement_info is None:
+            node.existing_statement_info = self._create_mock_get_statement_info(
+                name=dml_statement_name,
+                status_phase="UNKNOWN"
+            )
+        return node
