@@ -72,7 +72,11 @@ def build_folder_structure_for_table(table_folder_name: str,
     create_folder_if_not_exist(f"{table_folder}/tests")
     internal_table_name=get_long_table_name(table_folder_name, product_name, table_type)
 
-    _create_makefile(internal_table_name, table_folder, config["kafka"]["cluster_type"])
+    cluster_type = get_config().get('kafka').get('cluster_type')
+    cloud_region = get_config().get('confluent_cloud').get('region')
+    abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')
+    prefix=cluster_type + '-' + abbv_region + '-' + product_name
+    _create_makefile(internal_table_name, table_folder, prefix)
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder, product_name)
     _create_dml_skeleton(internal_table_name, table_folder, product_name)
@@ -171,9 +175,14 @@ def update_makefile_in_folder(pipeline_folder: str, table_name: str):
         return
     existing_path = inventory[table_name]["table_folder_name"]
     table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
+    product_name=existing_path.split("/")[-2]
+    cluster_type = get_config().get('kafka').get('cluster_type')
+    cloud_region = get_config().get('confluent_cloud').get('region')
+    abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')
+    prefix=cluster_type + '-' + abbv_region + '-' + product_name
     _create_makefile( table_name, 
                     table_folder, 
-                    get_config()["kafka"]["cluster_type"])
+                    prefix)
 
 def update_all_makefiles_in_folder(folder_path: str) -> int:
     """
@@ -186,7 +195,10 @@ def update_all_makefiles_in_folder(folder_path: str) -> int:
             product_name=os.path.dirname(root).split("/")[-1]
             table_type = get_table_type_from_file_path(root)
             table_name=get_long_table_name(table_name, product_name, table_type)
-            prefix=get_config()["kafka"]["cluster_type"] + "-" + product_name
+            cluster_type = get_config().get('kafka').get('cluster_type')
+            cloud_region = get_config().get('confluent_cloud').get('region')
+            abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')
+            prefix=cluster_type + '-' + abbv_region + "-" + product_name
             _create_makefile(table_name, root, prefix)
             count+=1
     logger.info(f"Updated {count} Makefiles for tables in {folder_path}")
