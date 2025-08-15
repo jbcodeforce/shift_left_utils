@@ -550,7 +550,8 @@ def _drop_node_worker(node: FlinkStatementNode) -> str:
     """Worker function to drop a single node's table and statements."""
     try:
         print(f"Dropping table {node.table_name}")
-        statement_mgr.delete_statement_if_exists(node.dml_statement_name)   
+        statement_mgr.delete_statement_if_exists(node.dml_statement_name) 
+        statement_mgr.delete_statement_if_exists(node.ddl_statement_name)   
         rep = statement_mgr.drop_table(node.table_name, node.compute_pool_id)
         return f"Dropped table {node.table_name} with result: {rep}\n"
     except Exception as e:
