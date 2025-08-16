@@ -383,7 +383,7 @@ class TestDeploymentManager(BaseUT):
 
         mock_delete.return_value = "deleted"
         mock_post.side_effect = mock_post_statement
-        path_to_sql_file = os.getenv("HOME") + "/Code/customers/mc/data-platform-flink/pipelines/alter_table_debezium_avro_dev1.sql"
+        path_to_sql_file = os.getenv("PIPELINES") + "/alter_table_avro_debezium.sql"
         dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file, 
                                         compute_pool_id="lfcp-121")
 

@@ -455,7 +455,7 @@ class TestStatementManager(BaseUT):
     @patch('shift_left.core.statement_mgr.datetime')
     @patch('shift_left.core.statement_mgr.os.path.exists')
     @patch('builtins.open')
-    def test_cache_none_file_exists_but_ttl_is_expired(self, 
+    def test_cache_file_exists_but_ttl_is_expired(self, 
                 mock_open_file, mock_exists, mock_datetime,
                 MockConfluentCloudClient):
         """Test cache is None, file exists with cache above TTL - should reload from API"""

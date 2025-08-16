@@ -170,6 +170,7 @@ def init_unit_tests(
     print("#" * 30 + f" Unit tests initialization for {table_name}")
     test_mgr.init_unit_test_for_table(table_name, create_csv=create_csv)
     print("#" * 30 + f" Unit tests initialization for {table_name} completed")
+    
 @app.command()
 def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),

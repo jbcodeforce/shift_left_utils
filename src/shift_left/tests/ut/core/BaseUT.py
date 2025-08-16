@@ -96,7 +96,9 @@ class BaseUT(unittest.TestCase):
         )
         return ComputePoolList(pools=[pool_1, pool_2, pool_3])
     
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode, 
+                compute_pool_id: str,
+                pool_creation: bool) -> FlinkStatementNode:
         """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
         
         node.compute_pool_id = compute_pool_id
