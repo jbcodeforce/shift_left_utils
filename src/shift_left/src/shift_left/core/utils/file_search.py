@@ -11,7 +11,7 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
-from shift_left.core.models.flink_statement_model import FlinkStatementNode
+from shift_left.core.models.flink_statement_model import FlinkStatementNode, FlinkStatementComplexity
 from shift_left.core.utils.naming_convention import DmlNameModifier
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
@@ -43,6 +43,8 @@ class FlinkTableReference(InfoNode):
             return NotImplemented
         return self.table_name == other.table_name
 
+
+
 class FlinkTablePipelineDefinition(InfoNode):
     """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
     
@@ -50,7 +52,7 @@ class FlinkTablePipelineDefinition(InfoNode):
     For sink tables, children will be empty.
     """
     path: str = Field(default="", description="path to the table")
-    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    complexity: Optional[FlinkStatementComplexity] = Field(default=FlinkStatementComplexity(), description="Complexity of the statement")
     parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
     children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
 
@@ -73,7 +75,7 @@ class FlinkTablePipelineDefinition(InfoNode):
                                type=self.type,
                                ddl_statement_name=ddl_statement_name,
                                ddl_ref=self.ddl_ref,
-                               upgrade_mode=self.state_form
+                               upgrade_mode=self.complexity.state_form
                                )
         _apply_naming_convention(r)
         
@@ -295,6 +297,7 @@ def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTab
             return content
     except Exception as e:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
+        print(f"processing {file_name} got {e}, ... try to continue")
         return None
 
 def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):

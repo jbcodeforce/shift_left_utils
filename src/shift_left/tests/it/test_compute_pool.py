@@ -63,7 +63,7 @@ class TestComputePoolMgr(unittest.TestCase):
             print(e)
             assert True
     
-    def test_4_test_pool_validation(self):
+    def test_4_test_pool_validation_and_delete(self):
         try:    
             print("test_4_test_pool_validation and delete the compute pool")
             compute_pool_id, compute_pool_name = compute_mgr.create_compute_pool("p1-test-table")

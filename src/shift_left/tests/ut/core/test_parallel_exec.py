@@ -97,7 +97,9 @@ class TestParallelExecutePlan(BaseUT):
             dml_only=False, 
             may_start_descendants=False, # should get same result if true
             force_ancestors=True,
-            execute_plan=False  # set to false as we just want to validate autonomous nodes and nodes to execute
+            execute_plan=False,  # set to false as we just want to validate autonomous nodes and nodes to execute
+            max_thread=4,
+            pool_creation=False
         )
         autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes, started_nodes=[])
         assert len(autonomous_nodes) == 2
@@ -130,7 +132,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         self.assertEqual(len(result), 3)
@@ -162,7 +165,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         self.assertEqual(len(result), 4)
@@ -188,7 +192,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -212,7 +217,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=True,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -234,7 +240,8 @@ class TestParallelExecutePlan(BaseUT):
                 execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,
-                sequential=False
+                sequential=False,
+                max_thread=4
             )
 
     def test_get_nodes_to_execute_filters_correctly(self):
@@ -333,7 +340,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -354,7 +362,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert

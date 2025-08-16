@@ -708,7 +708,6 @@ class TestExecutionPlan(BaseUT):
                                 "dev-usw2-p2-dml-b"]:  
                 return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
-                
                 return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN") 
         
         mock_get_status.side_effect = mock_statement
@@ -723,7 +722,8 @@ class TestExecutionPlan(BaseUT):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             execute_plan=False,
             may_start_descendants=True,
-            force_ancestors=False
+            force_ancestors=False,
+            pool_creation=False
         )
         print(f"{summary}\n")
         assert len(report.tables) == 13

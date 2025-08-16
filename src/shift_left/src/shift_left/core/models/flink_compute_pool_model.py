@@ -15,7 +15,7 @@ class ComputePoolInfo(BaseModel):
     current_cfu: Optional[int] = Field(default=None)
     
 class ComputePoolList(BaseModel):
-    created_at: Optional[str] = Field(default=None)
+    created_at: Optional[datetime] = Field(default=datetime.now())
     pools: Optional[list[ComputePoolInfo]] = Field(default=[])
 
 

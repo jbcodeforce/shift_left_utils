@@ -11,7 +11,7 @@ from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.models.flink_compute_pool_model import *
 from shift_left.core.utils.naming_convention import ComputePoolNameModifier
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.file_search import get_ddl_dml_names_from_pipe_def
+
 
 STATEMENT_COMPUTE_POOL_FILE=session_log_dir + "/pool_assignments.json"
 COMPUTE_POOL_LIST_FILE=session_log_dir + "/compute_pool_list.json"
@@ -29,8 +29,8 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
         reload = True
         if os.path.exists(COMPUTE_POOL_LIST_FILE):
             with open(COMPUTE_POOL_LIST_FILE, "r") as f:
-                _compute_pool_list = ComputePoolList.model_validate_json(f.read())
-            if _compute_pool_list.created_at and (datetime.now() - datetime.fromisoformat(_compute_pool_list.created_at)).total_seconds() < config['app']['cache_ttl']:  
+                _compute_pool_list = ComputePoolList.model_validate(json.load(f))
+            if _compute_pool_list.created_at and (datetime.now() - _compute_pool_list.created_at).total_seconds() < config['app']['cache_ttl']:  
                 # keep the list if it was created in the last 60 minutes
                 reload = False
         if reload:
@@ -39,7 +39,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
             start_time = time.perf_counter()
             client = ConfluentCloudClient(get_config())
             response: ComputePoolListResponse = client.get_compute_pool_list(env_id, region)
-            _compute_pool_list = ComputePoolList(created_at=datetime.now().isoformat())
+            _compute_pool_list = ComputePoolList(created_at=datetime.now())
             for pool in response.data:
                 cp_pool = ComputePoolInfo(id=pool.id,
                                         name=pool.spec.display_name, 
@@ -53,8 +53,16 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
             logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
             stop_time = time.perf_counter()
             print(f"Compute pool list has {len(_compute_pool_list.pools)} pools in {int(stop_time - start_time)} seconds")
+    elif (_compute_pool_list.created_at 
+         and (datetime.now() - _compute_pool_list.created_at).total_seconds() > get_config()['app']['cache_ttl']):
+        logger.info("Compute pool list cache is expired, reload it")
+        _compute_pool_list = None
+        return get_compute_pool_list(env_id, region)
     return _compute_pool_list
 
+def reset_compute_list():
+    global _compute_pool_list
+    _compute_pool_list = None
 
 
 def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
@@ -175,6 +183,9 @@ def delete_compute_pool(compute_pool_id: str):
     env_id = config['confluent_cloud']['environment_id']
     client = ConfluentCloudClient(config)
     client.delete_compute_pool(compute_pool_id, env_id)
+    _cp_list = get_compute_pool_list()
+    _cp_list.pools.remove(get_compute_pool_with_id(_cp_list, compute_pool_id))
+    _save_compute_pool_list(_cp_list)
 
 def get_pool_usage_from_dict(pool_info: dict) -> float:
     current = pool_info['status']['current_cfu']
@@ -186,12 +197,35 @@ def get_pool_usage_from_pool_info(pool_info: ComputePoolInfo) -> float:
     max = pool_info.max_cfu
     return (current / max)
 
+def delete_all_compute_pools_of_product(product_name: str):
+    if product_name:
+        compute_pool_list = get_compute_pool_list()
+        logger.info(f"Delete all compute pools for product {product_name}")
+        
+        # First, collect all pools that need to be deleted
+        pools_to_delete = []
+        for pool in compute_pool_list.pools:
+            if product_name in pool.name:
+                pools_to_delete.append(pool)
+        
+        # Then delete them in a separate loop
+        count = 0
+        for pool in pools_to_delete:
+            delete_compute_pool(pool.id)
+            print(f"Deleted compute pool {pool.id} for product {product_name}")
+            count += 1
+            
+        logger.info(f"Deleted {count} compute pools for product {product_name}")
+        print(f"Deleted {count} compute pools for product {product_name}")
+    else:
+        logger.error("No product name provided, will not delete any compute pool")
+        raise Exception("No product name provided, will not delete any compute pool")
+
 # ------ Private methods ------
 
 def _save_compute_pool_list(compute_pool_list: ComputePoolList):
     with open(COMPUTE_POOL_LIST_FILE, "w") as f:
-        json.dump(compute_pool_list.model_dump(), f, indent=4)
-
+        f.write(compute_pool_list.model_dump_json(indent=2, warnings=False))
 
 
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
