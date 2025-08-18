@@ -984,6 +984,8 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
         if not sequential:
             # for parallel execution split the statements to execute into buckets for the one with no parent
             # or all parents are running and not to be restarted.
+            if max_thread == 1:
+                max_thread = multiprocessing.cpu_count()
             autonomous_nodes = _build_autonomous_nodes(nodes_to_execute, started_nodes)
             if len(autonomous_nodes) > 0:
                 if len(autonomous_nodes) < max_thread:
@@ -1104,9 +1106,9 @@ def _deploy_one_node(node: FlinkStatementNode,
 )-> Statement:
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
-            
-    logger.info(f"Deploy table: '{node.table_name}'")
-    print(f"Deploy table: '{node.table_name}'")
+    maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')        
+    logger.info(f"Deploy table: '{maintenant} - {node.table_name}'")
+    print(f"Deploy table: '{maintenant} - {   node.table_name}'")
     try:
         if not node.dml_only:
             statement = _deploy_ddl_dml(node)

@@ -6,7 +6,7 @@ v0.1.33
 * Add region to the statement name when deployed with Makefile
 * Undeploy pipeline is improved: delete ddl as part of undeploy, verify DML is not just RUNNING, but also Failed, completed, pending. Unknown status will not try to delete statement.
 * Add delete compute pool per product name. The command is `shift_left project --delete_al-compute-pools  product_1`. The product _1 string could be a string in the compute pool.
-* Add `--max-thread` to the deploy command when coupled with --parallel.
+* Add `--max-thread` to the deploy command when coupled with --parallel. When set to more than 1, the parallel is set to true automatically.
 * Add complexity to pipeline definition, by parsing SQL to count joins, left joins, outer joins, right joins.
 
 
