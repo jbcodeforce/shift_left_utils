@@ -192,6 +192,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 #"replace": rf".\1{topic_prefix}.{env}.\2-{env}.\3"
             }
         },
+        "stageb": {
+            "adapt": {
+                "search": r"^(.*?)(ap-.*?)-(dev)\.",
+                "replace": rf"\1{topic_prefix}.{env}.\2-{env}."
+            }
+        },
         "dev": {
             "adapt": {
                 "search": r"\s*select\s+\*\s+from\s+final\s*;?",
@@ -214,6 +220,12 @@ class ReplaceEnvInSqlContent(TableWorker):
                 "replace": rf"\1-{env}"
             }
         },
+        "stageb": {
+            "schema-context": {
+                "search": rf"(.flink)-(dev)",
+                "replace": rf"\1-{env}"
+            }
+        },
         "prod": {
             "schema-context": {
                 "search": rf"(.flink)-(dev)",
@@ -225,12 +237,19 @@ class ReplaceEnvInSqlContent(TableWorker):
     def __init__(self):
         self.config = get_config()
         self.env = self.config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
+        modified_env = self.env
+        if self.env.startswith('stageb'):
+            modified_env = 'stage'   #-- clone topics is same for stage & stageb env.
         self.topic_prefix = self.config.get('kafka',{'src_topic_prefix': 'clone'}).get('src_topic_prefix')
         # Update the replacements with the current env
         self.dml_replacements["stage"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
+        self.dml_replacements["stageb"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{modified_env}.\2-{modified_env}."
         self.dml_replacements["prod"]["adapt"]["replace"] = rf"\1{self.topic_prefix}.{self.env}.\2-{self.env}."
+        #
         self.ddl_replacements["stage"]["schema-context"]["replace"] = rf"\1-{self.env}"
+        self.ddl_replacements["stageb"]["schema-context"]["replace"] = rf"\1-{self.env}"
         self.ddl_replacements["prod"]["schema-context"]["replace"] = rf"\1-{self.env}"
+        #
         self.insert_into_src=r"\s*INSERT\s+INTO\s+src_"
         self.semaphore = threading.Semaphore(value=1)
 
