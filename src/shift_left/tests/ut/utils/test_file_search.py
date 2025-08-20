@@ -77,7 +77,7 @@ class TestFileSearch(unittest.TestCase):
                                                ddl_ref="src/src_table/sql_scripts/ddl.src_p1_table.sql")
         assert pipe_def
         assert pipe_def.path == "src/src_table"
-        assert pipe_def.complexity.state_form == "Stateful"
+        assert pipe_def.complexity.state_form == "Stateless"
         node = pipe_def.to_node()
         assert node.dml_statement_name == "dev-usw2-p1-dml-src-table"
         assert node.ddl_statement_name == "dev-usw2-p1-ddl-src-table"

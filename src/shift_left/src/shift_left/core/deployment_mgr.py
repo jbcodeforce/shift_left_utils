@@ -16,7 +16,7 @@ import threading
 from datetime import datetime
 from collections import deque
 from typing import List, Any, Set, Tuple, Dict, Final
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from shift_left.core import pipeline_mgr
 from shift_left.core import compute_pool_mgr
 from shift_left.core import statement_mgr
@@ -162,7 +162,7 @@ def build_deploy_pipelines_from_product(
             count+=1
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
-        ancestors = _filtering_ancestors(ancestors, product_name, may_start_descendants)
+        ancestors = _filtering_descendant_nodes(ancestors, product_name, may_start_descendants)
         start_node = ancestors[-1]
         execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
                                                                       node_map=combined_node_map, 
@@ -988,37 +988,15 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                 max_thread = multiprocessing.cpu_count()
             autonomous_nodes = _build_autonomous_nodes(nodes_to_execute, started_nodes)
             if len(autonomous_nodes) > 0:
-                if len(autonomous_nodes) < max_thread:
-                    _max_workers = len(autonomous_nodes)
-                else:
+                print(f"Deploying {len(autonomous_nodes)} flink statements using parallel processing on {max_thread} workers")
+                while len(autonomous_nodes) > 0:
                     _max_workers = max_thread
-                print(f"Deploying {len(autonomous_nodes)} statements using parallel processing on {_max_workers} workers")
-                with ThreadPoolExecutor(max_workers=_max_workers) as executor:
+                    if len(autonomous_nodes) < max_thread:
+                        _max_workers = len(autonomous_nodes)                   
                     to_process = [] # need to use a separate list as we can have more elements in autonomous_nodes than max_workers
                     for _ in range(_max_workers):
                         to_process.append(autonomous_nodes.pop(0))
-
-                    futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
-                    for future in as_completed(futures):
-                        try:
-                            result = future.result()
-                            print(result)
-                            if result is not None:  # Only append if we got a valid result
-                                statements.append(result)
-                                if result.status.phase == "FAILED":
-                                    print(f"Statement {result.name} failed, move to next node")
-                                    _modify_impacted_nodes(result, nodes_to_execute)
-                                    pass
-                            else:
-                                logger.warning(f"Result from future is None")
-                        except Exception as e:
-                            logger.error(f"Failed to get result from future: {str(e)}")
-                            if not accept_exceptions:
-                                raise
-                    for node in to_process:
-                        node.to_run = False
-                        node.to_restart = False
-                        started_nodes.append(node)
+                    _execute_statements_in_parallel(to_process, _max_workers, accept_exceptions, compute_pool_id, started_nodes, statements)
             else:
                 # no parallel execution possible, so execute sequentially
                 _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
@@ -1041,6 +1019,39 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
             nodes_to_execute.append(node)
     return nodes_to_execute
 
+def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],   
+                                    max_workers: int,
+                                    accept_exceptions: bool = False, 
+                                    compute_pool_id: str = None,
+                                    started_nodes: List[FlinkStatementNode] = None,
+                                    statements: List[Statement] = None) -> List[Statement]:
+    """
+    Execute statements in parallel.
+    """
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
+        for future in as_completed(futures):
+            try:
+                result = future.result(timeout=60)  # will wait up to timeout seconds.
+                print(result)
+                if result is not None:  # Only append if we got a valid result
+                    statements.append(result)
+                    if result.status.phase not in ["COMPLETED", "RUNNING"]:
+                        print(f"Statement {result.name} failed, move to next node")
+                        logger.error(f"Statement {result.name} failed, move to next node")
+                        nodes_to_execute = _modify_impacted_nodes(result, nodes_to_execute)
+                        pass
+                else:
+                    logger.warning(f"Result from future is None")
+            except Exception as e:
+                logger.error(f"Failed to get result from future: {str(e)}")
+                if not accept_exceptions:
+                    raise
+        for node in to_process: # need this to avoid re-running the same node
+            node.to_run = False
+            node.to_restart = False
+            started_nodes.append(node)
+
 def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode], 
                                     accept_exceptions: bool = False, 
                                     compute_pool_id: str = None,
@@ -1060,42 +1071,50 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     node.to_restart = False
     started_nodes.append(node)
 
-def _build_autonomous_nodes(nodes_to_execute: List[FlinkStatementNode], 
-                            started_nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
-    """
-    Build a list of autonomous statements: a statement is autonomous so can be executed
-    in parallel of other statements in the list if it has no parents or all
-    its parents are running and not started.
-    """
-    autonomous_nodes = []
-    for node in nodes_to_execute:
-        if not node.parents and node not in started_nodes:
-            if node.to_run or node.to_restart:
+def _build_autonomous_nodes(
+        nodes_to_execute: List[FlinkStatementNode], 
+        started_nodes: List[FlinkStatementNode]
+    ) -> List[FlinkStatementNode]:
+        """
+        Build a list of autonomous statements: a statement is autonomous when it can be executed
+        in parallel of other statements in the list, because it has no parents or all
+        its parents are running.
+        """
+        
+        if not nodes_to_execute:
+            return []
+        
+        # Build dependencies (child->parent) for each child,parent relation in the graph
+        dependencies = []
+        for node in nodes_to_execute:
+            for parent in node.parents:
+                parent_table_name = parent if isinstance(parent, str) else parent.table_name
+                parent_node = next((n for n in nodes_to_execute if n.table_name == parent_table_name), None)
+                if parent_node and (parent_node.to_run or parent_node.to_restart) and parent_node not in started_nodes:
+                    dependencies.append((node.table_name, parent_node))
+        
+        # Use same in-degree calculation logic as existing _topological_sort
+        in_degree = {node.table_name: 0 for node in nodes_to_execute}
+        for child_name, parent_node in dependencies:
+            in_degree[child_name] += 1
+        
+        # Find autonomous nodes (in-degree 0) that need execution
+        started_node_names = {node.table_name for node in started_nodes}
+        autonomous_nodes = []
+        
+        for node in nodes_to_execute:
+            if (in_degree[node.table_name] == 0 and
+                (node.to_run or node.to_restart) and
+                node.table_name not in started_node_names):
                 autonomous_nodes.append(node)
-        else:
-            all_parents_running = True
-            for p in node.parents:
-                if isinstance(p, str):  # to assess why with some time there is astring
-                    for n in nodes_to_execute:
-                        # search if parent is in the execution plan
-                        if n.table_name == p:
-                            if (n.to_run or n.to_restart or n in started_nodes):
-                                all_parents_running = False
-                                break
-                else: # p is a FlinkStatementNode
-                    for n in nodes_to_execute:
-                        if (n.table_name == p.table_name and 
-                            (n.to_run or n.to_restart or n in started_nodes)):
-                            all_parents_running = False
-                            break
-            if all_parents_running:
-                autonomous_nodes.append(node)
-
-    return autonomous_nodes
+        
+        return autonomous_nodes
+        
 
 def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkStatementNode]) -> None:
     """
-    Modify the nodes to execute based on the statement result.
+    Modify the nodes to execute based on the statement result of a previous statement.
+    remove direct children nodes of the failed statement from the nodes to execute.
     """
     # TODO: implement this
     pass
@@ -1121,7 +1140,7 @@ def _deploy_one_node(node: FlinkStatementNode,
             logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
             raise RuntimeError(f"Statement execution failed: {str(e)}")
         else:
-            logger.info(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
+            logger.error(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
     
 
 def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
@@ -1129,7 +1148,7 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     Deploy the DDL and then the DML for the given table to process.
     """
 
-    logger.debug(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement")
+    logger.info(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement")
     statement_mgr.delete_statement_if_exists(node_to_process.dml_statement_name)
     statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
@@ -1162,6 +1181,8 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
         logger.debug(f"DML deployment status is: {statement.status.phase}")
     if statement.status.phase == "FAILED":
         raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
+    logger.info(f"DML deployment completed for {to_process.table_name} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"DML deployment completed for {to_process.table_name} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     return statement
 
 
@@ -1257,10 +1278,12 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
 
 # --- to work on for stateless ---------------
 
-def _filtering_ancestors(ancestors: List[FlinkStatementNode], 
+def _filtering_descendant_nodes(ancestors: List[FlinkStatementNode], 
                         product_name: str, 
                         may_start_descendants: bool) -> List[FlinkStatementNode]:
     """
+    when may start descendant is true
+    we need to keep nodes that are in the same product or in the accepted_common_products
     Filter ancestors based on product name and descendant policies.
     Remove ancestors that don't belong to the expected product and have no children in the expected product.
     
@@ -1274,17 +1297,18 @@ def _filtering_ancestors(ancestors: List[FlinkStatementNode],
     """
     ancestors_to_remove = []
     for ancestor in ancestors:
-        if (ancestor.product_name != product_name 
-            and not may_start_descendants 
-            and ancestor.product_name not in get_config()['app']['accepted_common_products']):
-            # Check if any children of this ancestor belong to the expected product
-            has_children_in_product = any(
-                child.product_name == product_name 
-                for child in ancestor.children
-            )
-            if not has_children_in_product:
-                ancestors_to_remove.append(ancestor)
-    
+        if may_start_descendants:   
+            if ancestor.product_name == product_name or ancestor.product_name in get_config()['app']['accepted_common_products']:
+                continue
+            else:
+                # Check if any children of this ancestor belong to the expected product
+                has_children_in_product = any(
+                    child.product_name == product_name or
+                    child.product_name in get_config()['app']['accepted_common_products']
+                    for child in ancestor.children
+                )
+                if not has_children_in_product:
+                    ancestors_to_remove.append(ancestor)
     # Remove ancestors that don't meet the criteria
     for ancestor in ancestors_to_remove:
         ancestors.remove(ancestor)

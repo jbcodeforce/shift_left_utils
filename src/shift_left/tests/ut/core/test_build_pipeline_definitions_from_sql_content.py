@@ -74,7 +74,7 @@ class TestBuildPipelineDefinitionsFromSqlContent(unittest.TestCase):
         self.assertEqual(result_table, "fact_table")
         self.assertEqual(len(result_deps), 2)
         self.assertEqual(result_complexity.state_form, "Stateful")
-        self.assertEqual(result_complexity.number_of_joins, 1)
+        self.assertEqual(result_complexity.number_of_regular_joins, 1)
 
     @patch('shift_left.core.pipeline_mgr._build_pipeline_definition')
     @patch('builtins.open')

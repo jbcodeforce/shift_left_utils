@@ -265,7 +265,7 @@ class SQLparser:
         complexity.state_form = state_form
         
         if not sql_content:
-            complexity.number_of_joins = 0
+            complexity.number_of_regular_joins = 0
             complexity.number_of_left_joins = 0
             complexity.number_of_right_joins = 0
             complexity.number_of_inner_joins = 0
@@ -292,7 +292,7 @@ class SQLparser:
         # Calculate total joins (excluding CROSS JOINs as they are typically stateless)
         total_joins = left_joins + right_joins + inner_joins + outer_joins + regular_joins
         
-        complexity.number_of_joins = regular_joins
+        complexity.number_of_regular_joins = regular_joins
         complexity.number_of_left_joins = left_joins
         complexity.number_of_right_joins = right_joins
         complexity.number_of_inner_joins = inner_joins

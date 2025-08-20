@@ -1,4 +1,5 @@
-from ut.core.BaseUT import BaseUT
+import pathlib
+
 import unittest
 from unittest.mock import patch, MagicMock, call
 from datetime import datetime
@@ -9,10 +10,14 @@ from shift_left.core.models.flink_statement_model import (
     Statement,
     Status
 )
+from ut.core.BaseUT import BaseUT
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.deployment_mgr as dm
 from typing import List
 import os
+
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 class TestParallelExecutePlan(BaseUT):
 
@@ -308,8 +313,8 @@ class TestParallelExecutePlan(BaseUT):
         """Test _build_autonomous_nodes with complex parent-child relationships"""
         # Arrange
         # Create a complex dependency graph
-        root1 = self._create_mock_node("root1", to_run=True)  # autonomous
-        root2 = self._create_mock_node("root2", is_running=True)  # running, not autonomous
+        root1 = self._create_mock_node("root1", to_run=True) 
+        root2 = self._create_mock_node("root2", to_run=False, to_restart=False)  
         
         level1_1 = self._create_mock_node("level1_1", to_run=True, parents=[root2])  # can run (parent running)
         level1_2 = self._create_mock_node("level1_2", to_run=True, parents=[root1])  # blocked by root1
