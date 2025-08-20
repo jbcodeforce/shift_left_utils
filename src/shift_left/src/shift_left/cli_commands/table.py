@@ -16,7 +16,7 @@ from shift_left.core.table_mgr import (
 )
 from shift_left.core.process_src_tables import migrate_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
-from shift_left.core.utils.app_config import shift_left_dir, session_log_dir
+from shift_left.core.utils.app_config import shift_left_dir, session_log_dir, get_config
 import shift_left.core.table_mgr as table_mgr
 import shift_left.core.test_mgr as test_mgr
 from shift_left.core.test_mgr import TestSuiteResult
@@ -178,7 +178,8 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
-    print("#" * 30 + f" Unit tests execution for {table_name}")
+    print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
+    print(f"Cluster name: {get_config().get("flink").get("database_name")}")
     if test_case_name:
         
         test_result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)

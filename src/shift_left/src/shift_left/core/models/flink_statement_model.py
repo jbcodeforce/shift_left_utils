@@ -117,7 +117,7 @@ class FlinkStatementComplexity(BaseModel):
     Keep metrics of the DML statement, derive a complexity of a Flink Statement.
     
     """
-    number_of_joins: int = Field(default=0, description="Number of joins in the statement")
+    number_of_regular_joins: int = Field(default=0, description="Number of regular joins in the statement")
     number_of_left_joins: int = Field(default=0, description="Number of left joins in the statement")
     number_of_right_joins: int = Field(default=0, description="Number of right joins in the statement")
     number_of_inner_joins: int = Field(default=0, description="Number of inner joins in the statement")

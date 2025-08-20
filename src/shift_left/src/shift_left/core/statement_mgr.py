@@ -379,9 +379,15 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
     elif info and isinstance(info, Statement) and info.spec:
         catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
         database = info.spec.properties.get('sql.current-database','UNKNOWN')
+        if info.status:
+            status_phase = info.status.phase
+            status_detail = info.status.detail
+        else:
+            status_phase = "UNKNOWN"
+            status_detail = "UNKNOWN"
         return StatementInfo(name=info.name,
-                             status_phase= info.status.phase,
-                             status_detail= info.status.detail,
+                             status_phase= status_phase,
+                             status_detail= status_detail,
                              sql_content= info.spec.statement,
                              compute_pool_id= info.spec.compute_pool_id,
                              principal= info.spec.principal,

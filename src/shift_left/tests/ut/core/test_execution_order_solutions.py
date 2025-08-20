@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from shift_left.core.deployment_mgr import _execute_plan
-from shift_left.core.models.flink_statement_model import FlinkStatementNode, FlinkStatementExecutionPlan, Statement, Status
+from shift_left.core.models.flink_statement_model import FlinkStatementNode, FlinkStatementExecutionPlan, Statement, Status, Spec
 from ut.core.BaseUT import BaseUT
 
 
@@ -13,6 +13,37 @@ class TestExecutionOrderSolutions(BaseUT):
     def setUp(self):
         """Set up test fixtures"""
         super().setUp()
+
+    def _create_mock_spec(self, compute_pool_id: str = None, statement_name: str = "test_statement") -> Spec:
+        """Create a properly structured Spec object for pydantic validation"""
+        return Spec(
+            compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1,
+            principal="test-principal",
+            statement=f"CREATE TABLE {statement_name} AS SELECT * FROM source;",
+            stopped=False,
+            properties={}
+        )
+
+    def _create_mock_statement(self, statement_name: str, compute_pool_id: str = None, phase: str = "RUNNING") -> Statement:
+        """Create a properly structured Statement object for pydantic validation"""
+        return Statement(
+            name=statement_name,
+            status=Status(phase=phase),
+            spec=self._create_mock_spec(compute_pool_id, statement_name),
+            compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1
+        )
+
+    def _create_mock_deploy_function(self, execution_order: list):
+        """Create a reusable mock deploy function that tracks execution order"""
+        def mock_deploy(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None):
+            delay = getattr(node, '_test_delay', 0.1)
+            time.sleep(delay)
+            execution_order.append(node.table_name)
+            return self._create_mock_statement(
+                statement_name=node.dml_statement_name,
+                compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1
+            )
+        return mock_deploy
 
     def _create_mock_node(self, table_name: str, delay: float = 0.1, to_run: bool = True) -> FlinkStatementNode:
         """Create a mock node with controllable execution delay"""
@@ -43,18 +74,7 @@ class TestExecutionOrderSolutions(BaseUT):
         print("\n--> Testing current parallel execution race condition")
         
         execution_order = []
-        
-        def mock_deploy_with_delay(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None):
-            """Mock deployment that respects test delay"""
-            delay = getattr(node, '_test_delay', 0.1)
-            time.sleep(delay)
-            execution_order.append(node.table_name)
-            return Statement(
-                name=node.dml_statement_name,
-                status=Status(phase="RUNNING"),
-                spec=MagicMock(),
-                compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1
-            )
+        mock_deploy_with_delay = self._create_mock_deploy_function(execution_order)
         
         # Create nodes where first node takes longest
         node1 = self._create_mock_node("slow_table", delay=0.3, to_run=True)
@@ -89,17 +109,7 @@ class TestExecutionOrderSolutions(BaseUT):
         print("\n--> Testing sequential execution (control case)")
         
         execution_order = []
-        
-        def mock_deploy_with_delay(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None):
-            delay = getattr(node, '_test_delay', 0.1)
-            time.sleep(delay)
-            execution_order.append(node.table_name)
-            return Statement(
-                name=node.dml_statement_name,
-                status=Status(phase="RUNNING"),
-                spec=MagicMock(),
-                compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1
-            )
+        mock_deploy_with_delay = self._create_mock_deploy_function(execution_order)
         
         # Same setup as parallel test
         node1 = self._create_mock_node("slow_table", delay=0.3, to_run=True)
@@ -169,17 +179,7 @@ class TestExecutionOrderSolutions(BaseUT):
         print("\n--> Testing batch parallel execution with dependencies")
         
         execution_order = []
-        
-        def mock_deploy(node: FlinkStatementNode, accept_exceptions: bool = False, compute_pool_id: str = None):
-            delay = getattr(node, '_test_delay', 0.1)
-            time.sleep(delay)
-            execution_order.append(node.table_name)
-            return Statement(
-                name=node.dml_statement_name,
-                status=Status(phase="RUNNING"),
-                spec=MagicMock(),
-                compute_pool_id=compute_pool_id or self.TEST_COMPUTE_POOL_ID_1
-            )
+        mock_deploy = self._create_mock_deploy_function(execution_order)
         
         # Create dependency graph: src1, src2 (parallel) -> intermediate -> sink
         src1 = self._create_mock_node("src1", delay=0.2, to_run=True)

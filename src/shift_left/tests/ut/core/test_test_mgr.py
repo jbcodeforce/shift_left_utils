@@ -1142,7 +1142,7 @@ class TestTestManager(unittest.TestCase):
         
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             # Mock the file loading to return our test SQL
-            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 # Apply the function transformation to our test SQL
                 return fct(sql_input)
             
@@ -1162,7 +1162,7 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
                 transformed_sql = fct(sql_with_substring_issue)
                 return None
@@ -1194,7 +1194,7 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
                 transformed_sql = fct(sql_multiple_overlaps)
                 return None
@@ -1220,7 +1220,7 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
                 transformed_sql = fct(sql_case_insensitive)
                 return None
@@ -1241,7 +1241,7 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
                 transformed_sql = fct(sql_no_tables)
                 return None

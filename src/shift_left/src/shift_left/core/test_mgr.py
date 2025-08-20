@@ -368,6 +368,7 @@ def _execute_foundation_statements(
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
                                     compute_pool_id=compute_pool_id,
+                                    product_name=table_ref.product_name,
                                     statements=statements)
     return statements
 
@@ -417,6 +418,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 prefix=prefix+"-ddl",
                                 compute_pool_id=compute_pool_id,
                                 fct=replace_table_name,
+                                product_name=table_ref.product_name,
                                 statements=statements)
     if ddl_result is not None:
         statements = ddl_result
@@ -427,6 +429,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 prefix=prefix+"-dml",
                                 compute_pool_id=compute_pool_id,
                                 fct=replace_table_name,
+                                product_name=table_ref.product_name,
                                 statements=statements)
     if dml_result is not None:
         statements = dml_result
@@ -438,6 +441,7 @@ def _load_sql_and_execute_statement(table_name: str,
                                 prefix: str = 'dev-ddl', 
                                 compute_pool_id: Optional[str] = None,
                                 fct: Callable[[str], str] = lambda x: x,
+                                product_name: Optional[str] = None,
                                 statements: Optional[List[Statement]] = None) -> Optional[List[Statement]]:
  
     # Initialize statements list if None
@@ -455,7 +459,12 @@ def _load_sql_and_execute_statement(table_name: str,
         return None  # Return None when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
-    statement, is_new = _execute_flink_test_statement(sql_content, statement_name, compute_pool_id)
+    logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
+    print(f"Execute statement {statement_name} on: {compute_pool_id}")
+    statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
+                                                      statement_name=statement_name, 
+                                                      compute_pool_id=compute_pool_id, 
+                                                      product_name=product_name)
     if statement and is_new:
         statements.append(statement)
         if statement.status and statement.status.phase == "FAILED":
@@ -475,7 +484,7 @@ def _execute_test_inputs(test_case: SLTestCase,
     statements = []
     for input_step in test_case.inputs:
         statement = None
-        print(f"Execute test input for {input_step.table_name}")
+        print(f"Run insert test data for {input_step.table_name}")
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             statements = _load_sql_and_execute_statement(table_name=input_step.table_name,
@@ -483,6 +492,7 @@ def _execute_test_inputs(test_case: SLTestCase,
                                         prefix=prefix,
                                         compute_pool_id=compute_pool_id,
                                         fct=lambda x: x,
+                                        product_name=table_ref.product_name,
                                         statements=statements)
         elif input_step.file_type == "csv":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
