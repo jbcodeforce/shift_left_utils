@@ -1,6 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+from math import prod
 import os
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -172,12 +173,24 @@ def deploy(
         force_ancestors: bool = typer.Option(False, help="When reaching table with no ancestor, this flag forces restarting running Flink statements."),
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
-        parallel: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.")
+        parallel: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel."),
+        max_thread: int = typer.Option(1, help="The maximum number of threads to use when deploying the pipeline in parallel."),
+        pool_creation: bool = typer.Option(False, help="By default the deployment will not create a compute pool per table. This flag will create a pool.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory.
     """
     print(f"Deploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
+    if product_name:
+        print(f"Command parameters: may_start_descendants: False, force_ancestors: {force_ancestors}, parallel: {parallel}, max_thread: {max_thread}, pool_creation: {pool_creation}")
+    else:
+        print(f"Command parameters: may_start_descendants: {may_start_descendants}, force_ancestors: {force_ancestors}, cross_product_deployment: {cross_product_deployment}, parallel: {parallel}, max_thread: {max_thread}, pool_creation: {pool_creation}")
+    
+    if max_thread > 1:
+        print(f"Deploying pipeline in parallel with {max_thread} threads")
+        parallel = True
+    else:
+        print(f"Deploying pipeline in sequential")
     _build_deploy_pipeline( 
         table_name=table_name, 
         product_name=product_name, 
@@ -190,7 +203,9 @@ def deploy(
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
         parallel=parallel,
-        execute_plan=True)
+        max_thread=max_thread,
+        execute_plan=True,
+        pool_creation=pool_creation)
     
     print(f"#### Pipeline deployed ####")
 
@@ -205,7 +220,7 @@ def build_execution_plan(
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
         force_ancestors: bool = typer.Option(False, help="This flag forces restarting running ancestorsFlink statements."),
-        cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.")):
+        cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products when considering descendants only.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
@@ -221,7 +236,9 @@ def build_execution_plan(
         may_start_descendants=may_start_descendants, 
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
-        execute_plan=False)
+        execute_plan=False,
+        parallel=False,
+        pool_creation=False)
 
 @app.command()
 def report_running_statements(
@@ -282,6 +299,9 @@ def undeploy(
         product_name = product_name.lower()
         print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
+    else:
+        print(f"[red]Error: either table-name or product-name must be provided[/red]")
+        raise typer.Exit(1)
     print(result)
 
 
@@ -311,7 +331,9 @@ def _build_deploy_pipeline(
         force_ancestors: bool = False,
         cross_product_deployment: bool = False,
         parallel: bool = False,
-        execute_plan: bool=False):
+        max_thread: int = None,
+        execute_plan: bool=False,
+        pool_creation: bool = False):
     summary="Nothing done"
     try:
         report=None
@@ -326,7 +348,9 @@ def _build_deploy_pipeline(
                                                         force_ancestors=force_ancestors,
                                                         cross_product_deployment=cross_product_deployment,
                                                         sequential=not parallel,
-                                                        execute_plan=execute_plan)
+                                                        max_thread=max_thread,
+                                                        execute_plan=execute_plan,
+                                                        pool_creation=pool_creation)
             print(f"Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
             for node in execution_plan.nodes:
@@ -341,11 +365,13 @@ def _build_deploy_pipeline(
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
-                                                        may_start_descendants=may_start_descendants,
+                                                        may_start_descendants=False, # not used for product
                                                         force_ancestors=force_ancestors,
-                                                        cross_product_deployment=cross_product_deployment,  
+                                                        cross_product_deployment=False,  # not used for product
                                                         sequential=not parallel,
-                                                        execute_plan=execute_plan)
+                                                        execute_plan=execute_plan,
+                                                        max_thread=max_thread,
+                                                        pool_creation=pool_creation)
             print(f"Execution plan built and persisted for product {product_name}")
 
         elif dir:
@@ -358,7 +384,9 @@ def _build_deploy_pipeline(
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     sequential=not parallel,
-                                                                    execute_plan=execute_plan)
+                                                                    execute_plan=execute_plan,
+                                                                    max_thread=max_thread,
+                                                                    pool_creation=pool_creation)
         elif table_list_file_name:
             print(f"Build an execution plan for tables in {table_list_file_name}")
             summary, report=deployment_mgr.build_and_deploy_all_from_table_list(table_list_file_name=table_list_file_name,
@@ -369,7 +397,10 @@ def _build_deploy_pipeline(
                                                                     force_ancestors=force_ancestors,
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     sequential=not parallel,
-                                                                    execute_plan=execute_plan)
+                                                                    execute_plan=execute_plan,
+                                                                    max_thread=max_thread,
+                                                                    pool_creation=pool_creation
+                                                                )
         else:
             print(f"[red]Error: either table-name, product-name, dir or table-list-file-name must be provided[/red]")
             raise typer.Exit(1)

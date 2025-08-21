@@ -46,6 +46,14 @@ class TestPipelineCLI(unittest.TestCase):
         assert result.exit_code == 0
         print(result.stdout)
 
+    def test_undeploy_with_ack_or_not(self):
+        """Test successful execution of the build-execution-plan command"""
+
+        runner = CliRunner()
+        result = runner.invoke(app, ['undeploy', '--table-name', 'p1_fct_order'])
+        assert result.exit_code == 0
+        print(result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

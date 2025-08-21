@@ -48,6 +48,13 @@ Two important concepts of this practice:
 * **Dimensions** provide the “who, what, where, when, why, and how” context surrounding a business process event. Dimension tables contain the descriptive attributes used by BI applications for ﬁltering and grouping the facts. 
 * **Facts** are the measurements that result from a business process event and are almost always numeric. The design of a fact table is entirely based on a physical activity, and not by the reports to produce from those facts. A fact table always contains foreign keys for each of its associated dimensions, as well as optional degenerate dimension keys and date/time stamps
 
+### The star schema
+
+The star schema, was defined at the end of the 80s, as a multi-dimensional data model to organize data in Date warehouse, to maintain history and by reducing the data duplication. A star schema is used to denormalize business data into dimensions and facts. The fact table connects to multiple other dimension tables along "dimensions" like time, or product.
+
+![](./images/star_schema.drawio.png)
+
+
 ## Context
 
 The target environment will be Apache Flink running within the Confluent Cloud as a managed service or in th future running in standalone cluster. The source of the batch processing is defined within a dbt (Data build tool) project or within a SQL project and the refactored SQL are produced under the `pipelines` folder.
@@ -148,7 +155,7 @@ The `src/shift_left/tests/data` folder includes a dbt project used to demonstrat
     shift_left project init demo-flink-project ~/Code
     ```
 
-1. Modify the config.yaml file to reflect the Confluent Cloud environment. [See dedicated note on the config.yaml](./setup.md/#set-up-configuration-yaml-file), but for migration the only important parameters are:
+1. Modify the config.yaml file to reflect the Confluent Cloud environment. [See dedicated note on the config.yaml](./setup.md/#set-up-configyaml-file), but for migration the only important parameters are:
     ```yaml
     confluent_cloud:
     flink:

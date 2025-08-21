@@ -11,7 +11,7 @@ As a generic test plan for Flink project, we propose to address the following te
 
 ### 1. Unit Testing
 
-* **SQL Query Testing**: For each DML flink statement defined in the project pipelines folder, Data Engineer may define test suites with test data to validate the logic of the SQL statement. The [test harness tooling](./test_harness.md) is used for that, as it authorized to test individual Flink SQL query in isolation, by creating temporary input and output tables for running test suites.
+* **SQL Query Testing**: For each DML flink statement defined in the project pipelines folder, Data Engineer may define test suites with test data to validate the logic of the SQL statement. The [test harness tooling](./coding/test_harness.md) is used for that, as it authorized to test individual Flink SQL query in isolation, by creating temporary input and output tables for running test suites.
 
     * When window operators are used, special timing concerns need to be addressed
     * Unit test should be able to verify watermark handling and event time processing

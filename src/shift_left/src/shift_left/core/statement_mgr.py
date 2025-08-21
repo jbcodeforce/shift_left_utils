@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from importlib import import_module
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger, session_log_dir
+from shift_left.core.utils.app_config import get_config, logger, session_log_dir, shift_left_dir
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
     get_or_build_inventory,
@@ -34,7 +34,7 @@ from shift_left.core.utils.file_search import (
 )
 from shift_left.core.utils.table_worker import NoChangeDoneToSqlContent
 
-STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
+STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
                                                       flink_statement_file_path: str = None,
@@ -238,6 +238,11 @@ def get_statement_list() -> dict[str, StatementInfo]:
             stop_time = time.perf_counter()
             logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
             print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
+    elif (_statement_list_cache.created_at 
+         and (datetime.now() - _statement_list_cache.created_at).total_seconds() > get_config()['app']['cache_ttl']):
+        logger.info("Statement list cache is expired, reload it")
+        _statement_list_cache = None
+        return get_statement_list()
     return _statement_list_cache.statement_list
 
 
@@ -374,9 +379,15 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
     elif info and isinstance(info, Statement) and info.spec:
         catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
         database = info.spec.properties.get('sql.current-database','UNKNOWN')
+        if info.status:
+            status_phase = info.status.phase
+            status_detail = info.status.detail
+        else:
+            status_phase = "UNKNOWN"
+            status_detail = "UNKNOWN"
         return StatementInfo(name=info.name,
-                             status_phase= info.status.phase,
-                             status_detail= info.status.detail,
+                             status_phase= status_phase,
+                             status_detail= status_detail,
                              sql_content= info.spec.statement,
                              compute_pool_id= info.spec.compute_pool_id,
                              principal= info.spec.principal,

@@ -116,10 +116,6 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
           if not isinstance(config["app"][field], (int, float)):
             errors.append(f"Configuration app.{field} must be a number")
       
-      if config["app"].get("products"):
-        if not isinstance(config["app"]["products"], list):
-          errors.append("Configuration app.products must be a list")
-      
       if config["app"].get("accepted_common_products"):
         if not isinstance(config["app"]["accepted_common_products"], list):
           errors.append("Configuration app.accepted_common_products must be a list")

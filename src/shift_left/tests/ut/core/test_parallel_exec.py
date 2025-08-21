@@ -1,4 +1,5 @@
-from ut.core.BaseUT import BaseUT
+import pathlib
+
 import unittest
 from unittest.mock import patch, MagicMock, call
 from datetime import datetime
@@ -9,10 +10,14 @@ from shift_left.core.models.flink_statement_model import (
     Statement,
     Status
 )
+from ut.core.BaseUT import BaseUT
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.deployment_mgr as dm
 from typing import List
 import os
+
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 class TestParallelExecutePlan(BaseUT):
 
@@ -97,7 +102,9 @@ class TestParallelExecutePlan(BaseUT):
             dml_only=False, 
             may_start_descendants=False, # should get same result if true
             force_ancestors=True,
-            execute_plan=False  # set to false as we just want to validate autonomous nodes and nodes to execute
+            execute_plan=False,  # set to false as we just want to validate autonomous nodes and nodes to execute
+            max_thread=4,
+            pool_creation=False
         )
         autonomous_nodes = dm._build_autonomous_nodes(execution_plan.nodes, started_nodes=[])
         assert len(autonomous_nodes) == 2
@@ -130,7 +137,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         self.assertEqual(len(result), 3)
@@ -162,7 +170,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         self.assertEqual(len(result), 4)
@@ -188,7 +197,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -212,7 +222,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=True,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -234,7 +245,8 @@ class TestParallelExecutePlan(BaseUT):
                 execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,
-                sequential=False
+                sequential=False,
+                max_thread=4
             )
 
     def test_get_nodes_to_execute_filters_correctly(self):
@@ -301,8 +313,8 @@ class TestParallelExecutePlan(BaseUT):
         """Test _build_autonomous_nodes with complex parent-child relationships"""
         # Arrange
         # Create a complex dependency graph
-        root1 = self._create_mock_node("root1", to_run=True)  # autonomous
-        root2 = self._create_mock_node("root2", is_running=True)  # running, not autonomous
+        root1 = self._create_mock_node("root1", to_run=True) 
+        root2 = self._create_mock_node("root2", to_run=False, to_restart=False)  
         
         level1_1 = self._create_mock_node("level1_1", to_run=True, parents=[root2])  # can run (parent running)
         level1_2 = self._create_mock_node("level1_2", to_run=True, parents=[root1])  # blocked by root1
@@ -333,7 +345,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert
@@ -354,7 +367,8 @@ class TestParallelExecutePlan(BaseUT):
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
-            sequential=False
+            sequential=False,
+            max_thread=4
         )
         
         # Assert

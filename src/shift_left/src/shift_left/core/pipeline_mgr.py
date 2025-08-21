@@ -24,6 +24,7 @@ from shift_left.core.utils.file_search import (
     from_absolute_to_pipeline,
     FlinkTableReference, 
     FlinkTablePipelineDefinition,
+    FlinkStatementComplexity,
     get_ddl_file_name,
     extract_product_name,
     get_table_ref_from_inventory,
@@ -71,6 +72,7 @@ def build_pipeline_definition_from_ddl_dml_content(
     so entry point of the processing.
     
     Args:
+        ddl_file_name: Path to DDL file for root table
         dml_file_name: Path to DML file for root table
         pipeline_path: Root pipeline folder path
         
@@ -80,11 +82,11 @@ def build_pipeline_definition_from_ddl_dml_content(
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
     
-    table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
+    table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
     logger.debug(f"Build pipeline for table: {table_name} from {dml_file_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name=table_name,
                                               table_type=None,
-                                              state_form=state_form,
+                                              complexity=complexity,
                                               table_folder=None,
                                               dml_file_name=from_absolute_to_pipeline(dml_file_name),
                                               ddl_file_name=from_absolute_to_pipeline(ddl_file_name), 
@@ -172,8 +174,9 @@ def _build_pipeline_definitions_from_sql_content(
     dml_file_name: str,
     ddl_file_name: str,
     table_inventory: Dict
-) -> Tuple[str, Set[FlinkTablePipelineDefinition], str]:
-    """Extract parent table references and semantic from SQL content.
+) -> Tuple[str, Set[FlinkTablePipelineDefinition], FlinkStatementComplexity]:
+    """Extract parent table references and semantic from SQL content plus some
+    complexity metrics.
     
     Args:
         dml_file_name: Path to SQL file for dml content
@@ -181,7 +184,7 @@ def _build_pipeline_definitions_from_sql_content(
         table_inventory: Dictionary of all available files
         
     Returns:
-        Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition)
+        Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition, complexity of current table)
     """
     try:
         dml_sql_content = ""
@@ -189,6 +192,7 @@ def _build_pipeline_definitions_from_sql_content(
         referenced_table_names = set()
         parser = SQLparser()
         current_table_name = None
+        complexity = FlinkStatementComplexity()
         if dml_file_name:
             if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
                 dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
@@ -196,6 +200,7 @@ def _build_pipeline_definitions_from_sql_content(
                 dml_sql_content = f.read()
             current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
             referenced_table_names = parser.extract_table_references(dml_sql_content)
+            
         if  not current_table_name and ddl_file_name:
             if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
                 ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
@@ -204,6 +209,7 @@ def _build_pipeline_definitions_from_sql_content(
             current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)          
         dependencies = set()
         state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+        complexity = parser.extract_statement_complexity(dml_sql_content,state_form)
         if referenced_table_names:
             if current_table_name in referenced_table_names:
                 referenced_table_names.remove(current_table_name)
@@ -216,6 +222,7 @@ def _build_pipeline_definitions_from_sql_content(
                     continue
                 table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
+                dep_complexity = FlinkStatementComplexity(state_form=state_form)
                 if table_ref.dml_ref and table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
                     table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
                     _dml_sql_content=""
@@ -226,20 +233,22 @@ def _build_pipeline_definitions_from_sql_content(
                     with open(table_ddl_ref, "r") as g:
                         _ddl_sql_content = g.read()
                     dependent_state_form = parser.extract_upgrade_mode(_dml_sql_content, _ddl_sql_content)
+                    dep_complexity = parser.extract_statement_complexity(_dml_sql_content, dependent_state_form)
                 logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
-                dependencies.add(_build_pipeline_definition(
+                bpd = _build_pipeline_definition(
                     table_name, 
                     table_ref.type,
-                    state_form,
+                    dep_complexity,
                     table_ref.table_folder_name,
                     table_ref.dml_ref,
                     table_ref.ddl_ref,
                     set(),
                     set()
-                ))
+                )
+                dependencies.add(bpd)
         else:
             logger.warning(f"No referenced table found in {dml_file_name}")
-        return current_table_name, dependencies, state_form
+        return current_table_name, dependencies, complexity
             
     except Exception as e:
         logger.error(f"Error while processing {dml_file_name} or {ddl_file_name} with message: {e} but process continues...")
@@ -265,7 +274,7 @@ def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, 
 def _build_pipeline_definition(
             table_name: str,
             table_type: str,
-            state_form: str,
+            complexity: FlinkStatementComplexity,
             table_folder: str,
             dml_file_name: str,
             ddl_file_name: str,
@@ -295,7 +304,7 @@ def _build_pipeline_definition(
     f = FlinkTablePipelineDefinition.model_validate({
         "table_name": table_name,
         "product_name": product_name,
-        "state_form": state_form,
+        "complexity": complexity,
         "type": table_type,
         "path": table_folder,
         "ddl_ref": ddl_file_name,
@@ -318,9 +327,9 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
         logger.info(f"{current_node}")
         if not current_node.table_name in processed_nodes:
             if not current_node.parents:
-                table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
+                table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
                 current_node.parents = parent_references   # set of FlinkTablePipelineDefinition
-                current_node.state_form = state_form
+                current_node.complexity = complexity
             tmp_node= current_node.model_copy(deep=True)
             tmp_node.children = set()
             tmp_node.parents = set()

@@ -99,34 +99,72 @@ The following core principles for the management of this code is using the `gitf
         git push origin main
         ```
 
-**Release management:**
+### Release management
 
-1. When code is ready, create a new release branch off the `develop` branch. Run all tests and fixes on this release branch until ready for release.
-    ```sh
-    git checkout -b  v0.1.28 develop
-    ```
-1. Modify the cli.py to change the version number so `shift_left version` will return the matching version. Change the `pyproject.toml` version number and build the wheel (see [below section](#build)). Remove the `.gitignore` under the dist folder and remove the older wheel (may be keep the last 10).
+The script (`build_and_release.sh`) automates the CLI build and release branch creation process following the following instructions.
 
-1. Merge into main:
-    ```bash
-    git checkout main
-    git merge --no-ff v0.1.28
-    ```
-1. Tag the main branch: 
-    ```sh
-    git tag -a 0.1.28 -m "Release version 0.1.28"
-    git push origin 0.1.28
-    ```
-1. Merge into the `develop` branch:
-    ```bash
-    git checkout develop
-    git merge --no-ff v0.1.28
-    ```
-1. In gihub, create a new release referencing the newly created tag
-1. Delete the release branch: 
-    ```sh
-    git branch -d v0.1.28
-    ```
+1. **Creates release branch**: When code is ready, create a new release branch off the `develop` branch. Run all tests and fixes on this release branch until ready for release.from `develop` (e.g., `v0.1.34`)
+2. **Updates version numbers** in:
+   - `src/shift_left/src/shift_left/cli.py`
+   - `src/shift_left/pyproject.toml`
+3. **Builds the wheel package** using `uv build .`
+4. **Cleans old wheels** (keeps last 10 wheel and tar.gz files)
+5. **Updates CHANGELOG.md** with recent commits from `main..develop`
+6. **Commits all changes** with descriptive commit message to the release branch
+7. **Validate non-regression tests**
+8. **Merge to main**
+9. **Tag the release**
+10. **Merge back to develop**
+11. **Create GitHub release** referencing the new tag
+12. **Delete release branch**
+
+#### Prerequisites
+
+- **uv** package manager installed ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
+- Git repository with `main` and `develop` branches
+- Current working directory should be the `shift_left_utils` root directory
+
+#### Usage
+
+```bash
+./build_and_release.sh <version>
+# Example
+./build_and_release.sh 0.1.34
+```
+
+#### What You Need to Do Manually After Running the Script
+
+The script will provide you with the exact commands to run next:
+
+1. **Test the release branch** and make any necessary fixes (see the runRegressionTest.sh in src/shift_left)
+2. **Merge to main:**
+   ```bash
+   git checkout main
+   git merge --no-ff v0.1.34
+   git push
+   ```
+3. **Tag the release:**
+   ```bash
+   git tag -a 0.1.34 -m "Release version 0.1.34"
+   git push origin 0.1.34
+   ```
+4. **Merge back to develop:**
+   ```bash
+   git checkout develop
+   git merge --no-ff v0.1.34
+   git push
+   ```
+5. **Create GitHub release** referencing the new tag, in the [git web page](https://github.com/jbcodeforce/shift_left_utils/releases), copy, paste the 0.1.33 section of the changelog to the release note.
+6. **Delete release branch:**
+   ```bash
+   git branch -d v0.1.34
+   ```
+
+**Files Modified by the Script**
+- `src/shift_left/src/shift_left/cli.py` - Updates `__version__` variable
+- `src/shift_left/pyproject.toml` - Updates project version
+- `CHANGELOG.md` - Adds new version entry with recent commits
+- `src/shift_left/dist/` - Builds new wheel and cleans old ones
 
 
 ## Environment set up for developers

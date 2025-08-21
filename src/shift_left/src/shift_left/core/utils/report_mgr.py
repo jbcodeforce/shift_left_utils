@@ -6,7 +6,7 @@ from shift_left.core.models.flink_compute_pool_model import ComputePoolList
 import shift_left.core.metric_mgr as metrics_mgr
 import shift_left.core.utils.report_mgr as report_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
-from shift_left.core.utils.app_config import shift_left_dir, get_config
+from shift_left.core.utils.app_config import shift_left_dir, get_config, logger
 from pydantic import Field
 from datetime import datetime
 
@@ -103,9 +103,15 @@ def build_TableReport(report_name: str,
         num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids,from_date=from_date)
         for node in nodes:
             table_info = build_TableInfo(node,get_metrics=get_metrics)
-            table_info.pending_records = pending_records.get(node.existing_statement_info.name, 0)
-            table_info.num_records_out = num_records_out.get(node.existing_statement_info.name, 0)
-            table_info.num_records_in = num_records_in.get(node.existing_statement_info.name, 0)
+            if node.existing_statement_info:
+                table_info.pending_records = pending_records.get(node.existing_statement_info.name, 0)
+                table_info.num_records_out = num_records_out.get(node.existing_statement_info.name, 0)
+                table_info.num_records_in = num_records_in.get(node.existing_statement_info.name, 0)
+            else:
+                logger.error(f"Node {node.table_name} has no existing statement info")
+                table_info.pending_records = 0
+                table_info.num_records_out = 0
+                table_info.num_records_in = 0
             table_report.tables.append(table_info)
     else:
         for node in nodes:
@@ -265,13 +271,16 @@ def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
         status_detail = statement.status.detail
     else:
         status_detail = ""
+    
+    status_phase = statement.status.phase if statement.status else "UNKNOWN"
+    
     return StatementBasicInfo(
         name=statement.name,
         environment_id=statement.environment_id,
         created_at=statement.metadata.created_at,
         uid=statement.metadata.uid,
         compute_pool_id=statement.spec.compute_pool_id,
-        status=statement.status.phase,
+        status=status_phase,
         status_details=status_detail,
         execution_time=statement.execution_time
     )

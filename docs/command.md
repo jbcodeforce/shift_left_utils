@@ -50,6 +50,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
+* `delete-all-compute-pools`: Delete all compute pools for the given...
 * `clean-completed-failed-statements`: Delete all statements that are failed and...
 * `validate-config`: Validate the config.yaml file
 * `list-modified-files`: Get the list of files modified in the...
@@ -113,6 +114,24 @@ $ project list-compute-pools [OPTIONS]
 
 * `--environment-id TEXT`: Environment_id to return all compute pool
 * `--region TEXT`: Region_id to return all compute pool
+* `--help`: Show this message and exit.
+
+### `project delete-all-compute-pools`
+
+Delete all compute pools for the given product name
+
+**Usage**:
+
+```console
+$ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
+```
+
+**Arguments**:
+
+* `PRODUCT_NAME`: The product name to delete all compute pools for  [required]
+
+**Options**:
+
 * `--help`: Show this message and exit.
 
 ### `project clean-completed-failed-statements`
@@ -351,7 +370,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1083452e0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10393af30&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -563,6 +582,8 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
 * `--parallel / --no-parallel`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.  [default: no-parallel]
+* `--max-thread INTEGER`: The maximum number of threads to use when deploying the pipeline in parallel.  [default: 1]
+* `--pool-creation / --no-pool-creation`: By default the deployment will not create a compute pool per table. This flag will create a pool.  [default: no-pool-creation]
 * `--help`: Show this message and exit.
 
 ### `pipeline build-execution-plan`
@@ -633,6 +654,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 * `--table-name TEXT`: The sink table name from where the undeploy will run.
 * `--product-name TEXT`: The product name to undeploy from
+* `--no-ack / --no-no-ack`: By default the undeploy will ask for confirmation. This flag will undeploy without confirmation.  [default: no-no-ack]
 * `--help`: Show this message and exit.
 
 ### `pipeline prepare`

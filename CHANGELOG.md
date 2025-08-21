@@ -1,6 +1,21 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.33
+* Add --pool-creation boolean to pipeline deploy to set to true when the compute pool can be created during build execution plan, so one statement is allocated per compute pool. The flag is set to False for pipeline build-execution-plan.
+* Add region to the statement name when deployed with Makefile
+* Undeploy pipeline is improved: delete ddl as part of undeploy, verify DML is not just RUNNING, but also Failed, completed, pending. Unknown status will not try to delete statement.
+* Add delete compute pool per product name. The command is `shift_left project --delete_al-compute-pools  product_1`. The product _1 string could be a string in the compute pool.
+* Add `--max-thread` to the deploy command when coupled with --parallel. When set to more than 1, the parallel is set to true automatically.
+* Add complexity to pipeline definition, by parsing SQL to count joins, left joins, outer joins, right joins.
+* Improve selecting autonomous nodes for parallel processing
+* Update doc on blue/green deployment with different scenarios.
+
+
+v0.1.32
+* Fix in pipeline_definition creation to improve SQL parser to get CREATE TABLE when searching for table name.
+* Remove recursivity in one search for parent in pipeline_mgr, add more unit tests.
+
 v0.1.31
 * Add --no-ack to the pipeline undeploy command
 * Fix issue in SQL parser to avoid getting some inner join and by passing FROM in function like SUBSTRING or TRIM

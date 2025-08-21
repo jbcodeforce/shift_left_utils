@@ -96,7 +96,9 @@ class BaseUT(unittest.TestCase):
         )
         return ComputePoolList(pools=[pool_1, pool_2, pool_3])
     
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, compute_pool_id: str) -> FlinkStatementNode:
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode, 
+                compute_pool_id: str,
+                pool_creation: bool) -> FlinkStatementNode:
         """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
         
         node.compute_pool_id = compute_pool_id
@@ -112,10 +114,17 @@ class BaseUT(unittest.TestCase):
         compute_pool_id: str = ""
     ) -> FlinkStatementNode:
         """Create a mock FlinkStatementNode object."""
-        return FlinkStatementNode(
+        node = FlinkStatementNode(
             table_name=table_name,
             product_name=product_name,
             dml_statement_name=dml_statement_name,
             ddl_statement_name=ddl_statement_name,
             compute_pool_id=compute_pool_id
         )
+        # Initialize with default statement info if not set
+        if not hasattr(node, 'existing_statement_info') or node.existing_statement_info is None:
+            node.existing_statement_info = self._create_mock_get_statement_info(
+                name=dml_statement_name,
+                status_phase="UNKNOWN"
+            )
+        return node

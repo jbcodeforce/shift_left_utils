@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- int_p1_table_2
 TABLE_NAME=int_p1_table_2
-SCRIPT_PRE_KEBAB=stage-p1
+SCRIPT_PRE_KEBAB=stage-usw2-p1
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
