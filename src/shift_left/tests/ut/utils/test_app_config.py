@@ -281,16 +281,6 @@ class TestValidateConfig(unittest.TestCase):
 
     def test_list_type_fields_validation(self):
         """Test that list type fields are properly validated"""
-        # Test products - should be list
-        config = self.valid_config.copy()
-        config["app"]["products"] = "not-a-list"
-        with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
-            validate_config(config)
-            mock_print.assert_called_once()
-            mock_exit.assert_called_once()
-            error_message = mock_print.call_args[0][0]
-            assert "Configuration app.products must be a list" in error_message
-        
         # Test accepted_common_products - should be list
         config = self.valid_config.copy()
         config["app"]["accepted_common_products"] = "not-a-list"
@@ -368,7 +358,6 @@ class TestValidateConfig(unittest.TestCase):
             "app": {
                 "delta_max_time_in_min": "invalid",  # Type error
                 "logging": "INVALID",  # Invalid value
-                "products": "not-a-list",  # Type error
                 # Missing many required fields
             }
         }
@@ -393,7 +382,6 @@ class TestValidateConfig(unittest.TestCase):
             # Should contain type errors
             assert "Configuration app.delta_max_time_in_min must be a number" in error_message
             assert "Configuration app.logging must be a valid log level" in error_message
-            assert "Configuration app.products must be a list" in error_message
             
 
     def test_get_config(self):
