@@ -766,6 +766,8 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
             if not enriched_node:
                 continue
             for parent in enriched_node.parents:
+                if parent.table_name == "stage_user_dimension":
+                    print(f"current node: {current_node.table_name}")
                 ancestor_dependencies.append((enriched_node.table_name, parent))
                 if parent.table_name not in new_ancestors.keys():
                     new_ancestors[parent.table_name] = parent

@@ -313,7 +313,7 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def _test_full_pipeline_undeploy(
+    def test_full_pipeline_undeploy(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,

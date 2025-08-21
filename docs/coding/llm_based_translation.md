@@ -361,6 +361,6 @@ Flink statements have dependencies, so it is important to use shift_left to mana
   
   ```
 
-* Add unit tests per table (at least for the complex DML ones) ([see test harness](../test_harness.md))
+* Add unit tests per table (at least for the complex DML ones) ([see test harness](./test_harness.md))
 * Add source data into the first tables of the pipeline 
 * Verify the created records within the sink tables.

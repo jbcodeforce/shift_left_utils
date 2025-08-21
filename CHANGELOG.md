@@ -8,6 +8,8 @@ v0.1.33
 * Add delete compute pool per product name. The command is `shift_left project --delete_al-compute-pools  product_1`. The product _1 string could be a string in the compute pool.
 * Add `--max-thread` to the deploy command when coupled with --parallel. When set to more than 1, the parallel is set to true automatically.
 * Add complexity to pipeline definition, by parsing SQL to count joins, left joins, outer joins, right joins.
+* Improve selecting autonomous nodes for parallel processing
+* Update doc on blue/green deployment with different scenarios.
 
 
 v0.1.32

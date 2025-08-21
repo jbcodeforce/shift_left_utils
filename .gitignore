@@ -15,6 +15,7 @@ tmp/
 .webui_secret_key
 set_test_env
 set_stage_env
+**/set_demo_env
 **to_investigate.md
 .idea/
 .gitconfig

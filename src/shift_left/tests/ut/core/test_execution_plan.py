@@ -34,6 +34,7 @@ class TestExecutionPlan(BaseUT):
           \          \
     src_a -> a        \
     src_b -> b ------>  c -> e
+    Added more nodes to test cross product.
     """
     
     TEST_COMPUTE_POOL_ID_1 = "lfcp-121"
