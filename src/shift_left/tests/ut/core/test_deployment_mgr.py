@@ -341,13 +341,13 @@ class TestDeploymentManager(BaseUT):
         
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
-            table_name="z",
+            sink_table_name="z",
             inventory_path=self.inventory_path
         )
         print(result)
         # Verify
         mock_delete.assert_called()
-        assert self.count == 11  # call for all tables
+        assert self.count == 6  # call for all 6 tables (z, d, c, f, p, e)
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
