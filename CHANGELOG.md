@@ -1,6 +1,9 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.34
+* Add an intermediate step in test harness to run the validation script by its own, using: `shift_left table run-validation-tests <table-name> <test_name>`
+ 
 v0.1.33
 * Add --pool-creation boolean to pipeline deploy to set to true when the compute pool can be created during build execution plan, so one statement is allocated per compute pool. The flag is set to False for pipeline build-execution-plan.
 * Add region to the statement name when deployed with Makefile

@@ -174,28 +174,35 @@ def init_unit_tests(
 @app.command()
 def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                run_all: bool = typer.Option(False, "--run-all", help="RBy default run insert sqls and foundations, with this flag it will also run validation sql too."),
                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get("flink").get("database_name")}")
-    if test_case_name:
-        
-        test_result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
-        # review this
-        test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, 
-                                            test_results={test_case_name: test_result})
-        print(f"Validation test: {test_result.result}")
-    else:
-        test_suite_result  = test_mgr.execute_all_tests(table_name, compute_pool_id)
+
+    test_suite_result  = test_mgr.execute_one_or_all_tests(table_name, test_case_name, compute_pool_id, run_all)
+    if run_all:
+        file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
+        with open(file_name, "w") as f:
+            f.write(test_suite_result.model_dump_json(indent=2))
+        print(f"Test suite report saved into {file_name}")
+    print("#" * 30 + f" Unit tests execution for {table_name} completed")
+
+@app.command()
+def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+                test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+    """
+    Run only the validation tests (1 to n validation tests) for a given table.
+    """
+    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id)
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
     with open(file_name, "w") as f:
         f.write(test_suite_result.model_dump_json(indent=2))
     print(f"Test suite report saved into {file_name}")
-    print("#" * 30 + f" Unit tests execution for {table_name} completed")
-
-
+    print("#" * 30 + f" Unit tests validation execution for {table_name} - {compute_pool_id}")
 
 @app.command()
 def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
