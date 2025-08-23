@@ -180,7 +180,7 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
-    print(f"Cluster name: {get_config().get("flink").get("database_name")}")
+    print(f"Cluster name: {get_config().get('flink').get('database_name')}")
 
     test_suite_result  = test_mgr.execute_one_or_all_tests(table_name, test_case_name, compute_pool_id, run_all)
     if run_all:
