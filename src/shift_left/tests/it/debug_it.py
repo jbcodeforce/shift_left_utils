@@ -34,8 +34,9 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['table', 'build-inventory'])
         #result = runner.invoke(app, ['pipeline', 'build-metadata', os.getenv('PIPELINES') + '/dimensions/aqem/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql'])
         #result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
-        result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'])
+        #result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'])
         # result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'])
+        result = runner.invoke(app, ['pipeline', 'build-all-metadata'])
         print(result.stdout)
 
       

@@ -363,7 +363,6 @@ def _execute_foundation_statements(
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
-        print(f"Execute DDL for {foundation.table_name} from {testfile_path}")
         statements = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
@@ -460,7 +459,7 @@ def _load_sql_and_execute_statement(table_name: str,
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
     logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
-    print(f"Execute statement {statement_name} on: {compute_pool_id}")
+    print(f"Execute statement {statement_name}, sql {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
                                                       statement_name=statement_name, 
                                                       compute_pool_id=compute_pool_id, 
