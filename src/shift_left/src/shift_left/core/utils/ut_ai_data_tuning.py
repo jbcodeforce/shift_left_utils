@@ -50,6 +50,7 @@ class AIBasedDataTuning:
         self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_test_key")
         print(f"Using {self.model_name} with {self.llm_base_url} and {self.llm_api_key[:25]}...")
         self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
+        self._load_prompts()
 
     def _load_prompts(self):
         fname = importlib.resources.files("shift_left.core.utils.prompts.unit_tests").joinpath("main_instructions.txt")
@@ -57,7 +58,7 @@ class AIBasedDataTuning:
             self.main_instructions= f.read()
 
     def update_synthetic_data(self, dml_content: str, test_definition: SLTestDefinition, test_case_name: str):
-        self._load_prompts()
+        
         
         # Find the test case
         test_case = next((tc for tc in test_definition.test_suite if tc.name == test_case_name), None)
@@ -111,5 +112,15 @@ class AIBasedDataTuning:
             return None 
 
     
-    
-            
+    def enhance_test_data(self, test_definition: SLTestDefinition, test_case_name: str = None):
+        """
+        Get over all in the insert sql content of all test cases to keep consitency
+        between data and compliance with the ddl of the input tables.
+        This involves orchestrating different agents. The input synthetic data was generated
+        without AI as it does not needs bigger machine.
+        This method uses the LLM to enhance the synthetic data. The steps are:
+        1. Using the dml under test and the n input data represented by insert .sql files, consider
+        the joins and modify the data between all inputs.
+         For each test case get the ddl definition and the insert sql content, and validate
+        """
+        

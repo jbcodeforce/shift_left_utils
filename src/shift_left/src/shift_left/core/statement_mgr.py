@@ -36,7 +36,7 @@ from shift_left.core.utils.file_search import (
 )
 from shift_left.core.utils.table_worker import NoChangeDoneToSqlContent
 
-STATEMENT_LIST_FILE=shift_left_dir + "/statement_list.json"
+STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
                                                       flink_statement_file_path: str = None,
