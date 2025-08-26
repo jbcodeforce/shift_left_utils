@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- src_p5_raw_active_users
 TABLE_NAME=src_p5_raw_active_users
-SCRIPT_PRE_KEBAB=dev-usw2-p5
+SCRIPT_PRE_KEBAB=stageb-usw2-p5
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)

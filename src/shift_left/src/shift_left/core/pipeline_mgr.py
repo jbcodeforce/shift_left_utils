@@ -94,7 +94,7 @@ def build_pipeline_definition_from_ddl_dml_content(
                                               children=set())
     node_to_process= deque()
     node_to_process.append(current_node)
-    _update_hierarchy_of_next_node(node_to_process, {current_node.table_name: current_node}, table_inventory)
+    _update_hierarchy_of_next_node(node_to_process, {}, table_inventory)
     return current_node
 
 def build_all_pipeline_definitions(pipeline_path: str):
@@ -326,7 +326,7 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logger.info(f"{current_node}")
+        logger.info(f"Work on hierarchy for {current_node.table_name}")
         if not current_node.table_name in processed_nodes:
             if not current_node.parents: # the current node may not be fully built yet
                 table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)

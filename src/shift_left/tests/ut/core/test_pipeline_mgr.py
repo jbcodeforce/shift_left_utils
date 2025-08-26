@@ -27,7 +27,7 @@ class TestPipelineManager(unittest.TestCase):
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
-        #pm.delete_all_metada_files(os.getenv("PIPELINES"))
+        pm.delete_all_metada_files(os.getenv("PIPELINES"))
 
     def test_PipelineReport(self):
         report: PipelineReport = PipelineReport(table_name="fct_order",
