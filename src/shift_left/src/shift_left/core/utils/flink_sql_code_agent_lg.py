@@ -21,7 +21,7 @@ Create Flink SQL with a set of agents working within the following workflow
 """
 
 model_name=os.getenv("LLM_MODEL","qwen2.5-coder:32b")
-model_name="cogito:32b"
+#model_name="cogito:32b"
 llm_base_url=os.getenv("LLM_BASE_URL","http://localhost:11434")
 model = OllamaLLM(model=model_name, base_url=llm_base_url)
 

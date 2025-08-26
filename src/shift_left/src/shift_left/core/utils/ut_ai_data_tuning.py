@@ -6,19 +6,32 @@ from shift_left.core.utils.app_config import get_config, logger
 import os
 from openai import OpenAI
 import importlib.resources
-from shift_left.core.test_mgr import SLTestDefinition, Foundation, SLTestData
+from shift_left.core.models.flink_test_model import SLTestDefinition, SLTestCase, TestResult, TestSuiteResult
 from shift_left.core.utils.sql_parser import SQLparser
 from pydantic import BaseModel
+from shift_left.core.utils.file_search import from_pipeline_to_absolute
+from shift_left.core.utils.app_config import get_config, logger
 
-
-
-class SyntheticData(BaseModel):
+class InputTestData(BaseModel):
     """
-    Synthetic data for the unit tests.
+    Input test data for one unit test.
     """
-    dml_to_test_content: str
-    current_synthetic_data: str
-    synthetic_data_to_test: str
+    ddl_content: str
+    table_name: str
+    insert_sql_content: str
+
+class OutputTestData(BaseModel):
+    """
+    Input test data for one unit test.
+    """
+    table_name: str
+    output_sql_content: str
+
+class OutputTestDataList(BaseModel):
+    """
+    List of output test data for one unit test.
+    """
+    outputs: list[OutputTestData]
 
 class AIBasedDataTuning:
     """
@@ -39,19 +52,63 @@ class AIBasedDataTuning:
         self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
 
     def _load_prompts(self):
-        fname = importlib.resources.files("shift_left.core.utils.prompts.ut_ai_data_tuning").joinpath("main_instructions.txt")
+        fname = importlib.resources.files("shift_left.core.utils.prompts.unit_tests").joinpath("main_instructions.txt")
         with fname.open("r") as f:
             self.main_instructions= f.read()
 
-    def update_synthetic_data(self, dml_content: str, test_definition: SLTestDefinition):
+    def update_synthetic_data(self, dml_content: str, test_definition: SLTestDefinition, test_case_name: str):
         self._load_prompts()
-        prompt = self.main_instructions.format(dml_content=dml_content, test_definition=test_definition)
-        response = self.llm_client.chat.completions.create(
-            model=self.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
+        
+        # Find the test case
+        test_case = next((tc for tc in test_definition.test_suite if tc.name == test_case_name), None)
+        
+        # Build DDL mapping from foundations
+        ddl_map = {foundation.table_name: foundation.ddl_for_test for foundation in test_definition.foundations}
+        
+        # Create structured input data
+        input_data_list = []
+        for input_data in test_case.inputs:
+            file_name = from_pipeline_to_absolute(input_data.file_name)
+            with open(file_name, "r") as f:
+                sql_content = f.read()
+            
+            # Get DDL content for this table
+            ddl_file_name = ddl_map.get(input_data.table_name, "")
+            with open(ddl_file_name, "r") as f:
+                ddl_content = f.read()
+            input_test_data = InputTestData(
+                ddl_content=ddl_content,
+                insert_sql_content=sql_content,
+                table_name=input_data.table_name
+            )
+            input_data_list.append(input_test_data)
+        
+        # Create structured prompt data
+        structured_input = {
+            "dml_under_test": dml_content,
+            "input_tables": [data.model_dump() for data in input_data_list]
+        }
+        
+        prompt = self.main_instructions.format(
+            dml_under_test_content=dml_content, 
+            structured_input=structured_input
         )
-        return response.choices[0].message.content
+        print(prompt)
+        try:
+            response = self.llm_client.chat.completions.parse(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                response_format=OutputTestDataList
+            )
+            print(response.choices[0])
+            obj_response = response.choices[0].message  
+            if obj_response.parsed:
+                return obj_response.parsed.outputs
+            else:
+                return None
+        except Exception as e:
+            print(f"Error: {e}")
+            return None 
 
     
     

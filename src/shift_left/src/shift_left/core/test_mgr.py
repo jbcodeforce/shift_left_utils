@@ -24,6 +24,7 @@ from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.models.flink_statement_model import Statement, StatementError, StatementResult
+from shift_left.core.models.flink_test_model import SLTestDefinition, SLTestCase, TestResult, TestSuiteResult, Foundation, SLTestData
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.utils.file_search import (
     FlinkTableReference,
@@ -32,6 +33,7 @@ from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
     from_pipeline_to_absolute
 )
+from shift_left.core.utils.ut_ai_data_tuning import AIBasedDataTuning
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
@@ -55,45 +57,15 @@ DEFAULT_TEST_CASES_COUNT: Final[int] = 2  # Number of test cases to create by de
 
 
 
-class SLTestData(BaseModel):
-    table_name: str
-    file_name: str
-    file_type: str = "sql"
-
-class SLTestCase(BaseModel):
-    name: str
-    inputs: List[SLTestData]
-    outputs: List[SLTestData]
-
-class Foundation(BaseModel):
-    """
-    represent the table to test and the ddl for the input tables to be created during tests.
-    Those tables will be deleted after the tests are run.
-    """
-    table_name: str
-    ddl_for_test: str
-
-class SLTestDefinition(BaseModel):
-    foundations: List[Foundation]
-    test_suite: List[SLTestCase]
-
-class TestResult(BaseModel):
-    test_case_name: str
-    result: str
-    validation_result: StatementResult = None
-    foundation_statements: List[Statement] = []
-    statements: List[Statement] = []
-
-class TestSuiteResult(BaseModel):
-    foundation_statements: List[Statement] = []
-    test_results: Dict[str, TestResult] = {}
-
 class TopicListCache(BaseModel):
     created_at: Optional[datetime] = Field(default=datetime.now())
     topic_list: Optional[dict[str, str]] = Field(default={})
 
 # ----------- Public APIs  ------------------------------------------------------------
-def init_unit_test_for_table(table_name: str, create_csv: bool = False) -> None:
+def init_unit_test_for_table(table_name: str, 
+        create_csv: bool = False, 
+        nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
+        use_ai: bool = False) -> None:
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
     """
@@ -103,10 +75,12 @@ def init_unit_test_for_table(table_name: str, create_csv: bool = False) -> None:
     table_folder = table_ref.table_folder_name
     test_folder_path = from_pipeline_to_absolute(table_folder)
     create_folder_if_not_exist(f"{test_folder_path}/tests")
-    _add_test_files(table_ref=table_ref, 
+    _add_test_files(table_to_test_ref=table_ref, 
                     tests_folder=f"{table_folder}/tests", 
                     table_inventory=table_inventory,
-                    create_csv=create_csv)
+                    create_csv=create_csv,
+                    nb_test_cases=nb_test_cases,
+                    use_ai=use_ai)
 
 def execute_one_or_all_tests(table_name: str, 
                       test_case_name: str = None, 
@@ -164,6 +138,7 @@ def execute_validation_tests(table_name: str,
     """
     Execute all validation tests defined in the test suite definition for a given table.
     """
+    logger.info(f"Execute validation tests for {table_name}")
     config = get_config()
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
@@ -248,19 +223,6 @@ def _init_test_foundations(table_name: str,
                                             table_ref, prefix, compute_pool_id, 
                                             statements=test_result.foundation_statements)
     return test_suite_def, table_ref, prefix, test_result
-
-
-
-def _delete_test_statements(statement_names: List[str]) -> None:
-    for stmt_name in statement_names:
-        statement_mgr.delete_statement_if_exists(stmt_name)
-
-
-def _drop_test_tables(test_suite_def: SLTestDefinition, main_table_name: str) -> None:
-    for foundation in test_suite_def.foundations:
-        statement_mgr.drop_table(foundation.table_name)
-    statement_mgr.drop_table(main_table_name)
-
 
 
 def _execute_flink_test_statement(
@@ -352,7 +314,6 @@ def _execute_foundation_statements(
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
-        print(f"Execute DDL for {foundation.table_name} from {testfile_path}")
         statements = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
@@ -444,12 +405,12 @@ def _load_sql_and_execute_statement(table_name: str,
 
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
-    if statement_info and statement_info.status_phase == "RUNNING":
+    if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
         return None  # Return None when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
-    logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
-    print(f"Execute statement {statement_name} on: {compute_pool_id}")
+    logger.info(f"Execute statement {statement_name} for {sql_path} on: {compute_pool_id}")
+    print(f"Execute statement {statement_name} for {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
                                                       statement_name=statement_name, 
                                                       compute_pool_id=compute_pool_id, 
@@ -575,29 +536,32 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
     print(f"Final Result for {statement_name}: {final_row}")
     return final_row, resp
 
-def _add_test_files(table_ref: FlinkTableReference, 
+def _add_test_files(table_to_test_ref: FlinkTableReference, 
                     tests_folder: str, 
                     table_inventory: Dict[str, FlinkTableReference],
-                    create_csv: bool = False) -> SLTestDefinition:
+                    create_csv: bool = False,
+                    nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
+                    use_ai: bool = False) -> SLTestDefinition:
     """
     Add the test files to the table/tests folder by looking at the referenced tables in the DML SQL content.
     """
-    file_path = from_pipeline_to_absolute(table_ref.dml_ref)
+    dml_file_path = from_pipeline_to_absolute(table_to_test_ref.dml_ref)
     referenced_table_names: Optional[List[str]] = None
     primary_keys: List[str] = []
-    with open(file_path) as f:
-        sql_content = f.read()
+    dml_sql_content = ""
+    with open(dml_file_path) as f:
+        dml_sql_content = f.read()
         parser = SQLparser()
-        referenced_table_names = parser.extract_table_references(sql_content)
-        primary_keys = parser.extract_primary_key_from_sql_content(sql_content)
+        referenced_table_names = parser.extract_table_references(dml_sql_content)
+        primary_keys = parser.extract_primary_key_from_sql_content(dml_sql_content)
         # keep as print for user feedback
         print(f"From the DML under test the referenced table names are: {referenced_table_names}")
     if not referenced_table_names:
-        logger.error(f"No referenced table names found in the sql_content of {file_path}")
-        raise ValueError(f"No referenced table names found in the sql_content of {file_path}")
+        logger.error(f"No referenced table names found in the sql_content of {dml_file_path}")
+        raise ValueError(f"No referenced table names found in the sql_content of {dml_file_path}")
 
     tests_folder_path = from_pipeline_to_absolute(tests_folder)
-    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_ref.table_name, referenced_table_names, create_csv)
+    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_to_test_ref.table_name, referenced_table_names, create_csv, nb_test_cases)
     table_struct = _process_foundation_ddl_from_test_definitions(test_definition, tests_folder_path, table_inventory)
     
     # Create template files for each test case
@@ -622,16 +586,13 @@ def _add_test_files(table_ref: FlinkTableReference,
         # Create output validation files 
         for output_data in test_case.outputs:
             output_file = os.path.join(tests_folder_path, '..', output_data.file_name)
-            sql_content = "with result_table as (\n"
-            sql_content += f"   select * from {output_data.table_name}{POST_FIX_UNIT_TEST}\n"
-            sql_content += f"   where sid IS NOT NULL\n"
-            sql_content += f"   --- and ... add more validations here\n"
-            sql_content += ")\n"
-            sql_content += f"SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END as test_result from result_table"
+            dml_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
             with open(output_file, "w") as f:
-                f.write(sql_content)
+                f.write(dml_sql_content)
+        if use_ai:
+            _add_data_consistency_with_ai(test_case, dml_sql_content, table_to_test_ref)
 
-    _generate_test_readme(table_ref, test_definition, primary_keys, tests_folder_path)
+    _generate_test_readme(table_to_test_ref, test_definition, primary_keys, tests_folder_path)
     return test_definition
 
 
@@ -658,11 +619,24 @@ def _generate_test_readme(table_ref: FlinkTableReference,
     with open(tests_folder_path + '/README.md', 'w') as f:
         f.write(rendered_readme_md)
 
+def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefinition) -> str:
+    """
+    Build the validation SQL content for a given table.
+    """
+    env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    template = env.get_template("validate_test.jinja")
+    context = {
+        'table_name': table_name + POST_FIX_UNIT_TEST
+    }
+    sql_content = template.render(context)
+    return sql_content
+
 def _build_save_test_definition_json_file(
         file_path: str, 
         table_name: str, 
         referenced_table_names: List[str],
-        create_csv: bool = False
+        create_csv: bool = False,
+        nb_test_cases: int = DEFAULT_TEST_CASES_COUNT
 ) -> SLTestDefinition:
     """
     Build the test definition file for the unit tests.
@@ -677,7 +651,7 @@ def _build_save_test_definition_json_file(
         if input_table not in table_name:
             foundation_table_name = Foundation(table_name=input_table, ddl_for_test=f"./tests/ddl_{input_table}.sql")
             test_definition.foundations.append(foundation_table_name)
-    for i in range(1, DEFAULT_TEST_CASES_COUNT + 1):
+    for i in range(1, nb_test_cases + 1):
         test_case = SLTestCase(name=f"test_{table_name}_{i}", inputs=[], outputs=[])
         for input_table in referenced_table_names:
             if input_table not in table_name:
@@ -818,12 +792,20 @@ def _build_statement_name(table_name: str, prefix: str) -> str:
     return statement_name.replace('_', '-').replace('.', '-')
 
 
-def _add_data_consistency_with_ai(test_definition: SLTestDefinition):
+def _add_data_consistency_with_ai(test_case: SLTestCase, 
+    dml_sql_content: str, 
+    ddl_sql_content: str, 
+    table_to_test_ref: FlinkTableReference):
     """
     Add data consistency with AI:
     1/ from the dml content ask to keep integrity of the data for the joins logic and primary keys
     2/ search for the insert sql statment and the validate sql statement and ask to keep the data consistency
    
     """
-    pass
+    ddl_file_path = from_pipeline_to_absolute(table_to_test_ref.ddl_ref)
+    ddl_sql_content = ""
+    with open(ddl_file_path) as f:
+        ddl_sql_content = f.read()
+    agent = AIBasedDataTuning()
+    agent.update_synthetic_data(dml_sql_content, ddl_sql_content, test_case)
 

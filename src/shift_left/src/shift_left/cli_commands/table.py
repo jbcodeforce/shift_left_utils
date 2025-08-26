@@ -160,15 +160,16 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 @app.command()
 def init_unit_tests(
     table_name: Annotated[str, typer.Argument(help="Name of the table to unit tests.")],
-    create_csv: bool = typer.Option(False, "--create-csv", help="If set, also create a CSV file for the unit test data.")
-):
+    create_csv: bool = typer.Option(False, "--create-csv", help="If set, also create a CSV file for the unit test data."),
+    nb_test_cases: int = typer.Option(default=test_mgr.DEFAULT_TEST_CASES_COUNT, help="Number of test cases to create. Default is 2."),
+    ai: bool = typer.Option(False, "--ai", help="Use AI to generate test data and validate with tool calling.")):
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statements to create the insert statements for the unit tests.
     It is using the table inventory to find the table folder for the given table name.
     Optionally, it can also create a CSV file for the unit test data if --create-csv is set.
     """
     print("#" * 30 + f" Unit tests initialization for {table_name}")
-    test_mgr.init_unit_test_for_table(table_name, create_csv=create_csv)
+    test_mgr.init_unit_test_for_table(table_name, create_csv=create_csv, nb_test_cases=nb_test_cases, use_ai=ai)
     print("#" * 30 + f" Unit tests initialization for {table_name} completed")
     
 @app.command()
