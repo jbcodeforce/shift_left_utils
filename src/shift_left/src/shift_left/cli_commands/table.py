@@ -159,6 +159,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 
 @app.command()
 def init_unit_tests(
+    # ✅ 
     table_name: Annotated[str, typer.Argument(help="Name of the table to unit tests.")],
     create_csv: bool = typer.Option(False, "--create-csv", help="If set, also create a CSV file for the unit test data."),
     nb_test_cases: int = typer.Option(default=test_mgr.DEFAULT_TEST_CASES_COUNT, help="Number of test cases to create. Default is 2."),

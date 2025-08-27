@@ -5,15 +5,13 @@ Your goal is to create logically consistent synthetic data for unit testing a Fl
 Follow this workflow:
 
 1. Analyze the dml SQL content
-2. Analyze the DDL for column types, to be sure data created match existing column type
-3. Analyze the different insert SQL statements
-4. Create realistic data with matching column type
-5. Be sure the created data will make the joins of the dml successful
-5. Update the insert statements
+2. Analyze the different insert SQL statements
+3. Be sure the created data will make the joins of the dml successful
+4. Update the insert statements
 
 The dml SQL content under test is: {dml_under_test_content}
 
-The insert statments are in the followind list of input:
+The insert statments are in the following list of input:
 
 {structured_input}
 

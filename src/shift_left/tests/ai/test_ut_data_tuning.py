@@ -51,48 +51,29 @@ class TestUtaiDataTuning(unittest.TestCase):
         ) DISTRIBUTED BY HASH(id) INTO 1 BUCKETS
         """
         base_table_path = os.environ["PIPELINES"] +  "/facts/p1/fct_order"
-        int_table_1 = SLTestData(table_name="int_table_1", file_name=base_table_path + "/tests/insert_int_table_1_1.sql")
-        int_table_2 = SLTestData(table_name="int_table_2", file_name=base_table_path + "/tests/insert_int_table_2_1.sql")
+        int_table_1 = SLTestData(table_name="int_table_1", file_name= "./tests/insert_int_table_1_1.sql")
+        int_table_2 = SLTestData(table_name="int_table_2", file_name= "./tests/insert_int_table_2_1.sql")
+        output_data = SLTestData(table_name="p1_fct_order", file_name= "./tests/validate_fct_order_1.sql")
         test_case = SLTestCase(
             name="test_case_1",
             inputs=[int_table_1, int_table_2],
-            outputs=[]
+            outputs=[output_data]
         )
-        foundation_1 = Foundation(table_name="int_table_1", ddl_for_test=base_table_path + "/tests/ddl_int_table_1.sql")
-        foundation_2 = Foundation(table_name="int_table_2", ddl_for_test=base_table_path + "/tests/ddl_int_table_2.sql")
+        foundation_1 = Foundation(table_name="int_table_1", ddl_for_test= "./tests/ddl_int_table_1.sql")
+        foundation_2 = Foundation(table_name="int_table_2", ddl_for_test= "./tests/ddl_int_table_2.sql")
         test_suite = SLTestDefinition(
             foundations=[foundation_1, foundation_2],
             test_suite=[test_case]
         )
-        data = AIBasedDataTuning().update_synthetic_data(dml_content, test_suite, "test_case_1")
+        data = AIBasedDataTuning().enhance_test_data(base_table_path, dml_content, test_suite, "test_case_1")
         self.assertIsNotNone(data)
         for output in data:
             print(output.table_name)
             print(output.output_sql_content)
+            print(output.file_name)
 
 
-    def _test_modify_data_to_match_column_types(self):
-        """
-        Test the modify_data_to_match_column_types method.
-        """
-        foundation_1 = Foundation(table_name="table_1", ddl_for_test="./tests/ddl_table_1.sql")
-        input_data_1 = SLTestData(table_name="table_1", file_name="./tests/insert_table_1.sql")
-        test_case_1 = SLTestCase(
-            name="test_case_1",
-            inputs=[input_data_1],
-            outputs=[]
-        )
-        test_definition = SLTestDefinition(
-            foundations=[foundation_1],
-            test_suite=[test_case_1]
-        )
-        path_to_table =  str(pathlib.Path(__file__).parent)
-        for foundation in test_definition.foundations:
-            for test_case in test_definition.test_suite:
-                for input_data in test_case.inputs:
-                    if input_data.table_name == foundation.table_name:
-                        result = AIBasedDataTuning()._modify_data_to_match_column_types(path_to_table, foundation, input_data)
-                        self.assertIsNotNone(result)
+
 
 if __name__ == "__main__":
     unittest.main() 

@@ -16,19 +16,6 @@ with expected_results as (
         'element_id_3' as expected_element_target_id,
         'tag_id_3' as expected_tag_id,
         'tenant_id_3' as expected_tenant_id
-    -- Expected parent-child tag inheritance relationships (from parent_tag_join CTE)
-    union all
-    select 
-        MD5(CONCAT_WS(',', 'child_element_id_1', 'tag_id_4', 'tenant_id_1')) as expected_sid,
-        'child_element_id_1' as expected_element_target_id,
-        'tag_id_4' as expected_tag_id,
-        'tenant_id_1' as expected_tenant_id
-    union all
-    select 
-        MD5(CONCAT_WS(',', 'child_element_id_1', 'tag_id_5', 'tenant_id_1')) as expected_sid,
-        'child_element_id_1' as expected_element_target_id,
-        'tag_id_5' as expected_tag_id,
-        'tenant_id_1' as expected_tenant_id
 ),
 actual_results as (
     select 
@@ -65,8 +52,8 @@ overall_result as (
 )
 select 
     case 
-        when total_expected_records = 5 
-         and passing_records = 5 
+        when total_expected_records = 3 
+         and passing_records = 3
         then 'PASS' 
         else 'FAIL' 
     end as test_result,

@@ -548,12 +548,12 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
     dml_file_path = from_pipeline_to_absolute(table_to_test_ref.dml_ref)
     referenced_table_names: Optional[List[str]] = None
     primary_keys: List[str] = []
-    dml_sql_content = ""
+    sql_content = ""
     with open(dml_file_path) as f:
-        dml_sql_content = f.read()
+        sql_content = f.read()
         parser = SQLparser()
-        referenced_table_names = parser.extract_table_references(dml_sql_content)
-        primary_keys = parser.extract_primary_key_from_sql_content(dml_sql_content)
+        referenced_table_names = parser.extract_table_references(sql_content)
+        primary_keys = parser.extract_primary_key_from_sql_content(sql_content)
         # keep as print for user feedback
         print(f"From the DML under test the referenced table names are: {referenced_table_names}")
     if not referenced_table_names:
@@ -586,11 +586,11 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
         # Create output validation files 
         for output_data in test_case.outputs:
             output_file = os.path.join(tests_folder_path, '..', output_data.file_name)
-            dml_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
+            validation_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
             with open(output_file, "w") as f:
-                f.write(dml_sql_content)
+                f.write(validation_sql_content)
         if use_ai:
-            _add_data_consistency_with_ai(test_case, dml_sql_content, table_to_test_ref)
+            _add_data_consistency_with_ai(table_to_test_ref.table_folder_name, test_definition, sql_content, test_case.name)
 
     _generate_test_readme(table_to_test_ref, test_definition, primary_keys, tests_folder_path)
     return test_definition
@@ -792,20 +792,22 @@ def _build_statement_name(table_name: str, prefix: str) -> str:
     return statement_name.replace('_', '-').replace('.', '-')
 
 
-def _add_data_consistency_with_ai(test_case: SLTestCase, 
+def _add_data_consistency_with_ai(table_folder_name: str, 
+    test_definition: SLTestDefinition, 
     dml_sql_content: str, 
-    ddl_sql_content: str, 
-    table_to_test_ref: FlinkTableReference):
+    test_case_name: str = None
+):
     """
     Add data consistency with AI:
     1/ from the dml content ask to keep integrity of the data for the joins logic and primary keys
     2/ search for the insert sql statment and the validate sql statement and ask to keep the data consistency
-   
     """
-    ddl_file_path = from_pipeline_to_absolute(table_to_test_ref.ddl_ref)
-    ddl_sql_content = ""
-    with open(ddl_file_path) as f:
-        ddl_sql_content = f.read()
+
     agent = AIBasedDataTuning()
-    agent.update_synthetic_data(dml_sql_content, ddl_sql_content, test_case)
+    output_data_list = agent.enhance_test_data(table_folder_name, dml_sql_content, test_definition, test_case_name)
+    for output_data in output_data_list:
+        if output_data.file_name:
+            logger.info(f"Update insert sql content for {output_data.file_name}")
+            with open(output_data.file_name, "w") as f:
+                f.write(output_data.output_sql_content)
 
