@@ -52,7 +52,7 @@ MAX_SQL_CONTENT_SIZE_BYTES: Final[int] = 4_000_000  # 4MB limit for SQL content
 MAX_STATEMENT_NAME_LENGTH: Final[int] = 52  # Maximum characters for statement name
 
 # Test data generation constants
-DEFAULT_TEST_DATA_ROWS: Final[int] = 5  # Number of sample rows to generate
+DEFAULT_TEST_DATA_ROWS: Final[int] = 3 # Number of sample rows to generate
 DEFAULT_TEST_CASES_COUNT: Final[int] = 2  # Number of test cases to create by default
 
 
@@ -341,20 +341,74 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
     """
     Run DDL and DML statements for the given tested table
     """
-    def replace_table_name(sql_content: str) -> str:
+    def extract_all_table_names(sql_content: str) -> set:
+        """
+        Extract table names from SQL using multiple approaches to handle DML and DDL statements.
+        """
+        table_names = set()
+        
+        # Use the existing SQL parser for DML statements (SELECT, INSERT, etc.)
         parser = SQLparser()
-        table_names = parser.extract_table_references(sql_content)
+        dml_tables = parser.extract_table_references(sql_content)
+        table_names.update(dml_tables)
+        
+        # Additional patterns for comma-separated tables and schema.table formats in FROM clauses
+        # This handles cases like "FROM table1, table2, table3" and "FROM schema.`table`"
+        from_comma_pattern = r'\bFROM\s+((?:`?[a-zA-Z_][a-zA-Z0-9_]*(?:\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?)*`?(?:\s*,\s*`?[a-zA-Z_][a-zA-Z0-9_]*(?:\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?)*`?)*)+)'
+        from_matches = re.findall(from_comma_pattern, sql_content, re.IGNORECASE)
+        for match in from_matches:
+            # Split by comma and extract individual table names
+            table_list = re.split(r'\s*,\s*', match.strip())
+            for table in table_list:
+                # Extract all table/schema parts using a more comprehensive regex
+                # This pattern matches both schema.table and individual table names, with optional backticks
+                table_parts_pattern = r'`?([a-zA-Z_][a-zA-Z0-9_]*)`?'
+                parts = re.findall(table_parts_pattern, table.strip())
+                for part in parts:
+                    if part and not part.isdigit():  # Avoid numeric values
+                        table_names.add(part)
+        
+        # Additional patterns for DDL statements not handled by the SQL parser
+        ddl_patterns = [
+            r'\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # DROP TABLE
+            r'\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # CREATE TABLE
+            r'\bTRUNCATE\s+TABLE\s+(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # TRUNCATE TABLE
+            r'\bALTER\s+TABLE\s+(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # ALTER TABLE
+        ]
+        
+        for pattern in ddl_patterns:
+            matches = re.findall(pattern, sql_content, re.IGNORECASE)
+            for match in matches:
+                # Remove backticks for consistent handling
+                clean_name = match.strip('`')
+                table_names.add(clean_name)
+        
+        return table_names
+
+    def replace_table_name(sql_content: str) -> str:
+        table_names = extract_all_table_names(sql_content)
         
         # Sort table names by length (descending) to avoid substring replacement issues
         # This ensures longer table names are replaced first, preventing partial matches
         sorted_table_names = sorted(table_names, key=len, reverse=True)
         
         for table in sorted_table_names:
-            # Use regex with word boundaries to ensure we only replace complete table names
-            # This pattern matches the table name when it's surrounded by word boundaries,
-            # spaces, or SQL punctuation (commas, parentheses, etc.)
-            pattern = r'\b' + re.escape(table) + r'\b'
-            sql_content = re.sub(pattern, f"{table}{POST_FIX_UNIT_TEST}", sql_content, flags=re.IGNORECASE)
+            # Use regex with capturing groups to preserve backticks
+            # This pattern specifically handles backticks vs word boundaries separately
+            escaped_table = re.escape(table)
+            
+            # Handle backticked table names
+            backtick_pattern = r'`(' + escaped_table + r')`'
+            sql_content = re.sub(backtick_pattern, f'`{table}{POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            
+            # Handle non-backticked table names with word boundaries
+            word_pattern = r'\b(' + escaped_table + r')\b'
+            
+            def replacement_func(match):
+                table_name = match.group(1)
+                return f"{table_name}{POST_FIX_UNIT_TEST}"
+            
+            sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
         logger.info(f"Replaced table names in SQL content: {sql_content}")
         return sql_content
 
@@ -406,11 +460,12 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
     if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
+        print(f"Statement {statement_name} already exists and is running -> do nothing")
         return None  # Return None when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
-    logger.info(f"Execute statement {statement_name} for {sql_path} on: {compute_pool_id}")
-    print(f"Execute statement {statement_name} for {sql_path} on: {compute_pool_id}")
+    logger.info(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
+    print(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
                                                       statement_name=statement_name, 
                                                       compute_pool_id=compute_pool_id, 
@@ -419,7 +474,10 @@ def _load_sql_and_execute_statement(table_name: str,
         statements.append(statement)
         if statement.status and statement.status.phase == "FAILED":
             logger.error(f"{statement.status}")
+            print(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
             raise ValueError(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
+        else:
+            print(f"Executed test foundations for {table_name}.. {statement.status.phase}\n")
     return statements
 
 def _execute_test_inputs(test_case: SLTestCase, 

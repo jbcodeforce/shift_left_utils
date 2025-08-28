@@ -13,3 +13,7 @@ The source DDL: {ddl_content}
 The insert statment is {sql_content}
 
 return the modified sql_content only no explanation needed. 
+
+## Some mapping Rules
+
+* when a column is name `__op` the value should 'u'

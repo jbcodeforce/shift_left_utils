@@ -134,7 +134,7 @@ class AIBasedDataTuning:
                     post_fix_unit_test = get_config().get("app").get("post_fix_unit_test", "_ut")
                     for output in obj_response.parsed.outputs:
                         _table_name = output.table_name
-                        if post_fix_unit_test and _table_name.endswith(post_fix_unit_test):
+                        if _table_name.endswith(post_fix_unit_test):
                             _table_name = _table_name[: -len(post_fix_unit_test)]
                         _table_name = _table_name.split("/")[-1]
                         data = output_data_list.get(_table_name, None)
@@ -174,25 +174,41 @@ class AIBasedDataTuning:
 
     def _update_synthetic_data_validation_sql(self,
                 base_table_path: str,  
-                input_list: List[str], 
+                input_list: dict[str, OutputTestData], 
                 dml_content: str, 
                 test_definition: SLTestDefinition, 
-                test_case_name: str = None) -> list[OutputTestData]:
+                test_case_name: str = None) -> dict[str, OutputTestData]:
         """
+        Update the synthetic data validation SQL for test cases.
+
+        This function updates the validation SQL statements for the provided test cases to ensure
+        that the validation logic is consistent with the generated synthetic data and DML content.
+        If no specific test_case_name is provided, it processes all test cases in the test_definition.
+        Otherwise, it updates the validation SQL for the specified test case.
+
+        Args:
+            base_table_path (str): The base path to the table directory.
+            input_list (List[str]): List of input SQL content or OutputTestData objects for the test cases.
+            dml_content (str): The DML SQL content used for generating test data.
+            test_definition (SLTestDefinition): The test suite definition containing test cases.
+            test_case_name (str, optional): The name of the specific test case to update. If None, all test cases are processed.
+
+        Returns:
+            dict[str,OutputTestData]: A list of OutputTestData objects with updated validation SQL content.
         """
         validation_content = ""
         if test_case_name is None:
-            accumulatedOutputStatements = []
+            accumulatedOutputTestData = {}
             for test_case in test_definition.test_suite:
                 output_data = self._update_synthetic_data_validation_sql(base_table_path, input_list, dml_content, test_definition, test_case.name)
-                accumulatedOutputStatements.extend(output_data)
-            return accumulatedOutputStatements
+                accumulatedOutputTestData.update(output_data)
+            return accumulatedOutputTestData
         else:
             test_case = next((tc for tc in test_definition.test_suite if tc.name == test_case_name), None)
             validation_fname = from_pipeline_to_absolute(base_table_path + "/" + test_case.outputs[0].file_name)
             with open(validation_fname, "r") as f:
                 validation_content = f.read()
-            input_sqls = '\n'.join([input_data.output_sql_content for input_data in input_list])
+            input_sqls = '\n'.join([input_data.output_sql_content for input_data in input_list.values()])
             prompt = self.data_validation_sql_update.format(
                 dml_content=dml_content, 
                 validation_content=validation_content,
@@ -212,9 +228,7 @@ class AIBasedDataTuning:
                 obj_response = response.choices[0].message  
                 if obj_response.parsed:
                     validation_output.output_sql_content=obj_response.parsed.output_sql_content
-                    return [validation_output]
-                else:
-                    return [validation_content]
+                return {validation_output.table_name: validation_output}
             except Exception as e:
                 print(f"Error: {e}")
                 return [validation_content]
@@ -239,9 +253,9 @@ class AIBasedDataTuning:
         """
         ddl_map = {foundation.table_name: from_pipeline_to_absolute(base_table_path + "/" + foundation.ddl_for_test) for foundation in test_definition.foundations} 
         output_data_list = self._update_synthetic_data_cross_statements(base_table_path, dml_content, test_definition, ddl_map, test_case_name)
-        for  output_table_name in output_data_list.items():
+        for  output_table_name, output_data in output_data_list.items():
             ddl_file_name = ddl_map.get(output_table_name, "")
-            output_sql_content = output_data_list['output_table_name'].output_sql_content
+            output_sql_content = output_data.output_sql_content
             logger.info(f"Update insert sql content for {output_sql_content}")         
             with open(ddl_file_name, "r") as f:
                 ddl_content = f.read()
@@ -250,5 +264,5 @@ class AIBasedDataTuning:
                 #output_data.file_name = ddl_file_name
 
         validation_output = self._update_synthetic_data_validation_sql(base_table_path, output_data_list, dml_content, test_definition, test_case_name)
-        output_data_list.extend(validation_output)
-        return output_data_list
+        output_data_list.update(validation_output)
+        return output_data_list.values()
