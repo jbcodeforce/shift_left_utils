@@ -641,8 +641,8 @@ class TestTestManager(unittest.TestCase):
         self.assertIn("'name_1'", rows)  # VARCHAR columns should have quoted values
         self.assertIn("'description_2'", rows)
         
-        # Should have 5 rows
-        self.assertEqual(rows.count("),"), 4)  # 4 commas between 5 rows
+        # Should have DEFAULT_TEST_DATA_ROWS rows
+        self.assertEqual(rows.count("),"), test_mgr.DEFAULT_TEST_DATA_ROWS - 1)  # 4 commas between 5 rows
 
     def test_build_data_sample_with_offset(self):
         """Test building data samples with index offset."""
@@ -652,7 +652,7 @@ class TestTestManager(unittest.TestCase):
         
         # Should start from index 11 (10 + 1)
         self.assertIn("'name_11'", rows)
-        self.assertIn("'name_15'", rows)  # Last row should be 15 (10 + 5)
+        self.assertIn("'name_1" + str(test_mgr.DEFAULT_TEST_DATA_ROWS) +"'", rows)  # Last row should be 15 (10 + DEFAULT_TEST_DATA_ROWS)
 
     @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.os.remove')

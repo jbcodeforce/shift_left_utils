@@ -18,9 +18,9 @@ from shift_left.core.utils.file_search import get_or_build_inventory
 
 class TestIntegrationTestsInit(BaseUT):
     """
-    TDD: validate that init_integration_test_for_pipeline creates a tests folder structure
+    validate that init_integration_test_for_pipeline creates a tests folder structure
     with insert statements for source tables and validation SQLs for relevant intermediates
-    and the target table.
+    and the sink tables.
    """
 
     @classmethod
@@ -39,13 +39,11 @@ class TestIntegrationTestsInit(BaseUT):
         if tests_dir.exists():
             shutil.rmtree(tests_dir)
 
-   
-
     def _assert_files_exist(self, base_dir: pathlib.Path, file_names: list[str]) -> None:
         for fn in file_names:
             self.assertTrue((base_dir / fn).exists(), f"Expected file missing: {(base_dir / fn)}")
 
-    def _test_init_for_leaf_table_f_creates_inserts_and_validations(self) -> None:
+    def test_init_for_leaf_table_f_creates_inserts_and_validations(self) -> None:
         """
         For target table 'f' (leaf), expect:
         - inserts for sources feeding the pipeline (src_x, src_y)
