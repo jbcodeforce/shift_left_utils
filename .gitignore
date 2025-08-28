@@ -21,3 +21,4 @@ set_stage_env
 .gitconfig
 set_dev_env
 .vscode/launch.json
+.env.secrets

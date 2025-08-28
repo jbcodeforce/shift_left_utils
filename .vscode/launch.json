@@ -25,6 +25,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env.secrets",
             "env": {
                 //"CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
                 "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
@@ -40,6 +41,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
+            "envFile": "${workspaceFolder}/.env.secrets",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
                 "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"

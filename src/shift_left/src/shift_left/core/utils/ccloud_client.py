@@ -273,13 +273,19 @@ class ConfluentCloudClient:
         url = self.build_flink_url_and_auth_header()
         try:
             resp=self.make_request("GET",f"{url}/statements/{statement_name}")
-            if resp:
+            if resp and not resp.get("errors"):
                 try:
                     s: Statement = Statement.model_validate(resp)
                     return s 
                 except Exception as e:
-                    logger.error(f"Error parsing statement response: {resp}")
+                    logger.error(f"Error parsing statement response: {resp} with error {e}")
                     return None
+            elif resp and resp.get("errors") and resp.get("errors")[0].get("status") == "404":
+                logger.warning(f"Statement {statement_name} not found") 
+                return None
+            else:
+                logger.error(f"Error getting statement {statement_name}: {resp}")
+                return None
         except Exception as e:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             raise e

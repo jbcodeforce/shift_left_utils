@@ -24,6 +24,7 @@ from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.models.flink_statement_model import Statement, StatementError, StatementResult
+from shift_left.core.models.flink_test_model import SLTestDefinition, SLTestCase, TestResult, TestSuiteResult, Foundation, SLTestData
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.utils.file_search import (
     FlinkTableReference,
@@ -32,6 +33,7 @@ from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
     from_pipeline_to_absolute
 )
+from shift_left.core.utils.ut_ai_data_tuning import AIBasedDataTuning
 
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
@@ -50,50 +52,20 @@ MAX_SQL_CONTENT_SIZE_BYTES: Final[int] = 4_000_000  # 4MB limit for SQL content
 MAX_STATEMENT_NAME_LENGTH: Final[int] = 52  # Maximum characters for statement name
 
 # Test data generation constants
-DEFAULT_TEST_DATA_ROWS: Final[int] = 5  # Number of sample rows to generate
+DEFAULT_TEST_DATA_ROWS: Final[int] = 3 # Number of sample rows to generate
 DEFAULT_TEST_CASES_COUNT: Final[int] = 2  # Number of test cases to create by default
 
 
-
-class SLTestData(BaseModel):
-    table_name: str
-    file_name: str
-    file_type: str = "sql"
-
-class SLTestCase(BaseModel):
-    name: str
-    inputs: List[SLTestData]
-    outputs: List[SLTestData]
-
-class Foundation(BaseModel):
-    """
-    represent the table to test and the ddl for the input tables to be created during tests.
-    Those tables will be deleted after the tests are run.
-    """
-    table_name: str
-    ddl_for_test: str
-
-class SLTestDefinition(BaseModel):
-    foundations: List[Foundation]
-    test_suite: List[SLTestCase]
-
-class TestResult(BaseModel):
-    test_case_name: str
-    result: str
-    validation_result: StatementResult = None
-    foundation_statements: List[Statement] = []
-    statements: List[Statement] = []
-
-class TestSuiteResult(BaseModel):
-    foundation_statements: List[Statement] = []
-    test_results: Dict[str, TestResult] = {}
 
 class TopicListCache(BaseModel):
     created_at: Optional[datetime] = Field(default=datetime.now())
     topic_list: Optional[dict[str, str]] = Field(default={})
 
 # ----------- Public APIs  ------------------------------------------------------------
-def init_unit_test_for_table(table_name: str, create_csv: bool = False) -> None:
+def init_unit_test_for_table(table_name: str, 
+        create_csv: bool = False, 
+        nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
+        use_ai: bool = False) -> None:
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
     """
@@ -103,21 +75,20 @@ def init_unit_test_for_table(table_name: str, create_csv: bool = False) -> None:
     table_folder = table_ref.table_folder_name
     test_folder_path = from_pipeline_to_absolute(table_folder)
     create_folder_if_not_exist(f"{test_folder_path}/tests")
-    _add_test_files(table_ref=table_ref, 
+    _add_test_files(table_to_test_ref=table_ref, 
                     tests_folder=f"{table_folder}/tests", 
                     table_inventory=table_inventory,
-                    create_csv=create_csv)
-    
+                    create_csv=create_csv,
+                    nb_test_cases=nb_test_cases,
+                    use_ai=use_ai)
 
-def execute_one_test(
-        table_name: str, 
-        test_case_name: str, 
-        compute_pool_id: Optional[str] = None
-) -> TestResult:
+def execute_one_or_all_tests(table_name: str, 
+                      test_case_name: str = None, 
+                      compute_pool_id: Optional[str] = None,
+                      run_validation: bool = False
+) -> TestSuiteResult:
     """
-    Execute a single test case from the test suite definition.
-    
-    The function:
+    Execute all test cases defined in the test suite definition for a given table.
     1. Loads test suite definition from yaml file
     2. Creates foundation tables using DDL
     3. Executes input SQL statements to populate test data
@@ -129,73 +100,62 @@ def execute_one_test(
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-    logger.info(f"Running test case {test_case_name} for table {table_name} on compute pool {compute_pool_id}")
-    print(f"Running test case {test_case_name} for table {table_name} on compute pool {compute_pool_id}")
     try:
-        print(f"1. Create table foundations for unit tests")
-        test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id)
-    
-        # Parse through test case suite in yaml file, run the test case provided in parameter
-        for idx, test_case in enumerate(test_suite_def.test_suite):
-            if test_case.name == test_case_name:
-                logger.info(f"Running test case: {test_case.name}")
-                print(f"2. Create insert into statements for unit test {test_case.name}")
-                statements = _execute_test_inputs(test_case=test_case,
-                                                table_ref=table_ref,
-                                                prefix=prefix+"-ins-"+str(idx + 1),
-                                                compute_pool_id=compute_pool_id)
-                test_result.statements.extend(statements)
-                print(f"3. Run validation SQL statements for unit test {test_case.name}")
-                statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
-                                                                table_ref=table_ref,
-                                                                prefix=prefix+"-val"+"-"+str(idx + 1),
-                                                                compute_pool_id=compute_pool_id)
-                test_result.result = result_text
-                test_result.statements.extend(statements)
-                test_result.validation_result = statement_result
-        return test_result
-    except Exception as e:
-        logger.error(f"Error executing test case: {e}")
-        raise e
-
-
-def execute_all_tests(table_name: str, 
-                      compute_pool_id: Optional[str] = None
-) -> TestSuiteResult:
-    """
-    Execute all test cases defined in the test suite definition for a given table.
-    """
-    statement_mgr.reset_statement_list()
-    config = get_config()
-    if compute_pool_id is None:
-        compute_pool_id = config['flink']['compute_pool_id']
-    prefix = config['kafka']['cluster_type']
-    try:
-        print(f"1. Create table foundations for unit tests")
         test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id)
        
         test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
+
         for idx, test_case in enumerate(test_suite_def.test_suite):
-            print(f"2. Create input statements for unit test {test_case.name}")
+            # loop over all the test cases of the test suite
+            if test_case_name and test_case.name != test_case_name:
+                continue
             statements = _execute_test_inputs(test_case=test_case,
                                             table_ref=table_ref,
                                             prefix=prefix+"-ins-"+str(idx + 1),
                                             compute_pool_id=compute_pool_id)
-            test_result = TestResult(test_case_name=test_case.name, result="")
-            print(f"3. Run validation SQL statements for unit test {test_case.name}")
-            statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
-                                                                table_ref=table_ref,
-                                                                prefix=prefix+"-val-"+str(idx + 1),
-                                                                compute_pool_id=compute_pool_id)
-            test_result.result = result_text
+            test_result = TestResult(test_case_name=test_case.name, result="insertion done")
             test_result.statements.extend(statements)
-            test_result.validation_result = statement_result
+            if run_validation:
+                statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
+                                                                    table_ref=table_ref,
+                                                                    prefix=prefix+"-val-"+str(idx + 1),
+                                                                    compute_pool_id=compute_pool_id)
+                test_result.result = result_text
+                test_result.statements.extend(statements)
+                test_result.validation_result = statement_result
             test_suite_result.test_results[test_case.name] = test_result
-
+            if test_case_name and test_case.name == test_case_name:
+                break
         return test_suite_result
     except Exception as e:
         logger.error(f"Error executing test suite: {e}")
         raise e
+
+def execute_validation_tests(table_name: str, 
+                    test_case_name: str = None,
+                    compute_pool_id: Optional[str] = None
+) -> TestSuiteResult:
+    """
+    Execute all validation tests defined in the test suite definition for a given table.
+    """
+    logger.info(f"Execute validation tests for {table_name}")
+    config = get_config()
+    if compute_pool_id is None:
+        compute_pool_id = config['flink']['compute_pool_id']
+    prefix = config['kafka']['cluster_type']
+    test_suite_def, table_ref = _load_test_suite_definition(table_name)
+    test_suite_result = TestSuiteResult(foundation_statements=[], test_results={})
+    for idx, test_case in enumerate(test_suite_def.test_suite):
+        if test_case_name and test_case.name != test_case_name:
+            continue
+        statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
+                                                                    table_ref=table_ref,
+                                                                    prefix=prefix+"-val-"+str(idx + 1),
+                                                                    compute_pool_id=compute_pool_id)
+        test_suite_result.test_results[test_case.name] = TestResult(test_case_name=test_case.name, result=result_text, validation_result=statement_result)
+        if test_case_name and test_case.name == test_case_name:
+            break
+    return test_suite_result
 
 def delete_test_artifacts(table_name: str, 
                           compute_pool_id: Optional[str] = None) -> None:
@@ -249,6 +209,9 @@ def _init_test_foundations(table_name: str,
     Create input tables as defined in the test suite foundations for the given table.
     And modifyt the dml of the given table to use the input tables for the unit tests.
     """
+    print("-"*40)
+    print(f"1. Create table foundations for unit tests")
+    print("-"*40)
     test_suite_def, table_ref = _load_test_suite_definition(table_name)
     config = get_config()
     if compute_pool_id is None:
@@ -256,22 +219,10 @@ def _init_test_foundations(table_name: str,
     prefix = config['kafka']['cluster_type']
     test_result = TestResult(test_case_name=test_case_name, result="")
     test_result.foundation_statements = _execute_foundation_statements(test_suite_def, table_ref, prefix, compute_pool_id)
-    test_result.foundation_statements = _start_ddl_dml_for_flink_under_test(table_name, 
-                table_ref, prefix, compute_pool_id, 
-                statements=test_result.foundation_statements)
+    test_result.foundation_statements=_start_ddl_dml_for_flink_under_test(table_name, 
+                                            table_ref, prefix, compute_pool_id, 
+                                            statements=test_result.foundation_statements)
     return test_suite_def, table_ref, prefix, test_result
-
-
-def _delete_test_statements(statement_names: List[str]) -> None:
-    for stmt_name in statement_names:
-        statement_mgr.delete_statement_if_exists(stmt_name)
-
-
-def _drop_test_tables(test_suite_def: SLTestDefinition, main_table_name: str) -> None:
-    for foundation in test_suite_def.foundations:
-        statement_mgr.drop_table(foundation.table_name)
-    statement_mgr.drop_table(main_table_name)
-
 
 
 def _execute_flink_test_statement(
@@ -363,7 +314,6 @@ def _execute_foundation_statements(
     table_folder = from_pipeline_to_absolute(table_ref.table_folder_name)
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
-        print(f"Execute DDL for {foundation.table_name} from {testfile_path}")
         statements = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
@@ -391,20 +341,74 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
     """
     Run DDL and DML statements for the given tested table
     """
-    def replace_table_name(sql_content: str) -> str:
+    def extract_all_table_names(sql_content: str) -> set:
+        """
+        Extract table names from SQL using multiple approaches to handle DML and DDL statements.
+        """
+        table_names = set()
+        
+        # Use the existing SQL parser for DML statements (SELECT, INSERT, etc.)
         parser = SQLparser()
-        table_names = parser.extract_table_references(sql_content)
+        dml_tables = parser.extract_table_references(sql_content)
+        table_names.update(dml_tables)
+        
+        # Additional patterns for comma-separated tables and schema.table formats in FROM clauses
+        # This handles cases like "FROM table1, table2, table3" and "FROM schema.`table`"
+        from_comma_pattern = r'\bFROM\s+((?:`?[a-zA-Z_][a-zA-Z0-9_]*(?:\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?)*`?(?:\s*,\s*`?[a-zA-Z_][a-zA-Z0-9_]*(?:\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?)*`?)*)+)'
+        from_matches = re.findall(from_comma_pattern, sql_content, re.IGNORECASE)
+        for match in from_matches:
+            # Split by comma and extract individual table names
+            table_list = re.split(r'\s*,\s*', match.strip())
+            for table in table_list:
+                # Extract all table/schema parts using a more comprehensive regex
+                # This pattern matches both schema.table and individual table names, with optional backticks
+                table_parts_pattern = r'`?([a-zA-Z_][a-zA-Z0-9_]*)`?'
+                parts = re.findall(table_parts_pattern, table.strip())
+                for part in parts:
+                    if part and not part.isdigit():  # Avoid numeric values
+                        table_names.add(part)
+        
+        # Additional patterns for DDL statements not handled by the SQL parser
+        ddl_patterns = [
+            r'\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # DROP TABLE
+            r'\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # CREATE TABLE
+            r'\bTRUNCATE\s+TABLE\s+(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # TRUNCATE TABLE
+            r'\bALTER\s+TABLE\s+(`?[a-zA-Z_][a-zA-Z0-9_]*`?)',  # ALTER TABLE
+        ]
+        
+        for pattern in ddl_patterns:
+            matches = re.findall(pattern, sql_content, re.IGNORECASE)
+            for match in matches:
+                # Remove backticks for consistent handling
+                clean_name = match.strip('`')
+                table_names.add(clean_name)
+        
+        return table_names
+
+    def replace_table_name(sql_content: str) -> str:
+        table_names = extract_all_table_names(sql_content)
         
         # Sort table names by length (descending) to avoid substring replacement issues
         # This ensures longer table names are replaced first, preventing partial matches
         sorted_table_names = sorted(table_names, key=len, reverse=True)
         
         for table in sorted_table_names:
-            # Use regex with word boundaries to ensure we only replace complete table names
-            # This pattern matches the table name when it's surrounded by word boundaries,
-            # spaces, or SQL punctuation (commas, parentheses, etc.)
-            pattern = r'\b' + re.escape(table) + r'\b'
-            sql_content = re.sub(pattern, f"{table}{POST_FIX_UNIT_TEST}", sql_content, flags=re.IGNORECASE)
+            # Use regex with capturing groups to preserve backticks
+            # This pattern specifically handles backticks vs word boundaries separately
+            escaped_table = re.escape(table)
+            
+            # Handle backticked table names
+            backtick_pattern = r'`(' + escaped_table + r')`'
+            sql_content = re.sub(backtick_pattern, f'`{table}{POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            
+            # Handle non-backticked table names with word boundaries
+            word_pattern = r'\b(' + escaped_table + r')\b'
+            
+            def replacement_func(match):
+                table_name = match.group(1)
+                return f"{table_name}{POST_FIX_UNIT_TEST}"
+            
+            sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
         logger.info(f"Replaced table names in SQL content: {sql_content}")
         return sql_content
 
@@ -455,12 +459,13 @@ def _load_sql_and_execute_statement(table_name: str,
 
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
-    if statement_info and statement_info.status_phase == "RUNNING":
+    if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
+        print(f"Statement {statement_name} already exists and is running -> do nothing")
         return None  # Return None when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
-    logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
-    print(f"Execute statement {statement_name} on: {compute_pool_id}")
+    logger.info(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
+    print(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
                                                       statement_name=statement_name, 
                                                       compute_pool_id=compute_pool_id, 
@@ -469,7 +474,10 @@ def _load_sql_and_execute_statement(table_name: str,
         statements.append(statement)
         if statement.status and statement.status.phase == "FAILED":
             logger.error(f"{statement.status}")
+            print(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
             raise ValueError(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
+        else:
+            print(f"Executed test foundations for {table_name}.. {statement.status.phase}\n")
     return statements
 
 def _execute_test_inputs(test_case: SLTestCase, 
@@ -481,6 +489,9 @@ def _execute_test_inputs(test_case: SLTestCase,
     Execute the input and validation SQL statements for a given test case.
     """
     logger.info(f"Run insert statements for: {test_case.name}")
+    print("-"*40)
+    print(f"2. Create insert into statements for unit test {test_case.name}")
+    print("-"*40)
     statements = []
     for input_step in test_case.inputs:
         statement = None
@@ -522,6 +533,9 @@ def _execute_test_validation(test_case: SLTestCase,
                           prefix: str = 'dev', 
                           compute_pool_id: Optional[str] = None
 ) -> Tuple[List[Statement], str, Optional[StatementResult]]:
+    print("-"*40)
+    print(f"3. Run validation SQL statements for unit test {test_case.name}")
+    print("-"*40)
     statements = []
     result_text = ""
     for output_step in test_case.outputs:
@@ -558,6 +572,7 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
             # Check if results and data are non-empty
             if resp and resp.results and resp.results.data:
                 logger.info(f"Received results on poll {poll}")
+                logger.info(f"resp: {resp}")
                 logger.info(resp.results.data)
                 break
             elif resp:
@@ -573,22 +588,26 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
     #Check and print the result of the validation query
     final_row= 'FAIL'
     if resp and resp.results and resp.results.data:
-        final_row = resp.results.data[0].row[0]
+        # Take the last record in the list
+        final_row = resp.results.data[len(resp.results.data) - 1].row[0]
     logger.info(f"Final Result for {statement_name}: {final_row}")
     print(f"Final Result for {statement_name}: {final_row}")
     return final_row, resp
 
-def _add_test_files(table_ref: FlinkTableReference, 
+def _add_test_files(table_to_test_ref: FlinkTableReference, 
                     tests_folder: str, 
                     table_inventory: Dict[str, FlinkTableReference],
-                    create_csv: bool = False) -> SLTestDefinition:
+                    create_csv: bool = False,
+                    nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
+                    use_ai: bool = False) -> SLTestDefinition:
     """
     Add the test files to the table/tests folder by looking at the referenced tables in the DML SQL content.
     """
-    file_path = from_pipeline_to_absolute(table_ref.dml_ref)
+    dml_file_path = from_pipeline_to_absolute(table_to_test_ref.dml_ref)
     referenced_table_names: Optional[List[str]] = None
     primary_keys: List[str] = []
-    with open(file_path) as f:
+    sql_content = ""
+    with open(dml_file_path) as f:
         sql_content = f.read()
         parser = SQLparser()
         referenced_table_names = parser.extract_table_references(sql_content)
@@ -596,11 +615,11 @@ def _add_test_files(table_ref: FlinkTableReference,
         # keep as print for user feedback
         print(f"From the DML under test the referenced table names are: {referenced_table_names}")
     if not referenced_table_names:
-        logger.error(f"No referenced table names found in the sql_content of {file_path}")
-        raise ValueError(f"No referenced table names found in the sql_content of {file_path}")
+        logger.error(f"No referenced table names found in the sql_content of {dml_file_path}")
+        raise ValueError(f"No referenced table names found in the sql_content of {dml_file_path}")
 
     tests_folder_path = from_pipeline_to_absolute(tests_folder)
-    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_ref.table_name, referenced_table_names, create_csv)
+    test_definition = _build_save_test_definition_json_file(tests_folder_path, table_to_test_ref.table_name, referenced_table_names, create_csv, nb_test_cases)
     table_struct = _process_foundation_ddl_from_test_definitions(test_definition, tests_folder_path, table_inventory)
     
     # Create template files for each test case
@@ -625,16 +644,13 @@ def _add_test_files(table_ref: FlinkTableReference,
         # Create output validation files 
         for output_data in test_case.outputs:
             output_file = os.path.join(tests_folder_path, '..', output_data.file_name)
-            sql_content = "with result_table as (\n"
-            sql_content += f"   select * from {output_data.table_name}{POST_FIX_UNIT_TEST}\n"
-            sql_content += f"   where sid IS NOT NULL\n"
-            sql_content += f"   --- and ... add more validations here\n"
-            sql_content += ")\n"
-            sql_content += f"SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END as test_result from result_table"
+            validation_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
             with open(output_file, "w") as f:
-                f.write(sql_content)
+                f.write(validation_sql_content)
+        if use_ai:
+            _add_data_consistency_with_ai(table_to_test_ref.table_folder_name, test_definition, sql_content, test_case.name)
 
-    _generate_test_readme(table_ref, test_definition, primary_keys, tests_folder_path)
+    _generate_test_readme(table_to_test_ref, test_definition, primary_keys, tests_folder_path)
     return test_definition
 
 
@@ -661,33 +677,49 @@ def _generate_test_readme(table_ref: FlinkTableReference,
     with open(tests_folder_path + '/README.md', 'w') as f:
         f.write(rendered_readme_md)
 
+def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefinition) -> str:
+    """
+    Build the validation SQL content for a given table.
+    """
+    env = Environment(loader=PackageLoader("shift_left.core","templates"))
+    template = env.get_template("validate_test.jinja")
+    context = {
+        'table_name': table_name + POST_FIX_UNIT_TEST
+    }
+    sql_content = template.render(context)
+    return sql_content
+
 def _build_save_test_definition_json_file(
         file_path: str, 
         table_name: str, 
         referenced_table_names: List[str],
-        create_csv: bool = False
+        create_csv: bool = False,
+        nb_test_cases: int = DEFAULT_TEST_CASES_COUNT
 ) -> SLTestDefinition:
     """
     Build the test definition file for the unit tests.
     When create csv then the second test has csv based input.
+    for n input there is only on output per test case.
+    table_name is the table under test.
+    file_path is the path to the test definition file.
+    referenced_table_names is the list of tables referenced in the dml under test.
     """
     test_definition :SLTestDefinition = SLTestDefinition(foundations=[], test_suite=[])
-    for table in referenced_table_names:
-        if table not in table_name:
-            foundation_table_name = Foundation(table_name=table, ddl_for_test=f"./tests/ddl_{table}.sql")
+    for input_table in referenced_table_names:
+        if input_table not in table_name:
+            foundation_table_name = Foundation(table_name=input_table, ddl_for_test=f"./tests/ddl_{input_table}.sql")
             test_definition.foundations.append(foundation_table_name)
-    for i in range(1, DEFAULT_TEST_CASES_COUNT + 1):
+    for i in range(1, nb_test_cases + 1):
         test_case = SLTestCase(name=f"test_{table_name}_{i}", inputs=[], outputs=[])
-        for table in referenced_table_names:
-            if table not in table_name:
+        for input_table in referenced_table_names:
+            if input_table not in table_name:
                 if i % 2 == 1 or not create_csv and i%2 == 0:  
-                    input = SLTestData(table_name=table, file_name=f"./tests/insert_{table}_{i}.sql",file_type="sql")
-                    output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
+                    input = SLTestData(table_name=input_table, file_name=f"./tests/insert_{input_table}_{i}.sql",file_type="sql")
                 elif create_csv:
-                    input = SLTestData(table_name=table, file_name=f"./tests/insert_{table}_{i}.csv",file_type="csv")
-                    output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
+                    input = SLTestData(table_name=input_table, file_name=f"./tests/insert_{input_table}_{i}.csv",file_type="csv")
                 test_case.inputs.append(input)
-                test_case.outputs.append(output)
+        output = SLTestData(table_name=table_name, file_name=f"./tests/validate_{table_name}_{i}.sql",file_type="sql")
+        test_case.outputs.append(output)
         test_definition.test_suite.append(test_case)
     
     with open(f"{file_path}/{TEST_DEFINITION_FILE_NAME}", "w") as f:
@@ -818,12 +850,22 @@ def _build_statement_name(table_name: str, prefix: str) -> str:
     return statement_name.replace('_', '-').replace('.', '-')
 
 
-def _add_data_consistency_with_ai(test_definition: SLTestDefinition):
+def _add_data_consistency_with_ai(table_folder_name: str, 
+    test_definition: SLTestDefinition, 
+    dml_sql_content: str, 
+    test_case_name: str = None
+):
     """
     Add data consistency with AI:
     1/ from the dml content ask to keep integrity of the data for the joins logic and primary keys
     2/ search for the insert sql statment and the validate sql statement and ask to keep the data consistency
-   
     """
-    pass
+
+    agent = AIBasedDataTuning()
+    output_data_list = agent.enhance_test_data(table_folder_name, dml_sql_content, test_definition, test_case_name)
+    for output_data in output_data_list:
+        if output_data.file_name:
+            logger.info(f"Update insert sql content for {output_data.file_name}")
+            with open(output_data.file_name, "w") as f:
+                f.write(output_data.output_sql_content)
 

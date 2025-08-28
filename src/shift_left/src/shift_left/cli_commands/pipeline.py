@@ -182,9 +182,9 @@ def deploy(
     """
     print(f"Deploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
     if product_name:
-        print(f"Command parameters: may_start_descendants: False, force_ancestors: {force_ancestors}, parallel: {parallel}, max_thread: {max_thread}, pool_creation: {pool_creation}")
+        print(f"Command parameters: may_start_descendants: False, force_ancestors: {force_ancestors}, pool_creation: {pool_creation}")
     else:
-        print(f"Command parameters: may_start_descendants: {may_start_descendants}, force_ancestors: {force_ancestors}, cross_product_deployment: {cross_product_deployment}, parallel: {parallel}, max_thread: {max_thread}, pool_creation: {pool_creation}")
+        print(f"Command parameters: may_start_descendants: {may_start_descendants}, force_ancestors: {force_ancestors}, cross_product_deployment: {cross_product_deployment}, pool_creation: {pool_creation}")
     
     if max_thread > 1:
         print(f"Deploying pipeline in parallel with {max_thread} threads")

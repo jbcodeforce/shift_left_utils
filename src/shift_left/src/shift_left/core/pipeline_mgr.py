@@ -92,8 +92,9 @@ def build_pipeline_definition_from_ddl_dml_content(
                                               ddl_file_name=from_absolute_to_pipeline(ddl_file_name), 
                                               parents=parent_references, 
                                               children=set())
+    node_to_process= deque()
     node_to_process.append(current_node)
-    _update_hierarchy_of_next_node(node_to_process, dict(), table_inventory)
+    _update_hierarchy_of_next_node(node_to_process, {}, table_inventory)
     return current_node
 
 def build_all_pipeline_definitions(pipeline_path: str):
@@ -314,29 +315,31 @@ def _build_pipeline_definition(
         "children": children
     })
     logger.debug(f" FlinkTablePipelineDefinition created: {f}")
+
     return f
 
     
 def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inventory):
     """
     Process the next node from the queue if not already processed.
-    Look at parent of current nodes.
+    Look at parents of current node, and add them to the queue if not already present, add current node to children of its parents.
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logger.info(f"{current_node}")
+        logger.info(f"Work on hierarchy for {current_node.table_name}")
         if not current_node.table_name in processed_nodes:
-            if not current_node.parents:
+            if not current_node.parents: # the current node may not be fully built yet
                 table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
-                current_node.parents = parent_references   # set of FlinkTablePipelineDefinition
+                current_node.parents = parent_references   # parents is a set of FlinkTablePipelineDefinition
                 current_node.complexity = complexity
-            tmp_node= current_node.model_copy(deep=True)
+            tmp_node= current_node.model_copy(deep=True)  # make a copy with parent and children to avoid huge/recurring pipedef.
             tmp_node.children = set()
             tmp_node.parents = set()
             for parent in current_node.parents:
                 if not  current_node in parent.children: # current is a child of its parents        
                     parent.children.add(tmp_node)
-                _add_node_to_process_if_not_present(parent, nodes_to_process)
+                    _create_or_merge_pipeline_definition(parent)
+                nodes_to_process=_add_node_to_process_if_not_present(parent, nodes_to_process)
             _create_or_merge_pipeline_definition(current_node)
             processed_nodes[current_node.table_name]=current_node
             _update_hierarchy_of_next_node(nodes_to_process, processed_nodes, table_inventory)
@@ -347,6 +350,13 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
     """
     If the pipeline definition exists we may need to merge the parents and children
     """
+    def merge_table_sets(old_set, new_set):
+        """Merge sets, with new items overriding old ones by table_name"""
+        # Convert to dict by table_name for easy merging
+        merged = {item.table_name: item for item in old_set}
+        merged.update({item.table_name: item for item in new_set})
+        return set(merged.values())
+
     pipe_definition_fn = os.path.join(os.getenv("PIPELINES"), "..", current.path, PIPELINE_JSON_FILE_NAME)
     if not os.path.exists(pipe_definition_fn):
         with open(pipe_definition_fn, "w") as f:
@@ -354,15 +364,8 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
     else:
         with open(pipe_definition_fn, "r") as f:
             old_definition = FlinkTablePipelineDefinition.model_validate_json(f.read())
-            combined_children = old_definition.children
-            combined_parents = old_definition.parents
-            for child in current.children:
-                # Remove any existing child with same table_name before adding new one
-                combined_children = {c for c in combined_children if c.table_name != child.table_name}
-                combined_children.add(child)
-            for parent in current.parents:
-                combined_parents = {p for p in combined_parents if p.table_name != parent.table_name}
-                combined_parents.add(parent)
+            combined_children = merge_table_sets(old_definition.children, current.children)
+            combined_parents = merge_table_sets(old_definition.parents, current.parents)
         current.children = combined_children
         current.parents = combined_parents
         with open(pipe_definition_fn, "w") as f:
@@ -374,6 +377,7 @@ def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):
         nodes_to_process.index(current_hierarchy)
     except ValueError:
         nodes_to_process.append(current_hierarchy)
+    return nodes_to_process
 
 
 # ---- Reporting and walking up the hierarchy ----

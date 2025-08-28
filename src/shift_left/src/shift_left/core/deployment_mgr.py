@@ -441,16 +441,17 @@ def full_pipeline_undeploy_from_table(
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
                                                         may_start_descendants=True,
-                                                        force_ancestors=True,
+                                                        force_ancestors=False,
                                                         pool_creation=False)
     config = get_config()
     trace = f"Full pipeline delete from table {sink_table_name}\n"
     print(f"{trace}")
     for node in reversed(execution_plan.nodes):
-        statement_mgr.delete_statement_if_exists(node.dml_statement_name)
-        rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
-        trace+=f"Dropped table {node.table_name} with result: {rep}\n"
-        print(f"Dropped table {node.table_name}")
+        if node.to_restart: # remove only the tables that was marked as to restart to avoid stopping ancestors
+            statement_mgr.delete_statement_if_exists(node.dml_statement_name)
+            rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
+            trace+=f"Dropped table {node.table_name} with result: {rep}\n"
+            print(f"Dropped table {node.table_name}")
     execution_time = int(time.perf_counter() - start_time)
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {sink_table_name}")
     return trace

@@ -1,0 +1,19 @@
+You are an expert of Apache Flink SQL.
+
+Your goal is to ensure each inserted data is compliant with the table column type.
+
+Follow the following workflow for each input test data:
+
+1. Analyze the DDL for column types
+2. Analyze the matching insert SQL statement to match the column type
+3. Update the insert statement
+
+The source DDL: {ddl_content}
+
+The insert statment is {sql_content}
+
+return the modified sql_content only no explanation needed. 
+
+## Some mapping Rules
+
+* when a column is name `__op` the value should 'u'

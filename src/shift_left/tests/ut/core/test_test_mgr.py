@@ -288,7 +288,7 @@ class TestTestManager(unittest.TestCase):
                               mock_get_statement_info, 
                               mock_table_exists,
                               mock_get_statement):
-        """Test execution of foundations for the fact table that uses 2 input tables."""
+        """Test execution of sql unit test foundations for the fact table that uses 2 input tables."""
         def _mock_statement_info(statement_name):
             print(f"mock_statement_info: {statement_name}")
             if statement_name.startswith("dev-p1-ddl-int-table-1"):
@@ -367,10 +367,13 @@ class TestTestManager(unittest.TestCase):
         mock_get_statement.side_effect = self._mock_get_None_statement
 
         table_name = "p1_fct_order"
-        test_result = test_mgr.execute_one_test(table_name, "test_case_1")
+        test_suite_result = test_mgr.execute_one_or_all_tests(table_name, "test_case_1", run_validation=True)
+        assert test_suite_result
+        assert len(test_suite_result.test_results) == 1
+        test_result = test_suite_result.test_results["test_case_1"]
         assert test_result
         self.assertEqual(len(test_result.statements), 3)
-        self.assertEqual(len(test_result.foundation_statements), 4)
+        self.assertEqual(len(test_suite_result.foundation_statements), 4)
         assert test_result.result == "PASS"
         for statement in test_result.statements:
             print(f"statement: {statement.name} {statement.status}")
@@ -480,7 +483,7 @@ class TestTestManager(unittest.TestCase):
         mock_get_statement.side_effect = self._mock_get_None_statement
 
         table_name = "p1_fct_order"
-        suite_result = test_mgr.execute_all_tests(table_name)
+        suite_result = test_mgr.execute_one_or_all_tests(table_name, run_validation=True)
         assert suite_result
         assert len(suite_result.test_results) == 2
         assert len(suite_result.foundation_statements) == 4
@@ -825,23 +828,23 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(result, existing_statement)
         self.assertFalse(is_new)  # Should not be new since it already exists
 
-    def test_execute_one_test_error_handling(self):
-        """Test execute_one_test function error handling."""
+    def test_execute_one_or_all_tests_error_handling(self):
+        """Test execute_one_or_all_tests function error handling."""
         with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
             mock_init.side_effect = Exception("Foundation error")
             
             with self.assertRaises(Exception) as context:
-                test_mgr.execute_one_test("nonexistent_table", "test_case")
+                test_mgr.execute_one_or_all_tests("nonexistent_table", "test_case")
             
             self.assertIn("Foundation error", str(context.exception))
 
-    def test_execute_all_tests_error_handling(self):
-        """Test execute_all_tests function error handling."""
+    def test_execute_one_or_all_tests_error_handling(self):
+        """Test execute_one_or_all_tests function error handling."""
         with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
             mock_init.side_effect = Exception("Foundation error")
             
             with self.assertRaises(Exception) as context:
-                test_mgr.execute_all_tests("nonexistent_table")
+                test_mgr.execute_one_or_all_tests("nonexistent_table")
             
             self.assertIn("Foundation error", str(context.exception))
 
@@ -1087,24 +1090,6 @@ class TestTestManager(unittest.TestCase):
         if os.path.exists(corrupted_cache):
             os.remove(corrupted_cache)
 
-    @patch('shift_left.core.test_mgr._execute_test_inputs')
-    @patch('shift_left.core.test_mgr._execute_test_validation')
-    def test_execute_one_test_case_not_found(self, mock_validation, mock_inputs):
-        """Test execute_one_test when specified test case is not found."""
-        # Mock init foundations to return test suite without the requested case
-        with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
-            test_case = SLTestCase(name="different_test", inputs=[], outputs=[])
-            test_suite_def = SLTestDefinition(foundations=[], test_suite=[test_case])
-            table_ref = FlinkTableReference(table_name="test", dml_ref="", table_folder_name="")
-            test_result = TestResult(test_case_name="nonexistent_test", result="")
-            
-            mock_init.return_value = (test_suite_def, table_ref, "dev", test_result)
-            
-            result = test_mgr.execute_one_test("test_table", "nonexistent_test")
-            
-            # Should return test result but without executing validation
-            self.assertEqual(result.test_case_name, "nonexistent_test")
-            mock_validation.assert_not_called()
 
     @patch('shift_left.core.test_mgr.SQLparser')
     def test_replace_table_name_substring_issue_fix(self, mock_parser_class):

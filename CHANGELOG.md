@@ -1,6 +1,14 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.34
+* Add an intermediate step in test harness to run the validation script by its own, using: `shift_left table run-validation-tests <table-name> <test_name>`
+* Add nb-test-cases to the `shift_left table init-unit-tests` command to control the number of test case to create instead of the default of 2.
+* Fix undeploy at the table level to only deploy descendants and the selected table.
+* Improve table name retrieval in the test manager to better hansle backstick
+* Implement AI agents for unit test data tuning: consistency between insert .sqls, complaince to the column type and generation of the validation script. (This last one need far more work)
+
+
 v0.1.33
 * Add --pool-creation boolean to pipeline deploy to set to true when the compute pool can be created during build execution plan, so one statement is allocated per compute pool. The flag is set to False for pipeline build-execution-plan.
 * Add region to the statement name when deployed with Makefile
