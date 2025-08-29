@@ -27,7 +27,7 @@ Manage the table entities.
 - deploy a table taking care of the children Flink statements to stop and start
 - 
 """
-app = typer.Typer()
+app = typer.Typer(pretty_exceptions_show_locals=False)
 
 @app.command()
 def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],

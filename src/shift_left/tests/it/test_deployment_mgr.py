@@ -176,6 +176,73 @@ class TestDeploymentManager(unittest.TestCase):
         assert result
         print(result)
 
+    def test_10_prepare_tables_from_sql_file_integration(self):
+        """
+        Integration test for prepare_tables_from_sql_file function.
+        Tests the end-to-end functionality of preparing tables from a SQL file.
+        """
+        print("Running integration test for prepare_tables_from_sql_file")
+        
+        # Setup paths
+        test_sql_file = str(self.data_dir / "flink-project/pipelines/test_prepare_tables_integration.sql")
+        
+        # Get config for compute pool
+        config = get_config()
+        compute_pool_id = config.get('flink', {}).get('compute_pool_id')
+        if not compute_pool_id:
+            self.skipTest("No compute pool ID configured - skipping integration test")
+        
+        print(f"Using compute pool: {compute_pool_id}")
+        print(f"Preparing tables from file: {test_sql_file}")
+        
+        # Track statements that get created so we can clean them up
+        statement_prefix = f"prepare-table-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        created_statements = []
+        
+        try:
+            # Get initial statement list to compare against later
+            initial_statements = sm.get_statement_list()
+            initial_count = len(initial_statements)
+            print(f"Initial statement count: {initial_count}")
+            
+            # Execute the prepare function
+            dm.prepare_tables_from_sql_file(test_sql_file, compute_pool_id=compute_pool_id)
+            print("prepare_tables_from_sql_file completed successfully")
+            
+            # Verify that statements were created and processed
+            # Note: The function should clean up statements after completion,
+            # so we mainly verify the function executed without errors
+            
+            # Get final statement list
+            final_statements = sm.get_statement_list()
+            final_count = len(final_statements)
+            print(f"Final statement count: {final_count}")
+            
+            # The function should have created and then deleted temporary statements,
+            # so the final count should be the same as initial count
+            self.assertEqual(final_count, initial_count, 
+                           "Statement count changed - some prepare statements may not have been cleaned up")
+            
+            print("Integration test completed successfully")
+            
+        except Exception as e:
+            print(f"Integration test failed with error: {e}")
+            # Try to clean up any statements that might have been left behind
+            try:
+                current_statements = sm.get_statement_list()
+                for stmt_name, stmt_info in current_statements.items():
+                    if "prepare-table-" in stmt_name:
+                        print(f"Cleaning up leftover statement: {stmt_name}")
+                        try:
+                            sm.delete_statement_if_exists(stmt_name)
+                        except Exception as cleanup_error:
+                            print(f"Failed to cleanup statement {stmt_name}: {cleanup_error}")
+            except Exception as cleanup_error:
+                print(f"Failed to perform cleanup: {cleanup_error}")
+            
+            # Re-raise the original exception
+            raise e
+
 
 if __name__ == '__main__':
     unittest.main()

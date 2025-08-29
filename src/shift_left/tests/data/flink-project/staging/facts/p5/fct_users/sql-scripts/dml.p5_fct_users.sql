@@ -1,5 +1,4 @@
-
-INSERT INTO a_table
+INSERT INTO p5_fct_users
 SELECT 
 -- part to select stuff
 FROM src_table

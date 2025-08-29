@@ -8,7 +8,7 @@ from shift_left.cli_commands import project, table, pipeline
 
 
 
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 
     

@@ -13,6 +13,7 @@ from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
 from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.error_sanitizer import safe_error_display
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 
@@ -28,7 +29,7 @@ Manage a pipeline entity:
 - report the running statements for a given table, product name or a directory
 - undeploy a pipeline from a given table name, product name or a directory
 """
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 
 
@@ -92,7 +93,8 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
     except Exception as e:
-        print(f"[red]Error: {e}[/red]")
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
         raise typer.Exit(1)
 
     if to_yaml:
@@ -272,7 +274,8 @@ def report_running_statements(
             raise typer.Exit(1)
         print(results)
     except Exception as e:
-        print(f"[red]Error: {e}[/red]")
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
         raise typer.Exit(1)
     print(f"#"*120)
 
@@ -413,7 +416,8 @@ def _build_deploy_pipeline(
         print("Done.")
         
     except Exception as e:
-        print(f"[red]Error: {e}[/red]")
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
         raise typer.Exit(1)
     
    

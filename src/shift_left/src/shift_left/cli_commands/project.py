@@ -20,7 +20,7 @@ from typing_extensions import Annotated
 """
 Manage project foundations
 """
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 @app.command()
 def init(project_name: Annotated[str, typer.Argument(help= "Name of project to create")] = "default_data_project", 
