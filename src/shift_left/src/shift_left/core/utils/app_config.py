@@ -9,8 +9,30 @@ from logging.handlers import RotatingFileHandler
 import datetime
 import random
 import string
+from .error_sanitizer import sanitize_error_message, safe_error_display
 
 _config: dict[str, dict[str,str]] = {}
+
+
+class SecureFormatter(logging.Formatter):
+    """
+    Custom logging formatter that sanitizes sensitive information from log messages.
+    
+    This formatter ensures that API keys, passwords, tokens, and other sensitive data
+    are automatically masked in all log outputs, preventing accidental exposure
+    of secrets in log files.
+    """
+    
+    def format(self, record):
+        """Format the log record and sanitize any sensitive information."""
+        # First get the formatted message using the parent formatter
+        formatted_message = super().format(record)
+        
+        # Sanitize the entire formatted message
+        sanitized_message = sanitize_error_message(formatted_message)
+        
+        return sanitized_message
+
 
 def generate_session_id() -> tuple[str, str]:
     """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
@@ -25,6 +47,9 @@ log_dir = os.path.join(shift_left_dir, 'logs')
 log_name, session_id = generate_session_id()
 session_log_dir = os.path.join(log_dir, log_name)
 
+# Configure secure logging with automatic sensitive data sanitization
+# The SecureFormatter ensures that API keys, passwords, tokens, and other
+# sensitive information are automatically masked in all log outputs
 logger = logging.getLogger("shift_left")
 logger.propagate = False  # Prevent propagation to root logger
 os.makedirs(session_log_dir, exist_ok=True)
@@ -36,7 +61,7 @@ file_handler = RotatingFileHandler(
     backupCount=3        # Keep up to 3 backup files
 )
 file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
+file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 print("-" * 80)
 print(f"| SHIFT_LEFT Config_file: {os.getenv('CONFIG_FILE')} Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} LOGS folder is : {session_log_dir} |")
@@ -138,8 +163,10 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
   # If there are any errors, raise them all at once
   if len(errors) > 0:
     error_message = "Configuration validation failed with the following errors:\n" + "\n".join(f"  - {error}" for error in errors)
-    print(error_message)
-    logger.error(error_message)
+    # Use safe error display to ensure no sensitive config values are exposed
+    sanitized_message = sanitize_error_message(error_message)
+    print(sanitized_message)
+    logger.error(sanitized_message)
     exit()
 
 @lru_cache
