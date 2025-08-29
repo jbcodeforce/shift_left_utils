@@ -14,6 +14,7 @@ from rich.console import Console
 from typing_extensions import Annotated
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.error_sanitizer import safe_error_display
+from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 
@@ -29,7 +30,7 @@ Manage a pipeline entity:
 - report the running statements for a given table, product name or a directory
 - undeploy a pipeline from a given table name, product name or a directory
 """
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
+app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 
 

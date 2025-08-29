@@ -14,13 +14,14 @@ import shift_left.core.project_manager as project_manager
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE, 
         KIMBALL_PROJECT_TYPE)
+from shift_left.core.utils.secure_typer import create_secure_typer_app
 from typing_extensions import Annotated
 
 
 """
 Manage project foundations
 """
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
+app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 @app.command()
 def init(project_name: Annotated[str, typer.Argument(help= "Name of project to create")] = "default_data_project", 
