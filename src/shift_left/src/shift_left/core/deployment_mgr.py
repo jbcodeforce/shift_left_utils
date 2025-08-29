@@ -157,10 +157,11 @@ def build_deploy_pipelines_from_product(
             node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
             node.dml_only = dml_only
             nodes_to_process.append(node)
-            # Build the static graph from the Flink statement relationship
+            # Build the static graph to keep accurate references from the Flink statement relationship
             combined_node_map |= _build_statement_node_map(node)
             count+=1
-    if count > 0:            
+    if count > 0:
+        print(f"Building topological sorted parents for {count} tables")            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
         ancestors = _filtering_descendant_nodes(ancestors, product_name, may_start_descendants)
         start_node = ancestors[-1]
@@ -556,9 +557,10 @@ def prepare_tables_from_sql_file(sql_file_name: str,
             statement = statement_mgr.post_flink_statement(compute_pool_id, 
                                                            statement_name, 
                                                            sql_out)
-            while statement.status.phase != "COMPLETED":
-                time.sleep(1)
-                statement = statement_mgr.get_statement_info(statement_name)
+            while statement.status.phase not in ["COMPLETED", "FAILED"]:
+                time.sleep(2)
+                statement = statement_mgr.get_statement(statement_name)
+                logger.info(f"Prepare table {statement_name} status is: {statement}")
             idx+=1
             statement_mgr.delete_statement_if_exists(statement_name)
 #
@@ -1275,8 +1277,9 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
     while queue:
         current = queue.popleft()
         _search_children_from_current(node_map, current, visited_nodes)
-    logger.debug(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
-    logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
+    logger.info(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    #print(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    #logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
 
 # --- to work on for stateless ---------------

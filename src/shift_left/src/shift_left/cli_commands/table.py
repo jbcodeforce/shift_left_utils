@@ -16,18 +16,18 @@ from shift_left.core.table_mgr import (
 )
 from shift_left.core.process_src_tables import migrate_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
-from shift_left.core.utils.app_config import shift_left_dir, session_log_dir, get_config
+from shift_left.core.utils.app_config import session_log_dir, get_config
+from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.table_mgr as table_mgr
 import shift_left.core.test_mgr as test_mgr
-from shift_left.core.test_mgr import TestSuiteResult
 
 """
 Manage the table entities.
 - build an inventory of all the tables in the project with the basic metadata per table
 - deploy a table taking care of the children Flink statements to stop and start
-- 
+- suport commands for test harness
 """
-app = typer.Typer()
+app = create_secure_typer_app(pretty_exceptions_show_locals=False)
 
 @app.command()
 def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],

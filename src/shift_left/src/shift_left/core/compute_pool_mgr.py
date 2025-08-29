@@ -50,9 +50,9 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                                         current_cfu=pool.status.current_cfu)
                 _compute_pool_list.pools.append(cp_pool)
             _save_compute_pool_list(_compute_pool_list)
-            logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} pools")
+            logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} compute pools")
             stop_time = time.perf_counter()
-            print(f"Compute pool list has {len(_compute_pool_list.pools)} pools in {int(stop_time - start_time)} seconds")
+            print(f"Compute pool list has {len(_compute_pool_list.pools)} compute pools in {int(stop_time - start_time)} seconds")
     elif (_compute_pool_list.created_at 
          and (datetime.now() - _compute_pool_list.created_at).total_seconds() > get_config()['app']['cache_ttl']):
         logger.info("Compute pool list cache is expired, reload it")
