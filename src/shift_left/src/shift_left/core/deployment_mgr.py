@@ -557,9 +557,10 @@ def prepare_tables_from_sql_file(sql_file_name: str,
             statement = statement_mgr.post_flink_statement(compute_pool_id, 
                                                            statement_name, 
                                                            sql_out)
-            while statement.status.phase != "COMPLETED":
-                time.sleep(1)
-                statement = statement_mgr.get_statement_info(statement_name)
+            while statement.status.phase not in ["COMPLETED", "FAILED"]:
+                time.sleep(2)
+                statement = statement_mgr.get_statement(statement_name)
+                logger.info(f"Prepare table {statement_name} status is: {statement}")
             idx+=1
             statement_mgr.delete_statement_if_exists(statement_name)
 #
@@ -1277,7 +1278,7 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
         current = queue.popleft()
         _search_children_from_current(node_map, current, visited_nodes)
     logger.info(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
-    print(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    #print(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
     #logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
 
