@@ -157,10 +157,11 @@ def build_deploy_pipelines_from_product(
             node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
             node.dml_only = dml_only
             nodes_to_process.append(node)
-            # Build the static graph from the Flink statement relationship
+            # Build the static graph to keep accurate references from the Flink statement relationship
             combined_node_map |= _build_statement_node_map(node)
             count+=1
-    if count > 0:            
+    if count > 0:
+        print(f"Building topological sorted parents for {count} tables")            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
         ancestors = _filtering_descendant_nodes(ancestors, product_name, may_start_descendants)
         start_node = ancestors[-1]
@@ -1275,8 +1276,9 @@ def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,Flin
     while queue:
         current = queue.popleft()
         _search_children_from_current(node_map, current, visited_nodes)
-    logger.debug(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
-    logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
+    logger.info(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    print(f"End build table graph for {current_node.table_name} with {len(node_map)} nodes")
+    #logger.debug("\n\n".join("{}\t{}".format(k,v) for k,v in node_map.items()))
     return node_map
 
 # --- to work on for stateless ---------------
