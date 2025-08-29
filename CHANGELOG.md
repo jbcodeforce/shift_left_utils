@@ -1,6 +1,11 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.35
+* Improve prepare error management when statement is not completed- add failed status and use other api to get statement status
+* Add masing data from config in trace - disable type local variables reporting in case of exceptions
+* Add unit tests for preares, masking, error reporting
+
 v0.1.34
 * Add an intermediate step in test harness to run the validation script by its own, using: `shift_left table run-validation-tests <table-name> <test_name>`
 * Add nb-test-cases to the `shift_left table init-unit-tests` command to control the number of test case to create instead of the default of 2.
