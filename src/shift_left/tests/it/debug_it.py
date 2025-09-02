@@ -28,7 +28,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         runner = CliRunner()
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
-        #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--product-name', 'qx'])
+        result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--product-name', 'qx'])
         #result = runner.invoke(app, ['table', 'migrate', 'dim_training_course', os.getenv('SRC_FOLDER','.') + '/dimensions/qx/dim_training_course.sql', os.getenv('STAGING')])
         #result = runner.invoke(app, ['table', 'init-unit-tests', 'aqem_fct_step_role_assignee_relation'])
         #result = runner.invoke(app, ['table', 'build-inventory'])
@@ -37,7 +37,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'])
         #result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'])
         #result = runner.invoke(app,['pipeline', 'build-all-metadata'])
-        result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'])
+        #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'])
         #result = runner.invoke(app, ['table', 'init-unit-tests', '--ai', '--nb-test-cases', '1', 'qx_fct_linked_infocard'])
        
         print(result.stdout)

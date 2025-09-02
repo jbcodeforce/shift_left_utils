@@ -22,8 +22,7 @@ from shift_left.core.test_mgr import (
     SLTestDefinition,
     SLTestCase,
     SLTestData,
-    Foundation,
-    TestResult
+    Foundation
 )
 from shift_left.core.utils.file_search import FlinkTableReference
 
