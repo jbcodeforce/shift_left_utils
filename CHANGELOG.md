@@ -1,10 +1,14 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.36
+* Improve node_map builder for better performance: keep node visited and currently built node_map to avoid reprocessing nodes already visited.
+* Add compute pool analyzer.
+
 v0.1.35
 * Improve prepare error management when statement is not completed- add failed status and use other api to get statement status
-* Add masing data from config in trace - disable type local variables reporting in case of exceptions
-* Add unit tests for preares, masking, error reporting
+* Add masking data from config in trace - disable `typer` local variables reporting in case of exceptions
+* Add unit tests for masking, error reporting
 
 v0.1.34
 * Add an intermediate step in test harness to run the validation script by its own, using: `shift_left table run-validation-tests <table-name> <test_name>`

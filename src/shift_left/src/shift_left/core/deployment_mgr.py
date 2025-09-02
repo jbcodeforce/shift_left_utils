@@ -285,6 +285,8 @@ def build_and_deploy_all_from_table_list(
     with open(table_list_file_name, "r") as f:
         table_names = f.read().splitlines()
         count=0
+        combined_node_map = {}
+        visited_nodes = set()
         for table_name in table_names:
             print(f"Table name: {table_name}")
             for _inventory_table_name, table_ref_dict in table_inventory.items():
@@ -294,7 +296,7 @@ def build_and_deploy_all_from_table_list(
                     nodes_to_process.append(node)
                     node.to_restart = True
                     # Build the static graph from the Flink statement relationship
-                    combined_node_map |= _build_statement_node_map(node)
+                    combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
                     count+=1
                     break
     if count > 0:            
@@ -358,6 +360,7 @@ def report_running_flink_statements_for_all_from_directory(
         report_name = path_parts[-1]
     nodes_to_process= []
     count = 0
+    visited_nodes = set()
     combined_node_map = {}
     for root, _, files in os.walk(directory):
         if PIPELINE_JSON_FILE_NAME in files:
@@ -367,7 +370,7 @@ def report_running_flink_statements_for_all_from_directory(
             node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
             node.compute_pool_id = node.existing_statement_info.compute_pool_id
             nodes_to_process.append(node)
-            combined_node_map |= _build_statement_node_map(node)
+            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
@@ -399,6 +402,7 @@ def report_running_flink_statements_for_a_product(
     report_name = f"product:{product_name}"
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     count = 0
+    visited_nodes = set()
     nodes_to_process = []
     combined_node_map = {}
     for _, table_ref_dict in table_inventory.items():
@@ -410,7 +414,7 @@ def report_running_flink_statements_for_a_product(
             node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
             node.compute_pool_id = node.existing_statement_info.compute_pool_id
             nodes_to_process.append(node)
-            combined_node_map |= _build_statement_node_map(node)
+            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
@@ -472,6 +476,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
     start_time = time.perf_counter()
     nodes_to_process = []
     combined_node_map = {}
+    visited_nodes = set()
     count=0
     trace = ""
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
@@ -481,7 +486,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
             node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
-            combined_node_map |= _build_statement_node_map(node)
+            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
     if count > 0:            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)

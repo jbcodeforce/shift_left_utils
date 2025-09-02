@@ -86,7 +86,6 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
 
 def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     client = ConfluentCloudClient(config)
     url = client.build_flink_url_and_auth_header()
     response = client.make_request("GET", url + "/statements/" + statement_name)

@@ -77,7 +77,7 @@ class FlinkTablePipelineDefinition(InfoNode):
                                ddl_ref=self.ddl_ref,
                                upgrade_mode=self.complexity.state_form
                                )
-        _apply_naming_convention(r)
+        _apply_statement_naming_convention(r)
         
         for p in self.parents:
             node_p:FlinkStatementNode = p.to_node()
@@ -346,7 +346,7 @@ def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition) ->
     ddl_n, dml_n = get_ddl_dml_names_from_table(to_process.table_name)
     node.ddl_statement_name = ddl_n
     node.dml_statement_name = dml_n
-    _apply_naming_convention(node)
+    _apply_statement_naming_convention(node)
     return (node.ddl_statement_name, node.dml_statement_name)
 
 def get_ddl_file_name(folder_path: str) -> str:
@@ -397,7 +397,7 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     return sql_files
 
 
-def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
+def _apply_statement_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
     cluster_type = get_config().get('kafka').get('cluster_type')
     cloud_region = get_config().get('confluent_cloud').get('region')
     abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')

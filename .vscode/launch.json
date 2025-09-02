@@ -27,8 +27,8 @@
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env.secrets",
             "env": {
-                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
+                "CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
+                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
                 "PIPELINES": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines",
                 "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
             },

@@ -17,6 +17,7 @@ from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
+from shift_left.core.compute_pool_usage_analyzer import ComputePoolUsageAnalyzer
 
 
 """
@@ -420,6 +421,75 @@ def _build_deploy_pipeline(
         sanitized_error = safe_error_display(e)
         print(f"[red]Error: {sanitized_error}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def analyze_pool_usage(
+    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")] = None,
+    product_name: Annotated[str, typer.Option("--product-name", "-p", help="Analyze pool usage for a specific product only")] = None,
+    directory: Annotated[str, typer.Option("--directory", "-d", help="Analyze pool usage for pipelines in a specific directory")] = None
+):
+    """
+    Analyze compute pool usage and assess statement consolidation opportunities.
+    
+    This command will:
+    - Analyze current usage across compute pools (optionally filtered by product or directory)
+    - Identify running statements in each pool
+    - Assess opportunities for statement consolidation
+    - Generate optimization recommendations using simple heuristics
+    
+    Examples:
+        # Analyze all pools
+        shift-left pipeline analyze-pool-usage
+        
+        # Analyze for specific product
+        shift-left pipeline analyze-pool-usage --product-name saleops
+        
+        # Analyze for specific directory
+        shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
+        
+        # Combine product and directory filters
+        shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
+    """
+    try:
+        # Build analysis scope description
+        scope_desc = "all pools"
+        if product_name and directory:
+            scope_desc = f"product '{product_name}' in directory '{directory}'"
+        elif product_name:
+            scope_desc = f"product '{product_name}'"
+        elif directory:
+            scope_desc = f"directory '{directory}'"
+            
+        print(f"[blue]Analyzing compute pool usage and statement consolidation opportunities for {scope_desc}...[/blue]")
+        
+        analyzer = ComputePoolUsageAnalyzer()
+        report = analyzer.analyze_pool_usage(inventory_path, product_name, directory)
+        
+        # Print summary to console
+        summary = analyzer.print_analysis_summary(report)
+        print(summary)
+        
+        # Save detailed report to file
+        from shift_left.core.utils.app_config import shift_left_dir
+        import json
+        
+        report_file = f"{shift_left_dir}/pool_usage_analysis_{report.created_at.strftime('%Y%m%d_%H%M%S')}.json"
+        with open(report_file, 'w') as f:
+            f.write(report.model_dump_json(indent=2))
+        
+        print(f"[green]Detailed analysis report saved to: {report_file}[/green]")
+        
+        # Highlight key findings
+        if report.recommendations:
+            print(f"\n[yellow]🔍 Found {len(report.recommendations)} consolidation opportunities![/yellow]")
+            total_potential_savings = sum(rec.estimated_cfu_savings for rec in report.recommendations)
+            print(f"[yellow]💰 Potential CFU savings: {total_potential_savings}[/yellow]")
+        else:
+            print(f"\n[green]✅ Your compute pools appear to be efficiently utilized![/green]")
+            
+    except Exception as e:
+        safe_error_display(f"Error analyzing compute pool usage", e)
     
    
 
