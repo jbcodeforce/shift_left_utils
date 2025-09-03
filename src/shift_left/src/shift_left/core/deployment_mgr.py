@@ -150,6 +150,7 @@ def build_deploy_pipelines_from_product(
     #statement_mgr.reset_statement_list()
     nodes_to_process = []
     combined_node_map = {}
+    visited_nodes = set()  # Shared across all calls to avoid redundant processing
     count=0
     for table_name, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
@@ -158,8 +159,10 @@ def build_deploy_pipelines_from_product(
             node.dml_only = dml_only
             nodes_to_process.append(node)
             # Build the static graph to keep accurate references from the Flink statement relationship
-            combined_node_map |= _build_statement_node_map(node)
+            # Pass shared visited_nodes and node_map to avoid reprocessing already analyzed nodes
+            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
+    print(f"Build node map in {time.perf_counter() - start_time} seconds.")
     if count > 0:
         print(f"Building topological sorted parents for {count} tables")            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
@@ -216,6 +219,7 @@ def build_and_deploy_all_from_directory(
     start_time = time.perf_counter()
     nodes_to_process = []
     combined_node_map = {}
+    visited_nodes = set()  # Shared across all calls to avoid redundant processing
     for root, _, files in os.walk(directory):
         if PIPELINE_JSON_FILE_NAME in files:
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
@@ -223,7 +227,8 @@ def build_and_deploy_all_from_directory(
             #node.to_restart = True
             nodes_to_process.append(node)
             # Build the static graph from the Flink statement relationship
-            combined_node_map |= _build_statement_node_map(node)
+            # Pass shared visited_nodes and node_map to avoid reprocessing already analyzed nodes
+            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
     count = len(nodes_to_process)
     logger.info(f"Found {count} tables to process")
     if count > 0:            
@@ -1213,17 +1218,34 @@ def _delete_not_shared_parent(current_node: FlinkStatementNode, trace:str, confi
     return trace
         
 
-def _build_statement_node_map(current_node: FlinkStatementNode) -> dict[str,FlinkStatementNode]:
+def _build_statement_node_map(current_node: FlinkStatementNode, 
+                               visited_nodes: Set[FlinkStatementNode] = None,
+                               node_map: dict[str,FlinkStatementNode] = None) -> dict[str,FlinkStatementNode]:
     """
     Define the complete static graph of the related parents and children for the current node. 
     The returned node_map is a dict with each table name as key and the node with accurate list of parents and children.
     The function uses a DFS to reach all parents, and then a BFS to construct the list of reachable children with their own parents
     It should exclude all children because the decision to filter per product should be done during
     the execution plan construction taking into account if a parent needs to be restarted and if it is stateful.
+    
+    Args:
+        current_node: The starting node to build the graph from
+        visited_nodes: Set of already processed nodes to avoid reprocessing (optional)
+        node_map: Existing node map to extend (optional)
     """
     logger.info(f"start build tables static graph for {current_node.table_name} product: {current_node.product_name}")
-    visited_nodes = set()
-    node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search with table name as key.
+    
+    # Initialize parameters if not provided (backward compatibility)
+    if visited_nodes is None:
+        visited_nodes = set()
+    if node_map is None:
+        node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search with table name as key.
+    
+    # Early return if this node was already processed
+    if current_node in visited_nodes and current_node.table_name in node_map:
+        logger.info(f"Node {current_node.table_name} already processed, skipping")
+        return node_map
+        
     queue = deque()  # Queue for BFS processing to search children of nodes in the queue
     def _search_parent_from_current_update_node_map(node_map: dict[str, FlinkStatementNode], 
                                     current: FlinkStatementNode, 

@@ -31,8 +31,8 @@ class TestExecutionPlan(BaseUT):
     src_y ---> y -->  d -> f
                  \   /
     src_x ---> x - z -> p
-          \          \
-    src_a -> a        \
+          \          \ 
+    src_a -> a        \ 
     src_b -> b ------>  c -> e
     Added more nodes to test cross product.
     """
@@ -125,8 +125,8 @@ class TestExecutionPlan(BaseUT):
         src_y ---> y -->  d -> f
                  \   /
         src_x ---> x - z -> p -> c -> e -> f
-              \          \
-        src_a -> a        \
+              \          \ 
+        src_a -> a        \ 
         src_b -> b ------>  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_direct_parent_not_running should start nodes d and f")
@@ -180,8 +180,8 @@ class TestExecutionPlan(BaseUT):
             src_y ---> y -->  d -> f
                         \   /
             src_x ---> x - z -> p
-                   \        \
-            src_a -> a       \
+                   \        \ 
+            src_a -> a       \ 
             src_b -> b ---->  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running should start nodes src_y, y, z, d, c, p, e and f")

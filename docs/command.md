@@ -209,6 +209,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
 * `run-unit-tests`: Run all the unit tests or a specified test...
+* `run-validation-tests`: Run only the validation tests (1 to n...
 * `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
@@ -370,7 +371,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10393af30&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107857f20&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -392,6 +393,8 @@ $ table init-unit-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--create-csv`: If set, also create a CSV file for the unit test data.
+* `--nb-test-cases INTEGER`: Number of test cases to create. Default is 2.  [default: 2]
+* `--ai`: Use AI to generate test data and validate with tool calling.
 * `--help`: Show this message and exit.
 
 ### `table run-unit-tests`
@@ -402,6 +405,27 @@ Run all the unit tests or a specified test case by sending data to `_ut` topics 
 
 ```console
 $ table run-unit-tests [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
+* `--run-all`: RBy default run insert sqls and foundations, with this flag it will also run validation sql too.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table run-validation-tests`
+
+Run only the validation tests (1 to n validation tests) for a given table.
+
+**Usage**:
+
+```console
+$ table run-validation-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -507,7 +531,7 @@ $ pipeline delete-all-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
 
 **Arguments**:
 
-* `PATH_FROM_WHERE_TO_DELETE`: Delete metadata pipeline_definitions.json in the given folder  [required]
+* `PATH_FROM_WHERE_TO_DELETE`: Delete metadata pipeline_definitions.json in the given folder  [env var: PIPELINES; required]
 
 **Options**:
 
@@ -611,7 +635,7 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
 * `--force-ancestors / --no-force-ancestors`: This flag forces restarting running ancestorsFlink statements.  [default: no-force-ancestors]
-* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
+* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products when considering descendants only.  [default: no-cross-product-deployment]
 * `--help`: Show this message and exit.
 
 ### `pipeline report-running-statements`
@@ -626,7 +650,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -648,7 +672,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
