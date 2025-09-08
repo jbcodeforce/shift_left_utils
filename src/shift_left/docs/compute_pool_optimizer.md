@@ -6,20 +6,22 @@ The Compute Pool Usage Analyzer is a new feature designed to analyze current com
 
 ## Features
 
-### 🔍 Comprehensive Analysis
-- **Pool Usage Assessment**: Analyzes CFU usage across all compute pools
-- **Statement Discovery**: Identifies all running statements and their pool assignments
-- **Efficiency Metrics**: Calculates statements-per-CFU ratios and efficiency scores
+### Analysis
 
-### 🎯 Smart Consolidation Heuristics
-- **Product-based Grouping**: Groups statements from the same data product
-- **Resource-based Grouping**: Identifies underutilized pools for consolidation
-- **Efficiency-based Grouping**: Finds pools with single statements that could be combined
+- Analyzes CFU usage across all compute pools
+- Identifies all running statements and their pool assignments
+- *Calculates statements-per-CFU ratios and efficiency scores
 
-### 📊 Detailed Reporting
-- **Usage Statistics**: Per-pool CFU usage and statement counts
-- **Consolidation Recommendations**: Specific suggestions for optimization
-- **Cost Savings Estimates**: Potential CFU savings from consolidation
+### Consolidation Heuristics
+- Groups statements from the same data product
+- Identifies underutilized pools for consolidation
+- Finds pools with single statements that could be combined
+
+### Detailed Reporting
+
+- Per-pool CFU usage and statement counts
+- Specific suggestions for optimization
+- Potential CFU savings from consolidation
 
 ## Usage
 

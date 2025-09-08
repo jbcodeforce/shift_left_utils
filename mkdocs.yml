@@ -21,8 +21,8 @@ nav:
       - Feature Tracking: tracking.md
 theme: 
   name: material
-  logo: assets/logo.drawio.png
-  favicon: assets/logo.drawio.png
+  logo: assets/batchy.png
+  favicon: assets/batchy.png
   palette:
     scheme: default
   language: en

@@ -9,6 +9,5 @@ If you want to contribute [see the coding and design chapter](./coding/index.md)
 ## Future items to consider
 
 * Define a Data as a product project structure
-* Process ksql source project
-* Ksql AI prompting and migration
+* Integration tests
 * Persist Flink statements retrieved in API in duckdb for short term replay

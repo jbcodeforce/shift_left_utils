@@ -1001,6 +1001,8 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
             # or all parents are running and not to be restarted.
             if max_thread == 1:
                 max_thread = multiprocessing.cpu_count()
+            if max_thread > 10:
+                max_thread = 10
             autonomous_nodes = _build_autonomous_nodes(nodes_to_execute, started_nodes)
             if len(autonomous_nodes) > 0:
                 print(f"Deploying {len(autonomous_nodes)} flink statements using parallel processing on {max_thread} workers")
