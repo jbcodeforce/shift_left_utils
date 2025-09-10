@@ -22,3 +22,4 @@ set_stage_env
 set_dev_env
 .vscode/launch.json
 .env.secrets
+set_j9r_env

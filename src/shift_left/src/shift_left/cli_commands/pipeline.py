@@ -1,13 +1,10 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-from math import prod
 import os
 import networkx as nx
-import matplotlib.pyplot as plt
 from pydantic_yaml import to_yaml_str
 import typer
-import datetime
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
@@ -78,7 +75,6 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
-        to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree"),
         children_too: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
         parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
         output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
@@ -112,9 +108,6 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     if output_file_name:
         with open(output_file_name,"w") as f:
             f.write(result)
-    if to_graph:
-        print("[bold]Graph:[/bold]")
-        _process_hierarchy_to_node(pipeline_def)
         
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
@@ -508,13 +501,7 @@ def _display_directed_graph(nodes, edges):
     G.add_nodes_from(nodes)
     G.add_edges_from(edges)
 
-    # Draw the graph
-    pos = nx.spring_layout(G)  # Layout algorithm
-    nx.draw(G, pos, with_labels=True,
-            node_size=600, node_color="lightblue", font_size=10, 
-            font_weight="bold", 
-            arrowsize=20)
-    plt.show()
+    # TODO to replace with better graph visualization
 
 
 
@@ -533,7 +520,7 @@ def _process_parents(nodes_directed, edges_directed, current_node):
             edges_directed.append((parent.table_name, current_node.table_name))
             _process_parents(nodes_directed, edges_directed, parent)
 
-
+# 09/09/2025 to adapt in the future for a better graph visualization
 def _process_hierarchy_to_node(pipeline_def):
     nodes_directed = [pipeline_def.table_name]
     edges_directed = []

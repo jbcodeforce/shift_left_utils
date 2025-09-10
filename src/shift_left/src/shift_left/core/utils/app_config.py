@@ -9,9 +9,143 @@ from logging.handlers import RotatingFileHandler
 import datetime
 import random
 import string
+from typing import Dict, Any, Optional
 from .error_sanitizer import sanitize_error_message, safe_error_display
 
 _config: dict[str, dict[str,str]] = {}
+
+
+# Environment variable mapping for sensitive values
+ENV_VAR_MAPPING = {
+    # Kafka API credentials
+    "kafka.api_key": "SL_KAFKA_API_KEY",
+    "kafka.api_secret": "SL_KAFKA_API_SECRET",
+    "kafka.sasl.username": "SL_KAFKA_API_KEY", 
+    "kafka.sasl.password": "SL_KAFKA_API_SECRET",
+    
+    # Confluent Cloud API credentials
+    "confluent_cloud.api_key": "SL_CONFLUENT_CLOUD_API_KEY",
+    "confluent_cloud.api_secret": "SL_CONFLUENT_CLOUD_API_SECRET",
+    
+    # Flink API credentials
+    "flink.api_key": "SL_FLINK_API_KEY",
+    "flink.api_secret": "SL_FLINK_API_SECRET",
+    
+    # Registry credentials
+    "registry.registry_key_name": "SL_REGISTRY_KEY_NAME",
+    "registry.registry_key_secret": "SL_REGISTRY_KEY_SECRET",
+}
+
+
+def get_env_value(config_path: str) -> Optional[str]:
+    """
+    Get environment variable value for a given config path.
+    
+    Args:
+        config_path: Dot-separated config path like 'kafka.api_key'
+        
+    Returns:
+        Environment variable value if set, None otherwise
+    """
+    env_var_name = ENV_VAR_MAPPING.get(config_path)
+    if env_var_name:
+        return os.getenv(env_var_name)
+    return None
+
+
+def apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Apply environment variable overrides to configuration.
+    Environment variables take precedence over config file values.
+    
+    Args:
+        config: Configuration dictionary loaded from YAML
+        
+    Returns:
+        Updated configuration with environment variable overrides
+    """
+    # Use print instead of logger since logger may not be initialized yet
+    env_overrides_applied = 0
+    
+    for config_path, env_var_name in ENV_VAR_MAPPING.items():
+        env_value = os.getenv(env_var_name)
+        if env_value:
+            # Split the path to navigate the config structure
+            path_parts = config_path.split('.')
+            section = path_parts[0]
+            field = path_parts[1]
+            
+            # Initialize section if it doesn't exist
+            if section not in config:
+                config[section] = {}
+            
+            # Set the environment variable value
+            config[section][field] = env_value
+            env_overrides_applied += 1
+    
+    if env_overrides_applied > 0:
+        print(f"Applied {env_overrides_applied} environment variable overrides for sensitive values")
+    
+    return config
+
+
+def get_missing_env_vars(config: Dict[str, Any]) -> list[str]:
+    """
+    Check which environment variables are missing for required API keys/secrets.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        List of missing environment variable names
+    """
+    missing_env_vars = []
+    
+    for config_path, env_var_name in ENV_VAR_MAPPING.items():
+        path_parts = config_path.split('.')
+        section = path_parts[0]
+        field = path_parts[1]
+        
+        # Check if the config value exists and is a placeholder
+        if (config.get(section, {}).get(field) in ["<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"] and 
+            not os.getenv(env_var_name)):
+            missing_env_vars.append(env_var_name)
+    
+    return missing_env_vars
+
+
+def print_env_var_help():
+    """
+    Print helpful information about supported environment variables.
+    """
+    print("\n" + "="*80)
+    print("SHIFT_LEFT ENVIRONMENT VARIABLES")
+    print("="*80)
+    print("You can set the following environment variables to provide API keys and secrets")
+    print("instead of storing them in config.yaml files:\n")
+    
+    # Group by section for better readability
+    sections = {}
+    for config_path, env_var_name in ENV_VAR_MAPPING.items():
+        section = config_path.split('.')[0]
+        if section not in sections:
+            sections[section] = []
+        sections[section].append((config_path, env_var_name))
+    
+    for section, vars_list in sections.items():
+        print(f"{section.upper().replace('_', ' ')} SECTION:")
+        for config_path, env_var_name in vars_list:
+            config_field = config_path.split('.')[1]
+            print(f"  {env_var_name:<35} -> {config_path}")
+        print()
+    
+    print("USAGE EXAMPLES:")
+    print("  export SL_KAFKA_API_KEY='your-kafka-api-key'")
+    print("  export SL_KAFKA_API_SECRET='your-kafka-api-secret'")
+    print("  export SL_FLINK_API_KEY='your-flink-api-key'")
+    print("  export SL_FLINK_API_SECRET='your-flink-api-secret'")
+    print("\nNOTE: Environment variables take precedence over config.yaml values")
+    print("="*80 + "\n")
 
 
 class SecureFormatter(logging.Formatter):
@@ -150,15 +284,29 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
           errors.append("Configuration app.logging must be a valid log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
   
   # Check for placeholder values that need to be filled
-  placeholders = ["<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>"]
+  placeholders = ["<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"]
   def check_placeholders(obj, path=""):
     if isinstance(obj, dict):
       for key, value in obj.items():
         check_placeholders(value, f"{path}.{key}" if path else key)
     elif isinstance(obj, str) and obj in placeholders:
-      errors.append(f"Configuration contains placeholder value '{obj}' at {path} - please replace with actual value")
+      # Check if there's a corresponding environment variable
+      env_var_name = ENV_VAR_MAPPING.get(path)
+      if env_var_name and os.getenv(env_var_name):
+        # Environment variable is set, so placeholder is acceptable
+        return
+      else:
+        if env_var_name:
+          errors.append(f"Configuration contains placeholder value '{obj}' at {path} - please set environment variable {env_var_name} or replace with actual value in config file")
+        else:
+          errors.append(f"Configuration contains placeholder value '{obj}' at {path} - please replace with actual value")
   
   check_placeholders(config)
+  
+  # Check for missing environment variables when config values are placeholders
+  missing_env_vars = get_missing_env_vars(config)
+  if missing_env_vars:
+    errors.append(f"Missing environment variables for API keys/secrets: {', '.join(missing_env_vars)}. Please set these environment variables or update the config file with actual values.")
   
   # If there are any errors, raise them all at once
   if len(errors) > 0:
@@ -171,18 +319,60 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
 
 @lru_cache
 def get_config() -> dict[str,dict[str,str]]:
-  """_summary_
-  reads the client configuration from config.yaml
+  """
+  Read configuration from config.yaml and apply environment variable overrides.
+  
+  Environment variables take precedence over config file values for sensitive data.
+  Supported environment variables:
+  - SL_KAFKA_API_KEY / SL_KAFKA_API_SECRET
+  - SL_CONFLUENT_CLOUD_API_KEY / SL_CONFLUENT_CLOUD_API_SECRET  
+  - SL_FLINK_API_KEY / SL_FLINK_API_SECRET
+  - SL_REGISTRY_KEY_NAME / SL_REGISTRY_KEY_SECRET
+  
   Args:
-      fn (str, optional): _description_. Defaults to "config.yaml".
-  return: a key-value map
+      fn (str, optional): Config file path. Defaults to "config.yaml".
+  
+  Returns:
+      dict: Configuration dictionary with environment variable overrides applied
   """
   global _config
   if _config.__len__() == 0:
       CONFIG_FILE = os.getenv("CONFIG_FILE",  "./config.yaml")
       if CONFIG_FILE:
-        with open(CONFIG_FILE) as f:
-          _config=yaml.load(f,Loader=yaml.FullLoader)
+        try:
+          with open(CONFIG_FILE) as f:
+            _config = yaml.load(f, Loader=yaml.FullLoader)
+            
+          # Apply environment variable overrides for sensitive values
+          _config = apply_env_overrides(_config)
+          
+          # Validate the final configuration
+          validate_config(_config)
+          
+        except FileNotFoundError:
+          print(f"Warning: Configuration file {CONFIG_FILE} not found. Using environment variables only.")
+          # Create minimal config structure and apply environment variables
+          _config = {
+            "kafka": {},
+            "confluent_cloud": {},
+            "flink": {},
+            "registry": {},
+            "app": {
+              "logging": "INFO",
+              "delta_max_time_in_min": 15,
+              "timezone": "America/Los_Angeles",
+              "data_limit_column_name_to_select_from": "tenant_id",
+              "products": ["p1", "p2", "p3"],
+              "accepted_common_products": ["common", "seeds"],
+              "sql_content_modifier": "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent",
+              "dml_naming_convention_modifier": "shift_left.core.utils.naming_convention.DmlNameModifier",
+              "compute_pool_naming_convention_modifier": "shift_left.core.utils.naming_convention.ComputePoolNameModifier",
+              "data_limit_where_condition": "rf\"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})\"",
+              "data_limit_replace_from_reg_ex": "r\"\\s*select\\s+\\*\\s+from\\s+final\\s*;?\"",
+              "data_limit_table_type": "source"
+            }
+          }
+          _config = apply_env_overrides(_config)
           validate_config(_config)
 
   return _config

@@ -1,6 +1,13 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.37
+* Shift Left utility now supports environment variables for sensitive configuration values. Environment variables take precedence over config.yaml values, allowing you to:
+    - Keep sensitive data out of configuration files
+    - Use different credentials for different environments
+    - Securely manage secrets in CI/CD pipelines
+    - Follow security best practices
+
 v0.1.36
 * Improve node_map builder for better performance: keep node visited and currently built node_map to avoid reprocessing nodes already visited.
 * Add compute pool analyzer.
