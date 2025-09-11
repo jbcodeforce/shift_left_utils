@@ -49,78 +49,6 @@ def get_env_value(config_path: str) -> Optional[str]:
         return os.getenv(env_var_name)
     return None
 
-def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
-  """
-  Apply default overrides to configuration.
-  """
-  config["kafka"]["security.protocol"]= "SASL_SSL"  
-  config["kafka"]["sasl.mechanism"]= "PLAIN"
-  config["kafka"]["session.timeout.ms"]= "5000"
-  config["kafka"]["cluster_type"]= "dev"
-  config["kafka"]["src_topic_prefix"]= "clone"
-  config["confluent_cloud"]["base_api"]= "api.confluent.cloud/org/v2"
-  config["confluent_cloud"]["page_size"]= 100
-  config["confluent_cloud"]["glb_name"]= "glb"
-  config["confluent_cloud"]["url_scope"]= "private"
-  config["flink"]["max_cfu"]= "10"
-  config["flink"]["max_cfu_percent_before_allocation"]= "0.8"
-  config["flink"]["statement_name_post_fix"]= "None"
-  config["app"]["default_PK"]= "__db"
-  config["app"]["delta_max_time_in_min"]= 15
-  config["app"]["timezone"]= "America/Los_Angeles"
-  config["app"]["src_table_name_prefix"]= "src_"
-  config["app"]["logging"]= "INFO"
-  config["app"]["products"]= ["p1", "p2", "p3"]
-  config["app"]["accepted_common_products"]= ["common", "seeds"]
-  config["app"]["cache_ttl"]= 120
-  config["app"]["sql_content_modifier"]= "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent"
-  config["app"]["translator_to_flink_sql_agent"]= "shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent"
-  config["app"]["dml_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.DmlNameModifier"
-  config["app"]["compute_pool_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.ComputePoolNameModifier"
-  config["app"]["data_limit_where_condition"]= "rf\"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})\""
-  config["app"]["data_limit_replace_from_reg_ex"]= "r\"\\s*select\\s+\\*\\s+from\\s+final\\s*;?\""
-  config["app"]["data_limit_table_type"]= "source"
-  config["app"]["data_limit_column_name_to_select_from"]= "tenant_id"
-  config["app"]["post_fix_unit_test"]= "_ut"
-  config["app"]["post_fix_integration_test"]= "_it"
-  return config
-
-
-
-def _apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Apply environment variable overrides to configuration.
-    Environment variables take precedence over config file values.
-    
-    Args:
-        config: Configuration dictionary loaded from YAML
-        
-    Returns:
-        Updated configuration with environment variable overrides
-    """
-    # Use print instead of logger since logger may not be initialized yet
-    env_overrides_applied = 0
-    
-    for config_path, env_var_name in ENV_VAR_MAPPING.items():
-        env_value = os.getenv(env_var_name)
-        if env_value:
-            # Split the path to navigate the config structure
-            path_parts = config_path.split('.')
-            section = path_parts[0]
-            field = path_parts[1]
-            
-            # Initialize section if it doesn't exist
-            if section not in config:
-                config[section] = {}
-            
-            # Set the environment variable value
-            config[section][field] = env_value
-            env_overrides_applied += 1
-    
-    if env_overrides_applied > 0:
-        print(f"Applied {env_overrides_applied} environment variable overrides for sensitive values")
-    
-    return config
 
 
 def get_missing_env_vars(config: Dict[str, Any]) -> set[str]:
@@ -254,29 +182,13 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
   for section in required_sections:
     if not config.get(section):
       errors.append(f"Configuration is missing {section} section")
-
-  # deprecated fields
-  deprecated_fields = ["api_key", "api_secret"]
-  for section in ["kafka", "confluent_cloud", "flink"]:
-    for field in deprecated_fields:
-      if config.get(section) and config.get(section).get(field):
-        matched_env_var = get_env_value(f"{section}.{field}")
-        if not matched_env_var:
-          warnings.append(f"Warning: {section}.{field} is deprecated use environment variables instead")
-  deprecated_fields = ["glb_name", "pkafka_cluster", "url_scope", "base_api"]
-  for section in ["kafka", "confluent_cloud"]:
-    for field in deprecated_fields:
-      if config.get(section) and config.get(section).get(field):
-        warnings.append(f"Warning: {section}.{field} is deprecated - can be removed from config file")
-  if config.get("registry"):
-    warnings.append(f"Warning: registry section is deprecated - can be removed from config file")
+  warnings = _check_deprecated_fields(config)
   
-
   # Only proceed with detailed validation if main sections exist
   if not errors:
     # Validate kafka section
     if config.get("kafka"):
-      kafka_required = ["src_topic_prefix", "cluster_id", "cluster_type"]
+      kafka_required = ["src_topic_prefix", "bootstrap.servers", "cluster_type"]
       for field in kafka_required:
         if not config["kafka"].get(field):
           errors.append(f"Configuration is missing kafka.{field}")
@@ -291,25 +203,20 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     
     # Validate flink section
     if config.get("flink"):
-      flink_required = ["compute_pool_id", "catalog_name", "database_name", "max_cfu"]
+      flink_required = ["compute_pool_id", "catalog_name", "database_name"]
       for field in flink_required:
         if not config["flink"].get(field):
           errors.append(f"Configuration is missing flink.{field}")
     
     # Validate app section
     if config.get("app"):     
-      app_required = ["delta_max_time_in_min", 
-                      "timezone", 
-                      "logging", 
-                      "data_limit_column_name_to_select_from", 
-                      "products", 
+      app_required = [
+                     
                       "accepted_common_products", 
                       "sql_content_modifier", 
                       "dml_naming_convention_modifier",
-                     "compute_pool_naming_convention_modifier",
-                     "data_limit_where_condition", 
-                     "data_limit_replace_from_reg_ex",
-                     "data_limit_table_type"]
+                     "compute_pool_naming_convention_modifier"
+                  ]
       for field in app_required:
         if not config["app"].get(field):
           errors.append(f"Configuration is missing app.{field}") 
@@ -367,26 +274,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     print(sanitized_message)
     logger.warning(sanitized_message)
 
-def _merge_config(loaded_config: dict[str,dict[str,str]], default_config: dict[str,dict[str,str]]) -> dict[str,dict[str,str]]:
-  """Merge the loaded config with the default config, with loaded_config taking precedence"""
-  merged_config = {}
-  
-  # Start with all sections from default_config
-  for section, section_values in default_config.items():
-    merged_config[section] = section_values.copy()
-  
-  # Merge sections from loaded_config, preserving default values for missing keys
-  # Handle case where loaded_config might be None
-  if loaded_config is not None:
-    for section, section_values in loaded_config.items():
-      if section in merged_config:
-        # Section exists in defaults, merge the fields
-        merged_config[section].update(section_values)
-      else:
-        # New section not in defaults, add it completely
-        merged_config[section] = section_values.copy()
-  
-  return merged_config
+
 
 @lru_cache
 def get_config() -> dict[str,dict[str,str]]:
@@ -416,12 +304,10 @@ def get_config() -> dict[str,dict[str,str]]:
           config= _apply_default_overrides(config)
           with open(CONFIG_FILE) as f:
             _config = yaml.load(f, Loader=yaml.FullLoader)
+            validate_config(_config)
             _merged_config = _merge_config(_config, config)
             # Apply environment variable overrides for sensitive values
             _config = _apply_env_overrides(_merged_config)
-          
-            # Validate the final configuration
-            validate_config(_config)
           
         except FileNotFoundError:
           print(f"Warning: Configuration file {CONFIG_FILE} not found. Using environment variables only.")
@@ -491,3 +377,132 @@ try:
 except Exception:
     # If config loading fails during module import, use default level
     logger.setLevel(logging.INFO)
+
+
+# --- private functions ---
+def _merge_config(loaded_config: dict[str,dict[str,str]], default_config: dict[str,dict[str,str]]) -> dict[str,dict[str,str]]:
+  """Merge the loaded config with the default config, with loaded_config taking precedence"""
+  merged_config = {}
+  
+  # Start with all sections from default_config
+  for section, section_values in default_config.items():
+    merged_config[section] = section_values.copy()
+  
+  # Merge sections from loaded_config, preserving default values for missing keys
+  # Handle case where loaded_config might be None
+  if loaded_config is not None:
+    for section, section_values in loaded_config.items():
+      if section in merged_config:
+        # Section exists in defaults, merge the fields
+        merged_config[section].update(section_values)
+      else:
+        # New section not in defaults, add it completely
+        merged_config[section] = section_values.copy()
+  
+  return merged_config
+
+
+def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+  """
+  Apply default overrides to configuration.
+  """
+  config["kafka"]["security.protocol"]= "SASL_SSL"  
+  config["kafka"]["sasl.mechanism"]= "PLAIN"
+  config["kafka"]["session.timeout.ms"]= "5000"
+  config["kafka"]["cluster_type"]= "dev"
+  config["kafka"]["src_topic_prefix"]= "clone"
+  config["confluent_cloud"]["base_api"]= "api.confluent.cloud/org/v2"
+  config["confluent_cloud"]["page_size"]= 100
+  config["confluent_cloud"]["glb_name"]= "glb"
+  config["confluent_cloud"]["url_scope"]= "private"
+  config["flink"]["max_cfu"]= "10"
+  config["flink"]["max_cfu_percent_before_allocation"]= "0.8"
+  config["flink"]["statement_name_post_fix"]= "None"
+  config["app"]["default_PK"]= "__db"
+  config["app"]["delta_max_time_in_min"]= 15
+  config["app"]["timezone"]= "America/Los_Angeles"
+  config["app"]["src_table_name_prefix"]= "src_"
+  config["app"]["logging"]= "INFO"
+  config["app"]["products"]= ["p1", "p2", "p3"]
+  config["app"]["accepted_common_products"]= ["common", "seeds"]
+  config["app"]["cache_ttl"]= 120
+  config["app"]["sql_content_modifier"]= "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent"
+  config["app"]["translator_to_flink_sql_agent"]= "shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent"
+  config["app"]["dml_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.DmlNameModifier"
+  config["app"]["compute_pool_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.ComputePoolNameModifier"
+  config["app"]["data_limit_where_condition"]= "rf\"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})\""
+  config["app"]["data_limit_replace_from_reg_ex"]= "r\"\\s*select\\s+\\*\\s+from\\s+final\\s*;?\""
+  config["app"]["data_limit_table_type"]= "source"
+  config["app"]["data_limit_column_name_to_select_from"]= "tenant_id"
+  config["app"]["post_fix_unit_test"]= "_ut"
+  config["app"]["post_fix_integration_test"]= "_it"
+  return config
+
+
+def _apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Apply environment variable overrides to configuration.
+    Environment variables take precedence over config file values.
+    
+    Args:
+        config: Configuration dictionary loaded from YAML
+        
+    Returns:
+        Updated configuration with environment variable overrides
+    """
+    # Use print instead of logger since logger may not be initialized yet
+    env_overrides_applied = 0
+    
+    for config_path, env_var_name in ENV_VAR_MAPPING.items():
+        env_value = os.getenv(env_var_name)
+        if env_value:
+            # Split the path to navigate the config structure
+            path_parts = config_path.split('.')
+            section = path_parts[0]
+            field = path_parts[1]
+            
+            # Initialize section if it doesn't exist
+            if section not in config:
+                config[section] = {}
+            
+            # Set the environment variable value
+            config[section][field] = env_value
+            env_overrides_applied += 1
+    
+    if env_overrides_applied > 0:
+        print(f"Applied {env_overrides_applied} environment variable overrides for sensitive values")
+    
+    return config
+
+def _check_deprecated_fields(config: dict[str,dict[str,str]]) -> list[str]:
+  """Check for deprecated fields in the configuration"""
+  warnings = []
+  if config.get("registry"):
+    warnings.append(f"Warning: registry section is deprecated - may be removed from config file")
+
+  # deprecated fields
+  deprecated_fields = ["api_key", "api_secret"]
+  for section in ["kafka", "confluent_cloud", "flink"]:
+    for field in deprecated_fields:
+      if config.get(section) and config.get(section).get(field):
+        matched_env_var = get_env_value(f"{section}.{field}")
+        if not matched_env_var:
+          warnings.append(f"Warning: {section}.{field} is deprecated use environment variables instead")
+        else:
+          warnings.append(f"{section}.{field} is set via environment variable")
+  deprecated_fields = ["cluster_id", "security.protocol", "sasl.mechanism", "sasl.username", "sasl.password", "session.timeout.ms", "glb_name", "pkafka_cluster", "url_scope", "base_api", "page_size"]
+  warnings.extend(_check_fields_in_sections(config, ["kafka", "confluent_cloud"], deprecated_fields))
+  deprecated_fields = ["flink_url", "max_cfu", "max_cfu_percent_before_allocation", "statement_name_post_fix"]
+  warnings.extend(_check_fields_in_sections(config, ["flink"], deprecated_fields))
+  deprecated_fields = ["delta_max_time_in_min", "default_PK", "timezone", "logging", "products", "accepted_common_products", "cache_ttl",  "translator_to_flink_sql_agent",  "data_limit_where_condition", "data_limit_replace_from_reg_ex", "data_limit_table_type", "data_limit_column_name_to_select_from", "post_fix_unit_test", "post_fix_integration_test"]
+  warnings.extend(_check_fields_in_sections(config, ["app"], deprecated_fields))
+  return warnings
+
+def _check_fields_in_sections(config: dict[str,dict[str,str]], sections:list[str], deprecated_fields: list[str]) -> list[str]:
+  """Check for deprecated fields in the configuration"""
+  warnings = []
+  for section in sections:
+    for field in deprecated_fields:
+      if config.get(section) and config.get(section).get(field):
+        warnings.append(f"{section}.{field} is set to overide default value, or may be removed from config file")
+  return warnings

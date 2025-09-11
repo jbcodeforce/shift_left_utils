@@ -299,7 +299,7 @@ class ConfluentCloudClient:
         self.api_key = os.getenv("SL_FLINK_API_KEY") or self.config["flink"]["api_key"]
         self.api_secret = os.getenv("SL_FLINK_API_SECRET") or self.config["flink"]["api_secret"]
         auth_header = self._generate_auth_header(self.api_key, self.api_secret)
-        url=f"https://fink-{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
+        url=f"https://flink-{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
         return url, auth_header
     
     def get_flink_statement(self, statement_name: str)-> Statement | None:

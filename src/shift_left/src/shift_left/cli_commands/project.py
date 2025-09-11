@@ -67,7 +67,9 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         """
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
-        print("#" * 30 + f" List compute pools for environment {environment_id}")
+        if not region:
+               region = get_config().get('confluent_cloud').get('region')
+        print("#" * 30 + f" List compute pools for environment {environment_id} - in region {region}")
         list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
