@@ -921,8 +921,8 @@ class TestTestManager(unittest.TestCase):
             prefix="dev-ddl"
         )
         
-        # Should return None when table exists and prefix is ddl
-        self.assertIsNone(result)
+        # Should return [] when table exists and prefix is ddl
+        self.assertEqual(result, [])
         mock_execute.assert_not_called()
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
@@ -951,8 +951,8 @@ class TestTestManager(unittest.TestCase):
             prefix="dev-dml"
         )
         
-        # Should return None when DML statement is running
-        self.assertIsNone(result)
+        # Should return [] when DML statement is running
+        self.assertEqual(result, [])
         mock_execute.assert_not_called()
 
     @patch('shift_left.core.test_mgr.from_pipeline_to_absolute')

@@ -13,7 +13,7 @@ from shift_left.core.utils.app_config import logger, BASE_CC_API
 from shift_left.core.models.flink_statement_model import *
 from shift_left.core.models.flink_compute_pool_model import *
 
-COMPUTE_POOL_URL = "https://confluent.cloud/api/fcpm/v2/compute-pools/"
+COMPUTE_POOL_URL = "https://api.confluent.cloud/fcpm/v2/compute-pools"
 
 class VersionInfo:
     """
@@ -66,7 +66,7 @@ class ConfluentCloudClient:
             "User-Agent": f"python-shift-left-utils/{version_str}"
         }
         response = None
-        logger.info(f">>> Make request {method} to {url} with data: {data}")
+        logger.info(f">>> Make request {method} to {url} with headers: {headers} and data: {data}")
         try:
             response = requests.request(
                 method=method,
@@ -87,7 +87,7 @@ class ConfluentCloudClient:
                 if response.status_code == 404:
                     logger.debug(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
-                    logger.debug(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
+                    logger.info(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
                     return result
                 else:
                     logger.error(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
@@ -119,6 +119,7 @@ class ConfluentCloudClient:
         next_page_token = None
         page_size = self.config["confluent_cloud"].get("page_size", 100)
         auth_header = self._get_ccloud_auth()
+        #auth_header = self._get_flink_auth()
         url=f"{COMPUTE_POOL_URL}?spec.region={region}&environment={env_id}&page_size={page_size}"
         logger.info(f"compute pool url= {url}")
         previous_token=None
@@ -247,7 +248,7 @@ class ConfluentCloudClient:
         cluster_info = self._extract_cluster_info_from_bootstrap(self.config["kafka"]["bootstrap.servers"])
         cluster_id=cluster_info["cluster_id"]
         base_url=cluster_info["base_url"]
-        url=f"https://{base_url}/kafka/v3/clusters/{cluster_id}/topics"
+        url=f"https://{cluster_id}-{base_url}/kafka/v3/clusters/{cluster_id}/topics"
         return url
     
     def get_topic_message_count(self, topic_name: str) -> int:

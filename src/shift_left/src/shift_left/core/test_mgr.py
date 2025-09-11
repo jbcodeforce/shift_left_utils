@@ -278,7 +278,7 @@ def _execute_flink_test_statement(
     
 def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, FlinkTableReference]:
     inventory_path = os.path.join(os.getenv("PIPELINES"),)
-    table_inventory = get_or_build_inventory(inventory_path, inventory_path, True)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     if not table_ref:
         raise ValueError(f"Table {table_name} not found in inventory")  
@@ -455,13 +455,13 @@ def _load_sql_and_execute_statement(table_name: str,
     statement_name = _build_statement_name(table_name, prefix)
     table_under_test_exists = _table_exists(table_name+POST_FIX_UNIT_TEST)
     if "ddl" in prefix and table_under_test_exists:
-        return None  # Return None when DDL table already exists
+        return statements  # Return same list when DDL table already exists
 
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
     if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
         print(f"Statement {statement_name} already exists and is running -> do nothing")
-        return None  # Return None when statement is already running
+        return statements  # Return same list when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
     logger.info(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
