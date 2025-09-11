@@ -33,7 +33,7 @@ class ConfluentCloudClient:
     """
     def __init__(self, config: dict):
         self.config = config
-        self.base_url = self._extract_cluster_info_from_bootstrap(self.config["kafka"]["bootstrap.servers"])["base_url"]
+        self.base_url = self._extract_cluster_info_from_bootstrap(self.config.get("kafka").get("bootstrap.servers")).get("base_url")
 
     def _get_ccloud_auth(self):
         api_key = os.getenv("SL_CONFLUENT_CLOUD_API_KEY") or self.config["confluent_cloud"]["api_key"]
@@ -303,9 +303,9 @@ class ConfluentCloudClient:
         return url, auth_header
     
     def get_flink_statement(self, statement_name: str)-> Statement | None:
-        url = self.build_flink_url_and_auth_header()
+        url, auth_header = self.build_flink_url_and_auth_header()
         try:
-            resp=self.make_request("GET",f"{url}/statements/{statement_name}")
+            resp=self.make_request("GET",f"{url}/statements/{statement_name}", auth_header=auth_header)
             if resp and not resp.get("errors"):
                 try:
                     s: Statement = Statement.model_validate(resp)
@@ -324,10 +324,10 @@ class ConfluentCloudClient:
             raise e
 
     def delete_flink_statement(self, statement_name: str) -> str:
-        url = self.build_flink_url_and_auth_header()
+        url, auth_header = self.build_flink_url_and_auth_header()
         timer= self.config['flink'].get("poll_timer", 10)
         try:
-            resp = self.make_request("DELETE",f"{url}/statements/{statement_name}")
+            resp = self.make_request("DELETE",f"{url}/statements/{statement_name}", auth_header=auth_header)
             if resp:  # could be a 404 too.
                 return "deleted"
             if resp == '':
@@ -353,7 +353,7 @@ class ConfluentCloudClient:
             return "unknown - mostly not removed"
         
     def update_flink_statement(self, statement_name: str,  statement: Statement, stopped: bool):
-        url = self.build_flink_url_and_auth_header()
+        url, auth_header = self.build_flink_url_and_auth_header()
         try:
             statement.spec.stopped = stopped
             statement_data = {
@@ -364,7 +364,7 @@ class ConfluentCloudClient:
             }
             logger.info(f" update_flink_statement payload: {statement_data}")
             start_time = time.perf_counter()
-            statement=self.make_request("PUT",f"{url}/statements/{statement_name}", statement_data)
+            statement=self.make_request(method="PUT", url=f"{url}/statements/{statement_name}", data=statement_data, auth_header=auth_header )
             logger.info(f" update_flink_statement: {statement}")
             rep = self.wait_response(url, statement_name, start_time)
             logger.info(f" update_flink_statement: {rep}")

@@ -78,7 +78,7 @@ class TestConfluentClient(unittest.TestCase):
         os.environ["SL_KAFKA_API_SECRET"] = "test-api-secret"
         cclient = ConfluentCloudClient(get_config())
         key=b64encode("test-api-key:test-api-secret".encode('utf-8')).decode('utf-8')
-        auth_header = cclient._set_kafka_auth()
+        auth_header = cclient._get_kafka_auth()
         self.assertEqual(auth_header, "Basic " + key)
         
         

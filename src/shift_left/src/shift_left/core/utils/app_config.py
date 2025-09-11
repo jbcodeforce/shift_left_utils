@@ -263,7 +263,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
         if not matched_env_var:
           warnings.append(f"Warning: {section}.{field} is deprecated use environment variables instead")
   deprecated_fields = ["glb_name", "pkafka_cluster", "url_scope", "base_api"]
-  for section in ["kafka", "confluent_cloud", "flink"]:
+  for section in ["kafka", "confluent_cloud"]:
     for field in deprecated_fields:
       if config.get(section) and config.get(section).get(field):
         warnings.append(f"Warning: {section}.{field} is deprecated - can be removed from config file")
@@ -366,6 +366,25 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     print(sanitized_message)
     logger.warning(sanitized_message)
 
+def _merge_config(loaded_config: dict[str,dict[str,str]], default_config: dict[str,dict[str,str]]) -> dict[str,dict[str,str]]:
+  """Merge the loaded config with the default config, with loaded_config taking precedence"""
+  merged_config = {}
+  
+  # Start with all sections from default_config
+  for section, section_values in default_config.items():
+    merged_config[section] = section_values.copy()
+  
+  # Merge sections from loaded_config, preserving default values for missing keys
+  for section, section_values in loaded_config.items():
+    if section in merged_config:
+      # Section exists in defaults, merge the fields
+      merged_config[section].update(section_values)
+    else:
+      # New section not in defaults, add it completely
+      merged_config[section] = section_values.copy()
+  
+  return merged_config
+
 @lru_cache
 def get_config() -> dict[str,dict[str,str]]:
   """
@@ -388,15 +407,18 @@ def get_config() -> dict[str,dict[str,str]]:
       CONFIG_FILE = os.getenv("CONFIG_FILE",  "./config.yaml")
       if CONFIG_FILE:
         try:
+          config = {}
+          for section in ["kafka", "confluent_cloud", "flink", "app"]:
+            config[section] = {}
+          config= _apply_default_overrides(config)
           with open(CONFIG_FILE) as f:
             _config = yaml.load(f, Loader=yaml.FullLoader)
-            
-          # Apply environment variable overrides for sensitive values
-          _config = _apply_default_overrides(_config)
-          _config = _apply_env_overrides(_config)
+            _merged_config = _merge_config(_config, config)
+            # Apply environment variable overrides for sensitive values
+            _config = _apply_env_overrides(_merged_config)
           
-          # Validate the final configuration
-          validate_config(_config)
+            # Validate the final configuration
+            validate_config(_config)
           
         except FileNotFoundError:
           print(f"Warning: Configuration file {CONFIG_FILE} not found. Using environment variables only.")
@@ -420,6 +442,8 @@ def reset_config_cache():
   """Reset the configuration cache for testing purposes."""
   global _config
   _config = {}
+  # Clear the LRU cache for get_config function
+  get_config.cache_clear()
 
 
 def reset_all_caches() -> None:

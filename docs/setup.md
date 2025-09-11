@@ -201,6 +201,17 @@ The Shift Left utility now supports environment variables for sensitive configur
 | `SL_FLINK_API_KEY` | `flink.api_key` | Flink API key |
 | `SL_FLINK_API_SECRET` | `flink.api_secret` | Flink API secret |
 
+
+### Priority Order
+
+The setting will use the following order:
+
+1. **Environment Variables** (highest priority)
+2. **Config.yaml values** (fallback)
+3. Default values set in the code
+
+If an environment variable is set, it will override the corresponding value in config.yaml. If a value is set in config.yaml it will be override the default value.
+
 ### Setting Environment Variables
 
 #### Bash/Zsh

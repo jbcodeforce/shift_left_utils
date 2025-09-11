@@ -6,9 +6,10 @@ import pathlib
 from unittest.mock import patch
 
 # Set up config file path for testing
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+expected_config_file = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["CONFIG_FILE"] = expected_config_file
 
-from shift_left.core.utils.app_config import validate_config, get_config, _apply_default_overrides, _apply_env_overrides, get_missing_env_vars
+from shift_left.core.utils.app_config import validate_config, get_config, _apply_default_overrides, _apply_env_overrides, get_missing_env_vars, reset_config_cache
 """
 test app configuration management.
 """
@@ -447,14 +448,14 @@ class TestValidateConfig(unittest.TestCase):
         # Start with a valid config and apply defaults to avoid missing field errors  
         config = copy.deepcopy(self.valid_config)
         config = _apply_default_overrides(config)
-        
+        os.environ["SL_FLINK_API_KEY"]=""
+        os.environ["SL_FLINK_API_SECRET"]=""
         # Add deprecated fields
         config["kafka"]["pkafka_cluster"] = "test-pkafka-cluster"
         config["confluent_cloud"]["url_scope"] = "private"
         config["confluent_cloud"]["base_api"] = "https://api.confluent.cloud"
         config["flink"]["api_key"] = "flink-api-key"
         config["flink"]["api_secret"] = "flink-api-secret"
-        
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
             validate_config(config)
             
@@ -472,6 +473,7 @@ class TestValidateConfig(unittest.TestCase):
             assert "Warning: flink.api_key is deprecated use environment variables instead" in warning_message
             assert "Warning: flink.api_secret is deprecated use environment variables instead" in warning_message
 
+
     def test_error_and_warning_messages_together(self):
         """Test that both error and warning messages can be captured when both occur"""
         # Create a config with missing fields (errors) and deprecated fields (warnings)
@@ -481,7 +483,7 @@ class TestValidateConfig(unittest.TestCase):
         # Remove some required fields to generate errors
         del config["app"]["sql_content_modifier"]
         del config["app"]["products"]
-        
+        os.environ["SL_FLINK_API_KEY"]="" 
         # Add deprecated fields to generate warnings  
         config["flink"]["api_key"] = "deprecated-api-key"
         config["kafka"]["pkafka_cluster"] = "deprecated-cluster"
@@ -529,6 +531,99 @@ class TestValidateConfig(unittest.TestCase):
         config = _apply_default_overrides(config)
         missing_env_vars = get_missing_env_vars(config)
         assert missing_env_vars == {"SL_KAFKA_API_KEY"}
+
+    def test_ovveride_priority(self):
+        """Test that the priority order is correct"""
+        # Ensure we're using the correct config file (fix for uv run pytest env differences)
+        os.environ["CONFIG_FILE"] = expected_config_file
+        reset_config_cache()
+        
+        # environment variables before config file
+        os.environ["SL_KAFKA_API_SECRET"]="test-api-secret-2"
+        os.environ["SL_CONFLUENT_CLOUD_API_SECRET"]="test-api-secret-2"
+        os.environ["SL_FLINK_API_SECRET"]="test-api-secret-2"
+        os.environ["SL_KAFKA_API_KEY"]="test-api-key-2"
+        os.environ["SL_CONFLUENT_CLOUD_API_KEY"]="test-api-key-2"
+        os.environ["SL_FLINK_API_KEY"]="test-api-key-2"
+        
+        config = get_config()
+        
+        assert config["kafka"]["api_secret"] == "test-api-secret-2"
+        assert config["confluent_cloud"]["api_secret"] == "test-api-secret-2"
+        assert config["flink"]["api_secret"] == "test-api-secret-2"
+        assert config["kafka"]["api_key"] == "test-api-key-2"
+        assert config["confluent_cloud"]["api_key"] == "test-api-key-2"
+        assert config["flink"]["api_key"] == "test-api-key-2"
+        # config file before default overrides
+        assert config["flink"]["max_cfu"] == 17
+
+    def test_three_tier_priority_system(self):
+        """Test complete three-tier priority system: defaults → config.yaml → environment variables"""
+        reset_config_cache()
+        
+        # Save original env var values
+        test_env_vars = ["SL_KAFKA_API_KEY", "SL_KAFKA_API_SECRET", 
+                        "SL_CONFLUENT_CLOUD_API_KEY", "SL_CONFLUENT_CLOUD_API_SECRET",
+                        "SL_FLINK_API_KEY", "SL_FLINK_API_SECRET"]
+        
+        original_env_values = {}
+        for var in test_env_vars:
+            original_env_values[var] = os.environ.get(var)
+        
+        try:
+            # Set environment variables to test different priority scenarios
+            # Some values from env, some missing to test config file and defaults
+            os.environ["SL_KAFKA_API_KEY"] = "env-kafka-key"  # Test: env var wins
+            os.environ["SL_KAFKA_API_SECRET"] = "env-kafka-secret"  # Test: env var wins  
+            os.environ["SL_CONFLUENT_CLOUD_API_KEY"] = "env-cc-key"  # Required for validation
+            os.environ["SL_CONFLUENT_CLOUD_API_SECRET"] = "env-cc-secret"  # Required for validation
+            os.environ["SL_FLINK_API_KEY"] = "env-flink-key"  # Required for validation
+            os.environ["SL_FLINK_API_SECRET"] = "env-flink-secret"  # Test: env var wins
+            
+            config = get_config()
+            
+            # Test 1: Environment variable takes highest priority over defaults/config
+            assert config["kafka"]["api_key"] == "env-kafka-key", \
+                f"Expected env value 'env-kafka-key', got {config['kafka']['api_key']}"
+                
+            # Test 3: Config file values are properly loaded alongside defaults
+            assert config["flink"]["compute_pool_id"] == "lfcp-xvrvmz", \
+                f"Expected config value from file, got {config['flink']['compute_pool_id']}"
+                
+            # Test 4: Default value used when not in config file and no env mapping
+            # app.cache_ttl: Default=120, not in config, no env mapping -> Should be default
+            assert config["app"]["cache_ttl"] == 120, \
+                f"Expected default value 120, got {config['app']['cache_ttl']}"
+                
+            # Test 5: Config value overrides default for non-env-mapped fields
+            # kafka.src_topic_prefix: Default="clone", Config="cdc", no env mapping -> Should be config
+            assert config["kafka"]["src_topic_prefix"] == "cdc", \
+                f"Expected config value 'cdc', got {config['kafka']['src_topic_prefix']}"
+                
+            # Test 6: App section deep merge - config value used when present
+            assert config["app"]["post_fix_unit_test"] == "_ut", \
+                f"Expected config value '_ut', got {config['app']['post_fix_unit_test']}"
+                
+            # Test 7: App section deep merge - default used when not in config
+            expected_modifier = "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent"
+            assert config["app"]["sql_content_modifier"] == expected_modifier, \
+                f"Expected default value, got {config['app']['sql_content_modifier']}"
+                
+            # Test 8: Deep merge preserves both config and default values in same section
+            # This tests that our _merge_config properly merges at field level
+            assert config["app"]["accepted_common_products"] == ['common', 'seeds'], \
+                f"Expected config value, got {config['app']['accepted_common_products']}"
+            assert config["app"]["timezone"] == "America/Los_Angeles", \
+                f"Expected default value, got {config['app']['timezone']}"
+
+        finally:
+            # Restore original environment variables
+            for var, value in original_env_values.items():
+                if value is not None:
+                    os.environ[var] = value
+                elif var in os.environ:
+                    del os.environ[var]
+
 
 if __name__ == '__main__':
     unittest.main()
