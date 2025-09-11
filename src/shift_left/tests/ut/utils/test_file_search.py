@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import os
 import pathlib
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.file_search import (
     get_or_build_source_file_inventory, 
     build_inventory,
@@ -30,7 +31,7 @@ from shift_left.core.utils.file_search import (
     _get_statement_name_modifier,
     DmlNameModifier
 )
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+
 from shift_left.core.utils.app_config import get_config, logger
 
 import json

@@ -39,8 +39,9 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app,['pipeline', 'build-all-metadata'])
         #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'])
         #result = runner.invoke(app, ['table', 'init-unit-tests', '--ai', '--nb-test-cases', '1', 'qx_fct_linked_infocard'])
-        result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--product-name', 'aqem'])
+        #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--product-name', 'aqem'])
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--directory', os.getenv('PIPELINES') + '/sources])
+        result = runner.invoke(app, ['project', 'list-compute-pools'])
         print(result.stdout)
 
       

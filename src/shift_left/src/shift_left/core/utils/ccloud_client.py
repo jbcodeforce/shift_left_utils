@@ -13,7 +13,7 @@ from shift_left.core.utils.app_config import logger, BASE_CC_API
 from shift_left.core.models.flink_statement_model import *
 from shift_left.core.models.flink_compute_pool_model import *
 
-COMPUTE_POOL_URL = "https://api.confluent.cloud/fcpm/v2/compute-pools/"
+COMPUTE_POOL_URL = "https://confluent.cloud/api/fcpm/v2/compute-pools/"
 
 class VersionInfo:
     """
