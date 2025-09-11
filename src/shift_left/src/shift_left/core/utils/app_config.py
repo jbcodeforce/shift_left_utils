@@ -65,6 +65,7 @@ def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
   config["flink"]["max_cfu"]= "10"
   config["flink"]["max_cfu_percent_before_allocation"]= "0.8"
   config["flink"]["statement_name_post_fix"]= "None"
+  config["app"]["default_PK"]= "__db"
   config["app"]["delta_max_time_in_min"]= 15
   config["app"]["timezone"]= "America/Los_Angeles"
   config["app"]["src_table_name_prefix"]= "src_"
@@ -375,13 +376,15 @@ def _merge_config(loaded_config: dict[str,dict[str,str]], default_config: dict[s
     merged_config[section] = section_values.copy()
   
   # Merge sections from loaded_config, preserving default values for missing keys
-  for section, section_values in loaded_config.items():
-    if section in merged_config:
-      # Section exists in defaults, merge the fields
-      merged_config[section].update(section_values)
-    else:
-      # New section not in defaults, add it completely
-      merged_config[section] = section_values.copy()
+  # Handle case where loaded_config might be None
+  if loaded_config is not None:
+    for section, section_values in loaded_config.items():
+      if section in merged_config:
+        # Section exists in defaults, merge the fields
+        merged_config[section].update(section_values)
+      else:
+        # New section not in defaults, add it completely
+        merged_config[section] = section_values.copy()
   
   return merged_config
 

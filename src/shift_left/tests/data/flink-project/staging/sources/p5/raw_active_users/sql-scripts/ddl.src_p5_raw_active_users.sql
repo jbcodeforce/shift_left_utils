@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS src_p5_raw_active_users (
 
-  -- put here column definitions
-  PRIMARY KEY(default_key) NOT ENFORCED
-) DISTRIBUTED BY HASH(default_key) INTO 1 BUCKETS
+  -- add columns
+  PRIMARY KEY(__db) NOT ENFORCED
+) DISTRIBUTED BY HASH(__db) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
   'key.avro-registry.schema-context' = '.flink-dev',

@@ -6,6 +6,9 @@ import unittest
 import shutil
 from unittest.mock import patch
 import os, pathlib
+os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["PIPELINES"] =  str(pathlib.Path(__file__).parent.parent.parent /  "data/flink-project/pipelines")
+
 # need to be before the import of migrate_one_file
 data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
 os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
@@ -47,8 +50,6 @@ class TestProcessSrcTable(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-       
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
 
     def _get_env_var(self, var_name: str) -> str:
         """Get environment variable with proper null checking."""

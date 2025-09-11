@@ -113,7 +113,7 @@ class TestStatementManager(BaseUT):
         # Setup mock client: 1/ instance of the client, 2/ mock the make_request and build_flink_url_and_auth_header methods
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_client_instance.make_request.return_value = mock_response
-        mock_client_instance.build_flink_url_and_auth_header.return_value = "https://test-url"
+        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
 
         # Call the function
         result = statement_mgr.get_statement_list()
@@ -173,7 +173,7 @@ class TestStatementManager(BaseUT):
         
         # Configure mock
         mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = "http://test-url"
+        mock_client.build_flink_url_and_auth_header.return_value = ("http://test-url", "test-auth-header")
         
         # Mock successful response
         mock_response = {
@@ -323,6 +323,20 @@ class TestStatementManager(BaseUT):
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_client_instance = MockConfluentCloudClient.return_value
         
+        # Mock the client methods that will be called by post_flink_statement
+        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        mock_client_instance.make_request.return_value = {
+            "name": "drop-fct-order",
+            "status": {"phase": "COMPLETED"},
+            "spec": {
+                "statement": f"drop table if exists {table_name};",
+                "compute_pool_id": "test-pool",
+                "properties": {"sql.current-catalog": "default", "sql.current-database": "default"},
+                "stopped": False,
+                "principal": "test-principal"
+            }
+        }
+        
         result = statement_mgr.drop_table(table_name=table_name)
         
         self.assertEqual(result, "fct_order dropped")
@@ -414,7 +428,7 @@ class TestStatementManager(BaseUT):
         # Setup
         mock_exists.return_value = False
         mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = "https://test-url"
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
         mock_client.make_request.return_value = {
             "data": [],
             "metadata": {"next": None}
@@ -472,7 +486,7 @@ class TestStatementManager(BaseUT):
         }
         mock_open_file.return_value.__enter__.return_value.read.return_value = json.dumps(cache_data)
         mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = "https://test-url"
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
         
         # Setup pagination responses
         responses = [
@@ -506,7 +520,7 @@ class TestStatementManager(BaseUT):
     def test_api_pagination_multiple_pages(self, MockConfluentCloudClient):
         """Test API pagination with multiple pages of results"""
         mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = "https://test-url"
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
         
         # Setup pagination responses
         responses = [

@@ -100,36 +100,34 @@ def execute_one_or_all_tests(table_name: str,
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-    try:
-        test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id)
-       
-        test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
 
-        for idx, test_case in enumerate(test_suite_def.test_suite):
-            # loop over all the test cases of the test suite
-            if test_case_name and test_case.name != test_case_name:
-                continue
-            statements = _execute_test_inputs(test_case=test_case,
-                                            table_ref=table_ref,
-                                            prefix=prefix+"-ins-"+str(idx + 1),
-                                            compute_pool_id=compute_pool_id)
-            test_result = TestResult(test_case_name=test_case.name, result="insertion done")
+    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id, prefix)
+    
+    test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
+
+    for idx, test_case in enumerate(test_suite_def.test_suite):
+        # loop over all the test cases of the test suite
+        if test_case_name and test_case.name != test_case_name:
+            continue
+        statements = _execute_test_inputs(test_case=test_case,
+                                        table_ref=table_ref,
+                                        prefix=prefix+"-ins-"+str(idx + 1),
+                                        compute_pool_id=compute_pool_id)
+        test_result = TestResult(test_case_name=test_case.name, result="insertion done")
+        test_result.statements.extend(statements)
+        if run_validation:
+            statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
+                                                                table_ref=table_ref,
+                                                                prefix=prefix+"-val-"+str(idx + 1),
+                                                                compute_pool_id=compute_pool_id)
+            test_result.result = result_text
             test_result.statements.extend(statements)
-            if run_validation:
-                statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
-                                                                    table_ref=table_ref,
-                                                                    prefix=prefix+"-val-"+str(idx + 1),
-                                                                    compute_pool_id=compute_pool_id)
-                test_result.result = result_text
-                test_result.statements.extend(statements)
-                test_result.validation_result = statement_result
-            test_suite_result.test_results[test_case.name] = test_result
-            if test_case_name and test_case.name == test_case_name:
-                break
-        return test_suite_result
-    except Exception as e:
-        logger.error(f"Error executing test suite: {e}")
-        raise e
+            test_result.validation_result = statement_result
+        test_suite_result.test_results[test_case.name] = test_result
+        if test_case_name and test_case.name == test_case_name:
+            break
+    return test_suite_result
+
 
 def execute_validation_tests(table_name: str, 
                     test_case_name: str = None,
@@ -203,24 +201,23 @@ def delete_test_artifacts(table_name: str,
 
 def _init_test_foundations(table_name: str, 
         test_case_name: str, 
-        compute_pool_id: Optional[str] = None
+        compute_pool_id: Optional[str] = None,
+        prefix: str = "dev"
 ) -> Tuple[SLTestDefinition, FlinkTableReference, str, TestResult]:
     """
     Create input tables as defined in the test suite foundations for the given table.
     And modifyt the dml of the given table to use the input tables for the unit tests.
     """
-    print("-"*40)
+    print("-"*60)
     print(f"1. Create table foundations for unit tests")
-    print("-"*40)
+    print("-"*60)
     test_suite_def, table_ref = _load_test_suite_definition(table_name)
-    config = get_config()
-    if compute_pool_id is None:
-        compute_pool_id = config['flink']['compute_pool_id']
-    prefix = config['kafka']['cluster_type']
     test_result = TestResult(test_case_name=test_case_name, result="")
     test_result.foundation_statements = _execute_foundation_statements(test_suite_def, table_ref, prefix, compute_pool_id)
     test_result.foundation_statements=_start_ddl_dml_for_flink_under_test(table_name, 
-                                            table_ref, prefix, compute_pool_id, 
+                                            table_ref, 
+                                            prefix, 
+                                            compute_pool_id, 
                                             statements=test_result.foundation_statements)
     return test_suite_def, table_ref, prefix, test_result
 
@@ -281,8 +278,11 @@ def _execute_flink_test_statement(
     
 def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, FlinkTableReference]:
     inventory_path = os.path.join(os.getenv("PIPELINES"),)
-    table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+    table_inventory = get_or_build_inventory(inventory_path, inventory_path, True)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+    if not table_ref:
+        raise ValueError(f"Table {table_name} not found in inventory")  
+
     table_folder = table_ref.table_folder_name
     # Load test suite definition from tests folder
     table_folder = from_pipeline_to_absolute(table_folder)

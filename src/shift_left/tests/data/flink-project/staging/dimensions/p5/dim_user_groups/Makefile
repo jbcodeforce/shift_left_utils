@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- int_p3_it2
-TABLE_NAME=int_p3_it2
-SCRIPT_PRE_KEBAB=stage-usw2-p3
+# --- p5_dim_user_groups
+TABLE_NAME=p5_dim_user_groups
+SCRIPT_PRE_KEBAB=dev-usw2-p5
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_int_p3_it2: create_flink_ddl  create_flink_dml
+create_p5_dim_user_groups: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source

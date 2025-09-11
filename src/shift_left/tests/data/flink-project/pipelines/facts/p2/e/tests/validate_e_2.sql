@@ -1,6 +1,62 @@
-with result_table as (
-   select * from e_ut
-   where sid IS NOT NULL
-   --- and ... add more validations here
+with expected_results as (
+    select 
+        MD5(CONCAT_WS(',', 'element_id_1', 'tag_id_1', 'tenant_id_1')) as expected_sid,
+        'element_id_1' as expected_element_target_id,
+        'tag_id_1' as expected_tag_id,
+        'tenant_id_1' as expected_tenant_id
+    union all
+    select 
+        MD5(CONCAT_WS(',', 'element_id_2', 'tag_id_2', 'tenant_id_2')) as expected_sid,
+        'element_id_2' as expected_element_target_id,
+        'tag_id_2' as expected_tag_id,
+        'tenant_id_2' as expected_tenant_id
+    union all
+    select 
+        MD5(CONCAT_WS(',', 'element_id_3', 'tag_id_3', 'tenant_id_3')) as expected_sid,
+        'element_id_3' as expected_element_target_id,
+        'tag_id_3' as expected_tag_id,
+        'tenant_id_3' as expected_tenant_id
+),
+actual_results as (
+    select 
+        sid,
+        element_sid,
+        tag_sid,
+        user_modified_date,
+        modified_user_sid,
+        tenant_id
+    from e_ut
+),
+validation_check as (
+    select 
+        e.expected_sid,
+        e.expected_element_target_id,
+        e.expected_tag_id,
+        e.expected_tenant_id,
+        a.sid,
+        a.tenant_id as actual_tenant_id,
+        case when a.sid is not null then 'PASS' else 'FAIL' end as sid_check,
+        case when a.sid = e.expected_sid then 'PASS' else 'FAIL' end as sid_match_check,
+        case when a.tenant_id = e.expected_tenant_id then 'PASS' else 'FAIL' end as tenant_id_check,
+        case when a.user_modified_date is not null then 'PASS' else 'FAIL' end as timestamp_check
+    from expected_results e
+    left join actual_results a on e.expected_sid = a.sid
+),
+overall_result as (
+    select 
+        count(*) as total_expected_records,
+        sum(case when sid_check = 'PASS' and sid_match_check = 'PASS' and tenant_id_check = 'PASS' and timestamp_check = 'PASS'
+        then 1 else 0 end) as passing_records,
+        (select count(*) from actual_results) as actual_record_count
+    from validation_check
 )
-SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END as test_result from result_table
+select 
+    case 
+        when total_expected_records = 3 
+         and passing_records = 3
+        then 'PASS' 
+        else 'FAIL' 
+    end as test_result,
+    total_expected_records,
+    passing_records
+from overall_result

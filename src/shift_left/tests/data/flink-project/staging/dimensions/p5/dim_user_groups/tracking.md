@@ -1,4 +1,4 @@
-## Fact Table: int_p3_it2
+## Fact Table: p5_dim_user_groups
 
 Status date:
 

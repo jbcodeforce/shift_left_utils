@@ -22,7 +22,15 @@ Running source data analysis, from the env-nknqp3 environment:
 | c |  |  |
 
 
-**Issues to address:**
+## Unit tests creation and execution:
+
+DDL -> 
+
+| UT |   Inserts | Validation |
+| --- | --- | --- |
+| sql | ✅ | ✅  |
+
+### Issues to address
 
 
 
@@ -39,13 +47,4 @@ Analyze **data skew** with
 ```sql
 select id, tenant_id, count(*) as record_count from c  group by id, tenant_id
 ```
-
-* Unit tests creation and execution:
-
-DDL -> 
-
-| UT |   Insert | Validation |
-| --- | --- | --- |
-| sql | ✅ | ✅  |
-| csv | ✅ | ✅  |
 

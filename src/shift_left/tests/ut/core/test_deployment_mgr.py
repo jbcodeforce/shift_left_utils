@@ -60,12 +60,17 @@ class TestDeploymentManager(BaseUT):
     #  ----------- TESTS -----------
    
 
-    def test_build_topological_sorted_parents(self) -> None:
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+    def test_build_topological_sorted_parents(self, mock_statement_list) -> None:
         """Test building topologically sorted parents.
         
         f has 6 parents: d, then z, x, y then src_y, src_x.
         The topological sort should return src_y, src_x, y, x, z, d, f.
         """
+        mock_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
         print("test_build_topological_sorted_parents ")
         pipeline_def = read_pipeline_definition_from_file(
             self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
@@ -111,7 +116,12 @@ class TestDeploymentManager(BaseUT):
         assert ancestors[4].table_name == "z"
 
     
-    def test_build_children_sorted_graph_from_z(self):
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+    def test_build_children_sorted_graph_from_z(self, mock_statement_list):
+        mock_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
         node_map = {}
         node_map["src_x"] = FlinkStatementNode(table_name="src_x")
         node_map["src_y"] = FlinkStatementNode(table_name="src_y")
@@ -151,7 +161,12 @@ class TestDeploymentManager(BaseUT):
             print(node.table_name, node.to_run, node.to_restart)
             assert node.table_name in ["p","e", "d", "f", "c", "a", "z", "x", "src_x"]
 
-    def test_topological_sort(self):
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+    def test_topological_sort(self, mock_statement_list):
+        mock_statement_list.return_value = {
+            "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
+            "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
+        }
         node_map = {}
         node_map["src_x"] = FlinkStatementNode(table_name="src_x")
         node_map["src_y"] = FlinkStatementNode(table_name="src_y")

@@ -319,6 +319,7 @@ class TestTestManager(unittest.TestCase):
         assert "dev-ddl-int-table-1-ut" in statements[0].name
         assert "dev-ddl-int-table-2-ut" in statements[1].name
 
+    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
@@ -329,7 +330,8 @@ class TestTestManager(unittest.TestCase):
                                 mock_get_statement_info, 
                                 mock_get_statement_results,
                                 mock_table_exists,
-                                mock_get_statement):
+                                mock_get_statement,
+                                mock_delete_statement):
         
         """Test the execution of one test case for p1_fct_order"""
         def _mock_statement_info(statement_name):
@@ -364,6 +366,7 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
+        mock_delete_statement.return_value = None  # Mock delete operation
 
         table_name = "p1_fct_order"
         test_suite_result = test_mgr.execute_one_or_all_tests(table_name, "test_case_1", run_validation=True)
@@ -436,6 +439,7 @@ class TestTestManager(unittest.TestCase):
         print(f"statement: {statements[0]}")
 
 
+    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
@@ -446,7 +450,8 @@ class TestTestManager(unittest.TestCase):
                         mock_get_statement_info, 
                         mock_get_statement_results,
                         mock_table_exists,
-                        mock_get_statement):
+                        mock_get_statement,
+                        mock_delete_statement):
         
         """Test the execution of one test case."""
         def _mock_statement_info(statement_name):
@@ -480,6 +485,7 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
+        mock_delete_statement.return_value = None  # Mock delete operation
 
         table_name = "p1_fct_order"
         suite_result = test_mgr.execute_one_or_all_tests(table_name, run_validation=True)
@@ -687,10 +693,14 @@ class TestTestManager(unittest.TestCase):
             result = test_mgr._table_exists("nonexistent_table")
             self.assertFalse(result)
 
+    @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.ConfluentCloudClient')
     @patch('shift_left.core.test_mgr.os.path.exists')
-    def test_table_exists_cache_miss(self, mock_exists, mock_ccloud_client):
+    def test_table_exists_cache_miss(self, mock_exists, mock_ccloud_client, mock_get_config):
         """Test _table_exists function with cache miss - fetch from API."""
+        # Mock get_config to return a valid config
+        mock_get_config.return_value = {"confluent_cloud": {"api_key": "test", "api_secret": "test"}}
+        
         # Mock file doesn't exist, so cache miss
         mock_exists.return_value = False
         
@@ -716,10 +726,15 @@ class TestTestManager(unittest.TestCase):
             # Verify that the cache file was written
             mock_file.assert_called()
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_success_first_try(self, mock_get_results):
+    def test_poll_response_success_first_try(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when results are available on first try."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
+        
+        # Mock get_statement to return a successful statement
+        mock_statement = Statement(name="test_statement", status={"phase": "COMPLETED"})
+        mock_get_statement.return_value = mock_statement
         
         # Mock successful response on first call
         op_row = OpRow(op=0, row=["PASS"])
@@ -733,11 +748,16 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(statement_result, result)
         mock_get_results.assert_called_once_with("test_statement")
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.time.sleep')
-    def test_poll_response_retry_logic(self, mock_sleep, mock_get_results):
+    def test_poll_response_retry_logic(self, mock_sleep, mock_get_results, mock_get_statement):
         """Test _poll_response function retry logic with empty results."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
+        
+        # Mock get_statement to return a successful statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
         
         # First few calls return empty results, last call returns data
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
@@ -754,9 +774,16 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(mock_get_results.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)  # Sleep called for first 2 empty results
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_max_retries_exceeded(self, mock_get_results):
+    def test_poll_response_max_retries_exceeded(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when max retries are exceeded."""
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, Statement
+        
+        # Mock get_statement to return a running statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
+        
         # Always return empty results
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
         mock_get_results.return_value = empty_result
@@ -765,12 +792,19 @@ class TestTestManager(unittest.TestCase):
             final_result, statement_result = test_mgr._poll_response("test_statement")
         
         self.assertEqual(final_result, "FAIL")  # Default when no data
-        # Should call get_results for max_retries - 1 times
+        # Should call get_results for max_retries - 1 times (range(1, 7) = 1,2,3,4,5,6)
         self.assertEqual(mock_get_results.call_count, 6)  # max_retries - 1
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_exception_handling(self, mock_get_results):
+    def test_poll_response_exception_handling(self, mock_get_results, mock_get_statement):
         """Test _poll_response function exception handling."""
+        from shift_left.core.models.flink_statement_model import Statement
+        
+        # Mock get_statement to return a running statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
+        
         # Mock exception on first call
         mock_get_results.side_effect = Exception("API Error")
         
@@ -1053,12 +1087,16 @@ class TestTestManager(unittest.TestCase):
             if os.path.exists(temp_dml_file):
                 os.remove(temp_dml_file)
 
+    @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.os.remove')
     @patch('shift_left.core.test_mgr.datetime')
-    def test_table_exists_cache_error_handling(self, mock_datetime, mock_remove):
+    def test_table_exists_cache_error_handling(self, mock_datetime, mock_remove, mock_get_config):
         """Test _table_exists cache error handling when loading corrupted cache."""
         import json
         from datetime import datetime
+        
+        # Mock get_config to return a valid config
+        mock_get_config.return_value = {"confluent_cloud": {"api_key": "test", "api_secret": "test"}}
         
         # Mock datetime
         mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
