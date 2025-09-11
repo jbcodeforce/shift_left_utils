@@ -10,15 +10,15 @@ Additionally, when using the tool to do migration of existing code to Apache Fli
 
 ## Pre-requisites
 
-* On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install)
+* On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install). The shift_left tool was developed on Mac and tested on Linux. Windows WSL should work. Powershell use will not work as of now (09/2025).
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-* Make is used to encapsulate the confluent cli, to make it easier for Data engineers to deploy Flink statements. 
+* Make is used to encapsulate the confluent cli, to make it easier for Data engineers to deploy Flink statement during development: It is not use by shift_left tool, but shift_left creates the Makefile with the `shift_left table init` command (see [the recipe section](./recipes.md/#table-related-tasks)). 
     * [install make for windows](https://gnuwin32.sourceforge.net/packages/make.htm)
     * Mac OS: ```brew install make``` 
     * Linux: ```sudo apt-get install build-essential```
 
-* All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html)
-* If using uv, install it [using the documentation](https://docs.astral.sh/uv/getting-started/installation/)
+* All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html), also used for make execution. This is not mandatory to run shift_left tool.
+* If using `uv` as python package manager (developers of the shift left tool), install it [using the documentation](https://docs.astral.sh/uv/getting-started/installation/).
 * All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
 
 * Clone this repository (this will not be necessary once the CLI will be available in pypi): 
@@ -45,9 +45,12 @@ Additionally, when using the tool to do migration of existing code to Apache Fli
         # install requirements
         python -m pip install -r requirements.txt
         ```
-    * Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the wheel, they are under the `src/shift_left/dist` folder
+    * Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the available wheels, look at the content under the `src/shift_left/dist` folder.  
         ```sh
-        pip install src/shift_left/dist/shift_left-0.1.30-py3-none-any.whl
+        ls src/shift_left/dist
+        # >.. shift_left-0.1.36-py3-none-any.whl
+        # install the last one for example:
+        pip install src/shift_left/dist/shift_left-0.1.36-py3-none-any.whl
         ```
 
 === "uv"
@@ -57,12 +60,14 @@ Additionally, when using the tool to do migration of existing code to Apache Fli
         ```sh
         source .venv/bin/activate
         ```
+    * Verify the list of wheels available in the src/shift_left/dist/ to take the last one. The github also include the list of releases to see the last available version number.
     * Install the cli:
         ```sh
         uv tool list
         # in case it was already installed
         uv uninstall shift_left
-        uv install shift_left src/shift_left/dist/shift_left-0.1.30-py3-none-any.whl
+        # The weel number may change!
+        uv install shift_left src/shift_left/dist/shift_left-0.1.36-py3-none-any.whl
         ```
 
 ## Set up config.yaml file
@@ -87,12 +92,13 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
       security.protocol: SASL_SSL
       sasl.mechanisms: PLAIN
       sasl.username: <key name>
-      sasl.password: <key seceret> 
+      sasl.password: <key secret> 
       session.timeout.ms: 5000
       cluster_type: stage
       src_topic_prefix: clone
     ```
-    * the sasl.username is the api key name, and the sasl.password is the api secrets. Those are created in the `Kafka cluster > API Keys`. The key can be downloaded locally
+    * the sasl.username is the api key name, and the sasl.password is the api secrets. Those are created in the `Kafka cluster > API Keys`. The key can be downloaded locally.
+    ![]()
 
 === "Confluent cloud"
     
@@ -139,7 +145,6 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
     ```yaml
     app:
         delta_max_time_in_min: 15  # this is to apply randomly to the event timestamp to create out of order
-        report_output_dir: ./reports
         default_PK: __db
         timezone: America/Los_Angeles
         src_table_name_prefix: src_
@@ -169,29 +174,74 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
 
 ## Environment variables
 
+This document explains how to use environment variables to securely manage API keys and secrets instead of storing them in config.yaml files.
 
-Ensure the following environment variables are set: in a `set_env` file. For example, in a project where the source repository is cloned to your-src-dbt-folder and the target Flink project is flink-project, use these setting:
+The Shift Left utility now supports environment variables for sensitive configuration values. Environment variables take precedence over config.yaml values, allowing you to:
 
-```sh
-export FLINK_PROJECT=$HOME/Code/flink-project
-export STAGING=$FLINK_PROJECT/staging
-export PIPELINES=$FLINK_PROJECT/pipelines
-export SRC_FOLDER=$HOME/Code/datawarehouse/models
-export CONFIG_FILE=./config.yaml
-# The following variables are used when deploying with the Makefile.
+- Keep sensitive data out of configuration files
+- Use different credentials for different environments
+- Securely manage secrets in CI/CD pipelines
+- Follow security best practices
 
-export CCLOUD_ENV_ID=env-xxxx
-export CCLOUD_ENV_NAME=j9r-env
-export CCLOUD_KAFKA_CLUSTER=jxxxxx
-export CLOUD_REGION=us-west-2
-export CLOUD_PROVIDER=aws
-export CCLOUD_CONTEXT=login-<user_id>@<domain>.com-https://confluent.cloud
+### Kafka Section
+| Environment Variable | Config Path | Description |
+|---------------------|-------------|-------------|
+| `SL_KAFKA_API_KEY` | `kafka.api_key` | Kafka API key |
+| `SL_KAFKA_API_SECRET` | `kafka.api_secret` | Kafka API secret |
+
+### Confluent Cloud Section
+| Environment Variable | Config Path | Description |
+|---------------------|-------------|-------------|
+| `SL_CONFLUENT_CLOUD_API_KEY` | `confluent_cloud.api_key` | Confluent Cloud API key |
+| `SL_CONFLUENT_CLOUD_API_SECRET` | `confluent_cloud.api_secret` | Confluent Cloud API secret |
+
+### Flink Section
+| Environment Variable | Config Path | Description |
+|---------------------|-------------|-------------|
+| `SL_FLINK_API_KEY` | `flink.api_key` | Flink API key |
+| `SL_FLINK_API_SECRET` | `flink.api_secret` | Flink API secret |
+
+### Setting Environment Variables
+
+#### Bash/Zsh
+```bash
+export SL_KAFKA_API_KEY="your-kafka-api-key"
+export SL_KAFKA_API_SECRET="your-kafka-api-secret"
+export SL_FLINK_API_KEY="your-flink-api-key"
+export SL_FLINK_API_SECRET="your-flink-api-secret"
+export SL_CONFLUENT_CLOUD_API_KEY="your-confluent-cloud-api-key"
+export SL_CONFLUENT_CLOUD_API_SECRET="your-confluent-cloud-api-secret"
 ```
 
-To get the environment variables configured for your Terminal session do:
+#### Using .env File
+Create a `.env` file (don't commit this to version control):
+```
+SL_KAFKA_API_KEY=your-kafka-api-key
+SL_KAFKA_API_SECRET=your-kafka-api-secret
+SL_FLINK_API_KEY=your-flink-api-key
+SL_FLINK_API_SECRET=your-flink-api-secret
+SL_CONFLUENT_CLOUD_API_KEY=your-confluent-cloud-api-key
+SL_CONFLUENT_CLOUD_API_SECRET=your-confluent-cloud-api-secret
+```
 
-```sh
-source set_env
+Then load it before running your application:
+```bash
+set -a && source .env && set +a
+```
+
+**Never commit secrets to version control**: Use `.gitignore` to exclude `.env` files
+
+#### Common Issues
+
+1. **"Missing environment variables" error**
+   - Check that environment variable names are correct (case-sensitive)
+   - Verify that variables are exported in your shell
+   - Use `env | grep SL to see what's set
+
+1. To see all supported environment variables, you can call the help function in Python:
+```python
+from shift_left.core.utils.app_config import print_env_var_help
+print_env_var_help()
 ```
 
 ## Validate the CLI

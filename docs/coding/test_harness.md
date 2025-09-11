@@ -52,7 +52,7 @@ The objectives of a test harness for developers and system testers, is to valida
       file_type: sql
   ```
 
-1. support multiple testcase definitions as a test suite. Test suite may be automated for non-regression testing to ensure continuous quality.
+1. Support multiple testcase definitions as a test suite. Test suite may be automated for non-regression testing to ensure continuous quality.
 1. Once tests are completed, tear down tables and data.
   ```sh
   shift_left table delete-unit-tests <table-name>
@@ -70,7 +70,6 @@ The following diagram illustrates the global infrastructure deployment context:
 ![2](./images/test_frwk_infra.drawio.png){ width=750 }
 <figcaption>Test Harness environment and scope</figcaption>
 </figure>
-
 
 
 * One the left, the developer mahchine is used to run the test harness tool and send statements to Confluent cloud environment using the REST API. The Flink API key and secrets are used. 
@@ -179,7 +178,7 @@ Then 2 test cases are created as you can see in the `test_definitions.yaml`
 
 The two test cases use different approaches to define the data: SQL and CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The csv data may come from an extract of kafka topic records.
 
-* Data engineers update the content of the insert statements and the validation statements. Once done, try unit testing with the command:
+* Data engineers **update the content** of the insert statements and **the validation statements** to reflect business requirements. Once done, try unit testing with the command:
   ```sh
   shift_left table  run-unit-tests <table_name> --test-case-name test_<table_name>_1 
   ```
@@ -195,13 +194,21 @@ A test execution may take some time as it performs the following steps:
 1. Build test report
 
 
-To run the complete suite of tests:
+* To run the one test :
   ```sh
-  shift_left table  run-unit-tests <table_name>
+  # change the table name and test case name
+  shift_left table run-unit-tests <table_name> --test-case-name <test_case_1> 
   ```
 
-Clean the tests artifacts created on Confluent Cloud with the command:
-  ```sf
+  This command executes the creation of the DDLs to create the input tables with a postfix like ('_ut') and the insert SQLs to inject synthetic data
+
+* Run your validation script to see :
+  ```sh
+  shift_left table run-validation-tests  <table_name> --test-case-name <test_case_1> 
+  ```
+
+* Clean the tests artifacts created on Confluent Cloud with the command:
+  ```sh
   shift_left table delete-unit-tests <table_name>
   ```
 

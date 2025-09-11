@@ -10,10 +10,11 @@ import datetime
 import random
 import string
 from typing import Dict, Any, Optional
-from .error_sanitizer import sanitize_error_message, safe_error_display
+from .error_sanitizer import sanitize_error_message
 
 _config: dict[str, dict[str,str]] = {}
 
+BASE_CC_API = "api.confluent.cloud/org/v2"
 
 # Environment variable mapping for sensitive values
 ENV_VAR_MAPPING = {
@@ -26,14 +27,10 @@ ENV_VAR_MAPPING = {
     # Confluent Cloud API credentials
     "confluent_cloud.api_key": "SL_CONFLUENT_CLOUD_API_KEY",
     "confluent_cloud.api_secret": "SL_CONFLUENT_CLOUD_API_SECRET",
-    
+
     # Flink API credentials
     "flink.api_key": "SL_FLINK_API_KEY",
-    "flink.api_secret": "SL_FLINK_API_SECRET",
-    
-    # Registry credentials
-    "registry.registry_key_name": "SL_REGISTRY_KEY_NAME",
-    "registry.registry_key_secret": "SL_REGISTRY_KEY_SECRET",
+    "flink.api_secret": "SL_FLINK_API_SECRET"
 }
 
 
@@ -52,8 +49,44 @@ def get_env_value(config_path: str) -> Optional[str]:
         return os.getenv(env_var_name)
     return None
 
+def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+  """
+  Apply default overrides to configuration.
+  """
+  config["kafka"]["security.protocol"]= "SASL_SSL"  
+  config["kafka"]["sasl.mechanism"]= "PLAIN"
+  config["kafka"]["session.timeout.ms"]= "5000"
+  config["kafka"]["cluster_type"]= "dev"
+  config["kafka"]["src_topic_prefix"]= "clone"
+  config["confluent_cloud"]["base_api"]= "api.confluent.cloud/org/v2"
+  config["confluent_cloud"]["page_size"]= 100
+  config["confluent_cloud"]["glb_name"]= "glb"
+  config["confluent_cloud"]["url_scope"]= "private"
+  config["flink"]["max_cfu"]= "10"
+  config["flink"]["max_cfu_percent_before_allocation"]= "0.8"
+  config["flink"]["statement_name_post_fix"]= "None"
+  config["app"]["delta_max_time_in_min"]= 15
+  config["app"]["timezone"]= "America/Los_Angeles"
+  config["app"]["src_table_name_prefix"]= "src_"
+  config["app"]["logging"]= "INFO"
+  config["app"]["products"]= ["p1", "p2", "p3"]
+  config["app"]["accepted_common_products"]= ["common", "seeds"]
+  config["app"]["cache_ttl"]= 120
+  config["app"]["sql_content_modifier"]= "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent"
+  config["app"]["translator_to_flink_sql_agent"]= "shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent"
+  config["app"]["dml_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.DmlNameModifier"
+  config["app"]["compute_pool_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.ComputePoolNameModifier"
+  config["app"]["data_limit_where_condition"]= "rf\"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})\""
+  config["app"]["data_limit_replace_from_reg_ex"]= "r\"\\s*select\\s+\\*\\s+from\\s+final\\s*;?\""
+  config["app"]["data_limit_table_type"]= "source"
+  config["app"]["data_limit_column_name_to_select_from"]= "tenant_id"
+  config["app"]["post_fix_unit_test"]= "_ut"
+  config["app"]["post_fix_integration_test"]= "_it"
+  return config
 
-def apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
+
+
+def _apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Apply environment variable overrides to configuration.
     Environment variables take precedence over config file values.
@@ -89,7 +122,7 @@ def apply_env_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 
-def get_missing_env_vars(config: Dict[str, Any]) -> list[str]:
+def get_missing_env_vars(config: Dict[str, Any]) -> set[str]:
     """
     Check which environment variables are missing for required API keys/secrets.
     
@@ -99,7 +132,7 @@ def get_missing_env_vars(config: Dict[str, Any]) -> list[str]:
     Returns:
         List of missing environment variable names
     """
-    missing_env_vars = []
+    missing_env_vars = set()
     
     for config_path, env_var_name in ENV_VAR_MAPPING.items():
         path_parts = config_path.split('.')
@@ -107,11 +140,11 @@ def get_missing_env_vars(config: Dict[str, Any]) -> list[str]:
         field = path_parts[1]
         
         # Check if the config value exists and is a placeholder
-        if (config.get(section, {}).get(field) in ["<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"] and 
-            not os.getenv(env_var_name)):
-            missing_env_vars.append(env_var_name)
+        value=config.get(section, {}).get(field)
+        if (not value or value in ["", "<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"]) and not os.getenv(env_var_name):
+            missing_env_vars.add(env_var_name)
     
-    return missing_env_vars
+    return missing_env_vars 
 
 
 def print_env_var_help():
@@ -142,6 +175,8 @@ def print_env_var_help():
     print("USAGE EXAMPLES:")
     print("  export SL_KAFKA_API_KEY='your-kafka-api-key'")
     print("  export SL_KAFKA_API_SECRET='your-kafka-api-secret'")
+    print("  export SL_CONFLUENT_CLOUD_API_KEY='your-confluent-cloud-api-key'")
+    print("  export SL_CONFLUENT_CLOUD_API_SECRET='your-confluent-cloud-api-secret'")
     print("  export SL_FLINK_API_KEY='your-flink-api-key'")
     print("  export SL_FLINK_API_SECRET='your-flink-api-secret'")
     print("\nNOTE: Environment variables take precedence over config.yaml values")
@@ -198,7 +233,7 @@ file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 print("-" * 80)
-print(f"| SHIFT_LEFT Config_file: {os.getenv('CONFIG_FILE')} Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} LOGS folder is : {session_log_dir} |")
+print(f"| SHIFT_LEFT - CONFIG_FILE used: {os.getenv('CONFIG_FILE')} - Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - LOGS folder is : {session_log_dir} |")
 print("-" * 80)
 #console_handler = logging.StreamHandler()
 #console_handler.setLevel(logging.INFO)
@@ -208,7 +243,7 @@ print("-" * 80)
 def validate_config(config: dict[str,dict[str,str]]) -> None:
   """Validate the configuration"""
   errors = []
-  
+  warnings = []
   if not config:
     errors.append("Configuration is empty")
     raise ValueError("\n".join(errors))
@@ -218,40 +253,50 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
   for section in required_sections:
     if not config.get(section):
       errors.append(f"Configuration is missing {section} section")
+
+  # deprecated fields
+  deprecated_fields = ["api_key", "api_secret"]
+  for section in ["kafka", "confluent_cloud", "flink"]:
+    for field in deprecated_fields:
+      if config.get(section) and config.get(section).get(field):
+        matched_env_var = get_env_value(f"{section}.{field}")
+        if not matched_env_var:
+          warnings.append(f"Warning: {section}.{field} is deprecated use environment variables instead")
+  deprecated_fields = ["glb_name", "pkafka_cluster", "url_scope", "base_api"]
+  for section in ["kafka", "confluent_cloud", "flink"]:
+    for field in deprecated_fields:
+      if config.get(section) and config.get(section).get(field):
+        warnings.append(f"Warning: {section}.{field} is deprecated - can be removed from config file")
+  if config.get("registry"):
+    warnings.append(f"Warning: registry section is deprecated - can be removed from config file")
   
+
   # Only proceed with detailed validation if main sections exist
   if not errors:
     # Validate kafka section
     if config.get("kafka"):
-      #kafka_required = ["bootstrap.servers", "api_key", "api_secret", "sasl.username", "sasl.password"]
-      kafka_required = ["src_topic_prefix", "cluster_id", "pkafka_cluster", "cluster_type"]
+      kafka_required = ["src_topic_prefix", "cluster_id", "cluster_type"]
       for field in kafka_required:
         if not config["kafka"].get(field):
           errors.append(f"Configuration is missing kafka.{field}")
     
-    # Validate registry section (commented out as it's optional)
-    #if config.get("registry"):
-    #  registry_required = ["url", "registry_key_name", "registry_key_secret"]
-    #  for field in registry_required:
-    #    if not config["registry"].get(field):
-    #      errors.append(f"Configuration is missing registry.{field}")
     
     # Validate confluent_cloud section
     if config.get("confluent_cloud"):
-      cc_required = ["base_api", "environment_id", "region", "provider", "organization_id", "api_key", "api_secret", "url_scope"]
+      cc_required = ["environment_id", "region", "provider", "organization_id"]
       for field in cc_required:
         if not config["confluent_cloud"].get(field):
           errors.append(f"Configuration is missing confluent_cloud.{field}")
     
     # Validate flink section
     if config.get("flink"):
-      flink_required = ["flink_url", "api_key", "api_secret", "compute_pool_id", "catalog_name", "database_name", "max_cfu", "max_cfu_percent_before_allocation"]
+      flink_required = ["compute_pool_id", "catalog_name", "database_name", "max_cfu"]
       for field in flink_required:
         if not config["flink"].get(field):
           errors.append(f"Configuration is missing flink.{field}")
     
     # Validate app section
-    if config.get("app"):
+    if config.get("app"):     
       app_required = ["delta_max_time_in_min", 
                       "timezone", 
                       "logging", 
@@ -266,8 +311,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
                      "data_limit_table_type"]
       for field in app_required:
         if not config["app"].get(field):
-          errors.append(f"Configuration is missing app.{field}")
-      
+          errors.append(f"Configuration is missing app.{field}") 
       # Validate specific app configuration types only if the fields exist
       numeric_fields = ["delta_max_time_in_min", "max_cfu", "max_cfu_percent_before_allocation", "cache_ttl"]
       for field in numeric_fields:
@@ -306,7 +350,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
   # Check for missing environment variables when config values are placeholders
   missing_env_vars = get_missing_env_vars(config)
   if missing_env_vars:
-    errors.append(f"Missing environment variables for API keys/secrets: {', '.join(missing_env_vars)}. Please set these environment variables or update the config file with actual values.")
+    errors.append(f"Missing environment variables for API keys/secrets: {', '.join(sorted(missing_env_vars))}. Please set these environment variables or update the config file with actual values.")
   
   # If there are any errors, raise them all at once
   if len(errors) > 0:
@@ -316,6 +360,11 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     print(sanitized_message)
     logger.error(sanitized_message)
     exit()
+  if len(warnings) > 0:
+    warning_message = "Configuration validation has the following warnings:\n" + "\n".join(f"  - {warning}" for warning in warnings)
+    sanitized_message = sanitize_error_message(warning_message)
+    print(sanitized_message)
+    logger.warning(sanitized_message)
 
 @lru_cache
 def get_config() -> dict[str,dict[str,str]]:
@@ -327,7 +376,6 @@ def get_config() -> dict[str,dict[str,str]]:
   - SL_KAFKA_API_KEY / SL_KAFKA_API_SECRET
   - SL_CONFLUENT_CLOUD_API_KEY / SL_CONFLUENT_CLOUD_API_SECRET  
   - SL_FLINK_API_KEY / SL_FLINK_API_SECRET
-  - SL_REGISTRY_KEY_NAME / SL_REGISTRY_KEY_SECRET
   
   Args:
       fn (str, optional): Config file path. Defaults to "config.yaml".
@@ -344,7 +392,8 @@ def get_config() -> dict[str,dict[str,str]]:
             _config = yaml.load(f, Loader=yaml.FullLoader)
             
           # Apply environment variable overrides for sensitive values
-          _config = apply_env_overrides(_config)
+          _config = _apply_default_overrides(_config)
+          _config = _apply_env_overrides(_config)
           
           # Validate the final configuration
           validate_config(_config)
@@ -358,21 +407,10 @@ def get_config() -> dict[str,dict[str,str]]:
             "flink": {},
             "registry": {},
             "app": {
-              "logging": "INFO",
-              "delta_max_time_in_min": 15,
-              "timezone": "America/Los_Angeles",
-              "data_limit_column_name_to_select_from": "tenant_id",
-              "products": ["p1", "p2", "p3"],
-              "accepted_common_products": ["common", "seeds"],
-              "sql_content_modifier": "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent",
-              "dml_naming_convention_modifier": "shift_left.core.utils.naming_convention.DmlNameModifier",
-              "compute_pool_naming_convention_modifier": "shift_left.core.utils.naming_convention.ComputePoolNameModifier",
-              "data_limit_where_condition": "rf\"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})\"",
-              "data_limit_replace_from_reg_ex": "r\"\\s*select\\s+\\*\\s+from\\s+final\\s*;?\"",
-              "data_limit_table_type": "source"
             }
           }
-          _config = apply_env_overrides(_config)
+          _config = _apply_default_overrides(_config)
+          _config = _apply_env_overrides(_config)
           validate_config(_config)
 
   return _config

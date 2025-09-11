@@ -26,7 +26,7 @@ from shift_left.core.utils.file_search import (
     list_src_sql_files,
     derive_table_type_product_name_from_path,
     get_ddl_dml_names_from_pipe_def,
-    _apply_naming_convention,
+    _apply_statement_naming_convention,
     _get_statement_name_modifier,
     DmlNameModifier
 )
@@ -261,7 +261,7 @@ class TestFileSearch(unittest.TestCase):
         )
         
         # Apply naming convention
-        modified_node = _apply_naming_convention(node)
+        modified_node = _apply_statement_naming_convention(node)
         
         # Verify naming convention was applied
         self.assertNotEqual(modified_node.dml_statement_name, "dml-test-table")
