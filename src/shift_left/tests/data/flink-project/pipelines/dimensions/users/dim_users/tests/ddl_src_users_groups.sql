@@ -1,16 +1,12 @@
-CREATE TABLE IF NOT EXISTS users_dim_users (
-  user_id STRING NOT NULL,
-  user_name STRING,
-  user_email STRING,
-  group_id STRING,
+CREATE TABLE IF NOT EXISTS src_users_groups_ut (
+  group_id STRING NOT NULL,
   group_name STRING,
   group_type STRING,
-  created_date DATE,
-  is_active BOOLEAN
-
-  -- put here column definitions
-  PRIMARY KEY(user_id) NOT ENFORCED
-) DISTRIBUTED BY HASH(user_id) INTO 1 BUCKETS
+  created_date STRING,
+  is_active BOOLEAN,
+  updated_at TIMESTAMP,
+  PRIMARY KEY(group_id) NOT ENFORCED
+) DISTRIBUTED BY HASH(group_id) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
   'key.avro-registry.schema-context' = '.flink-dev',

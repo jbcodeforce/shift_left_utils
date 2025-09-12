@@ -1,7 +1,7 @@
 include ../../../common.mk
 
 # --- users_dim_user
-TABLE_NAME=users_dim_users
+TABLE_NAME=dim_users
 SCRIPT_PRE_KEBAB=j9r
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 

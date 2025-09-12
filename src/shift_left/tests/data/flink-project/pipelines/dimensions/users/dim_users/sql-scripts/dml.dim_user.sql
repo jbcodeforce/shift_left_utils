@@ -1,4 +1,4 @@
-INSERT INTO users_dim_users
+INSERT INTO dim_users
 SELECT 
   u.user_id,
   u.user_name,

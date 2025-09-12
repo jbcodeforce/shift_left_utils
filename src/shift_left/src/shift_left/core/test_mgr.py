@@ -38,7 +38,8 @@ from shift_left.core.utils.ut_ai_data_tuning import AIBasedDataTuning
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
-POST_FIX_UNIT_TEST: Final[str] = get_config().get('app').get('post_fix_unit_test','_ut')
+DEFAULT_POST_FIX_UNIT_TEST="_ut"
+CONFIGURED_POST_FIX_UNIT_TEST: Final[str] = get_config().get('app').get('post_fix_unit_test',DEFAULT_POST_FIX_UNIT_TEST)
 TOPIC_LIST_FILE: Final[str] = shift_left_dir + "/topic_list.json"
 
 # Polling and retry configuration constants
@@ -81,6 +82,8 @@ def init_unit_test_for_table(table_name: str,
                     create_csv=create_csv,
                     nb_test_cases=nb_test_cases,
                     use_ai=use_ai)
+    logger.info(f"Unit test for {table_name} created")
+    print(f"Unit test for {table_name} created")
 
 def execute_one_or_all_tests(table_name: str, 
                       test_case_name: str = None, 
@@ -100,7 +103,6 @@ def execute_one_or_all_tests(table_name: str,
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-
     test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id, prefix)
     
     test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
@@ -149,6 +151,7 @@ def execute_validation_tests(table_name: str,
         statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
                                                                     table_ref=table_ref,
                                                                     prefix=prefix+"-val-"+str(idx + 1),
+                                                                    post_fix_ut=post_fix_ut,
                                                                     compute_pool_id=compute_pool_id)
         test_suite_result.test_results[test_case.name] = TestResult(test_case_name=test_case.name, result=result_text, validation_result=statement_result)
         if test_case_name and test_case.name == test_case_name:
@@ -181,18 +184,18 @@ def delete_test_artifacts(table_name: str,
             statement_mgr.delete_statement_if_exists(statement_name)
             logger.info(f"Deleted statement {statement_name}")
             print(f"Deleted statement {statement_name}")
-    logger.info(f"Deleting ddl and dml artifacts for {table_name}{POST_FIX_UNIT_TEST}")
-    print(f"Deleting ddl and dml artifacts for {table_name}{POST_FIX_UNIT_TEST}")
+    logger.info(f"Deleting ddl and dml artifacts for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
+    print(f"Deleting ddl and dml artifacts for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
     statement_name = _build_statement_name(table_name, prefix+"-dml")
     statement_mgr.delete_statement_if_exists(statement_name)
     statement_name = _build_statement_name(table_name, prefix+"-ddl")
     statement_mgr.delete_statement_if_exists(statement_name)
-    statement_mgr.drop_table(table_name+POST_FIX_UNIT_TEST, compute_pool_id)
+    statement_mgr.drop_table(table_name+CONFIGURED_POST_FIX_UNIT_TEST, compute_pool_id)
     for foundation in test_suite_def.foundations:
-        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}{POST_FIX_UNIT_TEST}")
+        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
         statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl")
         statement_mgr.delete_statement_if_exists(statement_name)
-        statement_mgr.drop_table(foundation.table_name+POST_FIX_UNIT_TEST, compute_pool_id)
+        statement_mgr.drop_table(foundation.table_name+CONFIGURED_POST_FIX_UNIT_TEST, compute_pool_id)
     logger.info(f"Test artifacts for {table_name} deleted")
 
 
@@ -206,14 +209,17 @@ def _init_test_foundations(table_name: str,
 ) -> Tuple[SLTestDefinition, FlinkTableReference, str, TestResult]:
     """
     Create input tables as defined in the test suite foundations for the given table.
-    And modifyt the dml of the given table to use the input tables for the unit tests.
+    And modify the dml of the given table to use the input tables for the unit tests.
     """
     print("-"*60)
-    print(f"1. Create table foundations for unit tests")
+    print(f"1. Create table foundations for unit tests for {table_name}")
     print("-"*60)
     test_suite_def, table_ref = _load_test_suite_definition(table_name)
     test_result = TestResult(test_case_name=test_case_name, result="")
-    test_result.foundation_statements = _execute_foundation_statements(test_suite_def, table_ref, prefix, compute_pool_id)
+    test_result.foundation_statements = _execute_foundation_statements(test_suite_def, 
+                                            table_ref, 
+                                            prefix, 
+                                            compute_pool_id)
     test_result.foundation_statements=_start_ddl_dml_for_flink_under_test(table_name, 
                                             table_ref, 
                                             prefix, 
@@ -318,17 +324,20 @@ def _execute_foundation_statements(
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
                                     compute_pool_id=compute_pool_id,
+                                    fct=_replace_table_name,
                                     product_name=table_ref.product_name,
                                     statements=statements)
     return statements
 
-def _read_and_treat_sql_content_for_ut(sql_path: str, fct: Callable[[str], str]) -> str:
+def _read_and_treat_sql_content_for_ut(sql_path: str, 
+                                    fct: Callable[[str], str],
+                                    table_name: str) -> str:
     """
     Read the SQL content from the file and apply the given function fct() to the content.
     """
     sql_path = from_pipeline_to_absolute(sql_path)
     with open(sql_path, "r") as f:
-        return fct(f.read())
+        return fct(f.read(), table_name)
 
 
     
@@ -385,7 +394,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
         
         return table_names
 
-    def replace_table_name(sql_content: str) -> str:
+    def replace_table_name(sql_content: str, post_fix_ut: str = DEFAULT_POST_FIX_UNIT_TEST) -> str:
         table_names = extract_all_table_names(sql_content)
         
         # Sort table names by length (descending) to avoid substring replacement issues
@@ -399,14 +408,14 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
             
             # Handle backticked table names
             backtick_pattern = r'`(' + escaped_table + r')`'
-            sql_content = re.sub(backtick_pattern, f'`{table}{POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            sql_content = re.sub(backtick_pattern, f'`{table}{CONFIGURED_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
             
             # Handle non-backticked table names with word boundaries
             word_pattern = r'\b(' + escaped_table + r')\b'
             
             def replacement_func(match):
                 table_name = match.group(1)
-                return f"{table_name}{POST_FIX_UNIT_TEST}"
+                return f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}"
             
             sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
         logger.info(f"Replaced table names in SQL content: {sql_content}")
@@ -452,8 +461,8 @@ def _load_sql_and_execute_statement(table_name: str,
     if statements is None:
         statements = []
     
-    statement_name = _build_statement_name(table_name, prefix)
-    table_under_test_exists = _table_exists(table_name+POST_FIX_UNIT_TEST)
+    statement_name = _build_statement_name(table_name, prefix, CONFIGURED_POST_FIX_UNIT_TEST)
+    table_under_test_exists = _table_exists(table_name+CONFIGURED_POST_FIX_UNIT_TEST)
     if "ddl" in prefix and table_under_test_exists:
         return statements  # Return same list when DDL table already exists
 
@@ -463,7 +472,7 @@ def _load_sql_and_execute_statement(table_name: str,
         print(f"Statement {statement_name} already exists and is running -> do nothing")
         return statements  # Return same list when statement is already running
 
-    sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct)
+    sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
     logger.info(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
     print(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
@@ -509,7 +518,7 @@ def _execute_test_inputs(test_case: SLTestCase,
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             sql_path = from_pipeline_to_absolute(sql_path)
             headers, rows = _read_csv_file(sql_path)
-            sql = _transform_csv_to_sql(input_step.table_name+POST_FIX_UNIT_TEST, headers, rows)
+            sql = _transform_csv_to_sql(input_step.table_name+CONFIGURED_POST_FIX_UNIT_TEST, headers, rows)
             print(f"Execute test input {sql}")
             statement_name = _build_statement_name(input_step.table_name, prefix)
             
@@ -630,7 +639,7 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
                 columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
                 with open(input_file, "w") as f:
-                    f.write(f"insert into {input_data.table_name}{POST_FIX_UNIT_TEST}\n({columns_names})\nvalues\n{rows}\n")
+                    f.write(f"insert into {input_data.table_name}{DEFAULT_POST_FIX_UNIT_TEST}\n({columns_names})\nvalues\n{rows}\n")
             if input_data.file_type == "csv":
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
                 columns_names, rows = _build_data_sample(table_struct[input_data.table_name], DEFAULT_TEST_DATA_ROWS)
@@ -684,7 +693,7 @@ def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefin
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     template = env.get_template("validate_test.jinja")
     context = {
-        'table_name': table_name + POST_FIX_UNIT_TEST
+        'table_name': table_name + DEFAULT_POST_FIX_UNIT_TEST
     }
     sql_content = template.render(context)
     return sql_content
@@ -738,13 +747,13 @@ def _process_foundation_ddl_from_test_definitions(test_definition: SLTestDefinit
     table_struct = {}  # table_name -> {column_name -> column_metadata}
     for foundation in test_definition.foundations:
         input_table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[foundation.table_name])
-        ddl_sql_content = f"create table if not exists {foundation.table_name}{POST_FIX_UNIT_TEST} (\n\n)"
+        ddl_sql_content = f"create table if not exists {foundation.table_name}{DEFAULT_POST_FIX_UNIT_TEST} (\n\n)"
         file_path = from_pipeline_to_absolute(input_table_ref.ddl_ref)
         parser = SQLparser()
         with open(file_path, "r") as f:
             ddl_sql_content = f.read()
             columns = parser.build_column_metadata_from_sql_content(ddl_sql_content)  # column_name -> column_metadata
-            ddl_sql_content = ddl_sql_content.replace(input_table_ref.table_name, f"{input_table_ref.table_name}{POST_FIX_UNIT_TEST}")
+            ddl_sql_content = ddl_sql_content.replace(input_table_ref.table_name, f"{input_table_ref.table_name}{DEFAULT_POST_FIX_UNIT_TEST}")
             table_struct[foundation.table_name] = columns
         ddl_file = os.path.join(tests_folder_path, '..', foundation.ddl_for_test)
         with open(ddl_file, "w") as f:
@@ -807,7 +816,10 @@ def _table_exists(table_name: str) -> bool:
             _topic_list_cache = TopicListCache(created_at=datetime.now())
             ccloud = ConfluentCloudClient(get_config())
             topics = ccloud.list_topics()
-            _topic_list_cache.topic_list = [topic['topic_name'] for topic in topics['data']]
+            if topics and topics.get('data'):
+                _topic_list_cache.topic_list = [topic['topic_name'] for topic in topics['data']]
+            else:
+                _topic_list_cache.topic_list = []
             logger.debug(f"Topic list: {_topic_list_cache}")
             with open(TOPIC_LIST_FILE, "w") as f:
                 f.write(_topic_list_cache.model_dump_json(indent=2, warnings=False))
@@ -842,13 +854,16 @@ def _transform_csv_to_sql(table_name: str,
     sql_content = sql_content[:-2] + ";\n"
     return sql_content
 
-def _build_statement_name(table_name: str, prefix: str) -> str:
+def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = DEFAULT_POST_FIX_UNIT_TEST) -> str:
     _table_name_for_statement = table_name
     if len(_table_name_for_statement) > MAX_STATEMENT_NAME_LENGTH:
         _table_name_for_statement = _table_name_for_statement[:MAX_STATEMENT_NAME_LENGTH]    
-    statement_name = f"{prefix}-{_table_name_for_statement}{POST_FIX_UNIT_TEST}"
+    statement_name = f"{prefix}-{_table_name_for_statement}{post_fix_ut}"
     return statement_name.replace('_', '-').replace('.', '-')
 
+def _replace_table_name(sql_content: str, table_name: str, post_fix_ut: str = CONFIGURED_POST_FIX_UNIT_TEST) -> str:
+    
+    return sql_content.replace(table_name+DEFAULT_POST_FIX_UNIT_TEST, f"{table_name}{post_fix_ut}")
 
 def _add_data_consistency_with_ai(table_folder_name: str, 
     test_definition: SLTestDefinition, 

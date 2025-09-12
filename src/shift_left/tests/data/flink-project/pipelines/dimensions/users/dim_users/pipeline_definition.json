@@ -1,5 +1,5 @@
 {
-   "table_name": "users_dim_users",
+   "table_name": "dim_users",
    "product_name": "users",
    "type": "dimension",
    "dml_ref": "pipelines/dimensions/users/dim_users/sql-scripts/dml.users_dim_user.sql",
@@ -34,7 +34,7 @@
          "parents": [],
          "children": [
             {
-               "table_name": "users_dim_users",
+               "table_name": "dim_users",
                "product_name": "users",
                "type": "dimension",
                "dml_ref": "pipelines/dimensions/users/dim_users/sql-scripts/dml.users_dim_user.sql",
@@ -73,7 +73,7 @@
          "parents": [],
          "children": [
             {
-               "table_name": "users_dim_users",
+               "table_name": "dim_users",
                "product_name": "users",
                "type": "dimension",
                "dml_ref": "pipelines/dimensions/users/dim_users/sql-scripts/dml.users_dim_user.sql",

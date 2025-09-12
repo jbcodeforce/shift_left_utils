@@ -39,17 +39,66 @@ class TestTestMgrScenario(unittest.TestCase):
         """
         Set up the test environment
         """
-        pass
+        self._ddls_executed = {}
 
-    def test_happy_path_scenario(self):
+    def _mock_table_exists(self, table_name):
+        """
+        Mock the _table_exists(table_name) function to return True if the table name is in the _ddls_executed dictionary
+        """
+        if table_name not in self._ddls_executed.keys():
+            return False
+        value = self._ddls_executed[table_name]
+        self._ddls_executed[table_name] = True  # mock the table will exist after the tet execution
+        return value
+    
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
+    @patch('shift_left.core.test_mgr._table_exists')
+    @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
+    def test_happy_path_scenario(self, mock_post_flink_statement, 
+                mock_table_exists,
+                mock_get_statement_info,
+                mock_get_statement):
         """
         Taking the fact table fct_order, we want to create the unit tests, run the foundation and inserts, then run the validation.
         Verify the test has _ut as a based but the sql content is modified on the fly by using the app.post_fix_unit_test variable.
         """
+        def _mock_post_statement(compute_pool_id, statement_name, sql_content):
+            print(f"mock_post_statement: {statement_name}")
+            print(f"sql_content: {sql_content}")
+            if "ddl" in statement_name:
+                return Statement(name=statement_name, status={"phase": "COMPLETED"})
+            else:
+                return Statement(name=statement_name, status={"phase": "RUNNING"})
+
+        def _mock_statement_info(statement_name):
+            """
+            Mock the statement_mgr.get_statement_info(statement_name) function to return None
+            to enforce execution of the statement
+            """
+            print(f"mock_statement_info: {statement_name}")
+            return None
+
+        def _mock_get_statement(statement_name: str):
+            print(f"mock_get_statement: {statement_name} returns None")  
+            return None
+    
+
+        mock_post_flink_statement.side_effect = _mock_post_statement
+        mock_table_exists.side_effect = self._mock_table_exists
+        mock_get_statement_info.side_effect = _mock_statement_info
+        mock_get_statement.side_effect = _mock_get_statement
+
         print("Test happy path scenario\n--- Step 1: init testcases")
-        table_name = "dim_users_users"
+        table_name = "dim_users"
+        print(f"Table name: {os.getenv('PIPELINES')}")
         test_mgr.init_unit_test_for_table(table_name, create_csv=False, nb_test_cases=1, use_ai=False)
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/test_definitions.yaml"))
+        where_to_find=os.getenv("PIPELINES") + "/dimensions/users/dim_users/tests/test_definitions.yaml"
+        print(f"Where to find: {where_to_find}")
+        self.assertTrue(os.path.exists(where_to_find))
+        print("Test happy path scenario\n--- Step 2: run the foundation")
+        
+        test_mgr.execute_one_or_all_tests(table_name=table_name, test_case_name="test_dim_users_1", compute_pool_id=None, run_validation=False)
        
 
 if __name__ == "__main__":
