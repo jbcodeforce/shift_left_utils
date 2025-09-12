@@ -66,9 +66,14 @@ class TestConfluentClient(unittest.TestCase):
         """Test building of confluent cloud url"""
         config = get_config()
         config["kafka"]["bootstrap.servers"] = "lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092"
-        cclient = ConfluentCloudClient(get_config())
+        cclient = ConfluentCloudClient(config)
         url = cclient._build_confluent_cloud_url()
         self.assertEqual(url, "https://lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud/kafka/v3/clusters/lkc-79kg3p/topics")
+
+        config["kafka"]["bootstrap.servers"] = "pkc-n98pk.us-west-2.aws.confluent.cloud:9092"
+        cclient = ConfluentCloudClient(config)
+        url = cclient._build_confluent_cloud_url()
+        self.assertEqual(url, "https://lkc-n98pk.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-n98pk/topics")
 
     def test_auth_header(self):
         """Test authentication header"""
@@ -81,6 +86,13 @@ class TestConfluentClient(unittest.TestCase):
         auth_header = cclient._get_kafka_auth()
         self.assertEqual(auth_header, "Basic " + key)
         
+    def test_flink_url(self):
+        """Test building of flink url"""
+        config = get_config()
+        config["kafka"]["bootstrap.servers"] = "lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092"
+        cclient = ConfluentCloudClient(config)
+        url = cclient.build_flink_url_and_auth_header()
+        self.assertEqual(url, "https://flink.us-west-2.aws.glb.confluent.cloud/sql/v1/organizations/49cee212-6346-438a-a1fa-d1b1cbd90d44/environments/env-nknqp3")
         
 if __name__ == "__main__":
     unittest.main()

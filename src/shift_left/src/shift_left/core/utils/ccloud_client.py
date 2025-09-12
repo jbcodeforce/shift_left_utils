@@ -33,7 +33,9 @@ class ConfluentCloudClient:
     """
     def __init__(self, config: dict):
         self.config = config
-        self.base_url = self._extract_cluster_info_from_bootstrap(self.config.get("kafka").get("bootstrap.servers")).get("base_url")
+        cluster_info = self._extract_cluster_info_from_bootstrap(self.config.get("kafka").get("bootstrap.servers"))
+        self.cluster_id=cluster_info["cluster_id"]
+        self.base_url=cluster_info["base_url"]
 
     def _get_ccloud_auth(self):
         api_key = os.getenv("SL_CONFLUENT_CLOUD_API_KEY") or self.config["confluent_cloud"]["api_key"]
@@ -218,10 +220,11 @@ class ConfluentCloudClient:
             Extract cluster_id and base_url from bootstrap.servers value.
             
             Args:
-                bootstrap_servers (str): Bootstrap servers string like 'lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092'
+                bootstrap_servers (str): Bootstrap servers string like 'lkc-7...g3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092'
+                                      or 'pkc-n9..pk.us-west-2.aws.confluent.cloud:9092'
             
             Returns:
-                dict: Contains 'cluster_id', 'base_url', and 'pkafka_cluster'
+                dict: Contains 'cluster_id', 'base_url'
             """
             if not bootstrap_servers:
                 bootstrap_servers = self.config["kafka"]["bootstrap.servers"]
@@ -229,28 +232,34 @@ class ConfluentCloudClient:
             # Remove port if present
             server_without_port = bootstrap_servers.split(':')[0]
             
-            # Extract cluster_id (everything up to the first dash after 'lkc-')
-            if server_without_port.startswith('lkc-'):
-                parts = server_without_port.split('-', 2)  # Split into at most 3 parts
-                if len(parts) >= 2:
+            # Extract cluster_id and base_url
+            if server_without_port.startswith('lkc-') or server_without_port.startswith('pkc-'):
+                # Handle format like: lkc-7..p-..us-west-2.aws.glb.confluent.cloud
+                # The key difference is lkc- has a third component after the cluster ID
+                if server_without_port.startswith('lkc-') and server_without_port.count('-') >= 3:
+                    parts = server_without_port.split('-', 2)  # Split into at most 3 parts
                     cluster_id = f"{parts[0]}-{parts[1]}"  # e.g., 'lkc-79kg3p'
-                    base_url = parts[2] if len(parts) > 2 else ""  # e.g., 'dm8me7.us-west-2.aws.glb.confluent.cloud'
-                    
-                    return {
-                        "cluster_id": cluster_id,
-                        "base_url": base_url,
-                    }
+                    base_url = parts[2]  # e.g., 'dm8me7.us-west-2.aws.glb.confluent.cloud'
+                # Handle format like: pkc-n9..n.us-west-2.aws.confluent.cloud  
+                else:
+                    # Find the first dot to separate cluster from domain
+                    dot_index = server_without_port.find('.')
+                    if dot_index != -1:
+                        cluster_part = server_without_port[:dot_index]  # e.g., 'pkc-n...pk'
+                        base_url = server_without_port[dot_index+1:]  # e.g., 'us-west-2.aws.confluent.cloud'
+                        cluster_id = cluster_part
+                    else:
+                        return {"cluster_id": None, "base_url": None}
+                
+                return {
+                    "cluster_id": cluster_id,
+                    "base_url": base_url,
+                }
             
             return {"cluster_id": None, "base_url": None}
 
     # ---- Topic related methods ----
-    def _build_confluent_cloud_url(self) -> str:
-        cluster_info = self._extract_cluster_info_from_bootstrap(self.config["kafka"]["bootstrap.servers"])
-        cluster_id=cluster_info["cluster_id"]
-        base_url=cluster_info["base_url"]
-        url=f"https://{cluster_id}-{base_url}/kafka/v3/clusters/{cluster_id}/topics"
-        return url
-    
+ 
     def get_topic_message_count(self, topic_name: str) -> int:
         """
         Get the number of messages in a Kafka topic.
@@ -297,10 +306,13 @@ class ConfluentCloudClient:
     def build_flink_url_and_auth_header(self) -> Tuple[str, str]:
         organization_id=self.config["confluent_cloud"]["organization_id"]
         env_id=self.config["confluent_cloud"]["environment_id"]
-        self.api_key = os.getenv("SL_FLINK_API_KEY") or self.config["flink"]["api_key"]
-        self.api_secret = os.getenv("SL_FLINK_API_SECRET") or self.config["flink"]["api_secret"]
-        auth_header = self._generate_auth_header(self.api_key, self.api_secret)
-        url=f"https://flink-{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
+        api_key = os.getenv("SL_FLINK_API_KEY") or self.config["flink"]["api_key"]
+        api_secret = os.getenv("SL_FLINK_API_SECRET") or self.config["flink"]["api_secret"]
+        auth_header = self._generate_auth_header(api_key, api_secret)
+        if self.cluster_id and self.cluster_id.startswith("lkc-"):
+            url=f"https://flink-{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
+        else:
+            url=f"https://flink.{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
         return url, auth_header
     
     def get_flink_statement(self, statement_name: str)-> Statement | None:
@@ -399,3 +411,19 @@ class ConfluentCloudClient:
             return None    
 
 
+
+    def _build_confluent_cloud_url(self) -> str:
+        cluster_info = self._extract_cluster_info_from_bootstrap(self.config["kafka"]["bootstrap.servers"])
+        cluster_id=cluster_info["cluster_id"]
+        base_url=cluster_info["base_url"]
+        
+        # Convert pkc- to lkc- for the URL construction
+        url_cluster_id = cluster_id.replace("pkc-", "lkc-") if cluster_id and cluster_id.startswith("pkc-") else cluster_id
+        
+        # For lkc- format with multiple components, use dash; for pkc- format, use dot
+        if cluster_id and cluster_id.startswith("lkc-"):
+            url=f"https://{url_cluster_id}-{base_url}/kafka/v3/clusters/{url_cluster_id}/topics"
+        else:
+            url=f"https://{url_cluster_id}.{base_url}/kafka/v3/clusters/{url_cluster_id}/topics"
+        return url
+    

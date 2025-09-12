@@ -426,7 +426,7 @@ def report_running_flink_statements_for_a_product(
                                                                       cross_product_deployment=False,
                                                                       compute_pool_id=None, 
                                                                       table_name=start_node.table_name, 
-                                                                    expected_product_name=start_node.product_name,
+                                                                      expected_product_name=start_node.product_name,
                                                                       pool_creation=False)
        
         table_report = report_mgr.build_TableReport(report_name, execution_plan.nodes, from_date=from_date, get_metrics=True)

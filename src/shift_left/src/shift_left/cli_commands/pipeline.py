@@ -222,6 +222,10 @@ def build_execution_plan(
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
     """
+    if compute_pool_id:
+        pool_creation = False
+    else:
+        pool_creation = True
     _build_deploy_pipeline( 
         table_name=table_name, 
         product_name=product_name, 
@@ -235,7 +239,7 @@ def build_execution_plan(
         cross_product_deployment=cross_product_deployment,
         execute_plan=False,
         parallel=False,
-        pool_creation=False)
+        pool_creation=pool_creation)
 
 @app.command()
 def report_running_statements(

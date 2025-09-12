@@ -175,6 +175,22 @@
         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
         "table_folder_name": "pipelines/sources/src_table_1"
     },
+    "src_users_groups": {
+        "table_name": "src_users_groups",
+        "product_name": "users",
+        "type": "source",
+        "dml_ref": "pipelines/sources/users/src_groups/sql-scripts/dml.src_users_groups.sql",
+        "ddl_ref": "pipelines/sources/users/src_groups/sql-scripts/ddl.src_users_groups.sql",
+        "table_folder_name": "pipelines/sources/users/src_groups"
+    },
+    "src_users_users": {
+        "table_name": "src_users_users",
+        "product_name": "users",
+        "type": "source",
+        "dml_ref": "pipelines/sources/users/src_users/sql-scripts/dml.src_users_users.sql",
+        "ddl_ref": "pipelines/sources/users/src_users/sql-scripts/ddl.src_users_users.sql",
+        "table_folder_name": "pipelines/sources/users/src_users"
+    },
     "src_x": {
         "table_name": "src_x",
         "product_name": "p2",
@@ -190,6 +206,22 @@
         "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
         "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
         "table_folder_name": "pipelines/sources/p2/src_y"
+    },
+    "users_dim_users": {
+        "table_name": "users_dim_users",
+        "product_name": "users",
+        "type": "dimension",
+        "dml_ref": "pipelines/dimensions/users/dim_users/sql-scripts/dml.users_dim_user.sql",
+        "ddl_ref": "pipelines/dimensions/users/dim_users/sql-scripts/ddl.users_dim_user.sql",
+        "table_folder_name": "pipelines/dimensions/users/dim_users"
+    },
+    "users_fct_user_per_group": {
+        "table_name": "users_fct_user_per_group",
+        "product_name": "users",
+        "type": "fact",
+        "dml_ref": "pipelines/facts/users/fct_user_per_group/sql-scripts/dml.users_fct_user_per_group.sql",
+        "ddl_ref": "pipelines/facts/users/fct_user_per_group/sql-scripts/ddl.users_fct_user_per_group.sql",
+        "table_folder_name": "pipelines/facts/users/fct_user_per_group"
     },
     "x": {
         "table_name": "x",

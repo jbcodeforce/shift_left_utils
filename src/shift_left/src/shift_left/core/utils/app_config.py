@@ -406,26 +406,26 @@ def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
   """
   Apply default overrides to configuration.
   """
-  config["kafka"]["security.protocol"]= "SASL_SSL"  
-  config["kafka"]["sasl.mechanism"]= "PLAIN"
-  config["kafka"]["session.timeout.ms"]= "5000"
-  config["kafka"]["cluster_type"]= "dev"
-  config["kafka"]["src_topic_prefix"]= "clone"
-  config["confluent_cloud"]["base_api"]= "api.confluent.cloud/org/v2"
-  config["confluent_cloud"]["page_size"]= 100
-  config["confluent_cloud"]["glb_name"]= "glb"
-  config["confluent_cloud"]["url_scope"]= "private"
-  config["flink"]["max_cfu"]= "10"
-  config["flink"]["max_cfu_percent_before_allocation"]= "0.8"
-  config["flink"]["statement_name_post_fix"]= "None"
-  config["app"]["default_PK"]= "__db"
+  config["kafka"]["security.protocol"]="SASL_SSL"  
+  config["kafka"]["sasl.mechanism"]="PLAIN"
+  config["kafka"]["session.timeout.ms"]=5000
+  config["kafka"]["cluster_type"]="dev"
+  config["kafka"]["src_topic_prefix"]="clone"
+  config["confluent_cloud"]["base_api"]="api.confluent.cloud/org/v2"
+  config["confluent_cloud"]["page_size"]=100
+  config["confluent_cloud"]["glb_name"]="glb"
+  config["confluent_cloud"]["url_scope"]="private"
+  config["flink"]["max_cfu"]=10
+  config["flink"]["max_cfu_percent_before_allocation"]=0.8
+  config["flink"]["statement_name_post_fix"]="None"
+  config["app"]["default_PK"]="__db"
   config["app"]["delta_max_time_in_min"]= 15
-  config["app"]["timezone"]= "America/Los_Angeles"
-  config["app"]["src_table_name_prefix"]= "src_"
-  config["app"]["logging"]= "INFO"
-  config["app"]["products"]= ["p1", "p2", "p3"]
-  config["app"]["accepted_common_products"]= ["common", "seeds"]
-  config["app"]["cache_ttl"]= 120
+  config["app"]["timezone"]="America/Los_Angeles"
+  config["app"]["src_table_name_prefix"]="src_"
+  config["app"]["logging"]="INFO"
+  config["app"]["products"]=["p1", "p2", "p3"]
+  config["app"]["accepted_common_products"]=["common", "seeds"]
+  config["app"]["cache_ttl"]=120
   config["app"]["sql_content_modifier"]= "shift_left.core.utils.table_worker.ReplaceEnvInSqlContent"
   config["app"]["translator_to_flink_sql_agent"]= "shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent"
   config["app"]["dml_naming_convention_modifier"]= "shift_left.core.utils.naming_convention.DmlNameModifier"

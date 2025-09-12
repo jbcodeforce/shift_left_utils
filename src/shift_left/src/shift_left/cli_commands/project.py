@@ -126,16 +126,17 @@ def housekeep_statements( starts_with: str = typer.Option(None, "--starts-with",
             statement_created_time = datetime.strptime(statement.created_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
             time_difference = current_time - statement_created_time
             statement_age = time_difference.days
-
+            print(f"statement_name: {statement_name} statement_age: {statement_age} statement_status: {statement.status_phase}")
             if statement.name.startswith(starts_with) and statement.status_phase in statement_status and statement_age >= age:
-               statement_mgr.delete_statement_if_exists(statement_name)
-               if statement.status_phase == 'COMPLETED':
-                   completed_stmnt_cnt+=1
-               elif statement.status_phase == 'FAILED':
-                   failed_stmnt_cnt+=1
-               elif statement.status_phase == 'STOPPED':
-                   stopped_stmnt_cnt+=1
-               print(f"delete {statement_name} {statement.status_phase}")
+                print(f"\t--> delete {statement_name} {statement.status_phase}")
+                statement_mgr.delete_statement_if_exists(statement_name)
+                if statement.status_phase == 'COMPLETED':
+                    completed_stmnt_cnt+=1
+                elif statement.status_phase == 'FAILED':
+                    failed_stmnt_cnt+=1
+                elif statement.status_phase == 'STOPPED':
+                    stopped_stmnt_cnt+=1
+                print(f"delete {statement_name} {statement.status_phase}")
 
         if completed_stmnt_cnt == 0 and failed_stmnt_cnt == 0 and stopped_stmnt_cnt == 0:
             print("No statements deleted")
