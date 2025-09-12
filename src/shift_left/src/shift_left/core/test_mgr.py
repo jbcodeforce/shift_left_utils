@@ -407,8 +407,10 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
             
             # Handle backticked table names
             backtick_pattern = r'`(' + escaped_table + r')`'
-            sql_content = re.sub(backtick_pattern, f'`{table}{DEFAULT_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
-            
+            if table+DEFAULT_POST_FIX_UNIT_TEST in sql_content:
+                sql_content = re.sub(backtick_pattern, f'`{table}{CONFIGURED_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            else:
+                sql_content = re.sub(backtick_pattern, f'`{table}`', sql_content, flags=re.IGNORECASE)
             # Handle non-backticked table names with word boundaries
             word_pattern = r'\b(' + escaped_table + r')\b'
             
@@ -417,7 +419,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                 return f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}"
             
             sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
-        logger.info(f"Replaced table names in SQL content: {sql_content}")
+        logger.info(f"Replaced table names: {sorted_table_names} in SQL content: {sql_content}")
         return sql_content
 
     # Initialize statements list if None
@@ -485,7 +487,7 @@ def _load_sql_and_execute_statement(table_name: str,
             print(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
             raise ValueError(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
         else:
-            print(f"Executed test foundations for {table_name}.. {statement.status.phase}\n")
+            print(f"Executed test foundations for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}.. {statement.status.phase}\n")
     return statements
 
 def _execute_test_inputs(test_case: SLTestCase, 
@@ -503,7 +505,7 @@ def _execute_test_inputs(test_case: SLTestCase,
     statements = []
     for input_step in test_case.inputs:
         statement = None
-        print(f"Run insert test data for {input_step.table_name}")
+        print(f"Run insert test data for {input_step.table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             statements = _load_sql_and_execute_statement(table_name=input_step.table_name,
@@ -853,7 +855,7 @@ def _transform_csv_to_sql(table_name: str,
     sql_content = sql_content[:-2] + ";\n"
     return sql_content
 
-def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = DEFAULT_POST_FIX_UNIT_TEST) -> str:
+def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = CONFIGURED_POST_FIX_UNIT_TEST) -> str:
     _table_name_for_statement = table_name
     if len(_table_name_for_statement) > MAX_STATEMENT_NAME_LENGTH:
         _table_name_for_statement = _table_name_for_statement[:MAX_STATEMENT_NAME_LENGTH]    
