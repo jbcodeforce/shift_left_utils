@@ -6,6 +6,7 @@ Scenario to do end to end unit tests.
 import unittest
 from unittest.mock import patch, MagicMock
 import os
+import pytest
 import pathlib
 from datetime import datetime
 import json
@@ -17,6 +18,7 @@ from shift_left.core.utils.app_config import reset_all_caches
 import shift_left.core.test_mgr as test_mgr
 from shift_left.core.models.flink_statement_model import (
     Statement, 
+    StatementResult,
     StatementInfo, 
     StatementListCache, 
     Status, 
@@ -24,6 +26,8 @@ from shift_left.core.models.flink_statement_model import (
     Data, 
     OpRow, 
     Metadata)  
+
+
 
 class TestTestMgrScenario(unittest.TestCase):
     """
@@ -50,15 +54,19 @@ class TestTestMgrScenario(unittest.TestCase):
         value = self._ddls_executed[table_name]
         self._ddls_executed[table_name] = True  # mock the table will exist after the tet execution
         return value
-    
+
+
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
     def test_happy_path_scenario(self, mock_post_flink_statement, 
                 mock_table_exists,
                 mock_get_statement_info,
-                mock_get_statement):
+                mock_get_statement_results,
+                mock_get_statement
+                ):
         """
         Taking the fact table fct_order, we want to create the unit tests, run the foundation and inserts, then run the validation.
         Verify the test has _ut as a based but the sql content is modified on the fly by using the app.post_fix_unit_test variable.
@@ -81,25 +89,31 @@ class TestTestMgrScenario(unittest.TestCase):
 
         def _mock_get_statement(statement_name: str):
             print(f"mock_get_statement: {statement_name} returns None")  
+            
             return None
     
+        def _mock_get_statement_results(statement_name: str):
+            print(f"mock_get_statement_results: {statement_name}")
+            result = StatementResult(api_version="1.0", kind="StatementResult",  
+                         results=Data(data=[OpRow(op=0, row=['PASS'])]))
+            return result
 
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement_info.side_effect = _mock_statement_info
         mock_get_statement.side_effect = _mock_get_statement
-
-        print("Test happy path scenario\n--- Step 1: init testcases")
+        mock_get_statement_results.side_effect = _mock_get_statement_results
+        
         table_name = "dim_users"
-        print(f"Table name: {os.getenv('PIPELINES')}")
-        test_mgr.init_unit_test_for_table(table_name, create_csv=False, nb_test_cases=1, use_ai=False)
+        print("Test happy path scenario\n--- Step 0: reset the testcases")
+        test_mgr.delete_test_artifacts(table_name=table_name)
         where_to_find=os.getenv("PIPELINES") + "/dimensions/users/dim_users/tests/test_definitions.yaml"
         print(f"Where to find: {where_to_find}")
         self.assertTrue(os.path.exists(where_to_find))
         print("Test happy path scenario\n--- Step 2: run the foundation")
-        
         test_mgr.execute_one_or_all_tests(table_name=table_name, test_case_name="test_dim_users_1", compute_pool_id=None, run_validation=False)
-       
+        print("Test happy path scenario\n--- Step 3: run the validation")
+        test_mgr.execute_validation_tests(table_name=table_name, test_case_name="test_dim_users_1", compute_pool_id=None)
 
 if __name__ == "__main__":
     unittest.main()

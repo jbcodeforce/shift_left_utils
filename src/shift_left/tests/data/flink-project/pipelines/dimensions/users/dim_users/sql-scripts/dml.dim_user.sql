@@ -1,4 +1,10 @@
 INSERT INTO dim_users
+-- add CTE to validae the unit tests will not change the name of the CTE
+with valid_users as (
+  SELECT * FROM src_users_users
+  WHERE user_id IS NOT NULL
+  AND user_email IS NOT NULL
+)
 SELECT 
   u.user_id,
   u.user_name,
@@ -8,8 +14,6 @@ SELECT
   g.group_type,
   u.created_date,
   u.is_active
-FROM src_users_users u
+FROM valid_users u
 LEFT JOIN src_users_groups g
   ON u.group_id = g.group_id
-WHERE u.user_id IS NOT NULL 
-  AND u.user_email IS NOT NULL

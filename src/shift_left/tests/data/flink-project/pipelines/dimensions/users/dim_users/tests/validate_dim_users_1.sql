@@ -1,21 +1,33 @@
 with expected_results as (
     select 
-        MD5(CONCAT_WS(',', 'element_id_1', 'tag_id_1', 'tenant_id_1')) as expected_sid,
-        'element_id_1' as expected_element_target_id,
-        'tag_id_1' as expected_tag_id,
-        'tenant_id_1' as expected_tenant_id
+        'user_id_1' as expected_user_id,
+        'user_name_1' as expected_user_name,
+        'user_email_1' as expected_user_email,
+        'group_id_1' as expected_group_id,
+        'group_name_1' as expected_group_name,
+        'group_type_1' as expected_group_type,
+        'created_date_1' as expected_created_date,
+        false as expected_is_active
     union all
     select 
-        MD5(CONCAT_WS(',', 'element_id_2', 'tag_id_2', 'tenant_id_2')) as expected_sid,
-        'element_id_2' as expected_element_target_id,
-        'tag_id_2' as expected_tag_id,
-        'tenant_id_2' as expected_tenant_id
+        'user_id_2' as expected_user_id,
+        'user_name_2' as expected_user_name,
+        'user_email_2' as expected_user_email,
+        'group_id_2' as expected_group_id,
+        'group_name_2' as expected_group_name,
+        'group_type_2' as expected_group_type,
+        'created_date_2' as expected_created_date,
+        true as expected_is_active
     union all
     select 
-        MD5(CONCAT_WS(',', 'element_id_3', 'tag_id_3', 'tenant_id_3')) as expected_sid,
-        'element_id_3' as expected_element_target_id,
-        'tag_id_3' as expected_tag_id,
-        'tenant_id_3' as expected_tenant_id
+        'user_id_3' as expected_user_id,
+        'user_name_3' as expected_user_name,
+        'user_email_3' as expected_user_email,
+        'group_id_3' as expected_group_id,
+        'group_name_3' as expected_group_name,
+        'group_type_3' as expected_group_type,
+        'created_date_3' as expected_created_date,
+        false as expected_is_active
 ),
 actual_results as (
     select 
@@ -26,28 +38,36 @@ actual_results as (
         group_name,
         group_type,
         created_date,
-        is_active
+        is_active,
+        updated_at
     from dim_users_ut
 ),
 validation_check as (
     select 
-        e.expected_sid,
-        e.expected_element_target_id,
-        e.expected_tag_id,
-        e.expected_tenant_id,
-        a.sid,
-        a.tenant_id as actual_tenant_id,
-        case when a.sid is not null then 'PASS' else 'FAIL' end as sid_check,
-        case when a.sid = e.expected_sid then 'PASS' else 'FAIL' end as sid_match_check,
-        case when a.tenant_id = e.expected_tenant_id then 'PASS' else 'FAIL' end as tenant_id_check,
-        case when a.user_modified_date is not null then 'PASS' else 'FAIL' end as timestamp_check
+        e.expected_user_id,
+        e.expected_user_name,
+        e.expected_user_email,
+        e.expected_group_id,
+        e.expected_group_name,
+        e.expected_group_type,
+        e.expected_created_date,
+        e.expected_is_active,
+        a.user_id,
+        case when a.user_id is not null then 'PASS' else 'FAIL' end as user_id_check,
+        case when a.user_name = e.expected_user_name then 'PASS' else 'FAIL' end as user_name_check,
+        case when a.user_email = e.expected_user_email then 'PASS' else 'FAIL' end as user_email_check,
+        case when a.group_id = e.expected_group_id then 'PASS' else 'FAIL' end as group_id_check,
+        case when a.group_name = e.expected_group_name then 'PASS' else 'FAIL' end as group_name_check,
+        case when a.group_type = e.expected_group_type then 'PASS' else 'FAIL' end as group_type_check,
+        case when a.created_date = e.expected_created_date then 'PASS' else 'FAIL' end as created_date_check,
+        case when a.is_active = e.expected_is_active then 'PASS' else 'FAIL' end as is_active_check
     from expected_results e
-    left join actual_results a on e.expected_sid = a.sid
+    left join actual_results a on e.expected_user_id = a.user_id
 ),
 overall_result as (
     select 
         count(*) as total_expected_records,
-        sum(case when sid_check = 'PASS' and sid_match_check = 'PASS' and tenant_id_check = 'PASS' and timestamp_check = 'PASS'
+        sum(case when user_id_check = 'PASS' and user_name_check = 'PASS' and user_email_check = 'PASS' and group_id_check = 'PASS' and group_name_check = 'PASS' and group_type_check = 'PASS' and created_date_check = 'PASS' and is_active_check = 'PASS'
         then 1 else 0 end) as passing_records,
         (select count(*) from actual_results) as actual_record_count
     from validation_check
