@@ -131,7 +131,7 @@ def get_or_build_inventory(
         for dir in dirs:
             if SCRIPTS_DIR == dir:
                 ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
-                logger.info(f"Processing file {dml_file_name}")
+                logger.debug(f"Processing file {dml_file_name}")
                 count+=1
                 if not dml_file_name and not ddl_file_name:
                     continue
@@ -171,7 +171,6 @@ def get_or_build_inventory(
                     "table_folder_name": table_folder,
                     "state_form": upgrade_mode
                 })
-                logger.info(ref)
                 if ref.table_name in inventory:
                     logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                 inventory[ref.table_name] = ref.model_dump()

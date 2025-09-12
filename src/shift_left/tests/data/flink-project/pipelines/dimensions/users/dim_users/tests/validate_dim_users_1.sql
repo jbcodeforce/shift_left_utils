@@ -19,12 +19,14 @@ with expected_results as (
 ),
 actual_results as (
     select 
-        sid,
-        element_sid,
-        tag_sid,
-        user_modified_date,
-        modified_user_sid,
-        tenant_id
+        user_id,
+        user_name,
+        user_email,
+        group_id,
+        group_name,
+        group_type,
+        created_date,
+        is_active
     from dim_users_ut
 ),
 validation_check as (

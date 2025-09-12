@@ -151,7 +151,6 @@ def execute_validation_tests(table_name: str,
         statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
                                                                     table_ref=table_ref,
                                                                     prefix=prefix+"-val-"+str(idx + 1),
-                                                                    post_fix_ut=post_fix_ut,
                                                                     compute_pool_id=compute_pool_id)
         test_suite_result.test_results[test_case.name] = TestResult(test_case_name=test_case.name, result=result_text, validation_result=statement_result)
         if test_case_name and test_case.name == test_case_name:
@@ -324,7 +323,7 @@ def _execute_foundation_statements(
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
                                     compute_pool_id=compute_pool_id,
-                                    fct=_replace_table_name,
+                                    fct=_replace_table_name_ut_with_configured_postfix,
                                     product_name=table_ref.product_name,
                                     statements=statements)
     return statements
@@ -394,7 +393,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
         
         return table_names
 
-    def replace_table_name(sql_content: str, post_fix_ut: str = DEFAULT_POST_FIX_UNIT_TEST) -> str:
+    def replace_table_name(sql_content: str, table_name: str) -> str:
         table_names = extract_all_table_names(sql_content)
         
         # Sort table names by length (descending) to avoid substring replacement issues
@@ -408,7 +407,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
             
             # Handle backticked table names
             backtick_pattern = r'`(' + escaped_table + r')`'
-            sql_content = re.sub(backtick_pattern, f'`{table}{CONFIGURED_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            sql_content = re.sub(backtick_pattern, f'`{table}{DEFAULT_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
             
             # Handle non-backticked table names with word boundaries
             word_pattern = r'\b(' + escaped_table + r')\b'
@@ -473,7 +472,7 @@ def _load_sql_and_execute_statement(table_name: str,
         return statements  # Return same list when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
-    logger.info(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
+    logger.info(f"Execute statement {statement_name} table: {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} using {sql_path} on: {compute_pool_id}")
     print(f"Execute statement {statement_name} table: {table_name} using {sql_path} on: {compute_pool_id}")
     statement, is_new = _execute_flink_test_statement(sql_content=sql_content   , 
                                                       statement_name=statement_name, 
@@ -511,7 +510,7 @@ def _execute_test_inputs(test_case: SLTestCase,
                                         sql_path=sql_path,
                                         prefix=prefix,
                                         compute_pool_id=compute_pool_id,
-                                        fct=lambda x: x,
+                                        fct=_replace_table_name_ut_with_configured_postfix,
                                         product_name=table_ref.product_name,
                                         statements=statements)
         elif input_step.file_type == "csv":
@@ -555,7 +554,7 @@ def _execute_test_validation(test_case: SLTestCase,
                                     sql_path=sql_path,
                                     prefix=prefix,
                                     compute_pool_id=compute_pool_id,
-                                    fct=lambda x: x,
+                                    fct=_replace_table_name_ut_with_configured_postfix,
                                     statements=statements)
         result, statement_result=_poll_response(statement_name)
         result_text+=result
@@ -861,9 +860,9 @@ def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = DEFAU
     statement_name = f"{prefix}-{_table_name_for_statement}{post_fix_ut}"
     return statement_name.replace('_', '-').replace('.', '-')
 
-def _replace_table_name(sql_content: str, table_name: str, post_fix_ut: str = CONFIGURED_POST_FIX_UNIT_TEST) -> str:
+def _replace_table_name_ut_with_configured_postfix(sql_content: str, table_name: str) -> str:
     
-    return sql_content.replace(table_name+DEFAULT_POST_FIX_UNIT_TEST, f"{table_name}{post_fix_ut}")
+    return sql_content.replace(table_name+DEFAULT_POST_FIX_UNIT_TEST, f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
 
 def _add_data_consistency_with_ai(table_folder_name: str, 
     test_definition: SLTestDefinition, 

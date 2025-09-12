@@ -13,13 +13,13 @@ site/
 tmp/
 .DS_Store
 .webui_secret_key
-set_test_env
-set_stage_env
 **/set_demo_env
 **to_investigate.md
 .idea/
 .gitconfig
-set_dev_env
 .vscode/launch.json
 .env.secrets
 set_j9r_env
+set_mc_dev_env
+set_mc_stage_env
+set_test_env
