@@ -7,6 +7,8 @@ v0.1.37
     - Use different credentials for different environments
     - Securely manage secrets in CI/CD pipelines
     - Follow security best practices
+* Test harness now supports `app.post_fix_unit_test` to update table name while deploying. the _ut is during the creation of the unit tests, and should be committed to git as this. The run-unit-tests or run-validation-tests will take care of the `app.post_fix_unit_test`
+* A new command at the project level to do some statement housekeeping: `shilft_left project housekeep-statements` will clean completed and failed statements.
 
 v0.1.36
 * Improve node_map builder for better performance: keep node visited and currently built node_map to avoid reprocessing nodes already visited.
