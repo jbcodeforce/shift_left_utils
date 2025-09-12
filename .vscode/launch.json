@@ -4,7 +4,9 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
+        {
+            "python.defaultInterpreterPath": "${workspaceFolder}/src/shift_left/.venv/bin/python"
+        },
         {
             "name": "Python Debugger: current file",
             "type": "debugpy",
@@ -25,13 +27,14 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env.secrets",
+            "envFile": "${workspaceFolder}/.env",
             "env": {
-                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
+                "CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
+                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
                 "PIPELINES": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines",
                 "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
             },
+            "preLaunchTask": "setup_mc_environment",
              "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
@@ -41,7 +44,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
-            "envFile": "${workspaceFolder}/.env.secrets",
+            "envFile": "${workspaceFolder}/.env",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
                 "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"

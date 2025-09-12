@@ -181,6 +181,8 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
+    if not compute_pool_id:
+        compute_pool_id = get_config().get('flink').get('compute_pool_id')
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get('flink').get('database_name')}")
 

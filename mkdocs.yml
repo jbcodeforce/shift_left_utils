@@ -1,4 +1,4 @@
-site_name: Shift Left Utilities v0.1.36
+site_name: Shift Left Utilities v0.1.37
 repo_url: https://github.com/jbcodeforce/shift_left_utils
 site_url: https://jeromeboyer.net/shift_left_utils
 copyright: Copyright &copy; 2024 Jerome Boyer
@@ -21,8 +21,8 @@ nav:
       - Feature Tracking: tracking.md
 theme: 
   name: material
-  logo: assets/logo.drawio.png
-  favicon: assets/logo.drawio.png
+  logo: assets/batchy.png
+  favicon: assets/batchy.png
   palette:
     scheme: default
   language: en

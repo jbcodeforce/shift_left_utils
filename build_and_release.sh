@@ -75,6 +75,11 @@ if ! command -v uv &> /dev/null; then
 fi
 
 print_info "Starting release process for version ${VERSION}"
+# Step 0: Check if the current branch ais develop
+if [ $(git branch --show-current) != "develop" ]; then
+    print_error "Please switch to develop branch and be sure it is up to date with your last feature branches"
+    exit 1
+fi
 
 # Step 1: Create release branch from develop
 print_info "Creating release branch ${RELEASE_BRANCH} from develop"

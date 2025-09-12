@@ -1,13 +1,10 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-from math import prod
 import os
 import networkx as nx
-import matplotlib.pyplot as plt
 from pydantic_yaml import to_yaml_str
 import typer
-import datetime
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
@@ -17,6 +14,7 @@ from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
+from shift_left.core.compute_pool_usage_analyzer import ComputePoolUsageAnalyzer
 
 
 """
@@ -77,7 +75,6 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
-        to_graph: bool = typer.Option(False, "--graph", help="Output the report in Graphical tree"),
         children_too: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
         parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
         output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
@@ -111,9 +108,6 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     if output_file_name:
         with open(output_file_name,"w") as f:
             f.write(result)
-    if to_graph:
-        print("[bold]Graph:[/bold]")
-        _process_hierarchy_to_node(pipeline_def)
         
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
@@ -228,6 +222,10 @@ def build_execution_plan(
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
     and existing Flink Statement running status.
     """
+    if compute_pool_id:
+        pool_creation = False
+    else:
+        pool_creation = True
     _build_deploy_pipeline( 
         table_name=table_name, 
         product_name=product_name, 
@@ -241,7 +239,7 @@ def build_execution_plan(
         cross_product_deployment=cross_product_deployment,
         execute_plan=False,
         parallel=False,
-        pool_creation=False)
+        pool_creation=pool_creation)
 
 @app.command()
 def report_running_statements(
@@ -420,6 +418,75 @@ def _build_deploy_pipeline(
         sanitized_error = safe_error_display(e)
         print(f"[red]Error: {sanitized_error}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def analyze_pool_usage(
+    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")] = None,
+    product_name: Annotated[str, typer.Option("--product-name", "-p", help="Analyze pool usage for a specific product only")] = None,
+    directory: Annotated[str, typer.Option("--directory", "-d", help="Analyze pool usage for pipelines in a specific directory")] = None
+):
+    """
+    Analyze compute pool usage and assess statement consolidation opportunities.
+    
+    This command will:
+    - Analyze current usage across compute pools (optionally filtered by product or directory)
+    - Identify running statements in each pool
+    - Assess opportunities for statement consolidation
+    - Generate optimization recommendations using simple heuristics
+    
+    Examples:
+        # Analyze all pools
+        shift-left pipeline analyze-pool-usage
+        
+        # Analyze for specific product
+        shift-left pipeline analyze-pool-usage --product-name saleops
+        
+        # Analyze for specific directory
+        shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
+        
+        # Combine product and directory filters
+        shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
+    """
+    try:
+        # Build analysis scope description
+        scope_desc = "all pools"
+        if product_name and directory:
+            scope_desc = f"product '{product_name}' in directory '{directory}'"
+        elif product_name:
+            scope_desc = f"product '{product_name}'"
+        elif directory:
+            scope_desc = f"directory '{directory}'"
+            
+        print(f"[blue]Analyzing compute pool usage and statement consolidation opportunities for {scope_desc}...[/blue]")
+        
+        analyzer = ComputePoolUsageAnalyzer()
+        report = analyzer.analyze_pool_usage(inventory_path, product_name, directory)
+        
+        # Print summary to console
+        summary = analyzer.print_analysis_summary(report)
+        print(summary)
+        
+        # Save detailed report to file
+        from shift_left.core.utils.app_config import shift_left_dir
+        import json
+        
+        report_file = f"{shift_left_dir}/pool_usage_analysis_{report.created_at.strftime('%Y%m%d_%H%M%S')}.json"
+        with open(report_file, 'w') as f:
+            f.write(report.model_dump_json(indent=2))
+        
+        print(f"[green]Detailed analysis report saved to: {report_file}[/green]")
+        
+        # Highlight key findings
+        if report.recommendations:
+            print(f"\n[yellow]🔍 Found {len(report.recommendations)} consolidation opportunities![/yellow]")
+            total_potential_savings = sum(rec.estimated_cfu_savings for rec in report.recommendations)
+            print(f"[yellow]💰 Potential CFU savings: {total_potential_savings}[/yellow]")
+        else:
+            print(f"\n[green]✅ Your compute pools appear to be efficiently utilized![/green]")
+            
+    except Exception as e:
+        safe_error_display(f"Error analyzing compute pool usage", e)
     
    
 
@@ -438,13 +505,7 @@ def _display_directed_graph(nodes, edges):
     G.add_nodes_from(nodes)
     G.add_edges_from(edges)
 
-    # Draw the graph
-    pos = nx.spring_layout(G)  # Layout algorithm
-    nx.draw(G, pos, with_labels=True,
-            node_size=600, node_color="lightblue", font_size=10, 
-            font_weight="bold", 
-            arrowsize=20)
-    plt.show()
+    # TODO to replace with better graph visualization
 
 
 
@@ -463,7 +524,7 @@ def _process_parents(nodes_directed, edges_directed, current_node):
             edges_directed.append((parent.table_name, current_node.table_name))
             _process_parents(nodes_directed, edges_directed, parent)
 
-
+# 09/09/2025 to adapt in the future for a better graph visualization
 def _process_hierarchy_to_node(pipeline_def):
     nodes_directed = [pipeline_def.table_name]
     edges_directed = []

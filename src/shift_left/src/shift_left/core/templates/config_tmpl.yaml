@@ -6,16 +6,10 @@ kafka:
   api_secret: <kafka-api-key_secret>
   security.protocol: SASL_SSL
   sasl.mechanism: PLAIN
-  sasl.username:  <TO_FILL>
-  sasl.password:  <TO_FILL>
   session.timeout.ms: 5000
   reject_topics_prefixes: ["clone","dim_","src_"]
   cluster_type: dev
   src_topic_prefix: clone
-registry:
-  url: <TO_FILL>
-  registry_key_name:   <TO_FILL>
-  registry_key_secret:  <TO_FILL>
 confluent_cloud:
   base_api: api.confluent.cloud/org/v2
   environment_id:  env-<TO_FILL>
@@ -25,7 +19,8 @@ confluent_cloud:
   api_key:  <TO_FILL>
   api_secret:  <TO_FILL>
   page_size: 100
-  url_scope: public
+  glb_name: glb # or None
+  url_scope: private 
 flink:
   flink_url: flink.<TO_FILL>.confluent.cloud
   api_key:  <TO_FILL>
@@ -38,7 +33,6 @@ flink:
   statement_name_post_fix: None
 app:
   delta_max_time_in_min: 15  # this is to apply randomly to the event timestamp to create out of order
-  report_output_dir: ./reports
   default_PK: __db
   timezone: America/Los_Angeles
   src_table_name_prefix: src_

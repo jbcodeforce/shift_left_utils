@@ -1,0 +1,10 @@
+{"version": "0.2.0",
+"tasks": [
+        {
+            "label": "setup_mc_environment",
+            "type": "shell",
+            "command": "source ${workspaceFolder}/set_dev_env",
+            "problemMatcher": []
+        }
+    ]
+}

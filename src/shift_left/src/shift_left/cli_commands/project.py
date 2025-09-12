@@ -4,6 +4,8 @@ Copyright 2024-2025 Confluent, Inc.
 import typer
 import subprocess
 import os
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from rich import print
 from shift_left.core.utils.app_config import get_config, validate_config as validate_config_impl
@@ -67,7 +69,9 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         """
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
-        print("#" * 30 + f" List compute pools for environment {environment_id}")
+        if not region:
+               region = get_config().get('confluent_cloud').get('region')
+        print("#" * 30 + f" List compute pools for environment {environment_id} - in region {region}")
         list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
@@ -81,18 +85,63 @@ def delete_all_compute_pools(product_name: Annotated[str, typer.Argument(help="T
         print(f"Done")
 
 @app.command()
-def clean_completed_failed_statements():
+def housekeep_statements( starts_with: str = typer.Option(None, "--starts-with", help="Statements names starting with this string. [default: workspace]"),
+                      status: str = typer.Option(None, "--status", help="Statements with this status. [default: COMPLETED, FAILED]"),
+                      age: int = typer.Option(None, "--age", help="Statements with created_date >= age (days). [default: 0]")):
         """
-        Delete all statements that are failed and completed
+        Delete statements in FAILED or COMPLETED state that starts with string 'workspace' in it ( default ).
+        Applies optional starts-with and age filters when provided.
         """
-        print("#" * 30 + f" Clean statements starting with Workspace in completed and failed state")
+        reserved_words = ['dev','stage','prod']
+        default_status = ['COMPLETED', 'FAILED']
+        allowed_status = ['COMPLETED', 'FAILED', 'STOPPED']
+        statement_status = []
+
+        current_time = datetime.now(timezone.utc)
+        completed_stmnt_cnt = failed_stmnt_cnt = stopped_stmnt_cnt = 0
+
+        if not starts_with:
+            starts_with='workspace'
+        elif starts_with.lower().startswith(tuple(reserved_words)):
+           print(f"Search String cannot start with one of these reserved words {reserved_words}")
+           sys.exit()
+
+        if not status:
+            statement_status = default_status
+        elif status.upper() not in allowed_status:
+           print(f"Allowed Status are {allowed_status}")
+           sys.exit()
+        else:
+            statement_status.append(status.upper())
+
+        if not age:
+            age=0
+
+
+        print("#" * 30 + f" Clean statements starting with " + starts_with + f" in COMPLETED and FAILED state, with a age >= " + str(age))
+
         statement_list = statement_mgr.get_statement_list().copy()
         for statement_name in statement_list:
-              statement = statement_list[statement_name]
-              if "workspace" in statement_name and (statement.status_phase == "COMPLETED" or statement.status_phase == "FAILED"):
-                     statement_mgr.delete_statement_if_exists(statement_name)
-                     print(f"delete {statement_name}")
-        print("Workspace statements cleaned")
+            statement = statement_list[statement_name]
+            statement_created_time = datetime.strptime(statement.created_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+            time_difference = current_time - statement_created_time
+            statement_age = time_difference.days
+            print(f"statement_name: {statement_name} statement_age: {statement_age} statement_status: {statement.status_phase}")
+            if statement.name.startswith(starts_with) and statement.status_phase in statement_status and statement_age >= age:
+                print(f"\t--> delete {statement_name} {statement.status_phase}")
+                statement_mgr.delete_statement_if_exists(statement_name)
+                if statement.status_phase == 'COMPLETED':
+                    completed_stmnt_cnt+=1
+                elif statement.status_phase == 'FAILED':
+                    failed_stmnt_cnt+=1
+                elif statement.status_phase == 'STOPPED':
+                    stopped_stmnt_cnt+=1
+                print(f"delete {statement_name} {statement.status_phase}")
+
+        if completed_stmnt_cnt == 0 and failed_stmnt_cnt == 0 and stopped_stmnt_cnt == 0:
+            print("No statements deleted")
+        else:
+            print("\n" + str(completed_stmnt_cnt) + " COMPLETED statements deleted, " + str(failed_stmnt_cnt) + " FAILED statements deleted, " + str(stopped_stmnt_cnt) + " STOPPED statements deleted")
 
 @app.command()
 def validate_config():

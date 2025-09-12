@@ -262,7 +262,7 @@ export PIPELINES=$(pwd)/tests/flink-project/pipelines
 * It is also possible to test the CLI with python:
 
 ```sh
-python src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
+uv run src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
 ```
 
 To avoid redundant tests, the tests are grouped in three sets:
@@ -286,6 +286,8 @@ uv run pytest -s tests/ut/core/test_pipeline_mgr.py
 ```sh
 uv run pytest -s tests/cli/test_project_cli.py
 ```
+
+To avoid comflict between test execution, each test gets its own copy of data into a temporary folder defined in the pytest fixture in `ut/core/conftest.py`. Tests can run simultaneously without conflicts. The temporary directories are automatically removed after tests.
 
 ### Debug core functions
 

@@ -86,10 +86,9 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
 
 def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     client = ConfluentCloudClient(config)
-    url = client.build_flink_url_and_auth_header()
-    response = client.make_request("GET", url + "/statements/" + statement_name)
+    url, auth_header = client.build_flink_url_and_auth_header()
+    response = client.make_request(method="GET", url=url + "/statements/" + statement_name, auth_header=auth_header)
     if response.get('errors'):
         return StatementError(**response)
     return Statement(**response)
@@ -104,7 +103,7 @@ def post_flink_statement(compute_pool_id: str,
         config = get_config()
         properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
         client = ConfluentCloudClient(config)
-        url = client.build_flink_url_and_auth_header()
+        url, auth_header = client.build_flink_url_and_auth_header()
         statement_data = {
                 "name": statement_name,
                 "organization_id": config["confluent_cloud"]["organization_id"],
@@ -119,7 +118,8 @@ def post_flink_statement(compute_pool_id: str,
         try:
             logger.debug(f"> Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
-            response = client.make_request("POST", url + "/statements", statement_data)
+            auth_header = client._get_flink_auth()
+            response = client.make_request(method="POST", url=f"{url}/statements", data=statement_data, auth_header=auth_header)
             logger.debug(f"> POST response= {response}")
             if response.get('errors'):
                 logger.error(f"Error executing rest call: {response['errors']}")
@@ -171,13 +171,13 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
 
 def get_statement_results(statement_name: str)-> StatementResult:
         client = ConfluentCloudClient(get_config())
-        url = client.build_flink_url_and_auth_header()
+        url, auth_header = client.build_flink_url_and_auth_header() 
         try:
-            resp=client.make_request("GET",f"{url}/statements/{statement_name}/results")
+            resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
             logger.info(resp)
 
             if resp["metadata"]["next"]:
-                resp=client.make_request("GET", resp["metadata"]["next"])
+                resp=client.make_request(method="GET", url=resp["metadata"]["next"], auth_header=auth_header)
                 logger.debug(f"After next called: {resp}")
             return StatementResult(**resp)
         except Exception as e:
@@ -187,8 +187,8 @@ def get_statement_results(statement_name: str)-> StatementResult:
 def get_next_statement_results(next_token_page: str) -> StatementResult:
     config = get_config()
     client = ConfluentCloudClient(config)
-    url = client.build_flink_url_and_auth_header()  # need that to build the header
-    resp=client.make_request("GET", next_token_page)
+    auth_header = client._get_flink_auth()
+    resp=client.make_request(method="GET", url=next_token_page, auth_header=auth_header)
     return StatementResult(**resp)
 
 _cache_lock = threading.RLock()    
@@ -219,13 +219,14 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 config = get_config()
                 page_size = config["confluent_cloud"].get("page_size", 100)
                 client = ConfluentCloudClient(config)
-                url=client.build_flink_url_and_auth_header()+"/statements?page_size="+str(page_size)
+                url, auth_header = client.build_flink_url_and_auth_header()
+                url=url+"/statements?page_size="+str(page_size)
                 next_page_token = None
                 while True:
                     if next_page_token:
-                        resp=client.make_request("GET", next_page_token)
+                        resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
                     else:
-                        resp=client.make_request("GET", url)
+                        resp=client.make_request(method="GET", url=url, auth_header=auth_header)
                     logger.debug("Statement execution result:", resp)
                     if resp and 'data' in resp:
                         for info in resp.get('data'):

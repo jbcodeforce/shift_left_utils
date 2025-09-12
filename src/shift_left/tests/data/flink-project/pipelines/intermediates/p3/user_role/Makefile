@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_int_p3_user_role
+delete_data: delete_schemas

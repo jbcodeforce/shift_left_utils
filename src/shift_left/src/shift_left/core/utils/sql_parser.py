@@ -91,7 +91,7 @@ class SQLparser:
         sql_content=self._normalize_sql(sql_content)
         regex=r'\b(\s*INSERT INTO)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
-        logger.info(f"table name: {tbname}")
+        logger.debug(f"table name: {tbname}")
         if len(tbname) > 0:
             if tbname[0][1] and '`' in tbname[0][1]:   
                 tb=tbname[0][1].replace("`","")

@@ -51,7 +51,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
 * `delete-all-compute-pools`: Delete all compute pools for the given...
-* `clean-completed-failed-statements`: Delete all statements that are failed and...
+* `housekeep-statements`: Delete statements in FAILED or COMPLETED...
 * `validate-config`: Validate the config.yaml file
 * `list-modified-files`: Get the list of files modified in the...
 
@@ -134,18 +134,22 @@ $ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
 
 * `--help`: Show this message and exit.
 
-### `project clean-completed-failed-statements`
+### `project housekeep-statements`
 
-Delete all statements that are failed and completed
+Delete statements in FAILED or COMPLETED state that starts with string &#x27;workspace&#x27; in it ( default ).
+Applies optional starts-with and age filters when provided.
 
 **Usage**:
 
 ```console
-$ project clean-completed-failed-statements [OPTIONS]
+$ project housekeep-statements [OPTIONS]
 ```
 
 **Options**:
 
+* `--starts-with TEXT`: Statements names starting with this string.
+* `--status TEXT`: Statements with this status.
+* `--age INTEGER`: Statements with created_date &gt;= age (days).
 * `--help`: Show this message and exit.
 
 ### `project validate-config`
@@ -371,7 +375,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107857f20&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1058e0590&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -499,6 +503,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
+* `analyze-pool-usage`: Analyze compute pool usage and assess...
 
 ### `pipeline build-metadata`
 
@@ -574,7 +579,6 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 * `--yaml`: Output the report in YAML format
 * `--json`: Output the report in JSON format
-* `--graph`: Output the report in Graphical tree
 * `--children-too / --no-children-too`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-too]
 * `--parent-only / --no-parent-only`: By default the report includes only parents  [default: parent-only]
 * `--output-file-name TEXT`: Output file name to save the report.
@@ -650,7 +654,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -672,7 +676,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -699,4 +703,43 @@ $ pipeline prepare [OPTIONS] SQL_FILE_NAME
 **Options**:
 
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
+* `--help`: Show this message and exit.
+
+### `pipeline analyze-pool-usage`
+
+Analyze compute pool usage and assess statement consolidation opportunities.
+
+This command will:
+- Analyze current usage across compute pools (optionally filtered by product or directory)
+- Identify running statements in each pool
+- Assess opportunities for statement consolidation
+- Generate optimization recommendations using simple heuristics
+
+Examples:
+    # Analyze all pools
+    shift-left pipeline analyze-pool-usage
+    
+    # Analyze for specific product
+    shift-left pipeline analyze-pool-usage --product-name saleops
+    
+    # Analyze for specific directory
+    shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
+    
+    # Combine product and directory filters
+    shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
+
+**Usage**:
+
+```console
+$ pipeline analyze-pool-usage [OPTIONS] [INVENTORY_PATH]
+```
+
+**Arguments**:
+
+* `[INVENTORY_PATH]`: Pipeline path, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES]
+
+**Options**:
+
+* `-p, --product-name TEXT`: Analyze pool usage for a specific product only
+* `-d, --directory TEXT`: Analyze pool usage for pipelines in a specific directory
 * `--help`: Show this message and exit.
