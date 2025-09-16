@@ -718,6 +718,41 @@ class TestDeploymentManager(BaseUT):
         self.assertIn("Full pipeline delete from product test_product", result)
         self.assertIn("Failed to process table1: Connection failed", result)
 
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    def test_deploy_product_using_parallel(self, 
+                                           mock_delete, 
+                                           mock_drop,
+                                           mock_post):
+        def _drop_table(table_name: str, compute_pool_id: str) -> str:
+            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
+            time.sleep(1)
+            return "deleted"
+        
+        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
+            print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
+            time.sleep(1)
+            if "ddl" in statement_name:
+                return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
+            return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
+        
+        def _delete_statement(statement_name: str):
+            print(f"@@@@ delete statement {statement_name}")
+            time.sleep(1)
+            return "deleted"
+
+        mock_delete.side_effect = _delete_statement
+        mock_drop.side_effect = _drop_table
+        mock_post.side_effect = _post_flink_statement
+
+        dm.build_deploy_pipelines_from_product(product_name="qx", 
+                                                           inventory_path=self.inventory_path, 
+                                                           execute_plan=True,
+                                                           force_ancestors=True,
+                                                           sequential=False)
+
        
 if __name__ == '__main__':
     unittest.main()
