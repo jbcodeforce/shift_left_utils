@@ -24,6 +24,7 @@ from shift_left.core.utils.file_search import (
     from_absolute_to_pipeline,
     FlinkTableReference, 
     FlinkTablePipelineDefinition,
+    FlinkStatementComplexity,
     get_ddl_file_name,
     extract_product_name,
     get_table_ref_from_inventory,
@@ -72,6 +73,7 @@ def build_pipeline_definition_from_ddl_dml_content(
     so entry point of the processing.
     
     Args:
+        ddl_file_name: Path to DDL file for root table
         dml_file_name: Path to DML file for root table
         pipeline_path: Root pipeline folder path
         
@@ -81,18 +83,19 @@ def build_pipeline_definition_from_ddl_dml_content(
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
     
-    table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
+    table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
     logger.debug(f"Build pipeline for table: {table_name} from {dml_file_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name=table_name,
                                               table_type=None,
-                                              state_form=state_form,
+                                              complexity=complexity,
                                               table_folder=None,
                                               dml_file_name=from_absolute_to_pipeline(dml_file_name),
                                               ddl_file_name=from_absolute_to_pipeline(ddl_file_name), 
                                               parents=parent_references, 
                                               children=set())
+    node_to_process= deque()
     node_to_process.append(current_node)
-    _update_hierarchy_of_next_node(node_to_process, dict(), table_inventory)
+    _update_hierarchy_of_next_node(node_to_process, {}, table_inventory)
     return current_node
 
 def build_all_pipeline_definitions(pipeline_path: str):
@@ -164,18 +167,10 @@ def delete_all_metada_files(root_folder: str):
     print(f"Total number of files deleted: {count}")
 
 
-
 def init_integration_test_for_pipeline(table_name: str, pipeline_path: str):
-    """
-    For the given table name, navigate its ancestors and create an insert statement for the table without more parent,
-    and for parent with more parents, generate a validation statement.
-    """
-    table_def: FlinkTablePipelineDefinition = get_pipeline_definition_for_table(table_name, pipeline_path)
-    where_to_save_test_files = f"{pipeline_path}/tests/{table_def.product_name}/{table_name}"
-    create_folder_if_not_exist(f"{pipeline_path}/tests")
-    create_folder_if_not_exist(f"{pipeline_path}/tests/{table_def.product_name}")
-    _process_table_for_integration_test(table_def, where_to_save_test_files)
-    print(f"Test files saved in {where_to_save_test_files}")
+    table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
+    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
+    
 
 # ---- Private APIs ---- 
 
@@ -196,8 +191,9 @@ def _build_pipeline_definitions_from_sql_content(
     dml_file_name: str,
     ddl_file_name: str,
     table_inventory: Dict
-) -> Tuple[str, Set[FlinkTablePipelineDefinition], str]:
-    """Extract parent table references and semantic from SQL content.
+) -> Tuple[str, Set[FlinkTablePipelineDefinition], FlinkStatementComplexity]:
+    """Extract parent table references and semantic from SQL content plus some
+    complexity metrics.
     
     Args:
         dml_file_name: Path to SQL file for dml content
@@ -205,7 +201,7 @@ def _build_pipeline_definitions_from_sql_content(
         table_inventory: Dictionary of all available files
         
     Returns:
-        Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition)
+        Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition, complexity of current table)
     """
     try:
         dml_sql_content = ""
@@ -213,6 +209,7 @@ def _build_pipeline_definitions_from_sql_content(
         referenced_table_names = set()
         parser = SQLparser()
         current_table_name = None
+        complexity = FlinkStatementComplexity()
         if dml_file_name:
             if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
                 dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
@@ -220,6 +217,7 @@ def _build_pipeline_definitions_from_sql_content(
                 dml_sql_content = f.read()
             current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
             referenced_table_names = parser.extract_table_references(dml_sql_content)
+            
         if  not current_table_name and ddl_file_name:
             if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
                 ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
@@ -228,6 +226,7 @@ def _build_pipeline_definitions_from_sql_content(
             current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)          
         dependencies = set()
         state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+        complexity = parser.extract_statement_complexity(dml_sql_content,state_form)
         if referenced_table_names:
             if current_table_name in referenced_table_names:
                 referenced_table_names.remove(current_table_name)
@@ -240,6 +239,7 @@ def _build_pipeline_definitions_from_sql_content(
                     continue
                 table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
+                dep_complexity = FlinkStatementComplexity(state_form=state_form)
                 if table_ref.dml_ref and table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
                     table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
                     _dml_sql_content=""
@@ -250,20 +250,22 @@ def _build_pipeline_definitions_from_sql_content(
                     with open(table_ddl_ref, "r") as g:
                         _ddl_sql_content = g.read()
                     dependent_state_form = parser.extract_upgrade_mode(_dml_sql_content, _ddl_sql_content)
+                    dep_complexity = parser.extract_statement_complexity(_dml_sql_content, dependent_state_form)
                 logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
-                dependencies.add(_build_pipeline_definition(
+                bpd = _build_pipeline_definition(
                     table_name, 
                     table_ref.type,
-                    state_form,
+                    dep_complexity,
                     table_ref.table_folder_name,
                     table_ref.dml_ref,
                     table_ref.ddl_ref,
                     set(),
                     set()
-                ))
+                )
+                dependencies.add(bpd)
         else:
             logger.warning(f"No referenced table found in {dml_file_name}")
-        return current_table_name, dependencies, state_form
+        return current_table_name, dependencies, complexity
             
     except Exception as e:
         logger.error(f"Error while processing {dml_file_name} or {ddl_file_name} with message: {e} but process continues...")
@@ -289,7 +291,7 @@ def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, 
 def _build_pipeline_definition(
             table_name: str,
             table_type: str,
-            state_form: str,
+            complexity: FlinkStatementComplexity,
             table_folder: str,
             dml_file_name: str,
             ddl_file_name: str,
@@ -319,7 +321,7 @@ def _build_pipeline_definition(
     f = FlinkTablePipelineDefinition.model_validate({
         "table_name": table_name,
         "product_name": product_name,
-        "state_form": state_form,
+        "complexity": complexity,
         "type": table_type,
         "path": table_folder,
         "ddl_ref": ddl_file_name,
@@ -329,29 +331,31 @@ def _build_pipeline_definition(
         "children": children
     })
     logger.debug(f" FlinkTablePipelineDefinition created: {f}")
+
     return f
 
     
 def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inventory):
     """
     Process the next node from the queue if not already processed.
-    Look at parent of current nodes.
+    Look at parents of current node, and add them to the queue if not already present, add current node to children of its parents.
     """
     if len(nodes_to_process) > 0:
         current_node = nodes_to_process.pop()
-        logger.info(f"{current_node}")
+        logger.info(f"Work on hierarchy for {current_node.table_name}")
         if not current_node.table_name in processed_nodes:
-            if not current_node.parents:
-                table_name, parent_references, state_form = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
-                current_node.parents = parent_references   # set of FlinkTablePipelineDefinition
-                current_node.state_form = state_form
-            tmp_node= current_node.model_copy(deep=True)
+            if not current_node.parents: # the current node may not be fully built yet
+                table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(current_node.dml_ref, current_node.ddl_ref, table_inventory)
+                current_node.parents = parent_references   # parents is a set of FlinkTablePipelineDefinition
+                current_node.complexity = complexity
+            tmp_node= current_node.model_copy(deep=True)  # make a copy with parent and children to avoid huge/recurring pipedef.
             tmp_node.children = set()
             tmp_node.parents = set()
             for parent in current_node.parents:
                 if not  current_node in parent.children: # current is a child of its parents        
                     parent.children.add(tmp_node)
-                _add_node_to_process_if_not_present(parent, nodes_to_process)
+                    _create_or_merge_pipeline_definition(parent)
+                nodes_to_process=_add_node_to_process_if_not_present(parent, nodes_to_process)
             _create_or_merge_pipeline_definition(current_node)
             processed_nodes[current_node.table_name]=current_node
             _update_hierarchy_of_next_node(nodes_to_process, processed_nodes, table_inventory)
@@ -362,6 +366,13 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
     """
     If the pipeline definition exists we may need to merge the parents and children
     """
+    def merge_table_sets(old_set, new_set):
+        """Merge sets, with new items overriding old ones by table_name"""
+        # Convert to dict by table_name for easy merging
+        merged = {item.table_name: item for item in old_set}
+        merged.update({item.table_name: item for item in new_set})
+        return set(merged.values())
+
     pipe_definition_fn = os.path.join(os.getenv("PIPELINES"), "..", current.path, PIPELINE_JSON_FILE_NAME)
     if not os.path.exists(pipe_definition_fn):
         with open(pipe_definition_fn, "w") as f:
@@ -369,15 +380,8 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
     else:
         with open(pipe_definition_fn, "r") as f:
             old_definition = FlinkTablePipelineDefinition.model_validate_json(f.read())
-            combined_children = old_definition.children
-            combined_parents = old_definition.parents
-            for child in current.children:
-                # Remove any existing child with same table_name before adding new one
-                combined_children = {c for c in combined_children if c.table_name != child.table_name}
-                combined_children.add(child)
-            for parent in current.parents:
-                combined_parents = {p for p in combined_parents if p.table_name != parent.table_name}
-                combined_parents.add(parent)
+            combined_children = merge_table_sets(old_definition.children, current.children)
+            combined_parents = merge_table_sets(old_definition.parents, current.parents)
         current.children = combined_children
         current.parents = combined_parents
         with open(pipe_definition_fn, "w") as f:
@@ -389,6 +393,7 @@ def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):
         nodes_to_process.index(current_hierarchy)
     except ValueError:
         nodes_to_process.append(current_hierarchy)
+    return nodes_to_process
 
 
 # ---- Reporting and walking up the hierarchy ----

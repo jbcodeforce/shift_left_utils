@@ -112,6 +112,20 @@ class StatementListCache(BaseModel):
     statement_list: Optional[dict[str, StatementInfo]] = Field(default={})
 
 
+class FlinkStatementComplexity(BaseModel):
+    """
+    Keep metrics of the DML statement, derive a complexity of a Flink Statement.
+    
+    """
+    number_of_regular_joins: int = Field(default=0, description="Number of regular joins in the statement")
+    number_of_left_joins: int = Field(default=0, description="Number of left joins in the statement")
+    number_of_right_joins: int = Field(default=0, description="Number of right joins in the statement")
+    number_of_inner_joins: int = Field(default=0, description="Number of inner joins in the statement")
+    number_of_outer_joins: int = Field(default=0, description="Number of outer joins in the statement")
+    complexity_type: str = Field(default="Simple", description="Type of complexity")
+    state_form: Optional[str] =  Field(default="Stateless", description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    
+    
 class FlinkStatementNode(BaseModel):
     """
     To build an execution plan we need one node for each popential Flink Statement to run.
@@ -149,7 +163,7 @@ class FlinkStatementNode(BaseModel):
 
     def is_running(self) -> bool:
         if self.existing_statement_info and self.existing_statement_info.status_phase:
-            return (self.existing_statement_info.status_phase == "RUNNING" or self.existing_statement_info.status_phase == "COMPLETED")
+            return (self.existing_statement_info.status_phase in ["RUNNING", "PENDING", "COMPLETED"])
         else:
             return False
     

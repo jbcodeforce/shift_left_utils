@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- int_p1_table_1
 TABLE_NAME=int_p1_table_1
-SCRIPT_PRE_KEBAB=stage-p1
+SCRIPT_PRE_KEBAB=stage-usw2-p1
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_int_p1_table_1
+delete_data: delete_schemas

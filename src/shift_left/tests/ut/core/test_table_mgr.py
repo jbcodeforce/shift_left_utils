@@ -6,6 +6,8 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
@@ -17,10 +19,8 @@ class TestTableManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
         tm.build_inventory(os.getenv("PIPELINES"))
         
     def test_extract_table_name(self):

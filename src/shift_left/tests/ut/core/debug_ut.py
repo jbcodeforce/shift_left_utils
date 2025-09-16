@@ -7,9 +7,8 @@ import time
 
 #os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 #os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"]= "/Users/jerome/.shift_left/config-dev.yaml"
-os.environ["PIPELINES"]= "/Users/jerome/Code/customers/mc/data-platform-flink/pipelines"
-        
+os.environ["CONFIG_FILE"]= os.getenv("HOME") + ".shift_left/config-dev.yaml"
+
 from shift_left.core.utils.app_config import get_config, shift_left_dir, logger
 from shift_left.core.models.flink_statement_model import ( 
     Statement, 

@@ -31,19 +31,38 @@ class TestExecutionPlan(BaseUT):
     src_y ---> y -->  d -> f
                  \   /
     src_x ---> x - z -> p
-          \          \
-    src_a -> a        \
+          \          \ 
+    src_a -> a        \ 
     src_b -> b ------>  c -> e
+    Added more nodes to test cross product.
     """
     
     TEST_COMPUTE_POOL_ID_1 = "lfcp-121"
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        """Set up test environment before running tests."""
-        pm.delete_all_metada_files(os.getenv("PIPELINES"))
-        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
-        cls.inventory_path = os.getenv("PIPELINES")
+    def setUp(self) -> None:
+        """Set up test environment before each individual test."""
+        # Get the current PIPELINES path (which may be set by conftest.py fixture)
+        self.inventory_path = os.getenv("PIPELINES")
+        
+        # Manually reset only the caches we need without affecting file operations
+        try:
+            import shift_left.core.statement_mgr as statement_mgr
+            statement_mgr._statement_list_cache = None
+            statement_mgr._runner_class = None
+        except (ImportError, AttributeError):
+            pass
+        
+        try:
+            import shift_left.core.compute_pool_mgr as compute_pool_mgr
+            compute_pool_mgr._compute_pool_list = None
+            compute_pool_mgr._compute_pool_name_modifier = None
+        except (ImportError, AttributeError):
+            pass
+        
+        # Always ensure fresh pipeline definitions to prevent cross-test contamination
+        # Other test classes may have deleted these files, so we must rebuild them
+        pm.delete_all_metada_files(self.inventory_path)
+        pm.build_all_pipeline_definitions(self.inventory_path)
 
     
     # ------------ TESTS ------------
@@ -106,8 +125,8 @@ class TestExecutionPlan(BaseUT):
         src_y ---> y -->  d -> f
                  \   /
         src_x ---> x - z -> p -> c -> e -> f
-              \          \
-        src_a -> a        \
+              \          \ 
+        src_a -> a        \ 
         src_b -> b ------>  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_direct_parent_not_running should start nodes d and f")
@@ -161,8 +180,8 @@ class TestExecutionPlan(BaseUT):
             src_y ---> y -->  d -> f
                         \   /
             src_x ---> x - z -> p
-                   \        \
-            src_a -> a       \
+                   \        \ 
+            src_a -> a       \ 
             src_b -> b ---->  c -> e
         """
         print("\n--> test_build_execution_plan_for_leaf_table_f_while_some_ancestors_not_running should start nodes src_y, y, z, d, c, p, e and f")
@@ -533,19 +552,19 @@ class TestExecutionPlan(BaseUT):
     # validate only needed sources or intermediates are restarted
     # enforced-ancestors T/F and may-start-descendants T/F
 
-    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
-    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
-    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
-    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_retention_size')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
     def test_deploy_pipeline_for_non_running_sources_with_dir(self, 
-                                        mock_get_status,
-                                        mock_get_compute_pool_list,
-                                        mock_assign_compute_pool_id,
-                                        mock_get_retention_size,
+                                        mock_get_num_records_out,
                                         mock_get_pending_records,
-                                        mock_get_num_records_out) -> None:
+                                        mock_get_retention_size,
+                                        mock_assign_compute_pool_id,
+                                        mock_get_compute_pool_list,
+                                        mock_get_status) -> None:
         """
         Test deploying pipeline from a directory, like all sources,
          taking into account the running statements.
@@ -564,6 +583,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
+        
         summary, report = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
@@ -708,7 +728,6 @@ class TestExecutionPlan(BaseUT):
                                 "dev-usw2-p2-dml-b"]:  
                 return self._create_mock_get_statement_info(name=statement_name,status_phase="RUNNING")
             else:
-                
                 return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN") 
         
         mock_get_status.side_effect = mock_statement
@@ -723,7 +742,8 @@ class TestExecutionPlan(BaseUT):
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             execute_plan=False,
             may_start_descendants=True,
-            force_ancestors=False
+            force_ancestors=False,
+            pool_creation=False
         )
         print(f"{summary}\n")
         assert len(report.tables) == 13

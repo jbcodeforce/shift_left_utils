@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import os
 import pathlib
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.file_search import (
     get_or_build_source_file_inventory, 
     build_inventory,
@@ -26,11 +27,11 @@ from shift_left.core.utils.file_search import (
     list_src_sql_files,
     derive_table_type_product_name_from_path,
     get_ddl_dml_names_from_pipe_def,
-    _apply_naming_convention,
+    _apply_statement_naming_convention,
     _get_statement_name_modifier,
     DmlNameModifier
 )
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+
 from shift_left.core.utils.app_config import get_config, logger
 
 import json
@@ -77,7 +78,7 @@ class TestFileSearch(unittest.TestCase):
                                                ddl_ref="src/src_table/sql_scripts/ddl.src_p1_table.sql")
         assert pipe_def
         assert pipe_def.path == "src/src_table"
-        assert pipe_def.state_form == "Stateful"
+        assert pipe_def.complexity.state_form == "Stateless"
         node = pipe_def.to_node()
         assert node.dml_statement_name == "dev-usw2-p1-dml-src-table"
         assert node.ddl_statement_name == "dev-usw2-p1-ddl-src-table"
@@ -261,7 +262,7 @@ class TestFileSearch(unittest.TestCase):
         )
         
         # Apply naming convention
-        modified_node = _apply_naming_convention(node)
+        modified_node = _apply_statement_naming_convention(node)
         
         # Verify naming convention was applied
         self.assertNotEqual(modified_node.dml_statement_name, "dml-test-table")

@@ -122,7 +122,49 @@ The list of impacted table can be specified in a text file and specified as para
 shift_left pipeline deploy --table-list-file-name statement_list.txt --may-start-descendants
 ```
 
-### Source schema evolution 
+## Different deployment scenarios
+
+To demonstrate blue/green deployment we will take the [flink_project_demos git repo](https://github.com/jbcodeforce/flink_project_demos) as a source of a real-time processing using a Kimball structure.
+
+???- info "Access to the the flink demos repository"
+    Clone the [https://github.com/jbcodeforce/flink_project_demos](https://github.com/jbcodeforce/flink_project_demos).
+    Set environment variables like:
+    ```sh
+    export FLINK_PROJECT=$HOME/Code/flink_project_demos/flink_data_products/
+    export PIPELINES=$FLINK_PROJECT/pipelines
+    ```
+
+
+### Deploying a Fact or Dimension
+
+The Fact or Dimension table deployment, means deploying an isolated sub-tree of a full pipeline, but with very limited set of children: mainly views or other facts. The scenario will be the same for new table deployment or update existing deployment. 
+
+In the figure below, the new or to update fact is `fact_1`, with two dimensions as parents and one view as children. 
+
+<figure markdown="span">
+![](./images/bg_fact_pipeline.drawio.png)
+</figure>
+
+The white flink statements are running, they could be part of the same product or not (common tables). The running ancestors to the `fact_1`
+
+The commands to start the Flink ancestors that are not already running and the descendants look like:
+
+```sh
+# 1- always look at the execution plan
+shift_left pipeline build-execution-plan --table-name fact_1 --may-start-descendants
+# 2- deploy
+shift_left pipeline deploy --table-name fact_1 --may-start-descendants
+```
+
+Recall that may-start-descendant will start statement within the same product. 
+
+### Deploy a data product
+
+As a data product, we mean, one to many Flink statements, integrated in a pipeline to serve a business/analytic data product. 
+
+There are already existing 
+
+## Source schema evolution 
 
 In this example, we consider source schema evolution occurs when the transactional data source changes. In this case, it is assumed the modifications are schema compatible with Full Transitive semantic. 
 

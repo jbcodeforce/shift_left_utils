@@ -113,7 +113,7 @@ class TestStatementManager(BaseUT):
         # Setup mock client: 1/ instance of the client, 2/ mock the make_request and build_flink_url_and_auth_header methods
         mock_client_instance = MockConfluentCloudClient.return_value
         mock_client_instance.make_request.return_value = mock_response
-        mock_client_instance.build_flink_url_and_auth_header.return_value = "https://test-url"
+        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
 
         # Call the function
         result = statement_mgr.get_statement_list()
@@ -173,7 +173,7 @@ class TestStatementManager(BaseUT):
         
         # Configure mock
         mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = "http://test-url"
+        mock_client.build_flink_url_and_auth_header.return_value = ("http://test-url", "test-auth-header")
         
         # Mock successful response
         mock_response = {
@@ -323,6 +323,20 @@ class TestStatementManager(BaseUT):
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_client_instance = MockConfluentCloudClient.return_value
         
+        # Mock the client methods that will be called by post_flink_statement
+        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        mock_client_instance.make_request.return_value = {
+            "name": "drop-fct-order",
+            "status": {"phase": "COMPLETED"},
+            "spec": {
+                "statement": f"drop table if exists {table_name};",
+                "compute_pool_id": "test-pool",
+                "properties": {"sql.current-catalog": "default", "sql.current-database": "default"},
+                "stopped": False,
+                "principal": "test-principal"
+            }
+        }
+        
         result = statement_mgr.drop_table(table_name=table_name)
         
         self.assertEqual(result, "fct_order dropped")
@@ -407,5 +421,137 @@ class TestStatementManager(BaseUT):
         assert "'key.avro-registry.schema-context' = '.flink-stage'," in statement.spec.statement
         mock_post_flink_statement.assert_called_once()
 
+    @patch('shift_left.core.statement_mgr.os.path.exists')
+    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
+    def test_cache_none_no_file_exists(self, MockConfluentCloudClient, mock_exists):
+        """Test cache is None and no cache file exists - should reload from API"""
+        # Setup
+        mock_exists.return_value = False
+        mock_client = MockConfluentCloudClient.return_value
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        mock_client.make_request.return_value = {
+            "data": [],
+            "metadata": {"next": None}
+        }
+        
+        # Call function
+        result = statement_mgr.get_statement_list()
+        
+        # Verify API was called
+        MockConfluentCloudClient.assert_called_once()
+        mock_client.make_request.assert_called_once()
+    
+    @patch('shift_left.core.statement_mgr.datetime')
+    @patch('shift_left.core.statement_mgr.os.path.exists')
+    @patch('builtins.open')
+    def test_cache_none_file_exists_valid(self, mock_open_file, mock_exists, mock_datetime):
+        """Test cache is None, file exists with valid cache within TTL"""
+        # Setup - cache file exists and is valid
+        mock_exists.return_value = True
+        current_time = datetime(2024, 1, 1, 12, 0, 0)
+        cache_time = datetime(2024, 1, 1, 11, 0, 0)  # 1 hour ago
+        mock_datetime.now.return_value = current_time
+        mock_datetime.strptime.return_value = cache_time
+        
+        cache_data = {
+            "created_at": "2024-01-01 11:00:00",
+            "statement_list": {}
+        }
+        mock_open_file.return_value.__enter__.return_value.read.return_value = json.dumps(cache_data)
+        # Mock config with TTL > 1 hour
+        with patch('shift_left.core.statement_mgr.get_config') as mock_config:
+            mock_config.return_value = {'app': {'cache_ttl': 7200}}  # 2 hours
+            result = statement_mgr.get_statement_list()    
+            # Should load from cache, not make API call
+            mock_open_file.assert_called_once()
+
+    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
+    @patch('shift_left.core.statement_mgr.datetime')
+    @patch('shift_left.core.statement_mgr.os.path.exists')
+    @patch('builtins.open')
+    def test_cache_file_exists_but_ttl_is_expired(self, 
+                mock_open_file, mock_exists, mock_datetime,
+                MockConfluentCloudClient):
+        """Test cache is None, file exists with cache above TTL - should reload from API"""
+        # Setup - cache file exists and is valid
+        mock_exists.return_value = True
+        current_time = datetime(2024, 1, 1, 12, 0, 0)
+        cache_time = datetime(2024, 1, 1, 11, 0, 0)  # 1 hour ago
+        mock_datetime.now.return_value = current_time
+        mock_datetime.strptime.return_value = cache_time
+        
+        cache_data = {
+            "created_at": "2024-01-01 11:00:00",
+            "statement_list": {}
+        }
+        mock_open_file.return_value.__enter__.return_value.read.return_value = json.dumps(cache_data)
+        mock_client = MockConfluentCloudClient.return_value
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        
+        # Setup pagination responses
+        responses = [
+            {
+                "data": [{"name": "stmt1", "spec": {}, "status": {}, "metadata": {
+                     "created_at": "2025-04-20T10:15:02.853006"
+                }}],
+                "metadata": {"next": "page2-token"}
+            },
+            {
+                "data": [{"name": "stmt2", "spec": {}, "status": {}, "metadata": {
+                     "created_at": "2025-04-20T10:15:02.853006"
+                }}],
+                "metadata": {"next": None}
+            }
+        ]
+        mock_client.make_request.side_effect = responses
+        with patch('shift_left.core.statement_mgr.get_config') as mock_config:
+            mock_config.return_value = {
+                'confluent_cloud': {'page_size': 100},
+                'app': {'cache_ttl': 60}
+            }  # 1 minute
+            result = statement_mgr.get_statement_list()
+            
+            # Should load from cache, not make API call
+            self.assertEqual(mock_open_file.call_count, 2)
+            self.assertEqual(mock_client.make_request.call_count, 2)
+            self.assertEqual(len(result), 2)
+
+    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
+    def test_api_pagination_multiple_pages(self, MockConfluentCloudClient):
+        """Test API pagination with multiple pages of results"""
+        mock_client = MockConfluentCloudClient.return_value
+        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        
+        # Setup pagination responses
+        responses = [
+            {
+                "data": [{"name": "stmt1", 
+                    "spec": {"statement": "CREATE TABLE test_table_1"}, 
+                    "status": {"phase": "RUNNING"}, 
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
+                    }
+                    }],
+                "metadata": {"next": "page2-token"}
+            },
+            {
+                "data": [{"name": "stmt2", 
+                    "spec": {"statement": "CREATE TABLE test_table_2"}, 
+                    "status": {"phase": "RUNNING"}, 
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
+                    }
+                }],
+                "metadata": {"next": None}
+            }
+        ]
+        mock_client.make_request.side_effect = responses
+        
+        result = statement_mgr.get_statement_list()
+        
+        # Should make 2 API calls for pagination
+        self.assertEqual(mock_client.make_request.call_count, 2)
+        self.assertEqual(len(result), 2)
+    
 if __name__ == '__main__':
     unittest.main()

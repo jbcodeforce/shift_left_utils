@@ -12,6 +12,12 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 **Test Harness**: Develop unit test SQL template with synthetic data to unit test a Flink SQL statement. 
 
+## Project status
+
+* This project is still under tuning and development.
+* It is used for different engagements extensively.
+* Stress test cammpaigns for parallel deployment and result accuracy were performed on Data Pipeline reposityory with 400+ sql statements
+
 ## Development Branches
 
 - **`main`**: Stable production-ready releases

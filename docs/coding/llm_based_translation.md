@@ -45,12 +45,9 @@ LLMs won't magically translate custom UDFs. This will likely require manual inte
 
 Flink excels at stateful stream processing. Spark SQL's batch orientation means translating stateful Spark operations (if they exist) to their Flink streaming counterparts would be highly complex and likely require significant human oversight or custom rules.
 
-
-
-
 ### Spark SQL to Flink SQL
 
-While Spark SQL is primarily designed for batch processing, even if it also supports streaming via micro-batching. Most basic SQL syntax (SELECT, FROM, WHERE, JOIN) is similar between Spark and Flink.
+While Spark SQL is primarily designed for batch processing, it can be migrated to Flink real-time processing with some refactoring and tuning. Spark also supports streaming via micro-batching. Most basic SQL syntax (SELECT, FROM, WHERE, JOIN) are similar between Spark and Flink.
 
 
 * Example of command to migrate one Spark SQL scripts
@@ -58,7 +55,7 @@ While Spark SQL is primarily designed for batch processing, even if it also supp
   shift_left table migrate customer_journey $SRC_FOLDER/src_customer_journey.sql $STAGING --source-type spark
   ```
 
-* It is possible to process the table and the fact table up to the sources, the tool will migrate recursively all the tables. This could take time if the dependencies graph is big.
+* It is possible to process the fact tables up to the sources, the tool will migrate recursively all the tables. This could take time if the dependencies graph is big.
   ```sql
   shift_left table migrate $SRC_FOLDER/facts/fct_examination_data.sql $STAGING --recursive --source-type spark
   ```
@@ -361,6 +358,6 @@ Flink statements have dependencies, so it is important to use shift_left to mana
   
   ```
 
-* Add unit tests per table (at least for the complex DML ones) ([see test harness](../test_harness.md))
+* Add unit tests per table (at least for the complex DML ones) ([see test harness](./test_harness.md))
 * Add source data into the first tables of the pipeline 
 * Verify the created records within the sink tables.

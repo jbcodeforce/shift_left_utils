@@ -11,7 +11,7 @@ from functools import lru_cache
 from pydantic import BaseModel, Field
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.app_config import logger, get_config
-from shift_left.core.models.flink_statement_model import FlinkStatementNode
+from shift_left.core.models.flink_statement_model import FlinkStatementNode, FlinkStatementComplexity
 from shift_left.core.utils.naming_convention import DmlNameModifier
 """
 Provides a set of function to search files from a given folder path for source project or Flink project.
@@ -43,6 +43,8 @@ class FlinkTableReference(InfoNode):
             return NotImplemented
         return self.table_name == other.table_name
 
+
+
 class FlinkTablePipelineDefinition(InfoNode):
     """Metadata definition for a Flink Statement to manage the pipeline hierarchy.
     
@@ -50,7 +52,7 @@ class FlinkTablePipelineDefinition(InfoNode):
     For sink tables, children will be empty.
     """
     path: str = Field(default="", description="path to the table")
-    state_form: Optional[str] =  Field(default="Stateful", description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    complexity: Optional[FlinkStatementComplexity] = Field(default=FlinkStatementComplexity(), description="Complexity of the statement")
     parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
     children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
 
@@ -73,9 +75,9 @@ class FlinkTablePipelineDefinition(InfoNode):
                                type=self.type,
                                ddl_statement_name=ddl_statement_name,
                                ddl_ref=self.ddl_ref,
-                               upgrade_mode=self.state_form
+                               upgrade_mode=self.complexity.state_form
                                )
-        _apply_naming_convention(r)
+        _apply_statement_naming_convention(r)
         
         for p in self.parents:
             node_p:FlinkStatementNode = p.to_node()
@@ -129,7 +131,7 @@ def get_or_build_inventory(
         for dir in dirs:
             if SCRIPTS_DIR == dir:
                 ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
-                logger.info(f"Processing file {dml_file_name}")
+                logger.debug(f"Processing file {dml_file_name}")
                 count+=1
                 if not dml_file_name and not ddl_file_name:
                     continue
@@ -169,7 +171,6 @@ def get_or_build_inventory(
                     "table_folder_name": table_folder,
                     "state_form": upgrade_mode
                 })
-                logger.info(ref)
                 if ref.table_name in inventory:
                     logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                 inventory[ref.table_name] = ref.model_dump()
@@ -295,7 +296,7 @@ def read_pipeline_definition_from_file(relative_path_file_name: str) -> FlinkTab
             return content
     except Exception as e:
         logger.error(f"processing {file_name} got {e}, ... try to continue")
-        #return FlinkStatementExecutionPlan()
+        print(f"processing {file_name} got {e}, ... try to continue")
         return None
 
 def update_pipeline_definition_file(relative_path_file_name: str, data: FlinkTablePipelineDefinition):
@@ -344,7 +345,7 @@ def get_ddl_dml_names_from_pipe_def(to_process: FlinkTablePipelineDefinition) ->
     ddl_n, dml_n = get_ddl_dml_names_from_table(to_process.table_name)
     node.ddl_statement_name = ddl_n
     node.dml_statement_name = dml_n
-    _apply_naming_convention(node)
+    _apply_statement_naming_convention(node)
     return (node.ddl_statement_name, node.dml_statement_name)
 
 def get_ddl_file_name(folder_path: str) -> str:
@@ -395,7 +396,7 @@ def list_src_sql_files(folder_path: str) -> Dict[str, str]:
     return sql_files
 
 
-def _apply_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
+def _apply_statement_naming_convention(node: FlinkStatementNode) -> FlinkStatementNode:
     cluster_type = get_config().get('kafka').get('cluster_type')
     cloud_region = get_config().get('confluent_cloud').get('region')
     abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')

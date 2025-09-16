@@ -22,8 +22,7 @@ from shift_left.core.test_mgr import (
     SLTestDefinition,
     SLTestCase,
     SLTestData,
-    Foundation,
-    TestResult
+    Foundation
 )
 from shift_left.core.utils.file_search import FlinkTableReference
 
@@ -288,7 +287,7 @@ class TestTestManager(unittest.TestCase):
                               mock_get_statement_info, 
                               mock_table_exists,
                               mock_get_statement):
-        """Test execution of foundations for the fact table that uses 2 input tables."""
+        """Test execution of sql unit test foundations for the fact table that uses 2 input tables."""
         def _mock_statement_info(statement_name):
             print(f"mock_statement_info: {statement_name}")
             if statement_name.startswith("dev-p1-ddl-int-table-1"):
@@ -320,6 +319,7 @@ class TestTestManager(unittest.TestCase):
         assert "dev-ddl-int-table-1-ut" in statements[0].name
         assert "dev-ddl-int-table-2-ut" in statements[1].name
 
+    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
@@ -330,7 +330,8 @@ class TestTestManager(unittest.TestCase):
                                 mock_get_statement_info, 
                                 mock_get_statement_results,
                                 mock_table_exists,
-                                mock_get_statement):
+                                mock_get_statement,
+                                mock_delete_statement):
         
         """Test the execution of one test case for p1_fct_order"""
         def _mock_statement_info(statement_name):
@@ -365,12 +366,16 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
+        mock_delete_statement.return_value = None  # Mock delete operation
 
         table_name = "p1_fct_order"
-        test_result = test_mgr.execute_one_test(table_name, "test_case_1")
+        test_suite_result = test_mgr.execute_one_or_all_tests(table_name, "test_case_1", run_validation=True)
+        assert test_suite_result
+        assert len(test_suite_result.test_results) == 1
+        test_result = test_suite_result.test_results["test_case_1"]
         assert test_result
         self.assertEqual(len(test_result.statements), 3)
-        self.assertEqual(len(test_result.foundation_statements), 4)
+        self.assertEqual(len(test_suite_result.foundation_statements), 4)
         assert test_result.result == "PASS"
         for statement in test_result.statements:
             print(f"statement: {statement.name} {statement.status}")
@@ -434,6 +439,7 @@ class TestTestManager(unittest.TestCase):
         print(f"statement: {statements[0]}")
 
 
+    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
@@ -444,7 +450,8 @@ class TestTestManager(unittest.TestCase):
                         mock_get_statement_info, 
                         mock_get_statement_results,
                         mock_table_exists,
-                        mock_get_statement):
+                        mock_get_statement,
+                        mock_delete_statement):
         
         """Test the execution of one test case."""
         def _mock_statement_info(statement_name):
@@ -478,9 +485,10 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
+        mock_delete_statement.return_value = None  # Mock delete operation
 
         table_name = "p1_fct_order"
-        suite_result = test_mgr.execute_all_tests(table_name)
+        suite_result = test_mgr.execute_one_or_all_tests(table_name, run_validation=True)
         assert suite_result
         assert len(suite_result.test_results) == 2
         assert len(suite_result.foundation_statements) == 4
@@ -638,8 +646,8 @@ class TestTestManager(unittest.TestCase):
         self.assertIn("'name_1'", rows)  # VARCHAR columns should have quoted values
         self.assertIn("'description_2'", rows)
         
-        # Should have 5 rows
-        self.assertEqual(rows.count("),"), 4)  # 4 commas between 5 rows
+        # Should have DEFAULT_TEST_DATA_ROWS rows
+        self.assertEqual(rows.count("),"), test_mgr.DEFAULT_TEST_DATA_ROWS - 1)  # 4 commas between 5 rows
 
     def test_build_data_sample_with_offset(self):
         """Test building data samples with index offset."""
@@ -649,7 +657,7 @@ class TestTestManager(unittest.TestCase):
         
         # Should start from index 11 (10 + 1)
         self.assertIn("'name_11'", rows)
-        self.assertIn("'name_15'", rows)  # Last row should be 15 (10 + 5)
+        self.assertIn("'name_1" + str(test_mgr.DEFAULT_TEST_DATA_ROWS) +"'", rows)  # Last row should be 15 (10 + DEFAULT_TEST_DATA_ROWS)
 
     @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.os.remove')
@@ -685,10 +693,14 @@ class TestTestManager(unittest.TestCase):
             result = test_mgr._table_exists("nonexistent_table")
             self.assertFalse(result)
 
+    @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.ConfluentCloudClient')
     @patch('shift_left.core.test_mgr.os.path.exists')
-    def test_table_exists_cache_miss(self, mock_exists, mock_ccloud_client):
+    def test_table_exists_cache_miss(self, mock_exists, mock_ccloud_client, mock_get_config):
         """Test _table_exists function with cache miss - fetch from API."""
+        # Mock get_config to return a valid config
+        mock_get_config.return_value = {"confluent_cloud": {"api_key": "test", "api_secret": "test"}}
+        
         # Mock file doesn't exist, so cache miss
         mock_exists.return_value = False
         
@@ -714,10 +726,15 @@ class TestTestManager(unittest.TestCase):
             # Verify that the cache file was written
             mock_file.assert_called()
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_success_first_try(self, mock_get_results):
+    def test_poll_response_success_first_try(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when results are available on first try."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
+        
+        # Mock get_statement to return a successful statement
+        mock_statement = Statement(name="test_statement", status={"phase": "COMPLETED"})
+        mock_get_statement.return_value = mock_statement
         
         # Mock successful response on first call
         op_row = OpRow(op=0, row=["PASS"])
@@ -731,11 +748,16 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(statement_result, result)
         mock_get_results.assert_called_once_with("test_statement")
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.time.sleep')
-    def test_poll_response_retry_logic(self, mock_sleep, mock_get_results):
+    def test_poll_response_retry_logic(self, mock_sleep, mock_get_results, mock_get_statement):
         """Test _poll_response function retry logic with empty results."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
+        
+        # Mock get_statement to return a successful statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
         
         # First few calls return empty results, last call returns data
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
@@ -752,9 +774,16 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(mock_get_results.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)  # Sleep called for first 2 empty results
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_max_retries_exceeded(self, mock_get_results):
+    def test_poll_response_max_retries_exceeded(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when max retries are exceeded."""
+        from shift_left.core.models.flink_statement_model import StatementResult, Data, Statement
+        
+        # Mock get_statement to return a running statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
+        
         # Always return empty results
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
         mock_get_results.return_value = empty_result
@@ -763,12 +792,19 @@ class TestTestManager(unittest.TestCase):
             final_result, statement_result = test_mgr._poll_response("test_statement")
         
         self.assertEqual(final_result, "FAIL")  # Default when no data
-        # Should call get_results for max_retries - 1 times
+        # Should call get_results for max_retries - 1 times (range(1, 7) = 1,2,3,4,5,6)
         self.assertEqual(mock_get_results.call_count, 6)  # max_retries - 1
 
+    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_exception_handling(self, mock_get_results):
+    def test_poll_response_exception_handling(self, mock_get_results, mock_get_statement):
         """Test _poll_response function exception handling."""
+        from shift_left.core.models.flink_statement_model import Statement
+        
+        # Mock get_statement to return a running statement
+        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
+        mock_get_statement.return_value = mock_statement
+        
         # Mock exception on first call
         mock_get_results.side_effect = Exception("API Error")
         
@@ -825,23 +861,23 @@ class TestTestManager(unittest.TestCase):
         self.assertEqual(result, existing_statement)
         self.assertFalse(is_new)  # Should not be new since it already exists
 
-    def test_execute_one_test_error_handling(self):
-        """Test execute_one_test function error handling."""
+    def test_execute_one_or_all_tests_error_handling(self):
+        """Test execute_one_or_all_tests function error handling."""
         with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
             mock_init.side_effect = Exception("Foundation error")
             
             with self.assertRaises(Exception) as context:
-                test_mgr.execute_one_test("nonexistent_table", "test_case")
+                test_mgr.execute_one_or_all_tests("nonexistent_table", "test_case")
             
             self.assertIn("Foundation error", str(context.exception))
 
-    def test_execute_all_tests_error_handling(self):
-        """Test execute_all_tests function error handling."""
+    def test_execute_one_or_all_tests_error_handling(self):
+        """Test execute_one_or_all_tests function error handling."""
         with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
             mock_init.side_effect = Exception("Foundation error")
             
             with self.assertRaises(Exception) as context:
-                test_mgr.execute_all_tests("nonexistent_table")
+                test_mgr.execute_one_or_all_tests("nonexistent_table")
             
             self.assertIn("Foundation error", str(context.exception))
 
@@ -853,16 +889,22 @@ class TestTestManager(unittest.TestCase):
         temp_sql_file = "/tmp/test_sql.sql"
         mock_from_pipeline.return_value = temp_sql_file
         
+        def _transform_sql_content(sql_content, table_name):
+            return sql_content
+
+        def _transform_sql_content_upper(sql_content, table_name):
+            return sql_content.upper()
+        
         with open(temp_sql_file, "w") as f:
             f.write(temp_sql_content)
         
         try:
             # Test with identity function
-            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", lambda x: x)
+            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", _transform_sql_content, "test_table")
             self.assertEqual(result, temp_sql_content)
             
             # Test with transformation function
-            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", lambda x: x.upper())
+            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", _transform_sql_content_upper, "test_table")
             self.assertEqual(result, temp_sql_content.upper())
         finally:
             if os.path.exists(temp_sql_file):
@@ -885,8 +927,8 @@ class TestTestManager(unittest.TestCase):
             prefix="dev-ddl"
         )
         
-        # Should return None when table exists and prefix is ddl
-        self.assertIsNone(result)
+        # Should return [] when table exists and prefix is ddl
+        self.assertEqual(result, [])
         mock_execute.assert_not_called()
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
@@ -915,8 +957,8 @@ class TestTestManager(unittest.TestCase):
             prefix="dev-dml"
         )
         
-        # Should return None when DML statement is running
-        self.assertIsNone(result)
+        # Should return [] when DML statement is running
+        self.assertEqual(result, [])
         mock_execute.assert_not_called()
 
     @patch('shift_left.core.test_mgr.from_pipeline_to_absolute')
@@ -1051,12 +1093,16 @@ class TestTestManager(unittest.TestCase):
             if os.path.exists(temp_dml_file):
                 os.remove(temp_dml_file)
 
+    @patch('shift_left.core.test_mgr.get_config')
     @patch('shift_left.core.test_mgr.os.remove')
     @patch('shift_left.core.test_mgr.datetime')
-    def test_table_exists_cache_error_handling(self, mock_datetime, mock_remove):
+    def test_table_exists_cache_error_handling(self, mock_datetime, mock_remove, mock_get_config):
         """Test _table_exists cache error handling when loading corrupted cache."""
         import json
         from datetime import datetime
+        
+        # Mock get_config to return a valid config
+        mock_get_config.return_value = {"confluent_cloud": {"api_key": "test", "api_secret": "test"}}
         
         # Mock datetime
         mock_datetime.now.return_value = datetime(2024, 1, 1, 12, 0, 0)
@@ -1087,24 +1133,6 @@ class TestTestManager(unittest.TestCase):
         if os.path.exists(corrupted_cache):
             os.remove(corrupted_cache)
 
-    @patch('shift_left.core.test_mgr._execute_test_inputs')
-    @patch('shift_left.core.test_mgr._execute_test_validation')
-    def test_execute_one_test_case_not_found(self, mock_validation, mock_inputs):
-        """Test execute_one_test when specified test case is not found."""
-        # Mock init foundations to return test suite without the requested case
-        with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
-            test_case = SLTestCase(name="different_test", inputs=[], outputs=[])
-            test_suite_def = SLTestDefinition(foundations=[], test_suite=[test_case])
-            table_ref = FlinkTableReference(table_name="test", dml_ref="", table_folder_name="")
-            test_result = TestResult(test_case_name="nonexistent_test", result="")
-            
-            mock_init.return_value = (test_suite_def, table_ref, "dev", test_result)
-            
-            result = test_mgr.execute_one_test("test_table", "nonexistent_test")
-            
-            # Should return test result but without executing validation
-            self.assertEqual(result.test_case_name, "nonexistent_test")
-            mock_validation.assert_not_called()
 
     @patch('shift_left.core.test_mgr.SQLparser')
     def test_replace_table_name_substring_issue_fix(self, mock_parser_class):
@@ -1142,9 +1170,9 @@ class TestTestManager(unittest.TestCase):
         
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             # Mock the file loading to return our test SQL
-            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 # Apply the function transformation to our test SQL
-                return fct(sql_input)
+                return fct(sql_input, table_name)
             
             mock_load_sql.side_effect = mock_sql_loader
             
@@ -1162,9 +1190,9 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_with_substring_issue)
+                transformed_sql = fct(sql_with_substring_issue, table_name)
                 return None
             
             mock_load_sql.side_effect = capture_transformed_sql
@@ -1194,9 +1222,9 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_multiple_overlaps)
+                transformed_sql = fct(sql_multiple_overlaps, table_name)
                 return None
             
             mock_load_sql.side_effect = capture_transformed_sql
@@ -1220,9 +1248,9 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_case_insensitive)
+                transformed_sql = fct(sql_case_insensitive, table_name)
                 return None
             
             mock_load_sql.side_effect = capture_transformed_sql
@@ -1241,9 +1269,9 @@ class TestTestManager(unittest.TestCase):
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
             
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_no_tables)
+                transformed_sql = fct(sql_no_tables, table_name)
                 return None
             
             mock_load_sql.side_effect = capture_transformed_sql

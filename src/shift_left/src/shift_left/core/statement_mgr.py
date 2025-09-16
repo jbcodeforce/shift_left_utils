@@ -6,10 +6,12 @@ from typing import List, Optional
 import os
 import time
 import json
+import threading
+import shutil
 from datetime import datetime
 from importlib import import_module
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
-from shift_left.core.utils.app_config import get_config, logger, session_log_dir
+from shift_left.core.utils.app_config import get_config, logger, session_log_dir, shift_left_dir
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
     get_or_build_inventory,
@@ -84,10 +86,9 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
 
 def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
-    properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
     client = ConfluentCloudClient(config)
-    url = client.build_flink_url_and_auth_header()
-    response = client.make_request("GET", url + "/statements/" + statement_name)
+    url, auth_header = client.build_flink_url_and_auth_header()
+    response = client.make_request(method="GET", url=url + "/statements/" + statement_name, auth_header=auth_header)
     if response.get('errors'):
         return StatementError(**response)
     return Statement(**response)
@@ -102,7 +103,7 @@ def post_flink_statement(compute_pool_id: str,
         config = get_config()
         properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
         client = ConfluentCloudClient(config)
-        url = client.build_flink_url_and_auth_header()
+        url, auth_header = client.build_flink_url_and_auth_header()
         statement_data = {
                 "name": statement_name,
                 "organization_id": config["confluent_cloud"]["organization_id"],
@@ -117,7 +118,8 @@ def post_flink_statement(compute_pool_id: str,
         try:
             logger.debug(f"> Send POST request to Flink statement api with {statement_data}")
             start_time = time.perf_counter()
-            response = client.make_request("POST", url + "/statements", statement_data)
+            auth_header = client._get_flink_auth()
+            response = client.make_request(method="POST", url=f"{url}/statements", data=statement_data, auth_header=auth_header)
             logger.debug(f"> POST response= {response}")
             if response.get('errors'):
                 logger.error(f"Error executing rest call: {response['errors']}")
@@ -169,13 +171,13 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
 
 def get_statement_results(statement_name: str)-> StatementResult:
         client = ConfluentCloudClient(get_config())
-        url = client.build_flink_url_and_auth_header()
+        url, auth_header = client.build_flink_url_and_auth_header() 
         try:
-            resp=client.make_request("GET",f"{url}/statements/{statement_name}/results")
+            resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
             logger.info(resp)
 
             if resp["metadata"]["next"]:
-                resp=client.make_request("GET", resp["metadata"]["next"])
+                resp=client.make_request(method="GET", url=resp["metadata"]["next"], auth_header=auth_header)
                 logger.debug(f"After next called: {resp}")
             return StatementResult(**resp)
         except Exception as e:
@@ -185,67 +187,79 @@ def get_statement_results(statement_name: str)-> StatementResult:
 def get_next_statement_results(next_token_page: str) -> StatementResult:
     config = get_config()
     client = ConfluentCloudClient(config)
-    url = client.build_flink_url_and_auth_header()  # need that to build the header
-    resp=client.make_request("GET", next_token_page)
+    auth_header = client._get_flink_auth()
+    resp=client.make_request(method="GET", url=next_token_page, auth_header=auth_header)
     return StatementResult(**resp)
-    
+
+_cache_lock = threading.RLock()    
 _statement_list_cache = None  # cache the statement list loaded to limit the number of call to CC API
 def get_statement_list() -> dict[str, StatementInfo]:
     """
     Get the statement list from the CC API - the list is <statement_name, statement_info>
     """
     global _statement_list_cache
-    if _statement_list_cache == None:
-        reload = True
-        if os.path.exists(STATEMENT_LIST_FILE):
-            try:
-                with open(STATEMENT_LIST_FILE, "r") as f:
-                    _statement_list_cache = StatementListCache.model_validate(json.load(f))
-                if _statement_list_cache.created_at and (datetime.now() - datetime.strptime(_statement_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
-                    reload = False
-            except Exception as e:
-                logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
-                reload = True
-                os.remove(STATEMENT_LIST_FILE)
-        if reload:
-            _statement_list_cache = StatementListCache(created_at=datetime.now())
-            logger.info("Load the current list of Flink statements using REST API")
-            print("Load the current list of Flink statements using REST API")
-            start_time = time.perf_counter()
-            config = get_config()
-            page_size = config["confluent_cloud"].get("page_size", 100)
-            client = ConfluentCloudClient(config)
-            url=client.build_flink_url_and_auth_header()+"/statements?page_size="+str(page_size)
-            next_page_token = None
-            while True:
-                if next_page_token:
-                    resp=client.make_request("GET", next_page_token)
-                else:
-                    resp=client.make_request("GET", url)
-                logger.debug("Statement execution result:", resp)
-                if resp and 'data' in resp:
-                    for info in resp.get('data'):
-                        statement_info = map_to_statement_info(info)
-                        _statement_list_cache.statement_list[info['name']] = statement_info
-                if resp and "metadata" in resp and "next" in resp["metadata"]:
-                    next_page_token = resp["metadata"]["next"]
-                    if not next_page_token:
+    with _cache_lock:
+        if _statement_list_cache == None:
+            reload = True
+            if os.path.exists(STATEMENT_LIST_FILE):
+                try:
+                    with open(STATEMENT_LIST_FILE, "r") as f:
+                        _statement_list_cache = StatementListCache.model_validate(json.load(f))
+                    if _statement_list_cache.created_at and (datetime.now() - datetime.strptime(_statement_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
+                        reload = False
+                except Exception as e:
+                    logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
+                    reload = True
+                    os.remove(STATEMENT_LIST_FILE)
+            if reload:
+                _statement_list_cache = StatementListCache(created_at=datetime.now())
+                logger.info("Load the current list of Flink statements using REST API")
+                print("Load the current list of Flink statements using REST API")
+                start_time = time.perf_counter()
+                config = get_config()
+                page_size = config["confluent_cloud"].get("page_size", 100)
+                client = ConfluentCloudClient(config)
+                url, auth_header = client.build_flink_url_and_auth_header()
+                url=url+"/statements?page_size="+str(page_size)
+                next_page_token = None
+                while True:
+                    if next_page_token:
+                        resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
+                    else:
+                        resp=client.make_request(method="GET", url=url, auth_header=auth_header)
+                    logger.debug("Statement execution result:", resp)
+                    if resp and 'data' in resp:
+                        for info in resp.get('data'):
+                            statement_info = map_to_statement_info(info)
+                            _statement_list_cache.statement_list[info['name']] = statement_info
+                    if resp and "metadata" in resp and "next" in resp["metadata"]:
+                        next_page_token = resp["metadata"]["next"]
+                        if not next_page_token:
+                            break
+                    else:
+                        logger.warning(f"resp is not valid: {resp}")
                         break
-                else:
-                    logger.warning(f"resp is not valid: {resp}")
-                    break
-            _save_statement_list(_statement_list_cache)
-            stop_time = time.perf_counter()
-            logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
-            print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
-    return _statement_list_cache.statement_list
+                _save_statement_list(_statement_list_cache)
+                stop_time = time.perf_counter()
+                logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
+                print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
+        elif (_statement_list_cache.created_at 
+            and (datetime.now() - _statement_list_cache.created_at).total_seconds() > get_config()['app']['cache_ttl']):
+            logger.info("Statement list cache is expired, reload it")
+            _statement_list_cache = None
+            return get_statement_list()
+        return _statement_list_cache.statement_list
 
 
 def reset_statement_list():
     global _statement_list_cache
-    _statement_list_cache = None
-    if os.path.exists(STATEMENT_LIST_FILE):
-        os.remove(STATEMENT_LIST_FILE)
+    with _cache_lock:
+        _statement_list_cache = None
+        try:
+            if os.path.exists(STATEMENT_LIST_FILE):
+                os.remove(STATEMENT_LIST_FILE)
+        except Exception as e:
+            logger.warning(f"Error resetting statement list cache: {e}")
 
 def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] = None) -> str | None:
     """
@@ -374,9 +388,15 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
     elif info and isinstance(info, Statement) and info.spec:
         catalog = info.spec.properties.get('sql.current-catalog','UNKNOWN')
         database = info.spec.properties.get('sql.current-database','UNKNOWN')
+        if info.status:
+            status_phase = info.status.phase
+            status_detail = info.status.detail
+        else:
+            status_phase = "UNKNOWN"
+            status_detail = "UNKNOWN"
         return StatementInfo(name=info.name,
-                             status_phase= info.status.phase,
-                             status_detail= info.status.detail,
+                             status_phase= status_phase,
+                             status_detail= status_detail,
                              sql_content= info.spec.statement,
                              compute_pool_id= info.spec.compute_pool_id,
                              principal= info.spec.principal,
@@ -391,8 +411,25 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
     """
     Save the statement list to the cache file
     """
-    with open(STATEMENT_LIST_FILE, "w") as f:
-        f.write(statement_list.model_dump_json(indent=2, warnings=False))
+
+    # Write to temporary file first, then atomic rename
+    temp_file = STATEMENT_LIST_FILE + ".tmp"
+    try:
+        with open(temp_file, "w") as f:
+            f.write(statement_list.model_dump_json(indent=2, warnings=False))
+            f.flush()  # Ensure data is written
+            os.fsync(f.fileno())  # Force write to disk
+        
+        # Atomic operation - either succeeds completely or fails
+        shutil.move(temp_file, STATEMENT_LIST_FILE)
+    except Exception as e:
+        logger.error(f"Failed to save statement list: {e}")
+        # Clean up temp file
+        try:
+            os.remove(temp_file)
+        except OSError:
+            pass
+
 
 
 

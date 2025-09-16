@@ -50,7 +50,8 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
-* `clean-completed-failed-statements`: Delete all statements that are failed and...
+* `delete-all-compute-pools`: Delete all compute pools for the given...
+* `housekeep-statements`: Delete statements in FAILED or COMPLETED...
 * `validate-config`: Validate the config.yaml file
 * `list-modified-files`: Get the list of files modified in the...
 
@@ -115,18 +116,40 @@ $ project list-compute-pools [OPTIONS]
 * `--region TEXT`: Region_id to return all compute pool
 * `--help`: Show this message and exit.
 
-### `project clean-completed-failed-statements`
+### `project delete-all-compute-pools`
 
-Delete all statements that are failed and completed
+Delete all compute pools for the given product name
 
 **Usage**:
 
 ```console
-$ project clean-completed-failed-statements [OPTIONS]
+$ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
+```
+
+**Arguments**:
+
+* `PRODUCT_NAME`: The product name to delete all compute pools for  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project housekeep-statements`
+
+Delete statements in FAILED or COMPLETED state that starts with string &#x27;workspace&#x27; in it ( default ).
+Applies optional starts-with and age filters when provided.
+
+**Usage**:
+
+```console
+$ project housekeep-statements [OPTIONS]
 ```
 
 **Options**:
 
+* `--starts-with TEXT`: Statements names starting with this string.
+* `--status TEXT`: Statements with this status.
+* `--age INTEGER`: Statements with created_date &gt;= age (days).
 * `--help`: Show this message and exit.
 
 ### `project validate-config`
@@ -190,6 +213,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `update-tables`: Update the tables with SQL code changes...
 * `init-unit-tests`: Initialize the unit test folder and...
 * `run-unit-tests`: Run all the unit tests or a specified test...
+* `run-validation-tests`: Run only the validation tests (1 to n...
 * `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
@@ -351,7 +375,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1083452e0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1058e0590&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -373,6 +397,8 @@ $ table init-unit-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--create-csv`: If set, also create a CSV file for the unit test data.
+* `--nb-test-cases INTEGER`: Number of test cases to create. Default is 2.  [default: 2]
+* `--ai`: Use AI to generate test data and validate with tool calling.
 * `--help`: Show this message and exit.
 
 ### `table run-unit-tests`
@@ -383,6 +409,27 @@ Run all the unit tests or a specified test case by sending data to `_ut` topics 
 
 ```console
 $ table run-unit-tests [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
+* `--run-all`: RBy default run insert sqls and foundations, with this flag it will also run validation sql too.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table run-validation-tests`
+
+Run only the validation tests (1 to n validation tests) for a given table.
+
+**Usage**:
+
+```console
+$ table run-validation-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -456,6 +503,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
+* `analyze-pool-usage`: Analyze compute pool usage and assess...
 
 ### `pipeline build-metadata`
 
@@ -488,7 +536,7 @@ $ pipeline delete-all-metadata [OPTIONS] PATH_FROM_WHERE_TO_DELETE
 
 **Arguments**:
 
-* `PATH_FROM_WHERE_TO_DELETE`: Delete metadata pipeline_definitions.json in the given folder  [required]
+* `PATH_FROM_WHERE_TO_DELETE`: Delete metadata pipeline_definitions.json in the given folder  [env var: PIPELINES; required]
 
 **Options**:
 
@@ -531,7 +579,6 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 
 * `--yaml`: Output the report in YAML format
 * `--json`: Output the report in JSON format
-* `--graph`: Output the report in Graphical tree
 * `--children-too / --no-children-too`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-too]
 * `--parent-only / --no-parent-only`: By default the report includes only parents  [default: parent-only]
 * `--output-file-name TEXT`: Output file name to save the report.
@@ -563,6 +610,8 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
 * `--dir TEXT`: The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name.
 * `--parallel / --no-parallel`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.  [default: no-parallel]
+* `--max-thread INTEGER`: The maximum number of threads to use when deploying the pipeline in parallel.  [default: 1]
+* `--pool-creation / --no-pool-creation`: By default the deployment will not create a compute pool per table. This flag will create a pool.  [default: no-pool-creation]
 * `--help`: Show this message and exit.
 
 ### `pipeline build-execution-plan`
@@ -590,7 +639,7 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
 * `--force-ancestors / --no-force-ancestors`: This flag forces restarting running ancestorsFlink statements.  [default: no-force-ancestors]
-* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products.  [default: no-cross-product-deployment]
+* `--cross-product-deployment / --no-cross-product-deployment`: By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products when considering descendants only.  [default: no-cross-product-deployment]
 * `--help`: Show this message and exit.
 
 ### `pipeline report-running-statements`
@@ -605,7 +654,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -627,12 +676,13 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
 * `--table-name TEXT`: The sink table name from where the undeploy will run.
 * `--product-name TEXT`: The product name to undeploy from
+* `--no-ack / --no-no-ack`: By default the undeploy will ask for confirmation. This flag will undeploy without confirmation.  [default: no-no-ack]
 * `--help`: Show this message and exit.
 
 ### `pipeline prepare`
@@ -653,4 +703,43 @@ $ pipeline prepare [OPTIONS] SQL_FILE_NAME
 **Options**:
 
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
+* `--help`: Show this message and exit.
+
+### `pipeline analyze-pool-usage`
+
+Analyze compute pool usage and assess statement consolidation opportunities.
+
+This command will:
+- Analyze current usage across compute pools (optionally filtered by product or directory)
+- Identify running statements in each pool
+- Assess opportunities for statement consolidation
+- Generate optimization recommendations using simple heuristics
+
+Examples:
+    # Analyze all pools
+    shift-left pipeline analyze-pool-usage
+    
+    # Analyze for specific product
+    shift-left pipeline analyze-pool-usage --product-name saleops
+    
+    # Analyze for specific directory
+    shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
+    
+    # Combine product and directory filters
+    shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
+
+**Usage**:
+
+```console
+$ pipeline analyze-pool-usage [OPTIONS] [INVENTORY_PATH]
+```
+
+**Arguments**:
+
+* `[INVENTORY_PATH]`: Pipeline path, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES]
+
+**Options**:
+
+* `-p, --product-name TEXT`: Analyze pool usage for a specific product only
+* `-d, --directory TEXT`: Analyze pool usage for pipelines in a specific directory
 * `--help`: Show this message and exit.

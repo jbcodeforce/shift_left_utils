@@ -466,6 +466,271 @@ class TestSQLParser(unittest.TestCase):
         assert rep
         assert "UNNEST" not in rep
 
+    def test_extract_statement_complexity_no_joins(self):
+        """Test complexity extraction with no joins - should be Simple"""
+        parser = SQLparser()
+        query = """
+        SELECT col1, col2, col3 
+        FROM table1 
+        WHERE col1 = 'value'
+        """
+        result = parser.extract_statement_complexity(query, "Stateless")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+        self.assertEqual(result.state_form, "Stateless")
+
+    def test_extract_statement_complexity_left_join(self):
+        """Test complexity extraction with LEFT JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        LEFT JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+        self.assertEqual(result.state_form, "Stateful")
+
+    def test_extract_statement_complexity_left_outer_join(self):
+        """Test complexity extraction with LEFT OUTER JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        LEFT OUTER JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_right_join(self):
+        """Test complexity extraction with RIGHT JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        RIGHT JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 1)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_right_outer_join(self):
+        """Test complexity extraction with RIGHT OUTER JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        RIGHT OUTER JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 1)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_inner_join(self):
+        """Test complexity extraction with INNER JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        INNER JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 1)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_full_outer_join(self):
+        """Test complexity extraction with FULL OUTER JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        FULL OUTER JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 1)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_regular_join(self):
+        """Test complexity extraction with regular JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        JOIN table2 t2 ON t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 1)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_multiple_joins_medium(self):
+        """Test complexity extraction with multiple joins - Medium complexity"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2, t3.col3
+        FROM table1 t1
+        LEFT JOIN table2 t2 ON t1.id = t2.id
+        LEFT JOIN table3 t3 ON t1.id = t3.id
+        INNER JOIN table4 t4 ON t2.id = t4.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 2)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 1)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Medium")
+
+    def test_extract_statement_complexity_multiple_joins_complex(self):
+        """Test complexity extraction with multiple joins - Complex"""
+        parser = SQLparser()
+        query = """
+        with cte_1 as (
+            SELECT t1.col1, t2.col2, t3.col3, t4.col4
+            FROM table1 t1
+            JOIN table2 t2 ON t1.id = t2.id
+            JOIN table3 t3 ON t2.id = t3.id
+        )
+        SELECT t1.col1, t2.col2, t3.col3, t4.col4
+        FROM cte_1 t1
+        LEFT JOIN table2 t2 ON t1.id = t2.id
+        RIGHT JOIN table3 t3 ON t2.id = t3.id
+        INNER JOIN table4 t4 ON t3.id = t4.id 
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 2)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.number_of_right_joins, 1)
+        self.assertEqual(result.number_of_inner_joins, 1)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Complex")
+
+    def test_extract_statement_complexity_cross_join_excluded(self):
+        """Test that CROSS JOINs are not counted in complexity (stateless operation)"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        CROSS JOIN table2 t2
+        """
+        result = parser.extract_statement_complexity(query, "Stateless")
+        
+        # CROSS JOINs should not contribute to complexity count
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_mixed_with_cross_join(self):
+        """Test complexity with mix of regular joins and CROSS JOIN"""
+        parser = SQLparser()
+        query = """
+        SELECT t1.col1, t2.col2, t3.col3
+        FROM table1 t1
+        LEFT JOIN table2 t2 ON t1.id = t2.id
+        CROSS JOIN table3 t3
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        # Only the LEFT JOIN should be counted, not the CROSS JOIN
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_with_comments(self):
+        """Test complexity extraction with SQL comments"""
+        parser = SQLparser()
+        query = """
+        -- This is a comment
+        SELECT t1.col1, t2.col2 
+        FROM table1 t1
+        /* Multi-line comment with LEFT JOIN inside */
+        LEFT JOIN table2 t2 ON t1.id = t2.id -- another comment
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+
+    def test_extract_statement_complexity_empty_sql(self):
+        """Test complexity extraction with empty SQL content"""
+        parser = SQLparser()
+        result = parser.extract_statement_complexity("", "Stateless")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 0)
+        self.assertEqual(result.number_of_right_joins, 0)
+        self.assertEqual(result.number_of_inner_joins, 0)
+        self.assertEqual(result.number_of_outer_joins, 0)
+        self.assertEqual(result.complexity_type, "Simple")
+        self.assertEqual(result.state_form, "Stateless")
+
+    def test_extract_statement_complexity_case_insensitive(self):
+        """Test complexity extraction is case insensitive"""
+        parser = SQLparser()
+        query = """
+        select t1.col1, t2.col2 
+        from table1 t1
+        left join table2 t2 on t1.id = t2.id
+        """
+        result = parser.extract_statement_complexity(query, "Stateful")
+        
+        self.assertEqual(result.number_of_regular_joins, 0)
+        self.assertEqual(result.number_of_left_joins, 1)
+        self.assertEqual(result.complexity_type, "Simple")
+
         
 
 if __name__ == '__main__':

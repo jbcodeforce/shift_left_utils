@@ -4,14 +4,11 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import json
 import os, pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+#os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
 
 class TestConfluentClient(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 
     def test_get_environment_list(self):
         print("#"*30 + "\ntest_get_environment_list\n")
@@ -22,6 +19,8 @@ class TestConfluentClient(unittest.TestCase):
         self.assertGreater(len(environments), 0)
         for e in environments['data']:
             print(e['display_name'])
+            print(e['id'])
+  
 
     def test_get_compute_pool_list(self):
         print("#"*30 + "\ntest_get_compute_pool_list\n")

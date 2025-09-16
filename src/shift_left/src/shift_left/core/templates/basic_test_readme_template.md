@@ -23,7 +23,15 @@ Running source data analysis{% if environment %}, from the {{ environment }} env
 | {{ table }} |  |  |
 {% endfor %}
 
-**Issues to address:**
+## Unit tests creation and execution:
+
+DDL -> 
+
+| UT |   Inserts | Validation |
+| --- | --- | --- |
+| sql | ✅ | ✅  |
+
+### Issues to address
 
 
 {% for table_name in source_tables %}
@@ -40,14 +48,5 @@ Analyze **data skew** with
 ```sql
 select id, tenant_id, count(*) as record_count from {{ table_name }}  group by id, tenant_id
 ```
-
-* Unit tests creation and execution:
-
-DDL -> 
-
-| UT |   Insert | Validation |
-| --- | --- | --- |
-| sql | ✅ | ✅  |
-| csv | ✅ | ✅  |
 
 {% endfor %}

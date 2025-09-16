@@ -1,9 +1,9 @@
 [project]
 name = "shift_left"
-version = "0.1.31"
+version = "0.1.37"
 description = "The shift-left CLI to manage your shift-left project"
 authors = [
-    {name = "jbcodeforce",email = "jerome.boyer@gmail.com"}
+    {name = "jbcodeforce",email = "jboyer@confluent.io"}
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -55,7 +55,7 @@ commit_parser = "conventional"
 logging_use_named_masks = false
 major_on_zero = true
 allow_zero_version = true
-repo_dir = "/Users/jerome/Code/shift_left_utils"
+repo_dir = "/Users/jerome/Documents/Code/shift_left_utils"
 no_git_verify = false
 tag_format = "v{version}"
 

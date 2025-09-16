@@ -3,6 +3,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import re
 from typing import Set, List, Tuple, Dict
+from shift_left.core.models.flink_statement_model import FlinkStatementComplexity
 from shift_left.core.utils.app_config import logger
 """
 Dedicated class to parse a SQL statement and extract elements like table name
@@ -90,7 +91,7 @@ class SQLparser:
         sql_content=self._normalize_sql(sql_content)
         regex=r'\b(\s*INSERT INTO)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
-        logger.info(f"table name: {tbname}")
+        logger.debug(f"table name: {tbname}")
         if len(tbname) > 0:
             if tbname[0][1] and '`' in tbname[0][1]:   
                 tb=tbname[0][1].replace("`","")
@@ -255,3 +256,54 @@ class SQLparser:
             result="No primary key found in the statement."
         return result
         
+
+    def extract_statement_complexity(self, sql_content: str, state_form: str) -> FlinkStatementComplexity:
+        """
+        Extract the complexity of the statement by counting different types of joins
+        """
+        complexity = FlinkStatementComplexity()
+        complexity.state_form = state_form
+        
+        if not sql_content:
+            complexity.number_of_regular_joins = 0
+            complexity.number_of_left_joins = 0
+            complexity.number_of_right_joins = 0
+            complexity.number_of_inner_joins = 0
+            complexity.number_of_outer_joins = 0
+            complexity.complexity_type = "Simple"
+            return complexity
+        
+        # Normalize SQL content to remove comments and extra whitespace
+        normalized_sql = self._normalize_sql(sql_content)
+        
+        # Count different types of joins using regex patterns (order matters to avoid double counting)
+        left_joins = len(re.findall(r'\bLEFT\s+(?:OUTER\s+)?JOIN\b', normalized_sql, re.IGNORECASE))
+        right_joins = len(re.findall(r'\bRIGHT\s+(?:OUTER\s+)?JOIN\b', normalized_sql, re.IGNORECASE))
+        inner_joins = len(re.findall(r'\bINNER\s+JOIN\b', normalized_sql, re.IGNORECASE))
+        # Only count standalone FULL OUTER JOIN, not LEFT/RIGHT OUTER JOIN
+        outer_joins = len(re.findall(r'\bFULL\s+OUTER\s+JOIN\b', normalized_sql, re.IGNORECASE))
+        # Count CROSS JOINs separately (these should not contribute to complexity)
+        cross_joins = len(re.findall(r'\bCROSS\s+JOIN\b', normalized_sql, re.IGNORECASE))
+        
+        # Count all JOINs first, then subtract specific types to get regular JOINs
+        all_joins = len(re.findall(r'\bJOIN\b', normalized_sql, re.IGNORECASE))
+        regular_joins = all_joins - left_joins - right_joins - inner_joins - outer_joins - cross_joins
+        
+        # Calculate total joins (excluding CROSS JOINs as they are typically stateless)
+        total_joins = left_joins + right_joins + inner_joins + outer_joins + regular_joins
+        
+        complexity.number_of_regular_joins = regular_joins
+        complexity.number_of_left_joins = left_joins
+        complexity.number_of_right_joins = right_joins
+        complexity.number_of_inner_joins = inner_joins
+        complexity.number_of_outer_joins = outer_joins
+        
+        # Determine complexity type based on join count
+        if total_joins <= 2:
+            complexity.complexity_type = "Simple"
+        elif total_joins <= 4:
+            complexity.complexity_type = "Medium"
+        else:
+            complexity.complexity_type = "Complex"
+            
+        return complexity

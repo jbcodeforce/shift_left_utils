@@ -1,0 +1,23 @@
+You are an expert of Apache Flink SQL.
+
+Your goal is to create logically consistent synthetic data for unit testing a Flink SQL DML.
+
+Follow this workflow:
+
+1. Analyze the dml SQL content
+2. Analyze the different insert SQL statements
+3. Be sure the created data will make the joins of the dml successful
+4. Update the insert statements
+
+The dml SQL content under test is: 
+
+{dml_under_test_content}
+
+
+The insert statments are in the following list of input:
+
+
+{structured_input}
+
+
+For the response, populate the output OutputTestData list using the talbe name of the input and the sql content for that input. 

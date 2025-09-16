@@ -46,6 +46,124 @@ class TestPipelineCLI(unittest.TestCase):
         assert result.exit_code == 0
         print(result.stdout)
 
+    def test_undeploy_with_ack_or_not(self):
+        """Test successful execution of the build-execution-plan command"""
+
+        runner = CliRunner()
+        result = runner.invoke(app, ['undeploy', '--table-name', 'p1_fct_order'])
+        assert result.exit_code == 0
+        print(result.stdout)
+
+    def test_build_metadata_command_success(self):
+        """Test successful execution of the build-metadata command"""
+        
+        runner = CliRunner()
+        # Using a test data directory path for DML file
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        test_dml_file = str(data_dir / "flink-project/pipelines/facts/p1/p1_fct_order/sql-scripts/dml.p1_fct_order.sql")
+        
+        result = runner.invoke(app, ['build-metadata', test_dml_file, str(data_dir / "flink-project/pipelines")])
+        assert result.exit_code == 0
+        assert "Pipeline built from" in result.stdout
+
+    def test_build_metadata_command_error_invalid_file(self):
+        """Test error handling when invalid file is provided to build-metadata"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['build-metadata', 'invalid_file.txt', os.getenv("PIPELINES")])
+        assert result.exit_code == 1
+        assert "Error: the first parameter needs to be a dml sql file" in result.stdout
+
+    def test_delete_all_metadata_command(self):
+        """Test successful execution of the delete-all-metadata command"""
+        
+        runner = CliRunner()
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        test_pipelines_dir = str(data_dir / "flink-project/pipelines")
+        
+        result = runner.invoke(app, ['delete-all-metadata', test_pipelines_dir])
+        assert result.exit_code == 0
+        assert "Delete pipeline definitions from" in result.stdout
+
+    def test_build_all_metadata_command(self):
+        """Test successful execution of the build-all-metadata command"""
+        
+        runner = CliRunner()
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        test_pipelines_dir = str(data_dir / "flink-project/pipelines")
+        
+        result = runner.invoke(app, ['build-all-metadata', test_pipelines_dir])
+        assert result.exit_code == 0
+        assert "Build all pipeline definitions for all tables in" in result.stdout
+
+    def test_deploy_command_with_table_name(self):
+        """Test deploy command with table name parameter"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['deploy', os.getenv("PIPELINES"), '--table-name', 'p1_fct_order'])
+        # This might fail due to missing infrastructure, but we test the command parsing
+        print(result.stdout)
+
+    def test_report_running_statements_command_with_table(self):
+        """Test successful execution of the report-running-statements command"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['report-running-statements', '--table-name', 'p1_fct_order', os.getenv("PIPELINES")])
+        # This command depends on actual Flink infrastructure, so we just test basic execution
+        print(result.stdout)
+
+    def test_report_running_statements_command_error_no_params(self):
+        """Test error handling when no parameters provided to report-running-statements"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['report-running-statements', os.getenv("PIPELINES")])
+        assert result.exit_code == 1
+        assert "Error: either table-name, product-name or dir must be provided" in result.stdout
+
+    def test_prepare_command_with_sql_file(self):
+        """Test prepare command with SQL file"""
+        
+        runner = CliRunner()
+        # Create a temporary SQL file for testing
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("-- Test SQL content\nSELECT 1;\n")
+            temp_sql_file = f.name
+        
+        try:
+            result = runner.invoke(app, ['prepare', temp_sql_file])
+            # This command depends on actual Flink infrastructure, so we just test basic execution
+            print(result.stdout)
+        finally:
+            os.unlink(temp_sql_file)
+
+    def test_analyze_pool_usage_command(self):
+        """Test successful execution of the analyze-pool-usage command"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES")])
+        # This command depends on actual Flink infrastructure, so we just test basic execution
+        print(result.stdout)
+
+    def test_analyze_pool_usage_command_with_product(self):
+        """Test analyze-pool-usage command with product filter"""
+        
+        runner = CliRunner()
+        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES"), '--product-name', 'p1'])
+        # This command depends on actual Flink infrastructure, so we just test basic execution  
+        print(result.stdout)
+
+    def test_analyze_pool_usage_command_with_directory(self):
+        """Test analyze-pool-usage command with directory filter"""
+        
+        runner = CliRunner()
+        data_dir = Path(__file__).parent.parent.parent / "data"
+        test_dir = str(data_dir / "flink-project/pipelines/facts")
+        
+        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES"), '--directory', test_dir])
+        # This command depends on actual Flink infrastructure, so we just test basic execution
+        print(result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
