@@ -30,6 +30,7 @@ from shift_left.core.utils.file_search import (
     get_table_ref_from_inventory,
     get_or_build_inventory,
     get_table_type_from_file_path,
+    create_folder_if_not_exist,
     read_pipeline_definition_from_file
 )
 
@@ -172,6 +173,18 @@ def init_integration_test_for_pipeline(table_name: str, pipeline_path: str):
     
 
 # ---- Private APIs ---- 
+
+def _process_table_for_integration_test(table_def: FlinkTablePipelineDefinition, where_to_save_test_files: str):
+    if len(table_def.parents) == 0:
+        # insert statement
+        print(f"Insert statement for {table_def.table_name}")
+        pass
+    else:
+        # generate a validation statement
+        print(f"Validation statement for {table_def.table_name}")
+        # recursively call the function for the parent 
+        for parent in table_def.parents:
+            _process_table_for_integration_test(parent, where_to_save_test_files)
 
 
 def _build_pipeline_definitions_from_sql_content(
