@@ -5,9 +5,8 @@ CREATE TABLE IF NOT EXISTS fct_user_per_group (
   total_users BIGINT,
   active_users BIGINT,
   inactive_users BIGINT,
-  latest_user_created_date DATE,
+  latest_user_created_date BIGINT,
   fact_updated_at TIMESTAMP,
-  
   PRIMARY KEY(group_id) NOT ENFORCED
 ) DISTRIBUTED BY HASH(group_id) INTO 1 BUCKETS
 WITH (

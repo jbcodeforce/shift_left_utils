@@ -13,6 +13,7 @@ from shift_left.core.compute_pool_mgr import get_compute_pool_list
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.project_manager as project_manager
+import shift_left.core.integration_test_mgr as integration_test_mgr
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE, 
         KIMBALL_PROJECT_TYPE)
@@ -246,3 +247,150 @@ def list_modified_files(
     finally:
         # Restore original working directory
         os.chdir(original_cwd)
+
+@app.command()
+def init_integration_tests(
+    sink_table_name: Annotated[str, typer.Argument(help="Name of the sink table to create integration tests for")],
+    project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located. If not provided, uses $PIPELINES environment variable")] = None
+):
+    """
+    Initialize integration test structure for a given sink table.
+    Creates test scaffolding including synthetic data templates and validation queries.
+    Integration tests validate end-to-end data flow from source tables to the specified sink table.
+    """
+    print("#" * 30 + f" Initialize Integration Tests for {sink_table_name}")
+    
+    try:
+        test_path = integration_test_mgr.init_integration_tests(sink_table_name, project_path)
+        print(f"✅ Integration test structure created successfully")
+        print(f"📁 Test location: {test_path}")
+        print(f"\n💡 Next steps:")
+        print(f"   1. Review and update synthetic data files in the test directory")
+        print(f"   2. Customize validation queries based on your business logic")
+        print(f"   3. Run tests with: shift_left project run-integration-tests {sink_table_name}")
+        
+    except Exception as e:
+        print(f"❌ Error initializing integration tests: {e}")
+        raise typer.Exit(1)
+
+@app.command()
+def run_integration_tests(
+    sink_table_name: Annotated[str, typer.Argument(help="Name of the sink table to run integration tests for")],
+    scenario_name: str = typer.Option(None, "--scenario-name", help="Specific test scenario to run. If not specified, runs all scenarios"),
+    project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located")] = None,
+    compute_pool_id: str = typer.Option(None, "--compute-pool-id", envvar=["CPOOL_ID"], help="Flink compute pool ID. Uses config.yaml value if not provided"),
+    measure_latency: bool = typer.Option(True, "--measure-latency/--no-measure-latency", help="Whether to measure end-to-end latency from source to sink"),
+    output_file: str = typer.Option(None, "--output-file", help="File path to save detailed test results")
+):
+    """
+    Run integration tests for a given sink table.
+    Executes end-to-end pipeline testing by injecting synthetic data into source tables,
+    waiting for data to flow through the pipeline, and validating results in the sink table.
+    Optionally measures latency from data injection to sink table arrival.
+    """
+    print("#" * 30 + f" Run Integration Tests for {sink_table_name}")
+    
+    if not compute_pool_id:
+        compute_pool_id = get_config().get('flink', {}).get('compute_pool_id')
+    
+    if scenario_name:
+        print(f"🎯 Running specific scenario: {scenario_name}")
+    else:
+        print(f"🔄 Running all test scenarios")
+        
+    print(f"📊 Latency measurement: {'enabled' if measure_latency else 'disabled'}")
+    print(f"🏊 Compute pool: {compute_pool_id}")
+    
+    try:
+        results = integration_test_mgr.run_integration_tests(
+            sink_table_name=sink_table_name,
+            scenario_name=scenario_name,
+            project_path=project_path,
+            compute_pool_id=compute_pool_id,
+            measure_latency=measure_latency
+        )
+        
+        # Display results summary
+        print(f"\n{'=' * 60}")
+        print(f"🏁 Integration Test Results Summary")
+        print(f"{'=' * 60}")
+        print(f"Suite: {results.suite_name}")
+        print(f"Overall Status: {_get_status_emoji(results.overall_status)} {results.overall_status}")
+        print(f"Total Duration: {results.total_duration_ms:.2f}ms")
+        print(f"Test Scenarios: {len(results.test_results)}")
+        
+        # Display individual scenario results
+        for test_result in results.test_results:
+            status_emoji = _get_status_emoji(test_result.status)
+            print(f"\n  {status_emoji} {test_result.scenario_name}")
+            print(f"     Status: {test_result.status}")
+            print(f"     Duration: {test_result.duration_ms:.2f}ms")
+            
+            if test_result.latency_results:
+                avg_latency = sum(lr.latency_ms for lr in test_result.latency_results) / len(test_result.latency_results)
+                print(f"     Avg Latency: {avg_latency:.2f}ms")
+            
+            if test_result.error_message:
+                print(f"     Error: {test_result.error_message}")
+        
+        # Save detailed results if output file specified
+        if output_file:
+            with open(output_file, 'w') as f:
+                f.write(results.model_dump_json(indent=2))
+            print(f"\n📄 Detailed results saved to: {output_file}")
+        
+        print(f"\n{'=' * 60}")
+        
+        if results.overall_status != "PASS":
+            raise typer.Exit(1)
+            
+    except Exception as e:
+        print(f"❌ Error running integration tests: {e}")
+        raise typer.Exit(1)
+
+@app.command()
+def delete_integration_tests(
+    sink_table_name: Annotated[str, typer.Argument(help="Name of the sink table to delete integration test artifacts for")],
+    project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located")] = None,
+    compute_pool_id: str = typer.Option(None, "--compute-pool-id", envvar=["CPOOL_ID"], help="Flink compute pool ID where test artifacts were created"),
+    no_confirm: bool = typer.Option(False, "--no-confirm", help="Skip confirmation prompt and delete immediately")
+):
+    """
+    Delete all integration test artifacts (Flink statements and Kafka topics) for a given sink table.
+    This cleanup command removes all test-related resources created during integration test execution.
+    """
+    print("#" * 30 + f" Delete Integration Test Artifacts for {sink_table_name}")
+    
+    if not no_confirm:
+        print("⚠️  This will delete all integration test artifacts including:")
+        print("   - Flink statements with '_it' postfix")
+        print("   - Associated Kafka topics")
+        print("   - Test data and temporary resources")
+        
+        confirm = typer.confirm("Are you sure you want to proceed?")
+        if not confirm:
+            print("❌ Deletion cancelled")
+            raise typer.Exit(0)
+    
+    try:
+        integration_test_mgr.delete_integration_test_artifacts(
+            sink_table_name=sink_table_name,
+            project_path=project_path,
+            compute_pool_id=compute_pool_id
+        )
+        
+        print(f"✅ Integration test artifacts deleted successfully")
+        print(f"🧹 All test resources for '{sink_table_name}' have been cleaned up")
+        
+    except Exception as e:
+        print(f"❌ Error deleting integration test artifacts: {e}")
+        raise typer.Exit(1)
+
+def _get_status_emoji(status: str) -> str:
+    """Get emoji representation for test status"""
+    emoji_map = {
+        "PASS": "✅",
+        "FAIL": "❌", 
+        "ERROR": "🚫"
+    }
+    return emoji_map.get(status, "❓")

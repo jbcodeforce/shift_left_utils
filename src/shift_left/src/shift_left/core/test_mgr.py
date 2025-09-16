@@ -10,7 +10,6 @@ Provides testing capabilities including:
 - Integration with Confluent Cloud Flink REST API
 - YAML-based test suite definitions and CSV test data support
 """
-from turtle import st
 from pydantic import BaseModel, Field
 from typing import List, Final, Optional, Dict, Tuple, Union, Any, Callable
 import yaml
