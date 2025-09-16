@@ -279,10 +279,11 @@ class ReplaceEnvInSqlContent(TableWorker):
                         sql_content=sql_out
                         return updated, sql_content
                 elif self.env in self.dml_replacements:
-                    for k, v in self.dml_replacements[self.env].items():
-                        sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
-                        updated = (sql_out != sql_content)
-                        sql_content=sql_out
-                        logger.info(f"{k} , {v} ")
+                    if re.search(self.insert_into_src, sql_content, re.IGNORECASE) and column_to_search in sql_content:
+                        for k, v in self.dml_replacements[self.env].items():
+                            sql_out = re.sub(v["search"], v["replace"], sql_content, flags=re.MULTILINE)
+                            updated = (sql_out != sql_content)
+                            sql_content=sql_out
+                            logger.info(f"{k} , {v} ")
             logger.debug(sql_content)
             return updated, sql_content
