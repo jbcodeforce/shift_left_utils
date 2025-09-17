@@ -610,7 +610,7 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
         # Create output validation files 
         for output_data in test_case.outputs:
             output_file = os.path.join(tests_folder_path, '..', output_data.file_name)
-            validation_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
+            validation_sql_content = _build_validation_sql_content(output_data.table_name, test_definition, table_inventory, tests_folder_path)
             with open(output_file, "w") as f:
                 f.write(validation_sql_content)
         if use_ai:
@@ -643,17 +643,61 @@ def _generate_test_readme(table_ref: FlinkTableReference,
     with open(tests_folder_path + '/README.md', 'w') as f:
         f.write(rendered_readme_md)
 
-def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefinition) -> str:
+def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefinition, table_inventory: Dict[str, FlinkTableReference], tests_folder_path: str) -> str:
     """
     Build the validation SQL content for a given table.
+    It is possible that the SQL under test has multiple output tables, but most likely one: itself.
+    The inventory argument is used to get the table reference of the output table.
     """
-    env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    template = env.get_template("validate_test.jinja")
-    context = {
-        'table_name': table_name + DEFAULT_POST_FIX_UNIT_TEST
-    }
-    sql_content = template.render(context)
+    output_table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[table_name])
+    file_path = from_pipeline_to_absolute(output_table_ref.ddl_ref)
+    parser = SQLparser()
+    sql_content = ""
+    with open(file_path, "r") as f:
+        ddl_sql_content = f.read()
+        columns = parser.build_column_metadata_from_sql_content(ddl_sql_content)  # column_name -> column_metadata
+        column_names = [name for name in columns]
+        expected_result_section = _build_expected_result_part(column_names, test_definition, tests_folder_path)
+        env = Environment(loader=PackageLoader("shift_left.core","templates"))
+        template = env.get_template("validate_test.jinja")
+        context = {
+            'table_name': table_name + DEFAULT_POST_FIX_UNIT_TEST,
+            'column_names': column_names,
+            'expected_result_section': expected_result_section
+        }
+        sql_content = template.render(context)
+        sql_content = sql_content.replace("AND then 1", "then 1")
     return sql_content
+
+
+def _build_expected_result_part(column_names: List[str], test_definition: SLTestDefinition, tests_folder_path: str) -> str:
+    """
+    Build the expected result part of the validation SQL content.
+    """
+    expected_result_section = ""
+    sql_parser = SQLparser()
+    for test_case in test_definition.test_suite:
+        # Get values used for test
+        for input_data in test_case.inputs:
+            if input_data.file_type == "sql":
+                with open(os.path.join(tests_folder_path, '..', input_data.file_name), "r") as f:
+                    sql_content = f.read()
+
+                try:
+                    # Parse the INSERT SQL and extract column names and values
+                    parsed_data = sql_parser.parse_insert_sql_to_dict(sql_content)
+                    for idx in range(DEFAULT_TEST_DATA_ROWS):
+                        for col_name, values in parsed_data.items():
+                            expected_result_section+=(f"\t'{values[idx]}' as expected_{col_name},\n")
+                        if idx < DEFAULT_TEST_DATA_ROWS - 1:
+                            expected_result_section=expected_result_section[:-2]
+                            expected_result_section+=("\n\n    union all\n    select\n")
+                    expected_result_section=expected_result_section[:-2] 
+                except Exception as e:
+                    logger.error(f"Error parsing INSERT SQL from {input_data.file_name}: {e}")
+                    print(f"Original SQL content:\n{sql_content}")
+
+    return expected_result_section
 
 def _build_save_test_definition_json_file(
         file_path: str, 

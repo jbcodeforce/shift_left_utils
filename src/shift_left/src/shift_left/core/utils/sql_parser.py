@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import re
-from typing import Set, List, Tuple, Dict
+from typing import Set, List, Tuple, Dict, Any
 from shift_left.core.models.flink_statement_model import FlinkStatementComplexity
 from shift_left.core.utils.app_config import logger
 """
@@ -307,3 +307,122 @@ class SQLparser:
             complexity.complexity_type = "Complex"
             
         return complexity
+
+    def parse_insert_sql_to_dict(self, sql_content: str) -> Dict[str, List[Any]]:
+        """
+        Parse INSERT SQL statement and extract column names and their corresponding values.
+        
+        Args:
+            sql_content: SQL INSERT statement as string
+            
+        Returns:
+            Dictionary mapping column names to lists of values
+            
+        Example:
+            For SQL: INSERT INTO table (col1, col2) VALUES ('val1', 'val2'), ('val3', 'val4')
+            Returns: {'col1': ['val1', 'val3'], 'col2': ['val2', 'val4']}
+        """
+        # Remove comments and normalize whitespace
+        sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+        sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+        sql_content = ' '.join(sql_content.split())
+        
+        # Extract column names using regex
+        # Matches: INSERT INTO table_name (col1, col2, col3) or INSERT INTO `table_name` (`col1`, `col2`, `col3`)
+        column_pattern = r'insert\s+into\s+[`"]?\w+[`"]?\s*\(\s*([^)]+)\s*\)'
+        column_match = re.search(column_pattern, sql_content, re.IGNORECASE)
+        
+        if not column_match:
+            raise ValueError("Could not extract column names from INSERT statement")
+        
+        # Clean column names (remove backticks, quotes, and whitespace)
+        column_names_str = column_match.group(1)
+        column_names = [
+            col.strip().strip('`').strip('"').strip("'") 
+            for col in column_names_str.split(',')
+        ]
+        
+        # Extract VALUES section
+        values_pattern = r'values\s+(.+?)(?:;|\s*$)'
+        values_match = re.search(values_pattern, sql_content, re.IGNORECASE | re.DOTALL)
+        
+        if not values_match:
+            raise ValueError("Could not extract VALUES section from INSERT statement")
+        
+        values_section = values_match.group(1).strip()
+        
+        # Parse individual value rows
+        # This regex matches parentheses containing values, handling nested quotes
+        row_pattern = r'\(([^)]+)\)'
+        rows = re.findall(row_pattern, values_section)
+        
+        if not rows:
+            raise ValueError("Could not extract value rows from VALUES section")
+        
+        # Initialize result dictionary
+        result = {col_name: [] for col_name in column_names}
+        
+        # Process each row
+        for row in rows:
+            # Split values by comma, but handle quoted strings properly
+            values = self._parse_sql_values(row)
+            
+            if len(values) != len(column_names):
+                raise ValueError(f"Number of values ({len(values)}) doesn't match number of columns ({len(column_names)})")
+            
+            # Add values to corresponding columns
+            for i, value in enumerate(values):
+                result[column_names[i]].append(value)
+        
+        return result
+
+    def _parse_sql_values(self, values_str: str) -> List[Any]:
+        """
+        Parse comma-separated SQL values, handling quotes and data types.
+        
+        Args:
+            values_str: String containing comma-separated values
+            
+        Returns:
+            List of parsed values (strings, numbers, booleans, None)
+        """
+        values = []
+        current_value = ""
+        in_quotes = False
+        quote_char = None
+        i = 0
+        
+        while i < len(values_str):
+            char = values_str[i]
+            
+            if char in ("'", '"') and not in_quotes:
+                in_quotes = True
+                quote_char = char
+                i += 1
+                continue
+            elif char == quote_char and in_quotes:
+                # Check for escaped quotes
+                if i + 1 < len(values_str) and values_str[i + 1] == quote_char:
+                    current_value += char
+                    i += 2
+                    continue
+                else:
+                    in_quotes = False
+                    quote_char = None
+                    i += 1
+                    continue
+            elif char == ',' and not in_quotes:
+                # End of current value
+                values.append(current_value.strip())
+                current_value = ""
+                i += 1
+                continue
+            
+            current_value += char
+            i += 1
+        
+        # Add the last value
+        if current_value.strip():
+            values.append(current_value.strip())
+        
+        return values
