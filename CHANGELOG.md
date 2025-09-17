@@ -1,6 +1,11 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.38
+- Enhance validation.sql for unit tests
+- Fix an issue for dev src sql content modification
+- remove dependency on tk
+
 v0.1.37
 * Shift Left utility now supports environment variables for sensitive configuration values. Environment variables take precedence over config.yaml values, allowing you to:
     - Keep sensitive data out of configuration files
