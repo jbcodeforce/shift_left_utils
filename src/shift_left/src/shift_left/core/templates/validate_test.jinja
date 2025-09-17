@@ -1,12 +1,16 @@
 with expected_results as (
     select 
-    {{ expected_result_section }}
+    {% for table in column_names -%}
+       '{{ table }}' as expected_{{ table }}{% if not loop.last %},{% endif %}    
+    {% endfor %}
+        
+    -- union all -- add more union here for each potential test data
     
 ),
 actual_results as (
     select 
         {% for table in column_names -%}
-        {{ table }},
+        {{ table }}{% if not loop.last %},{% endif %}
         {% endfor %}
     from {{ table_name }}
 ),
@@ -18,16 +22,16 @@ validation_check as (
         {% endfor %}
         -- be sure to use the correct conditions for the check
         {% for table in column_names -%}
-        case when a.{{ table }} = e.expected_{{ table }} then 'PASS' else 'FAIL' end as {{ table }}_check,
+        case when a.{{ table }} = e.expected_{{ table }} then 'PASS' else 'FAIL' end as {{ table }}_check{% if not loop.last %},{% endif %}
         {% endfor %}
 
     from expected_results e
-    left join actual_results a on a.sid = e.sid -- changecondition here
+    left join actual_results a on a.sid = e.sid -- !!! change the condition here
 ),
 overall_result as (
     select 
         count(*) as total_expected_records,
-        sum(case when {% for table in column_names -%} {{ table }}_check = 'PASS' AND {% endfor %}then 1 else 0 end) as passing_records,
+        sum(case when {% for table in column_names -%} {{ table }}_check = 'PASS'{% if not loop.last %} AND{% endif %} {% endfor %}then 1 else 0 end) as passing_records,
         (select count(*) from actual_results) as actual_record_count
     from validation_check
 )

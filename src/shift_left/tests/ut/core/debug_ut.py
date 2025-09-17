@@ -4,7 +4,7 @@ import os
 import pathlib
 import json
 import time
-
+import yaml
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 #os.environ["CONFIG_FILE"]= os.getenv("HOME") + ".shift_left/config-dev.yaml"
@@ -21,7 +21,7 @@ from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.deployment_mgr as dm
 import shift_left.core.test_mgr as test_mgr
 import shift_left.core.table_mgr as table_mgr
-from shift_left.core.utils.file_search import get_or_build_inventory
+from shift_left.core.utils.file_search import get_or_build_inventory, get_table_ref_from_inventory, FlinkTableReference, from_pipeline_to_absolute
 import shift_left.core.deployment_mgr as deployment_mgr
 from ut.core.BaseUT import BaseUT
 
@@ -84,26 +84,27 @@ class TestDebugUnitTests(BaseUT):
         return ComputePoolList(pools=[pool_1])
     
     
-    def test_create_validation_sql_content(self):
-        test_definition, table_ref= test_mgr._load_test_suite_definition(table_name="fct_user_per_group")
+    def test_create_yaml_file(self):
         inventory_path = os.path.join(os.getenv("PIPELINES"),)
         table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-        tests_folder_path = os.path.join(os.getenv("PIPELINES"), '..', table_ref.table_folder_name, "tests")
-        sql_content = test_mgr._build_validation_sql_content(table_name="fct_user_per_group", 
-                                                        test_definition=test_definition, 
-                                                        table_inventory=table_inventory, 
-                                                        tests_folder_path=tests_folder_path)
-        print(sql_content)
-        assert sql_content is not None
-        assert "expected_group_id" in sql_content
-        assert "expected_group_name" in sql_content
-        assert "expected_group_type" in sql_content
-        assert "expected_total_users" in sql_content
-        assert "expected_active_users" in sql_content
-        assert "expected_inactive_users" in sql_content
-        assert "expected_latest_user_created_date" in sql_content
+        table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name="fct_user_per_group", inventory=table_inventory)
+        test_folder_path = from_pipeline_to_absolute(table_ref.table_folder_name) + "/tests"
+        test_definition = test_mgr._add_test_files(table_to_test_ref=table_ref, 
+                                                tests_folder=test_folder_path,
+                                                table_inventory=table_inventory,
+                                                create_csv=False,
+                                                nb_test_cases=1,
+                                                use_ai=False)
 
-   
+        assert test_definition is not None
+        
+        yaml_file = os.path.join(test_folder_path, '..', "fct_user_per_group_1.yaml")
+        with open(yaml_file, "r") as f:
+            yaml_content = yaml.load(f, Loader=yaml.FullLoader)
+        assert yaml_content is not None
+        assert "fct_user_per_group" in yaml_content
+ 
+        
 
 if __name__ == '__main__':
     unittest.main()
