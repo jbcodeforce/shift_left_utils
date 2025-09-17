@@ -319,6 +319,14 @@ def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare t
     deployment_mgr.prepare_tables_from_sql_file(sql_file_name, compute_pool_id)
     print(f"Content of {sql_file_name} executed")
 
+@app.command()
+def init_integration_test(table_name: str = typer.Argument(help="The table name to initialize the integration test for.")):
+    """
+    Initialize the integration test for a given table.
+    """
+    print(f"Initialize integration test for table {table_name}")
+    pipeline_mgr.init_integration_test_for_pipeline(table_name, os.getenv("PIPELINES"))
+    print(f"Integration test initialized for table {table_name}")
 # ----- Private APIs -----
     
 def _build_deploy_pipeline(

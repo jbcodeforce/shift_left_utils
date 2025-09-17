@@ -1,12 +1,18 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.38
+- Enhance validation.sql for unit tests
+- Fix an issue for dev src sql content modification
+- remove dependency on tk
+
 v0.1.37
 * Shift Left utility now supports environment variables for sensitive configuration values. Environment variables take precedence over config.yaml values, allowing you to:
     - Keep sensitive data out of configuration files
     - Use different credentials for different environments
     - Securely manage secrets in CI/CD pipelines
     - Follow security best practices
+* The config.yaml is not reduced to the minimum parameters and default values are in the code.
 * Test harness now supports `app.post_fix_unit_test` to update table name while deploying. the _ut is during the creation of the unit tests, and should be committed to git as this. The run-unit-tests or run-validation-tests will take care of the `app.post_fix_unit_test`
 * A new command at the project level to do some statement housekeeping: `shilft_left project housekeep-statements` will clean completed and failed statements.
 

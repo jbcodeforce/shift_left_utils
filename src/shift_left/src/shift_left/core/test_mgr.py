@@ -10,7 +10,6 @@ Provides testing capabilities including:
 - Integration with Confluent Cloud Flink REST API
 - YAML-based test suite definitions and CSV test data support
 """
-from turtle import st
 from pydantic import BaseModel, Field
 from typing import List, Final, Optional, Dict, Tuple, Union, Any, Callable
 import yaml
@@ -598,6 +597,12 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
                 columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
                 with open(input_file, "w") as f:
                     f.write(f"insert into {input_data.table_name}{DEFAULT_POST_FIX_UNIT_TEST}\n({columns_names})\nvalues\n{rows}\n")
+                yaml_file = os.path.join(tests_folder_path, '..', input_data.file_name.replace(".sql", ".yaml"))
+                with open(yaml_file, "w") as f:
+                    f.write(f"{input_data.table_name}:\n")
+                    for column in table_struct[input_data.table_name]:
+                        f.write(f"  - {column}: ['enum_test_data']\n")
+
             if input_data.file_type == "csv":
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
                 columns_names, rows = _build_data_sample(table_struct[input_data.table_name], DEFAULT_TEST_DATA_ROWS)
@@ -611,7 +616,7 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
         # Create output validation files 
         for output_data in test_case.outputs:
             output_file = os.path.join(tests_folder_path, '..', output_data.file_name)
-            validation_sql_content = _build_validation_sql_content(output_data.table_name, test_definition)
+            validation_sql_content = _build_validation_sql_content(output_data.table_name, table_inventory)
             with open(output_file, "w") as f:
                 f.write(validation_sql_content)
         if use_ai:
@@ -644,17 +649,30 @@ def _generate_test_readme(table_ref: FlinkTableReference,
     with open(tests_folder_path + '/README.md', 'w') as f:
         f.write(rendered_readme_md)
 
-def _build_validation_sql_content(table_name: str,  test_definition: SLTestDefinition) -> str:
+def _build_validation_sql_content(table_name: str, table_inventory: Dict[str, FlinkTableReference]) -> str:
     """
     Build the validation SQL content for a given table.
+    It is possible that the SQL under test has multiple output tables, but most likely one: itself.
+    The inventory argument is used to get the table reference of the output table.
     """
-    env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    template = env.get_template("validate_test.jinja")
-    context = {
-        'table_name': table_name + DEFAULT_POST_FIX_UNIT_TEST
-    }
-    sql_content = template.render(context)
+    output_table_ref: FlinkTableReference = FlinkTableReference.model_validate(table_inventory[table_name])
+    file_path = from_pipeline_to_absolute(output_table_ref.ddl_ref)
+    parser = SQLparser()
+    sql_content = ""
+    with open(file_path, "r") as f:
+        ddl_sql_content = f.read()
+        columns = parser.build_column_metadata_from_sql_content(ddl_sql_content)  # column_name -> column_metadata
+        column_names = [name for name in columns]
+        env = Environment(loader=PackageLoader("shift_left.core","templates"))
+        template = env.get_template("validate_test.jinja")
+        context = {
+            'table_name': table_name + DEFAULT_POST_FIX_UNIT_TEST,
+            'column_names': column_names,
+        }
+        sql_content = template.render(context)
+        sql_content = sql_content.replace("AND then 1", "then 1")
     return sql_content
+
 
 def _build_save_test_definition_json_file(
         file_path: str, 

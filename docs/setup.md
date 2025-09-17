@@ -87,18 +87,11 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
     ```yaml
     kafka:
       bootstrap.servers: lkc-2qxxxx-pyyyy.us-west-2.aws.confluent.cloud:9092
-      cluster_id: lkc-2qxxxx
-      pkafka_cluster: lkc-2qxxxx-pyyyy
-      security.protocol: SASL_SSL
-      sasl.mechanisms: PLAIN
-      sasl.username: <key name>
-      sasl.password: <key secret> 
-      session.timeout.ms: 5000
       cluster_type: stage
       src_topic_prefix: clone
+      reject_topics_prefixes: ["clone","dim_","src_"]
     ```
-    * the sasl.username is the api key name, and the sasl.password is the api secrets. Those are created in the `Kafka cluster > API Keys`. The key can be downloaded locally.
-    ![]()
+
 
 === "Confluent cloud"
     
@@ -106,37 +99,22 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
 
     ```yaml
     confluent_cloud:
-      base_api: api.confluent.cloud/org/v2
       environment_id:  env-20xxxx
       region:  us-west-2
       provider:  aws
       organization_id: 5329.....96
-      api_key: T3.....HH
-      api_secret: secret-key
-      page_size: 100
-      glb_name: glb
-      url_scope: private
     ```
     * The `organization_id` is defined under the `user account > Organization settings`
-    * the url_scope is set to `private` or `public`. When using private link it should be private. 
-    * When using a global load balancer, the glb_name to be set. It will be use to define the URL of the REST API.
-    * The API key and secrets are defined per user, and visible  under the `user account > API keys`
-
+   
 === "Flink"
     * Flink settings are per environment. Get the URL endpoint by going to `Environments > one_of_the_env > Flink > Endpoints`, copy the private or public endpoint
     ```yaml
     flink:
-        flink_url: flink-d....7.us-west-2.aws.glb.confluent.cloud
-        api_key: MVXI.....HY   
-        api_secret: cf.......IztA
         compute_pool_id: lfcp-0...
         catalog_name:  dev-flink-us-west-2
         database_name:  dev-flink-us-west-2
-        max_cfu: 50       #-- maximum CFU when creating compute pool via the tool
-        max_cfu_percent_before_allocation: .8   #-- percent * 100 to consider before creating a new compute pool 
     ```
 
-    * Define the API keys from `Environments > one_of_the_env > Flink > API keys`.
     * The compute pool id is used as default for running Flink query.
     * Catalog name is the name of the environment and database name is the name of the Kafka cluster
 
@@ -144,16 +122,8 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
     The app section defines a set of capabilities to tune the cli.
     ```yaml
     app:
-        delta_max_time_in_min: 15  # this is to apply randomly to the event timestamp to create out of order
-        default_PK: __db
-        timezone: America/Los_Angeles
-        src_table_name_prefix: src_
-        logging: INFO
-        products: ["p1", "p2", "p3"]
         accepted_common_products: ['common', 'seeds']
-        cache_ttl: 120 # in seconds
         sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
-        translator_to_flink_sql_agent: shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent
         dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
         compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
         data_limit_where_condition : rf"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})"

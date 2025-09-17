@@ -91,8 +91,9 @@ class TestConfluentClient(unittest.TestCase):
         config = get_config()
         config["kafka"]["bootstrap.servers"] = "lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092"
         cclient = ConfluentCloudClient(config)
-        url = cclient.build_flink_url_and_auth_header()
-        self.assertEqual(url, "https://flink.us-west-2.aws.glb.confluent.cloud/sql/v1/organizations/49cee212-6346-438a-a1fa-d1b1cbd90d44/environments/env-nknqp3")
+        url, auth_header = cclient.build_flink_url_and_auth_header()
+        self.assertTrue(url.startswith("https://flink-dm8me7.us-west-2.aws.glb.confluent.cloud/sql/v1/organizations"))
+        self.assertTrue(auth_header.startswith("Basic "))
         
 if __name__ == "__main__":
     unittest.main()

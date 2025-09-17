@@ -18,4 +18,5 @@ INSERT INTO raw_groups (group_id, group_name, group_type, created_date, is_activ
 ('manager', 'Managers', 'leadership', '2023-01-05', true),
 
 -- Group 5: Developer group
-('developer', 'Developers', 'technical', '2023-01-15', true);
+('developer', 'Developers', 'technical', '2023-01-15', true),
+('analyst', 'Analysts', 'technical', '2023-01-15', true);

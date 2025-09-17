@@ -24,7 +24,7 @@ from shift_left.core.test_mgr import (
     SLTestData,
     Foundation
 )
-from shift_left.core.utils.file_search import FlinkTableReference
+from shift_left.core.utils.file_search import FlinkTableReference, get_or_build_inventory
 
 
 class TestTestManager(unittest.TestCase):
@@ -1305,6 +1305,31 @@ class TestTestManager(unittest.TestCase):
             print(content)
         os.remove(tests_folder_path + "/README.md")
         os.rmdir(tests_folder_path)
+
+
+    def test_create_validation_sql_content(self):
+        inventory_path = os.path.join(os.getenv("PIPELINES"),)
+        table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+        sql_content = test_mgr._build_validation_sql_content(table_name="fct_user_per_group", 
+                                                        table_inventory=table_inventory)
+        print(f"sql_content: {sql_content}")    
+        assert sql_content is not None
+        assert "expected_group_id" in sql_content
+        assert "expected_group_name" in sql_content
+        assert "expected_group_type" in sql_content
+        assert "expected_total_users" in sql_content
+        assert "expected_active_users" in sql_content
+        assert "expected_inactive_users" in sql_content
+        assert "expected_latest_user_created_date" in sql_content
+        assert "case when a.group_id = e.expected_group_id then 'PASS' else 'FAIL' end as group_id_check" in sql_content
+        assert "case when a.group_name = e.expected_group_name then 'PASS' else 'FAIL' end as group_name_check" in sql_content
+        assert "case when a.group_type = e.expected_group_type then 'PASS' else 'FAIL' end as group_type_check" in sql_content
+        assert "case when a.total_users = e.expected_total_users then 'PASS' else 'FAIL' end as total_users_check" in sql_content
+        assert "case when a.active_users = e.expected_active_users then 'PASS' else 'FAIL' end as active_users_check" in sql_content
+        assert "case when a.inactive_users = e.expected_inactive_users then 'PASS' else 'FAIL' end as inactive_users_check" in sql_content
+        assert "case when a.latest_user_created_date = e.expected_latest_user_created_date then 'PASS' else 'FAIL' end as latest_user_created_date_check" in sql_content
+        assert "case when a.fact_updated_at = e.expected_fact_updated_at then 'PASS' else 'FAIL' end as fact_updated_at_check" in sql_content
+   
 
 if __name__ == '__main__':
     unittest.main()
