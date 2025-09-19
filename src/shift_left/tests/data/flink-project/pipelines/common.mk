@@ -25,7 +25,7 @@ delete_schema = \
 create_flink_statement = \
 	sql_statement=$$(cat $2);\
 	echo $$sql_statement; \
-	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)  --environment $(ENV_ID) --context $(CC_CONTEXT) --wait 
+	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)  --environment $(ENV_ID) --wait 
 
 show_create_table = \
 	sql_statement="show create table $2";\
@@ -45,7 +45,7 @@ resume_flink_statement = \
 	confluent flink statement resume $1 --cloud $(CLOUD) --region $(REGION) 
 
 delete_flink_statement = \
-	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --context $(CC_CONTEXT)
+	confluent flink statement delete $1 --cloud $(CLOUD) --region $(REGION) --environment $(ENV_ID) --context $(CC_CONTEXT)
 
 list_topic_content = \
 	CLUSTER_ID=$$(confluent kafka cluster list --environment $$ENV_ID | awk -F '|' '{sub(/^[ \t]+/,"",$$2);sub(/[ \t]+$$/,"",$$2); print $$2}' | tail -1); \

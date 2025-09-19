@@ -8,6 +8,7 @@ import shutil
 import tempfile
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
+os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.project import app
 import subprocess
@@ -20,7 +21,6 @@ class TestProjectCLI(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/it-config.yaml"
 
     @classmethod
     def tearDownClass(cls):

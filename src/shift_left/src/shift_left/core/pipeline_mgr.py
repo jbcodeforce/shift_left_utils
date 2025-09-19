@@ -167,10 +167,6 @@ def delete_all_metada_files(root_folder: str):
     print(f"Total number of files deleted: {count}")
 
 
-def init_integration_test_for_pipeline(table_name: str, pipeline_path: str):
-    table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
-    table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    
 
 # ---- Private APIs ---- 
 
