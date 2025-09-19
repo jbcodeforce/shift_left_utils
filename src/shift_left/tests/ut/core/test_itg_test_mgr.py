@@ -5,6 +5,7 @@ Unit tests for Integration Test Manager functionality.
 """
 import os
 import pathlib
+import shutil
 import unittest
 from unittest.mock import patch, mock_open, MagicMock, call
 from datetime import datetime, timezone
@@ -33,16 +34,27 @@ from shift_left.core.utils.app_config import reset_all_caches
 
 
 class TestIntegrationTestManager(unittest.TestCase):
-    """Unit test suite for Integration Test Manager functionality."""
+    """
+    Validate that init_integration_test_for_pipeline creates a tests folder structure
+    with insert statements for source tables and validation SQLs for relevant intermediates
+    and the sink tables.
+    """
 
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
-        reset_all_caches()
+
+    def _assert_files_exist(self, base_dir: pathlib.Path, file_names: list[str]) -> None:
+        for fn in file_names:
+            self.assertTrue((base_dir / fn).exists(), f"Expected file missing: {(base_dir / fn)}")
+
+    def _cleanup_tests_dir(self, product_name: str, table_name: str) -> None:
+        tests_dir = pathlib.Path(self.inventory_path) / "tests" / product_name / table_name
+        if tests_dir.exists():
+            shutil.rmtree(tests_dir)
 
     def setUp(self):
         """Set up test environment and reset caches."""
-        reset_all_caches()
         
         # Sample test data
         self.test_pipeline_path = os.getenv("PIPELINES")

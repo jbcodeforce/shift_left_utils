@@ -1,14 +1,14 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-import pytest
 import unittest
 from typer.testing import CliRunner
 from shift_left.cli_commands.pipeline import app
 import os
 from pathlib import Path
+os.environ["CONFIG_FILE"] = str(Path(__file__).parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import shift_left_dir
-
+from shift_left.cli_commands.pipeline import app
 
 
 class TestPipelineCLI(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestPipelineCLI(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/it-config.yaml"
+
 
     def test_report_command_success(self):
         """Test successful execution of the report command"""

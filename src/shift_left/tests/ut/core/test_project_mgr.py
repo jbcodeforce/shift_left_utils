@@ -34,6 +34,10 @@ class TestProjectManager(unittest.TestCase):
         except Exception as e:
             self.fail()
 
+    def test_report_table_cross_products(self):
+        result = pm.report_table_cross_products(self.data_dir)
+        assert result
+        assert len(result) == 0
         
 if __name__ == '__main__':
     unittest.main()

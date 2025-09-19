@@ -6,10 +6,13 @@ import subprocess
 import shutil
 import importlib.resources 
 from typing import Tuple, List
+from shift_left.core.table_mgr import get_or_build_inventory
 from shift_left.core.utils.file_search import create_folder_if_not_exist
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
-
+from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
+from shift_left.core.utils.file_search import PIPELINE_JSON_FILE_NAME, get_table_ref_from_inventory
+from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
 TMPL_FOLDER="templates"
@@ -42,6 +45,21 @@ def get_topic_list(file_name: str):
     return topics["data"]
 
 
+def report_table_cross_products(project_path: str):
+    """
+    Return the lit of table names for tables that are referenced in other products.
+    """
+    if not project_path:
+        project_path = os.getenv("PIPELINES")
+    inventory = get_or_build_inventory(project_path, project_path, False)
+    risky_tables = []
+    for table_name, table_ref in inventory.items():
+        table_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+        for child in table_hierarchy.children:
+            if child.product_name != table_ref.product_name:
+                risky_tables.append(table_name)
+                break
+    return risky_tables
 
 # --- Private APIs ---
 
