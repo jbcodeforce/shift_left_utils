@@ -5,6 +5,7 @@ import unittest
 import pathlib
 import os
 from unittest.mock import patch
+
 from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
 from shift_left.core.utils.app_config import get_config
 

@@ -1,7 +1,0 @@
-int_p1_table_1
-int_p1_table_2
-p1_fct_order
-products
-src_p1_table_2
-src_p1_table_3
-src_table_1

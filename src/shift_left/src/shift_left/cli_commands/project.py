@@ -155,6 +155,32 @@ def validate_config():
         print("Config.yaml validated")
 
 @app.command()
+def report_table_cross_products():
+        """
+        Report the list of tables that are referenced in other products
+        """
+        print("#" * 30 + f" Report table cross products")
+        result = project_manager.report_table_cross_products(os.getenv("PIPELINES"))
+        print(result)
+        if result:
+            with open(os.getenv("PIPELINES") + "/table_cross_products.txt", "w") as f:
+                for table in result:
+                    f.write(table + "\n")
+            print(f"Table cross products saved in {os.getenv('PIPELINES')}/table_cross_products.txt")
+        else:
+            print(f"No table cross products found")
+       
+@app.command()
+def report_table_cross_products():
+        """
+        Report the list of tables that are referenced in other products
+        """
+        print("#" * 30 + f" Report table cross products")
+        result = project_manager.report_table_cross_products(os.getenv("PIPELINES"))
+        print(result)
+        print(f"Table cross products saved in {os.getenv('PIPELINES')}/table_cross_products.txt")
+
+@app.command()
 def list_modified_files(
     branch_name: Annotated[str, typer.Argument(help="Git branch name to compare against (e.g., 'main', 'origin/main')")],
     output_file: Annotated[str, typer.Option(help="Output file path to save the list")] = "modified_flink_files.txt",

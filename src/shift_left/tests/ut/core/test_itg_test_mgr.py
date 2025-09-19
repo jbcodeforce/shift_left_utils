@@ -59,7 +59,7 @@ class TestIntegrationTestManager(unittest.TestCase):
         # Sample test data
         self.test_pipeline_path = os.getenv("PIPELINES")
         self.test_sink_table = "fct_user_per_group"
-        self.test_product_name = "users"
+        self.test_product_name = "c360"
         
 
     def test_init_integration_tests_success_with_project_path(self):
@@ -125,7 +125,7 @@ class TestIntegrationTestManager(unittest.TestCase):
         result = _find_source_tables_for_sink(self.test_sink_table, inventory, self.test_pipeline_path)
         
         # Should find both source tables
-        self.assertCountEqual(result, ["src_users_users", "src_users_groups"])
+        self.assertCountEqual(result, ["src_c360_users", "src_c360_groups"])
 
    
     def _test_create_synthetic_data_files(self):

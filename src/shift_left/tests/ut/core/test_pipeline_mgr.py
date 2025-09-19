@@ -39,11 +39,11 @@ class TestPipelineManager(unittest.TestCase):
         print("test_build_a_src_pipelinedef")
         path= os.getenv("PIPELINES")
         pm.delete_all_metada_files(path)
-        dml_table_path=path + "/sources/src_table_1/sql-scripts/dml.src_table_1.sql"
-        ddl_table_path=path + "/sources/src_table_1/sql-scripts/ddl.src_table_1.sql"
+        dml_table_path=path + "/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql"
+        ddl_table_path=path + "/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql"
         result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
-        assert result.table_name == "src_table_1"
+        assert result.table_name == "src_c360_groups"
         assert len(result.parents) == 0
         assert len(result.children) == 0
         assert "source" == result.type
@@ -74,6 +74,7 @@ class TestPipelineManager(unittest.TestCase):
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
         pm.build_all_pipeline_definitions( os.getenv("PIPELINES"))
         assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
+        assert os.path.exists(os.getenv("PIPELINES") + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME)
 
     def test_visit_parents(self):
         print("test_visit_parents")
@@ -83,6 +84,8 @@ class TestPipelineManager(unittest.TestCase):
         assert pipeline_def
         pm._visit_parents(pipeline_def)
         print(pipeline_def.model_dump_json(indent=3))
+        assert len(pipeline_def.parents) == 2
+        assert len(pipeline_def.children) == 0
        
     def test_build_pipeline_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")

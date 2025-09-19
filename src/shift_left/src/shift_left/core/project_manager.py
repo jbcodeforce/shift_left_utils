@@ -54,11 +54,12 @@ def report_table_cross_products(project_path: str):
     inventory = get_or_build_inventory(project_path, project_path, False)
     risky_tables = []
     for table_name, table_ref in inventory.items():
-        table_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-        for child in table_hierarchy.children:
-            if child.product_name != table_ref.product_name:
-                risky_tables.append(table_name)
-                break
+        table_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
+        if table_hierarchy:
+            for child in table_hierarchy.children:
+                if child.product_name != table_ref['product_name']:
+                    risky_tables.append(table_name)
+                    break
     return risky_tables
 
 # --- Private APIs ---

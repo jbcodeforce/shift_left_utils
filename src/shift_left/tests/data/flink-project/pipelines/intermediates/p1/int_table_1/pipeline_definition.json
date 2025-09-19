@@ -56,11 +56,11 @@
       },
       {
          "table_name": "src_table_1",
-         "product_name": "None",
+         "product_name": "common",
          "type": "source",
-         "dml_ref": "pipelines/sources/src_table_1/sql-scripts/dml.src_table_1.sql",
-         "ddl_ref": "pipelines/sources/src_table_1/sql-scripts/ddl.src_table_1.sql",
-         "path": "pipelines/sources/src_table_1",
+         "dml_ref": "pipelines/sources/common/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "ddl_ref": "pipelines/sources/common/src_table_1/sql-scripts/ddl.src_table_1.sql",
+         "path": "pipelines/sources/common/src_table_1",
          "complexity": {
             "number_of_regular_joins": 0,
             "number_of_left_joins": 0,

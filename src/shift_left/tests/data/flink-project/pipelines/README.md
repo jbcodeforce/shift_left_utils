@@ -11,6 +11,7 @@ This table tracks the deployment status of all SQL scripts across the pipeline c
 
 ## Integration tests
 
+* [Happy path]() 
 
 ## Sources
 
