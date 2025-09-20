@@ -58,7 +58,6 @@ def build_folder_structure_for_table(table_folder_name: str,
     * `target_path/product_name/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
     """
     logger.info(f"Create folder {table_folder_name} in {target_path}")
-    config = get_config()
     table_type = get_table_type_from_file_path(target_path)
     if not product_name:
         table_folder = f"{target_path}/{table_folder_name}"

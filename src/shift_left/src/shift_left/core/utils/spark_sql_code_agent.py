@@ -1,5 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
+
+An agentic flow to translate Spark SQL to Flink SQL.
 """
 
 from pydantic import BaseModel

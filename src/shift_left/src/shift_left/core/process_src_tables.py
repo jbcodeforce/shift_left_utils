@@ -97,7 +97,7 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
     sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
     try:
         logger.info("try to get the column definitions by calling Confluent Cloud REST API")
-        column_definitions, fields=get_column_definitions(table_name, config)
+        column_definitions, fields=get_column_definitions(table_name)
     except Exception as e:
         logger.error(e)
         column_definitions = "-- add columns"

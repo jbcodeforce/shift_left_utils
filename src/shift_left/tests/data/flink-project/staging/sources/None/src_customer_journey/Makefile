@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- big_table
-TABLE_NAME=big_table
-SCRIPT_PRE_KEBAB=dev-usw2-ut
+# --- src_None_customer_journey
+TABLE_NAME=src_None_customer_journey
+SCRIPT_PRE_KEBAB=dev-usw2-None
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_big_table: create_flink_ddl  create_flink_dml
+create_src_None_customer_journey: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
