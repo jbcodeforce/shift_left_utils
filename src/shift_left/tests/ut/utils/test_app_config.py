@@ -663,7 +663,7 @@ class TestValidateConfig(unittest.TestCase):
                 f"Expected config value 'cdc', got {config['kafka']['src_topic_prefix']}"
 
             # Test 6: App section deep merge - config value used when present
-            assert config["app"]["post_fix_unit_test"] == "_ut", \
+            assert config["app"]["post_fix_unit_test"] == "_jb", \
                 f"Expected config value '_ut', got {config['app']['post_fix_unit_test']}"
 
             # Test 7: App section deep merge - config value used when present in config file

@@ -138,7 +138,7 @@ class TestTableWorker(unittest.TestCase):
         )
         """
         worker = Change_CompressionType()
-        updated, sql_out= worker.update_sql_content(sql_in)
+        updated, sql_out= worker.update_sql_content(sql_in,'','p4')
         assert sql_out
         assert updated
         assert "'kafka.producer.compression.type' = 'snappy'" in sql_out
@@ -164,7 +164,7 @@ class TestTableWorker(unittest.TestCase):
             'value.format' = 'avro-registry'
         )
         """
-        updated, sql_out= runner_class().update_sql_content(sql_in)
+        updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert updated
         assert "'key.avro-registry.schema-context' = '.flink-stage'" in sql_out
@@ -190,7 +190,7 @@ class TestTableWorker(unittest.TestCase):
             'value.format' = 'avro-registry'
         )
         """ 
-        updated, sql_out= runner_class().update_sql_content(sql_in)
+        updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert updated
         assert "'key.avro-registry.schema-context' = '.flink-prod'" in sql_out
@@ -213,7 +213,7 @@ class TestTableWorker(unittest.TestCase):
             `ap-tag-order-dev.template`
         );
         """
-        updated, sql_out= runner_class().update_sql_content(sql_in)
+        updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert "replicated.stage.ap-tag-order-stage.template" in sql_out
 
@@ -234,7 +234,7 @@ class TestTableWorker(unittest.TestCase):
             `ap-tag-order-dev.template`
         );
         """ 
-        updated, sql_out= runner_class().update_sql_content(sql_in)
+        updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert updated
         assert "replicated.prod.ap-tag-order-prod.template" in sql_out
@@ -467,7 +467,7 @@ class TestTableWorker(unittest.TestCase):
         # Test with invalid SQL content
         sql_in = "insert into src_order select id, status, name, is_migrated from `clone.dev.ap-tag-order-dev.template`;"
         worker = ReplaceEnvInSqlContent()
-        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in, column_to_search='tenant_id', product_name='p4')
         print(sql_out)
         assert updated
         assert "replicated.stage.ap-tag-order-stage.template" in sql_out
@@ -480,7 +480,7 @@ class TestTableWorker(unittest.TestCase):
         get_config()['kafka']['cluster_type']='prod'
         get_config()['kafka']['src_topic_prefix']='replicated'
         worker = ReplaceEnvInSqlContent()
-        updated, sql_out = worker.update_sql_content(sql_content=sql_in)
+        updated, sql_out = worker.update_sql_content(sql_content=sql_in, column_to_search='tenant_id', product_name='p4')
         print(sql_out)
         assert updated
         assert "replicated.prod.ap-tag-order-prod.template" in sql_out

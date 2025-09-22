@@ -731,6 +731,320 @@ class TestSQLParser(unittest.TestCase):
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.complexity_type, "Simple")
 
+    def test_parse_sql_values_simple_values(self):
+        """Test parsing simple comma-separated values without quotes"""
+        parser = SQLparser()
+        
+        # Simple values without quotes
+        result = parser._parse_sql_values("value1, value2, value3")
+        self.assertEqual(result, ["value1", "value2", "value3"])
+        
+        # Values with extra spaces
+        result = parser._parse_sql_values("  value1  ,  value2  ,  value3  ")
+        self.assertEqual(result, ["value1", "value2", "value3"])
+
+    def test_parse_sql_values_single_quotes(self):
+        """Test parsing values with single quotes"""
+        parser = SQLparser()
+        
+        # Simple quoted values
+        result = parser._parse_sql_values("'value1', 'value2', 'value3'")
+        self.assertEqual(result, ["value1", "value2", "value3"])
+        
+        # Mixed quoted and unquoted
+        result = parser._parse_sql_values("'quoted', unquoted, 'another quoted'")
+        self.assertEqual(result, ["quoted", "unquoted", "another quoted"])
+
+    def test_parse_sql_values_double_quotes(self):
+        """Test parsing values with double quotes"""
+        parser = SQLparser()
+        
+        # Double quoted values
+        result = parser._parse_sql_values('"value1", "value2", "value3"')
+        self.assertEqual(result, ["value1", "value2", "value3"])
+        
+        # Mixed quote types
+        result = parser._parse_sql_values("'single', \"double\", unquoted")
+        self.assertEqual(result, ["single", "double", "unquoted"])
+
+    def test_parse_sql_values_escaped_quotes(self):
+        """Test parsing values with escaped quotes"""
+        parser = SQLparser()
+        
+        # Escaped single quotes
+        result = parser._parse_sql_values("'O''Reilly', 'Don''t', 'It''s working'")
+        self.assertEqual(result, ["O'Reilly", "Don't", "It's working"])
+        
+        # Escaped double quotes
+        result = parser._parse_sql_values('"He said ""Hello""", "She replied ""Hi"""')
+        self.assertEqual(result, ['He said "Hello"', 'She replied "Hi"'])
+
+    def test_parse_sql_values_values_with_commas_in_quotes(self):
+        """Test parsing quoted values that contain commas"""
+        parser = SQLparser()
+        
+        # Commas inside quoted values should not split
+        result = parser._parse_sql_values("'value1, with comma', 'value2', 'another, value'")
+        self.assertEqual(result, ["value1, with comma", "value2", "another, value"])
+        
+        # Mixed with double quotes
+        result = parser._parse_sql_values('"value1, comma", \'value2\', "another, one"')
+        self.assertEqual(result, ["value1, comma", "value2", "another, one"])
+
+    def test_parse_sql_values_empty_and_edge_cases(self):
+        """Test parsing edge cases and empty values"""
+        parser = SQLparser()
+        
+        # Empty string
+        result = parser._parse_sql_values("")
+        self.assertEqual(result, [])
+        
+        # Single value
+        result = parser._parse_sql_values("single")
+        self.assertEqual(result, ["single"])
+        
+        # Single quoted value
+        result = parser._parse_sql_values("'single quoted'")
+        self.assertEqual(result, ["single quoted"])
+        
+        # Empty quoted values - note: function currently returns only one empty string for "'', \"\""
+        result = parser._parse_sql_values("'', ''")
+        self.assertEqual(result, [""])  # Current behavior: only returns one empty string
+        
+        # Single empty double quote
+        result = parser._parse_sql_values("\"\"")
+        self.assertEqual(result, [])  # Current behavior: returns empty list
+        
+        # Values with only spaces and commas
+        result = parser._parse_sql_values("   ,   ")
+        self.assertEqual(result, [""])  # Current behavior: returns one empty string
+
+    def test_parse_sql_values_special_characters(self):
+        """Test parsing values with special characters"""
+        parser = SQLparser()
+        
+        # Values with special characters
+        result = parser._parse_sql_values("'value@domain.com', 'user#123', 'path/to/file'")
+        self.assertEqual(result, ["value@domain.com", "user#123", "path/to/file"])
+        
+        # Numbers and mixed content
+        result = parser._parse_sql_values("123, 'text123', '456text'")
+        self.assertEqual(result, ["123", "text123", "456text"])
+
+    def test_parse_sql_values_complex_scenarios(self):
+        """Test parsing complex real-world scenarios"""
+        parser = SQLparser()
+        
+        # SQL-like values that might appear in INSERT statements
+        result = parser._parse_sql_values("'John Doe', 25, 'john@email.com', 'Manager'")
+        self.assertEqual(result, ["John Doe", "25", "john@email.com", "Manager"])
+        
+        # Values with quotes and escaped quotes mixed
+        result = parser._parse_sql_values("'It''s a test', \"Another \"\"test\"\"\", normal_value")
+        self.assertEqual(result, ["It's a test", 'Another "test"', "normal_value"])
+        
+        # Empty values in the middle
+        result = parser._parse_sql_values("'first', , 'third'")
+        self.assertEqual(result, ["first", "", "third"])
+
+    def test_parse_insert_sql_to_dict_basic(self):
+        """Test basic INSERT SQL parsing functionality"""
+        parser = SQLparser()
+        
+        # Simple INSERT with single row
+        sql = "INSERT INTO users (id, name, email) VALUES ('1', 'John Doe', 'john@example.com')"
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1'],
+            'name': ['John Doe'],
+            'email': ['john@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_multiple_rows(self):
+        """Test INSERT SQL with multiple value rows"""
+        parser = SQLparser()
+        
+        sql = """INSERT INTO users (id, name, email) VALUES 
+                 ('1', 'John Doe', 'john@example.com'),
+                 ('2', 'Jane Smith', 'jane@example.com'),
+                 ('3', 'Bob Johnson', 'bob@example.com')"""
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2', '3'],
+            'name': ['John Doe', 'Jane Smith', 'Bob Johnson'],
+            'email': ['john@example.com', 'jane@example.com', 'bob@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_quoted_columns(self):
+        """Test INSERT SQL with quoted column names"""
+        parser = SQLparser()
+        
+        # Test with backticks
+        sql = "INSERT INTO `users` (`id`, `name`, `email`) VALUES ('1', 'John Doe', 'john@example.com')"
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1'],
+            'name': ['John Doe'],
+            'email': ['john@example.com']
+        }
+        self.assertEqual(result, expected)
+        
+        # Test with double quotes
+        sql = 'INSERT INTO users ("id", "name", "email") VALUES (\'1\', \'John Doe\', \'john@example.com\')'
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1'],
+            'name': ['John Doe'],
+            'email': ['john@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_mixed_quotes(self):
+        """Test INSERT SQL with mixed quote types in values"""
+        parser = SQLparser()
+        
+        sql = """INSERT INTO users (id, name, comment) VALUES 
+                 ('1', "John O'Reilly", 'He said "Hello"'),
+                 ("2", 'Jane Smith', "She replied 'Hi'")"""
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ["John O'Reilly", 'Jane Smith'],
+            'comment': ['He said "Hello"', "She replied 'Hi'"]
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_with_comments(self):
+        """Test INSERT SQL with SQL comments"""
+        parser = SQLparser()
+        
+        sql = """-- Insert user data
+                 INSERT INTO users (id, name, email) -- columns
+                 VALUES ('1', 'John Doe', 'john@example.com'), -- first user
+                        ('2', 'Jane Smith', 'jane@example.com') -- second user
+                 /* End of insert */"""
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ['John Doe', 'Jane Smith'],
+            'email': ['john@example.com', 'jane@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_special_characters(self):
+        """Test INSERT SQL with special characters in values"""
+        parser = SQLparser()
+        
+        sql = """INSERT INTO users (id, name, email, tags) VALUES 
+                 ('1', 'John@Doe', 'user+test@domain.co.uk', 'admin,vip'),
+                 ('2', 'Jane#Smith', 'jane_smith@test-domain.com', 'user,basic')"""
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ['John@Doe', 'Jane#Smith'],
+            'email': ['user+test@domain.co.uk', 'jane_smith@test-domain.com'],
+            'tags': ['admin,vip', 'user,basic']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_with_spaces(self):
+        """Test INSERT SQL with extra spaces and formatting"""
+        parser = SQLparser()
+        
+        sql = """  INSERT   INTO   users   (  id  ,  name  ,  email  )  
+                 VALUES   (  '1'  ,  'John Doe'  ,  'john@example.com'  )  """
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1'],
+            'name': ['John Doe'],
+            'email': ['john@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_case_insensitive(self):
+        """Test INSERT SQL with different case variations"""
+        parser = SQLparser()
+        
+        sql = "insert into USERS (ID, Name, Email) values ('1', 'John Doe', 'john@example.com')"
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'ID': ['1'],
+            'Name': ['John Doe'],
+            'Email': ['john@example.com']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_error_cases(self):
+        """Test INSERT SQL parsing error cases"""
+        parser = SQLparser()
+        
+        # Missing column definition
+        with self.assertRaises(ValueError) as context:
+            parser.parse_insert_sql_to_dict("INSERT INTO users VALUES ('1', 'John')")
+        self.assertIn("Could not extract column names", str(context.exception))
+        
+        # Missing VALUES section
+        with self.assertRaises(ValueError) as context:
+            parser.parse_insert_sql_to_dict("INSERT INTO users (id, name)")
+        self.assertIn("Could not extract VALUES section", str(context.exception))
+        
+        # Mismatched number of columns and values
+        with self.assertRaises(ValueError) as context:
+            parser.parse_insert_sql_to_dict("INSERT INTO users (id, name) VALUES ('1', 'John', 'Extra')")
+        self.assertIn("Number of values", str(context.exception))
+        
+        # Malformed VALUES section
+        with self.assertRaises(ValueError) as context:
+            parser.parse_insert_sql_to_dict("INSERT INTO users (id, name) VALUES invalid_syntax")
+        self.assertIn("Could not extract value rows", str(context.exception))
+
+    def test_parse_insert_sql_to_dict_escaped_quotes(self):
+        """Test INSERT SQL with escaped quotes in values"""
+        parser = SQLparser()
+        
+        # Build SQL string with proper escaping
+        sql = ("INSERT INTO users (id, name, comment) VALUES " + 
+               "('1', 'O''Reilly', 'He said ''Hello World'''), " +
+               "('2', \"Jane \"\"The Great\"\" Smith\", \"She replied \"\"Hi there\"\"\")")
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ["O'Reilly", 'Jane "The Great" Smith'],
+            'comment': ["He said 'Hello World'", 'She replied "Hi there"']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_numeric_and_special_values(self):
+        """Test INSERT SQL with numeric values and special SQL values"""
+        parser = SQLparser()
+        
+        sql = """INSERT INTO products (id, name, price, active, created_date) VALUES 
+                 ('1', 'Product A', 29.99, true, '2023-01-01'),
+                 ('2', 'Product B', 15.50, false, '2023-01-02')"""
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ['Product A', 'Product B'],
+            'price': ['29.99', '15.50'],
+            'active': ['true', 'false'],
+            'created_date': ['2023-01-01', '2023-01-02']
+        }
+        self.assertEqual(result, expected)
+
+    def test_parse_insert_sql_to_dict_ending_semicolon(self):
+        """Test INSERT SQL with ending semicolon"""
+        parser = SQLparser()
+        
+        sql = "INSERT INTO users (id, name) VALUES ('1', 'John Doe'), ('2', 'Jane Smith');"
+        result = parser.parse_insert_sql_to_dict(sql)
+        expected = {
+            'id': ['1', '2'],
+            'name': ['John Doe', 'Jane Smith']
+        }
+        self.assertEqual(result, expected)
+
         
 
 if __name__ == '__main__':
