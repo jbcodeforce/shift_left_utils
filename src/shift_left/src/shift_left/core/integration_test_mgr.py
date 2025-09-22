@@ -32,6 +32,7 @@ from shift_left.core.utils.file_search import (
 from shift_left.core.models.flink_statement_model import Statement, StatementResult
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
+from shift_left.core.utils.file_search import PIPELINE_JSON_FILE_NAME
 
 
 # Integration Test Configuration Constants
@@ -294,11 +295,14 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
                 source_tables.append(table_name)
             
             # Get pipeline definition to find parent tables
-            pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_ref.table_name, pipeline_path)
+            pipeline_def = pipeline_mgr.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
             if pipeline_def and pipeline_def.parents:
                 for parent in pipeline_def.parents:
                     find_sources_recursive(parent.table_name)
-    
+            elif not pipeline_def:
+                logger.error(f"No pipeline definition found for table: {table_name} - ensure to have run build metadata first")
+                raise ValueError(f"No pipeline definition found for table: {table_name} - ensure to have run build metadata first")
+
     find_sources_recursive(sink_table_name)
     return source_tables
 
