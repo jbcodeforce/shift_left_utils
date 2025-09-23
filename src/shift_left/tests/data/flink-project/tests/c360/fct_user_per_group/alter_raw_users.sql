@@ -1,1 +1,0 @@
-ALTER TABLE raw_users add headers MAP<STRING, STRING> METADATA;

@@ -1,1 +1,0 @@
-ALTER TABLE raw_groups add headers MAP<STRING, STRING> METADATA;

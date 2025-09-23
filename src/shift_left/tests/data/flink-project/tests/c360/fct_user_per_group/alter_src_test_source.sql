@@ -1,1 +1,0 @@
-ALTER TABLE src_test_source add headers MAP<STRING, STRING> METADATA;

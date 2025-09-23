@@ -1,1 +1,0 @@
-ALTER TABLE raw_tenants add headers MAP<STRING, STRING> METADATA;

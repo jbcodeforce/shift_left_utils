@@ -105,9 +105,9 @@ def init_integration_tests(sink_table_name: str, pipeline_path: str = None) -> I
         yaml.dump(test_definition.model_dump(), f, default_flow_style=False, indent=2)
     
     # Create ddl files for each source table
-    _create_ddl_file_for_raw_tables(sink_test_path, source_tables)
+    sql_contents = _create_ddl_file_for_raw_tables(sink_test_path, source_tables)
     # Create synthetic data files for each source table
-    _create_synthetic_data_files(sink_test_path, source_tables)
+    _create_synthetic_data_files(sink_test_path, sql_contents)
     
     # Create validation query templates
     _create_validation_query_templates(sink_test_path, sink_table_name)
@@ -270,16 +270,23 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
     return source_tables
 
 
-def _create_ddl_file_for_raw_tables(sink_test_path: str, source_tables: List[str]) -> None:
+def _create_ddl_file_for_raw_tables(sink_test_path: str, source_tables: List[str]) -> dict[str, str]:
     """Create alter table files for each source table"""
+    sql_contents = {}
     for source_table in source_tables:
-        alter_file_path = os.path.join(sink_test_path, f"alter_{source_table}.sql")
-        with open(alter_file_path, 'w') as f:
-            f.write(f"ALTER TABLE {source_table} add headers MAP<STRING, STRING> METADATA;")
-            #f.write(f"ALTER TABLE {source_table} modify headers MAP<STRING, STRING> METADATA ;")
+        sql_content = statement_mgr.show_flink_table_structure(source_table)
+        if sql_content is None:
+            logger.warning(f"Could not retrieve table structure for {source_table}, skipping DDL file creation")
+            continue
+        sql_content = sql_content.replace(source_table, source_table + CONFIGURED_POST_FIX_INTEGRATION_TEST)
+        if "METADATA" not in sql_content:
+            sql_content = sql_content.replace("\n) DISTRIBUTED", ",\n\theaders MAP<STRING, STRING> METADATA)\n) DISTRIBUTED")
+        ddl_file_path = os.path.join(sink_test_path, f"ddl.{source_table}.sql")
+        with open(ddl_file_path, 'w') as f:
+            f.write(sql_content)
+        sql_contents[source_table] = sql_content
+    return sql_contents
           
-def _get_raw_table_definition():
-    pass
 
 def _create_integration_test_definition(sink_table_name: str, 
                                         sink_test_path: str,
@@ -298,7 +305,7 @@ def _create_integration_test_definition(sink_table_name: str,
         ))
         foundations.append(Foundation(
             table_name=source_table,
-            ddl_for_test=f"./ddl_{source_table}.sql"
+            ddl_for_test=f"./ddl.{source_table}.sql"
         ))
     
     # Create validation query specification
@@ -331,35 +338,39 @@ def _create_integration_test_definition(sink_table_name: str,
     )
 
 
-def _create_synthetic_data_files(test_path: str, source_tables: List[str]) -> None:
+def _create_synthetic_data_files(test_path: str, sql_contents: dict[str, str]) -> None:
     """Create synthetic data files for source tables"""
-    for source_table in source_tables:
+    parser = SQLparser()
+    for source_table in sql_contents.keys():
         # Create SQL insert file with timestamped synthetic data
         insert_file_path = os.path.join(test_path, f"insert_{source_table}_scenario_1.sql")
         unique_id = str(uuid.uuid4())
         current_timestamp = datetime.now(timezone.utc).isoformat()
-        
+        columns = parser.build_column_metadata_from_sql_content(sql_contents[source_table])
         sql_content = f"""-- Integration test synthetic data for {source_table}
 -- Generated on: {current_timestamp}
 -- Unique test ID: {unique_id}
-
-INSERT INTO {source_table}{CONFIGURED_POST_FIX_INTEGRATION_TEST} (
-    -- Add appropriate column names here
-    id,
-    test_unique_id,
-    test_timestamp,
-    -- Add other columns...
-    created_at
+INSERT INTO {source_table}{CONFIGURED_POST_FIX_INTEGRATION_TEST} ("""
+        for column in columns.keys():
+            sql_content += f"{column}, "
+        sql_content=sql_content[:-2] + """
 ) VALUES (
     -- Add appropriate test values here
-    'test_id_1',
-    '{unique_id}',
-    TIMESTAMP '{current_timestamp}',
-    -- Add other test values...
-    CURRENT_TIMESTAMP
+"""
+        for column in columns:
+            col_type = columns[column]['type']
+            if col_type == "BIGINT" or "INT" in col_type or col_type == "FLOAT" or col_type == "DOUBLE":
+                sql_content += f"0, "
+            elif col_type == 'BOOLEAN':
+                sql_content += 'false, '
+            elif col_type == ' ARRAY<STRING>':
+                sql_content += f"['{column}_1'], "
+            elif "TIMESTAMP" in col_type:
+                sql_content += f"TIMESTAMP '2021-01-01 00:00:00', "
+            else: # string
+                sql_content += f"'{column}_1', "
+        sql_content = sql_content[:-2] + """
 );
-
--- Add more test records as needed
 """
         with open(insert_file_path, 'w') as f:
             f.write(sql_content)

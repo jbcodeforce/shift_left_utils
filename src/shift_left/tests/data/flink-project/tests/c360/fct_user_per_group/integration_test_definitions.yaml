@@ -1,27 +1,27 @@
-created_at: 2025-09-22 23:43:40.079707+00:00
+created_at: 2025-09-23 04:13:24.002688+00:00
 description: End-to-end integration test for fct_user_per_group
 foundations:
-- ddl_for_test: ./ddl_raw_groups.sql
-  table_name: raw_groups
-- ddl_for_test: ./ddl_raw_tenants.sql
-  table_name: raw_tenants
-- ddl_for_test: ./ddl_raw_users.sql
+- ddl_for_test: ./ddl.raw_users.sql
   table_name: raw_users
+- ddl_for_test: ./ddl.raw_tenants.sql
+  table_name: raw_tenants
+- ddl_for_test: ./ddl.raw_groups.sql
+  table_name: raw_groups
 measure_latency: true
 product_name: c360
 scenarios:
 - intermediate_validations: []
   name: test_fct_user_per_group_scenario_1
   source_data:
-  - file_name: ./insert_raw_groups_scenario_1.sql
-    table_name: raw_groups
-    unique_id: 0a8e4951-e86e-4efe-92b1-e826d176ed7c
-  - file_name: ./insert_raw_tenants_scenario_1.sql
-    table_name: raw_tenants
-    unique_id: ccd7a028-ea80-4ae9-b762-0d8fec8f679c
   - file_name: ./insert_raw_users_scenario_1.sql
     table_name: raw_users
-    unique_id: 96467442-e167-4b48-8a0e-da5d05dd7168
+    unique_id: 8aa87f9a-4478-48fb-974b-81d940b31787
+  - file_name: ./insert_raw_tenants_scenario_1.sql
+    table_name: raw_tenants
+    unique_id: 5fa34a3e-53a4-490f-be9c-7365bbdb0e8d
+  - file_name: ./insert_raw_groups_scenario_1.sql
+    table_name: raw_groups
+    unique_id: 1bef9444-be32-49c3-aca6-9ae7694657d4
   validation_queries:
   - file_name: ./validate_fct_user_per_group_scenario_1.sql
     table_name: fct_user_per_group
