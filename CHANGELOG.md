@@ -1,6 +1,12 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.39
+- integration tests creation
+- enhancement to the sql parser to better identify CTEs
+- New project command to get the list of tables used by cross products
+- New project command to get the list of modified table since a given data, leveraging git logs, and then compare to the running statements to build of list of tables to deploy, in the context of a 'surgical' blue/green deployment.
+
 v0.1.38
 - Enhance validation.sql for unit tests
 - Fix an issue for dev src sql content modification

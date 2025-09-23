@@ -3,7 +3,7 @@
         {
             "label": "setup_mc_environment",
             "type": "shell",
-            "command": "source ${workspaceFolder}/set_dev_env",
+            "command": "source ${workspaceFolder}/set_mc_dev_env",
             "problemMatcher": []
         }
     ]

@@ -224,16 +224,22 @@ Data engineers may use the csv format to create a lot of records. Now the challe
 
 The logic of integration tests is to validate end-to-end processing for a given pipeline and assess the time to process records from sources to facts or sink tables. Integration tests are designed to test end-to-end data flow across multiple tables and pipelines within a project. This is inherently a project-level concern and not a pipelines concern.
 
-The approach is to keep those integration tests at the same levle as the `pipelines` folder, but organize it by data product. As an example for the product users, and the analytical data build from the `fact_users` then the hierarchy will look like:
+The approach is to keep those integration tests at the same level as the `pipelines` folder of the project, but organize the tests by data product. As an example for the product `c360`, and the analytical data build from the `fact_users`, the hierarchy will look like:
 
 ```sh
 pipelines
 tests
-  └── users
+  └── c360
       └── fact_users
 ```
 
-The content of the folder will include all the insert statements for the src_ of the pipeline and the validation SQLs for intermediates and facts. The following figure illustrates those principles:
+The content of the folder will include all the insert statements for the raw topics of the pipeline and the validation SQLs for intermediates and facts. The synthetic data are injected at the raw topics with unique identifier and time stamp in the headers so raw_tables need to be altered with something like:
+
+```sql
+ALTER TABLE raw_groups add headers MAP<STRING, STRING> METADATA;
+```
+
+The following figure illustrates those principles:
 
 ![](./images/test_frwk_flink_pipeline.drawio.png)
 
@@ -258,4 +264,14 @@ Tearsdown:
 shift_left project delete-integration-tests F
 ```
 
-With this capability, we can also assess the time to process records from source to sink tables.
+With these capabilities, we can also assess the time to process records from source to sink tables.
+
+### Feature tracking
+
+- [x] init tests folder, with data product and sink table folder
+- [ ] For test isolation in shared environment and cluster, the name of the table will have a postfix defined in config.yaml and defaulted with `_it`
+- [] get all alter table for the raw tables
+- [] get all the insert synthetic data for raw_table
+- [] build a validation SQL query to validate the message arrive and compute a delta, insert this to a it_test_topic
+- [ ] Support Kafka consumer created for output sink table
+  

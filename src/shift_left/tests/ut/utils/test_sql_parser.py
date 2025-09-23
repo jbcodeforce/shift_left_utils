@@ -433,6 +433,47 @@ class TestSQLParser(unittest.TestCase):
         assert columns['parent_id'] == {'name': 'parent_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['hierarchy'] == {'name': 'hierarchy', 'type': 'STRING', 'nullable': True, 'primary_key': False}
     
+    def test_build_columns_from_sql_content_quoted_column_names_2(self):
+        parser = SQLparser()
+        query="""CREATE TABLE `j9r-env`.`j9r-kafka`.`raw_users` (
+  `user_id` VARCHAR(2147483647),
+  `user_name` VARCHAR(2147483647),
+  `user_email` VARCHAR(2147483647),
+  `group_id` VARCHAR(2147483647),
+  `tenant_id` VARCHAR(2147483647),
+  `created_date` VARCHAR(2147483647),
+  `is_active` BOOLEAN,
+  `headers` MAP<VARBINARY(2147483647), VARBINARY(2147483647)> METADATA
+)
+DISTRIBUTED BY HASH(`user_id`) INTO 1 BUCKETS
+WITH (
+  'changelog.mode' = 'append',
+  'connector' = 'confluent',
+  'kafka.cleanup-policy' = 'delete',
+  'kafka.compaction.time' = '0 ms',
+  'kafka.max-message-size' = '2097164 bytes',
+  'kafka.producer.compression.type' = 'snappy',
+  'kafka.retention.size' = '0 bytes',
+  'kafka.retention.time' = '0 ms',
+  'key.avro-registry.schema-context' = '.flink-dev',
+  'key.format' = 'avro-registry',
+  'scan.bounded.mode' = 'unbounded',
+  'scan.startup.mode' = 'earliest-offset',
+  'value.avro-registry.schema-context' = '.flink-dev',
+  'value.fields-include' = 'all',
+  'value.format' = 'avro-registry'
+)
+        """
+        columns = parser.build_column_metadata_from_sql_content(query)
+        print(columns)
+        assert columns['user_id'] == {'name': 'user_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['user_name'] == {'name': 'user_name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['user_email'] == {'name': 'user_email', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['group_id'] == {'name': 'group_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['created_date'] == {'name': 'created_date', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['is_active'] == {'name': 'is_active', 'type': 'BOOLEAN', 'nullable': True, 'primary_key': False}
+    
     def test_should_not_consider_unnest_as_table_name(self):
         parser = SQLparser()
         query="""
@@ -1046,6 +1087,259 @@ class TestSQLParser(unittest.TestCase):
         self.assertEqual(result, expected)
 
         
+    def test_get_source_topics(self):
+        """Test getting source topics."""
+        src_table='src_c360_groups'
+        parser = SQLparser()
+        dml_content="""
+        INSERT INTO src_c360_groups (
+  group_id,
+  tenant_id,
+  group_name,
+  group_type,
+  created_date,
+  is_active,
+  updated_at
+)
+WITH deduplicated_groups AS (
+  SELECT 
+    group_id,
+    tenant_id,
+    group_name,
+    group_type,
+    created_date,
+    is_active,
+    CURRENT_TIMESTAMP AS updated_at,
+    
+    -- Deduplication: Keep latest record per group_id
+    -- This handles cases where the same group appears multiple times
+    ROW_NUMBER() OVER (
+      PARTITION BY tenant_id, group_id 
+      ORDER BY `$rowtime` DESC
+    ) AS row_num
+    
+  FROM raw_groups
+  WHERE 
+    group_id IS NOT NULL  -- Ensure we have valid group_id  and tenant_id
+    AND tenant_id IS NOT NULL  
+)
+SELECT 
+  group_id,
+  tenant_id,
+  group_name,
+  group_type,
+  created_date,
+  is_active,
+  updated_at
+FROM deduplicated_groups
+WHERE row_num = 1 
+"""
+        source_topics = parser.extract_table_references(dml_content)
+        assert source_topics is not None
+        assert len(source_topics) == 2
+        assert 'raw_groups' in source_topics
+        assert src_table in source_topics
+
+    def test_extract_cte_names_simple_uppercase(self):
+        """Test CTE name extraction with uppercase WITH and AS"""
+        parser = SQLparser()
+        
+        sql = """
+        WITH user_data AS (
+            SELECT user_id, name FROM users WHERE active = 1
+        )
+        SELECT * FROM user_data ORDER BY name
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_simple_lowercase(self):
+        """Test CTE name extraction with lowercase with and as"""
+        parser = SQLparser()
+        
+        sql = """
+        with user_data as (
+            select user_id, name from users where active = 1
+        )
+        select * from user_data order by name
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_mixed_case(self):
+        """Test CTE name extraction with mixed case WITH and AS"""
+        parser = SQLparser()
+        
+        sql = """
+        With user_data As (
+            SELECT user_id, name FROM users WHERE active = 1
+        ),
+        order_data as (
+            SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id
+        )
+        Select * From user_data u Left Join order_data o On u.user_id = o.user_id
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data", "order_data"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_multiple_ctes(self):
+        """Test CTE name extraction with multiple CTEs"""
+        parser = SQLparser()
+        
+        sql = """
+        WITH user_data AS (
+            SELECT user_id, name FROM users WHERE active = 1
+        )
+        ,order_data AS (
+            SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id
+        ),
+        combined_data AS (
+            SELECT u.*, o.order_count FROM user_data u LEFT JOIN order_data o ON u.user_id = o.user_id
+        )
+        SELECT * FROM combined_data WHERE order_count > 5
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data", "order_data", "combined_data"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_nested_subqueries(self):
+        """Test CTE name extraction with nested subqueries in CTE"""
+        parser = SQLparser()
+        
+        sql = """
+        WITH complex_cte AS (
+            SELECT user_id, 
+                   (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.user_id) as order_count
+            FROM users u
+            WHERE EXISTS (SELECT 1 FROM orders o2 WHERE o2.user_id = u.user_id)
+        )
+        SELECT * FROM complex_cte WHERE order_count > 5
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["complex_cte"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_no_cte_present(self):
+        """Test CTE name extraction when no CTEs are present"""
+        parser = SQLparser()
+        
+        sql = "SELECT * FROM users WHERE active = 1"
+        result = parser._extract_cte_names(sql)
+        
+        # Should return empty list when no CTEs found
+        self.assertEqual(result, [])
+
+    def test_extract_cte_names_empty_sql(self):
+        """Test CTE name extraction with empty or None SQL"""
+        parser = SQLparser()
+        
+        # Empty string
+        result = parser._extract_cte_names("")
+        self.assertEqual(result, [])
+        
+        # None
+        result = parser._extract_cte_names(None)
+        self.assertEqual(result, [])
+        
+        # Whitespace only
+        result = parser._extract_cte_names("   ")
+        self.assertEqual(result, [])
+
+    def test_extract_cte_names_insert_statement(self):
+        """Test CTE name extraction with INSERT statement"""
+        parser = SQLparser()
+        
+        sql = """
+        WITH active_users AS (
+            SELECT user_id, name FROM users WHERE active = 1
+        )
+        INSERT INTO user_summary 
+        SELECT user_id, name, 'active' as status FROM active_users
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["active_users"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_with_comments(self):
+        """Test CTE name extraction with SQL comments"""
+        parser = SQLparser()
+        
+        sql = """
+        -- User data CTE
+        WITH user_data AS (
+            /* Get active users only */
+            SELECT user_id, name FROM users WHERE active = 1
+        ),
+        -- Order data CTE
+        order_summary AS (
+            SELECT user_id, COUNT(*) as total_orders FROM orders GROUP BY user_id
+        )
+        SELECT * FROM user_data u JOIN order_summary o ON u.user_id = o.user_id
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data", "order_summary"]
+        self.assertEqual(result, expected)
+
+    def test_extract_cte_names_duplicate_handling(self):
+        """Test that duplicate CTE names are handled correctly"""
+        parser = SQLparser()
+        
+        # This shouldn't happen in valid SQL, but test the deduplication logic
+        sql = """
+        WITH user_data AS (SELECT * FROM users),
+             order_data AS (SELECT * FROM orders)
+        SELECT * FROM user_data u JOIN order_data o ON u.id = o.user_id
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["user_data", "order_data"]
+        self.assertEqual(result, expected)
+        
+        # Ensure no duplicates in result
+        self.assertEqual(len(result), len(set(result)))
+
+    def test_extract_cte_names_complex_real_world_example(self):
+        """Test CTE name extraction with complex real-world SQL"""
+        parser = SQLparser()
+        
+        sql = """
+        WITH section_detail as (
+            SELECT s.event_section_id, sc.name, s.tenant_id
+            FROM src_execution_plan as s
+            INNER JOIN src_configuration_section as sc
+                ON sc.id = s.config_section_id
+                AND sc.tenant_id = s.tenant_id
+        ),
+        tenant as (
+            SELECT CAST(null AS STRING) as id, t.__db as tenant_id
+            FROM tenant_dimension as t
+            where not (t.__op IS NULL OR t.__op = 'd')
+        ),
+        attachment as (
+            SELECT ae.*, JSON_VALUE(att.object_state, '$.fileName') as filename
+            FROM int_aqem_recordexecution_element_data_unnest ae
+            JOIN src_aqem_recordexecution_attachments att
+                ON ae.element_data = att.id AND ae.tenant_id = att.tenant_id
+            where ae.element_type = 'ATTACHMENT'
+        )
+        SELECT * FROM section_detail s 
+        JOIN tenant t ON s.tenant_id = t.tenant_id
+        LEFT JOIN attachment a ON s.tenant_id = a.tenant_id
+        """
+        
+        result = parser._extract_cte_names(sql)
+        expected = ["section_detail", "tenant", "attachment"]
+        self.assertEqual(result, expected)
 
 if __name__ == '__main__':
     unittest.main()

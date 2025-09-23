@@ -13,8 +13,8 @@ Provides integration testing capabilities including:
 """
 
 from datetime import datetime, timezone
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Tuple, Any
+from pydantic import Field
+from typing import List
 import os
 import yaml
 import time
@@ -32,7 +32,15 @@ from shift_left.core.utils.file_search import (
 from shift_left.core.models.flink_statement_model import Statement, StatementResult
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
-
+from shift_left.core.utils.file_search import PIPELINE_JSON_FILE_NAME
+from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.models.flink_test_model import (IntegrationTestSuite, 
+    IntegrationTestScenario, 
+    IntegrationTestData, 
+    IntegrationTestSuiteResult,
+    IntegrationTestLatencyResult, 
+    IntegrationTestResult, 
+    Foundation)
 
 # Integration Test Configuration Constants
 INTEGRATION_TEST_FOLDER = "tests"
@@ -41,68 +49,6 @@ CONFIGURED_POST_FIX_INTEGRATION_TEST = get_config().get('app', {}).get('post_fix
 INTEGRATION_TEST_DEFINITION_FILE = "integration_test_definitions.yaml"
 MAX_POLLING_RETRIES = 10
 POLLING_RETRY_DELAY_SECONDS = 15
-
-
-class IntegrationTestData(BaseModel):
-    """Data specification for integration tests"""
-    table_name: str
-    file_name: str
-    file_type: str = "sql"  # sql or csv
-    unique_id: Optional[str] = None  # For tracking data through pipeline
-    timestamp: Optional[datetime] = None  # For latency measurement
-
-
-class IntegrationTestScenario(BaseModel):
-    """Integration test scenario definition"""
-    name: str
-    description: Optional[str] = None
-    sink_table: str  # The target sink table to validate
-    source_data: List[IntegrationTestData]  # Raw data to inject
-    validation_queries: List[IntegrationTestData]  # Validation queries for each step
-    intermediate_validations: List[IntegrationTestData] = []  # Optional intermediate checks
-    measure_latency: bool = True
-
-
-class IntegrationTestSuite(BaseModel):
-    """Complete integration test suite definition"""
-    product_name: str
-    sink_table: str
-    sink_test_path: str
-    scenarios: List[IntegrationTestScenario]
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class IntegrationTestLatencyResult(BaseModel):
-    """Latency measurement result"""
-    unique_id: str
-    start_time: datetime
-    end_time: datetime
-    latency_ms: float
-    source_table: str
-    sink_table: str
-
-
-class IntegrationTestResult(BaseModel):
-    """Result of a single integration test scenario"""
-    scenario_name: str
-    status: str  # PASS, FAIL, ERROR
-    start_time: datetime
-    end_time: datetime
-    duration_ms: float
-    latency_results: List[IntegrationTestLatencyResult] = []
-    validation_results: List[StatementResult] = []
-    error_message: Optional[str] = None
-
-
-class IntegrationTestSuiteResult(BaseModel):
-    """Result of complete integration test suite execution"""
-    suite_name: str
-    product_name: str
-    sink_table: str
-    test_results: List[IntegrationTestResult]
-    overall_status: str  # PASS, FAIL, ERROR
-    total_duration_ms: float
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def init_integration_tests(sink_table_name: str, pipeline_path: str = None) -> IntegrationTestSuite:
@@ -145,7 +91,6 @@ def init_integration_tests(sink_table_name: str, pipeline_path: str = None) -> I
     
     # Get source tables by tracing back through the pipeline
     source_tables = _find_source_tables_for_sink(sink_table_name, inventory, pipeline_path)
-    
     # Create integration test definition file
     test_definition = _create_integration_test_definition(
         sink_table_name,
@@ -159,8 +104,10 @@ def init_integration_tests(sink_table_name: str, pipeline_path: str = None) -> I
     with open(definition_file_path, 'w') as f:
         yaml.dump(test_definition.model_dump(), f, default_flow_style=False, indent=2)
     
+    # Create ddl files for each source table
+    sql_contents = _create_ddl_file_for_raw_tables(sink_test_path, source_tables)
     # Create synthetic data files for each source table
-    _create_synthetic_data_files(sink_test_path, source_tables)
+    _create_synthetic_data_files(sink_test_path, sql_contents)
     
     # Create validation query templates
     _create_validation_query_templates(sink_test_path, sink_table_name)
@@ -280,8 +227,23 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
     """Find all source tables that feed into the given sink table"""
     source_tables = []
     visited = set()
-    
-    def find_sources_recursive(table_name: str):
+
+    def _find_raw_tables(src_tables: List[str]) -> List[str]:
+        raw_tables = []
+        parser = SQLparser()
+        for table_name in src_tables:
+            table_ref = FlinkTableReference.model_validate(inventory[table_name])
+            fname = from_pipeline_to_absolute(table_ref.dml_ref)
+            with open(fname, 'r') as file:
+                dml_sql_content = file.read()
+            source_topics = parser.extract_table_references(dml_sql_content)
+            for source_topic in source_topics:
+                if source_topic != sink_table_name and source_topic != table_name:
+                    raw_tables.append(source_topic)
+        print(f"raw_tables: {raw_tables}")
+        return raw_tables
+
+    def _find_sources_recursive(table_name: str):
         if table_name in visited:
             return
         visited.add(table_name)
@@ -294,14 +256,37 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
                 source_tables.append(table_name)
             
             # Get pipeline definition to find parent tables
-            pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_ref.table_name, pipeline_path)
+            pipeline_def = pipeline_mgr.read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
             if pipeline_def and pipeline_def.parents:
                 for parent in pipeline_def.parents:
-                    find_sources_recursive(parent.table_name)
-    
-    find_sources_recursive(sink_table_name)
+                    _find_sources_recursive(parent.table_name)
+            elif not pipeline_def:
+                logger.error(f"No pipeline definition found for table: {table_name} - ensure to have run build metadata first")
+                raise ValueError(f"No pipeline definition found for table: {table_name} - ensure to have run build metadata first")
+
+    _find_sources_recursive(sink_table_name)
+    print(f"source_tables: {source_tables}")
+    source_tables = _find_raw_tables(source_tables)
     return source_tables
 
+
+def _create_ddl_file_for_raw_tables(sink_test_path: str, source_tables: List[str]) -> dict[str, str]:
+    """Create alter table files for each source table"""
+    sql_contents = {}
+    for source_table in source_tables:
+        sql_content = statement_mgr.show_flink_table_structure(source_table)
+        if sql_content is None:
+            logger.warning(f"Could not retrieve table structure for {source_table}, skipping DDL file creation")
+            continue
+        sql_content = sql_content.replace(source_table, source_table + CONFIGURED_POST_FIX_INTEGRATION_TEST)
+        if "METADATA" not in sql_content:
+            sql_content = sql_content.replace("\n) DISTRIBUTED", ",\n\theaders MAP<STRING, STRING> METADATA)\n) DISTRIBUTED")
+        ddl_file_path = os.path.join(sink_test_path, f"ddl.{source_table}.sql")
+        with open(ddl_file_path, 'w') as f:
+            f.write(sql_content)
+        sql_contents[source_table] = sql_content
+    return sql_contents
+          
 
 def _create_integration_test_definition(sink_table_name: str, 
                                         sink_test_path: str,
@@ -311,11 +296,16 @@ def _create_integration_test_definition(sink_table_name: str,
     
     # Create source data specifications
     source_data = []
+    foundations = []
     for source_table in source_tables:
         source_data.append(IntegrationTestData(
             table_name=source_table,
             file_name=f"./insert_{source_table}_scenario_1.sql",
-            file_type="sql"
+            unique_id=str(uuid.uuid4())
+        ))
+        foundations.append(Foundation(
+            table_name=source_table,
+            ddl_for_test=f"./ddl.{source_table}.sql"
         ))
     
     # Create validation query specification
@@ -330,54 +320,56 @@ def _create_integration_test_definition(sink_table_name: str,
     # Create test scenario
     scenario = IntegrationTestScenario(
         name=f"test_{sink_table_name}_scenario_1",
-        description=f"End-to-end integration test for {sink_table_name}",
-        sink_table=sink_table_name,
+
         source_data=source_data,
         validation_queries=validation_queries,
-        measure_latency=True
+
     )
     
     return IntegrationTestSuite(
         product_name=product_name,
-        sink_test_path=sink_test_path,
         sink_table=sink_table_name,
-        scenarios=[scenario]
+        description=f"End-to-end integration test for {sink_table_name}",
+        sink_test_path=sink_test_path,
+        measure_latency=True,
+        scenarios=[scenario],
+        foundations=foundations
+       
     )
 
 
-def _create_synthetic_data_files(test_path: str, source_tables: List[str]) -> None:
+def _create_synthetic_data_files(test_path: str, sql_contents: dict[str, str]) -> None:
     """Create synthetic data files for source tables"""
-    for source_table in source_tables:
+    parser = SQLparser()
+    for source_table in sql_contents.keys():
         # Create SQL insert file with timestamped synthetic data
         insert_file_path = os.path.join(test_path, f"insert_{source_table}_scenario_1.sql")
         unique_id = str(uuid.uuid4())
         current_timestamp = datetime.now(timezone.utc).isoformat()
-        
+        columns = parser.build_column_metadata_from_sql_content(sql_contents[source_table])
         sql_content = f"""-- Integration test synthetic data for {source_table}
 -- Generated on: {current_timestamp}
 -- Unique test ID: {unique_id}
-
--- Add synthetic data with unique identifiers and timestamps
--- Update the following INSERT statement with appropriate test data:
-
-INSERT INTO {source_table}{CONFIGURED_POST_FIX_INTEGRATION_TEST} (
-    -- Add appropriate column names here
-    id,
-    test_unique_id,
-    test_timestamp,
-    -- Add other columns...
-    created_at
+INSERT INTO {source_table}{CONFIGURED_POST_FIX_INTEGRATION_TEST} ("""
+        for column in columns.keys():
+            sql_content += f"{column}, "
+        sql_content=sql_content[:-2] + """
 ) VALUES (
     -- Add appropriate test values here
-    'test_id_1',
-    '{unique_id}',
-    TIMESTAMP '{current_timestamp}',
-    -- Add other test values...
-    CURRENT_TIMESTAMP
-);
-
--- Add more test records as needed
 """
+        for column in columns:
+            col_type = columns[column]['type']
+            if col_type == "BIGINT" or "INT" in col_type or col_type == "FLOAT" or col_type == "DOUBLE":
+                sql_content += f"0, "
+            elif col_type == 'BOOLEAN':
+                sql_content += 'false, '
+            elif col_type == ' ARRAY<STRING>':
+                sql_content += f"['{column}_1'], "
+            elif "TIMESTAMP" in col_type:
+                sql_content += f"TIMESTAMP '2021-01-01 00:00:00', "
+            else: # string
+                sql_content += f"'{column}_1', "
+        sql_content = sql_content[:-2] + ");"
         with open(insert_file_path, 'w') as f:
             f.write(sql_content)
 

@@ -1,4 +1,4 @@
 ---
 alwaysApply: true
-description: start by unit test before writing the function
+description: start by unit test under the src/shift_left/tests/ut/core folder before writing any function in core services.
 ---

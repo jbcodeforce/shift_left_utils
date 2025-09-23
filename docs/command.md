@@ -53,7 +53,11 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `delete-all-compute-pools`: Delete all compute pools for the given...
 * `housekeep-statements`: Delete statements in FAILED or COMPLETED...
 * `validate-config`: Validate the config.yaml file
+* `report-table-cross-products`: Report the list of tables that are...
 * `list-modified-files`: Get the list of files modified in the...
+* `init-integration-tests`: Initialize integration test structure for...
+* `run-integration-tests`: Run integration tests for a given sink table.
+* `delete-integration-tests`: Delete all integration test artifacts...
 
 ### `project init`
 
@@ -166,6 +170,20 @@ $ project validate-config [OPTIONS]
 
 * `--help`: Show this message and exit.
 
+### `project report-table-cross-products`
+
+Report the list of tables that are referenced in other products
+
+**Usage**:
+
+```console
+$ project report-table-cross-products [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ### `project list-modified-files`
 
 Get the list of files modified in the current git branch compared to the specified branch.
@@ -187,6 +205,76 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 * `--output-file TEXT`: Output file path to save the list  [default: modified_flink_files.txt]
 * `--project-path TEXT`: Project path where git repository is located  [default: .]
 * `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
+* `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)
+* `--help`: Show this message and exit.
+
+### `project init-integration-tests`
+
+Initialize integration test structure for a given sink table.
+Creates test scaffolding including synthetic data templates and validation queries.
+Integration tests validate end-to-end data flow from source tables to the specified sink table.
+
+**Usage**:
+
+```console
+$ project init-integration-tests [OPTIONS] SINK_TABLE_NAME
+```
+
+**Arguments**:
+
+* `SINK_TABLE_NAME`: Name of the sink table to create integration tests for  [required]
+
+**Options**:
+
+* `--project-path TEXT`: Project path where pipelines are located. If not provided, uses $PIPELINES environment variable  [env var: PIPELINES]
+* `--help`: Show this message and exit.
+
+### `project run-integration-tests`
+
+Run integration tests for a given sink table.
+Executes end-to-end pipeline testing by injecting synthetic data into source tables,
+waiting for data to flow through the pipeline, and validating results in the sink table.
+Optionally measures latency from data injection to sink table arrival.
+
+**Usage**:
+
+```console
+$ project run-integration-tests [OPTIONS] SINK_TABLE_NAME
+```
+
+**Arguments**:
+
+* `SINK_TABLE_NAME`: Name of the sink table to run integration tests for  [required]
+
+**Options**:
+
+* `--scenario-name TEXT`: Specific test scenario to run. If not specified, runs all scenarios
+* `--project-path TEXT`: Project path where pipelines are located  [env var: PIPELINES]
+* `--compute-pool-id TEXT`: Flink compute pool ID. Uses config.yaml value if not provided  [env var: CPOOL_ID]
+* `--measure-latency / --no-measure-latency`: Whether to measure end-to-end latency from source to sink  [default: measure-latency]
+* `--output-file TEXT`: File path to save detailed test results
+* `--help`: Show this message and exit.
+
+### `project delete-integration-tests`
+
+Delete all integration test artifacts (Flink statements and Kafka topics) for a given sink table.
+This cleanup command removes all test-related resources created during integration test execution.
+
+**Usage**:
+
+```console
+$ project delete-integration-tests [OPTIONS] SINK_TABLE_NAME
+```
+
+**Arguments**:
+
+* `SINK_TABLE_NAME`: Name of the sink table to delete integration test artifacts for  [required]
+
+**Options**:
+
+* `--project-path TEXT`: Project path where pipelines are located  [env var: PIPELINES]
+* `--compute-pool-id TEXT`: Flink compute pool ID where test artifacts were created  [env var: CPOOL_ID]
+* `--no-confirm`: Skip confirmation prompt and delete immediately
 * `--help`: Show this message and exit.
 
 ## `table`
@@ -375,7 +463,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1058e0590&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x110f37980&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -503,6 +591,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
+* `init-integration-test`: Initialize the integration test for a...
 * `analyze-pool-usage`: Analyze compute pool usage and assess...
 
 ### `pipeline build-metadata`
@@ -654,7 +743,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -676,7 +765,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -703,6 +792,24 @@ $ pipeline prepare [OPTIONS] SQL_FILE_NAME
 **Options**:
 
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
+* `--help`: Show this message and exit.
+
+### `pipeline init-integration-test`
+
+Initialize the integration test for a given table.
+
+**Usage**:
+
+```console
+$ pipeline init-integration-test [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: The table name to initialize the integration test for.  [required]
+
+**Options**:
+
 * `--help`: Show this message and exit.
 
 ### `pipeline analyze-pool-usage`

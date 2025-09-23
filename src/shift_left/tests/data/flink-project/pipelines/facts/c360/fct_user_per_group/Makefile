@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- users_fct_user_per_group
 TABLE_NAME=fct_user_per_group
-SCRIPT_PRE_KEBAB=dev-usw2-users
+SCRIPT_PRE_KEBAB=dev-usw2-c360
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
