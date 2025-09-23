@@ -186,7 +186,7 @@ def list_modified_files(
     output_file: Annotated[str, typer.Option(help="Output file path to save the list")] = "modified_flink_files.txt",
     project_path: Annotated[str, typer.Option(help="Project path where git repository is located")] = ".",
     file_filter: Annotated[str, typer.Option(help="File extension filter (e.g., '.sql', '.py')")] = ".sql",
-    date_filter: Annotated[str, typer.Option(help="Date filter (e.g., 'YYYY-MM-DD')")] = None
+    since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = None
 ):
     """
     Get the list of files modified in the current git branch compared to the specified branch.
@@ -194,7 +194,7 @@ def list_modified_files(
     This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
     """
     print("#" * 30 + f" List modified files in current branch vs {branch_name}")
-    result = project_manager.list_modified_files(project_path, branch_name, date_filter, file_filter, output_file)
+    result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, output_file)
     
     # Display structured result summary
     print(f"\n📊 Summary:")

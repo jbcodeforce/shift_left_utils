@@ -506,7 +506,7 @@ class TestStatementManager(BaseUT):
         mock_client.make_request.side_effect = responses
         with patch('shift_left.core.statement_mgr.get_config') as mock_config:
             mock_config.return_value = {
-                'confluent_cloud': {'page_size': 100},
+                'confluent_cloud': {'page_size': 100, 'organization_id': 'id-org-test'},
                 'app': {'cache_ttl': 60}
             }  # 1 minute
             result = statement_mgr.get_statement_list()

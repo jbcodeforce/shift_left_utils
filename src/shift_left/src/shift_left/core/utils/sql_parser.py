@@ -23,90 +23,6 @@ class SQLparser:
         self.function_from_pattern = r'\b(TRIM|OVERLAY|SUBSTRING|EXTRACT)\s*\([^)]*FROM[^)]*\)'
     
 
-    def _normalize_sql(self, sql_script):
-        """
-        Normalize SQL script by removing comments and extra whitespace
-        Args:
-            sql_script (str): Original SQL script
-        Returns:
-            str: Normalized SQL script
-        """
-        # Remove multiple line comments /* */
-        sql = re.sub(r'/\*[^*]*\*+(?:[^*/][^*]*\*+)*/', ' ', sql_script)
-        
-        # Remove single line comments --
-        sql = re.sub(r'--[^\n]*', ' ', sql)
-        
-        # Replace newlines with spaces
-        sql = re.sub(r'\s+', ' ', sql)
-        
-        return sql.strip()
-
-    def extract_cte_names(self, sql_script: str) -> List[str]:
-        """
-        Extract Common Table Expressions (CTEs) names from SQL script.
-        Supports both uppercase and lowercase WITH and AS keywords.
-        
-        Args:
-            sql_script (str): SQL script that may contain CTEs
-            
-        Returns:
-            List[str]: List of CTE names
-            
-        Example:
-            Input: "WITH cte1 AS (SELECT * FROM table1), cte2 AS (SELECT * FROM table2) SELECT * FROM cte1"
-            Output: ["cte1", "cte2"]
-        """
-        if not sql_script or not sql_script.strip():
-            return []
-            
-        # Normalize the SQL first
-        sql = self._normalize_sql(sql_script)
-        
-        # Check if there's a WITH clause
-        with_match = re.search(self.cte_start_pattern, sql)
-        if not with_match:
-            return []  # No CTEs found, return empty list
-        
-        cte_names = []
-        
-        # Extract the first CTE name using existing pattern
-        first_cte_matches = re.findall(self.cte_pattern_1, sql)
-        if first_cte_matches:
-            cte_names.extend(first_cte_matches)
-        
-        # Extract subsequent CTE names using existing pattern  
-        subsequent_cte_matches = re.findall(self.cte_pattern_2, sql)
-        if subsequent_cte_matches:
-            cte_names.extend(subsequent_cte_matches)
-        
-        # Alternative approach: use a comprehensive pattern to catch all CTE names
-        if not cte_names:
-            # Fallback pattern to catch CTE names in various formats
-            comprehensive_pattern = r'(?i)\b(?:WITH|,)\s+(\w+)\s+AS\s*\('
-            all_matches = re.findall(comprehensive_pattern, sql)
-            if all_matches:
-                cte_names.extend(all_matches)
-        
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_cte_names = []
-        for name in cte_names:
-            if name not in seen:
-                seen.add(name)
-                unique_cte_names.append(name)
-        
-        return unique_cte_names
-
-    def remove_junk_words(self, table_name: str, not_wanted: List[str]) -> str:
-        """
-        Remove words not wanted as table name
-        """
-        for not_wanted_word in not_wanted:
-            if not_wanted_word in table_name.upper():
-                return None
-        return table_name.strip()
-
     def extract_table_references(self, sql_content) -> Set[str]:
         """
         Extract the table reference from the sql_content, using different reg expressions to
@@ -114,8 +30,6 @@ class SQLparser:
         name with mulitple '.' in it.
         """
         sql_content=self._normalize_sql(sql_content)
-        #regex = r'{{\s*ref\([\'"]([^\']+)[\'"]\)\s*}}'
-        #regex= r'{{\s*ref\(["\']([^"\']+)"\')\s*}}'
         # look at dbt ref
         regex=r'ref\([\'"]([^\'"]+)[\'"]\)'
         matches = re.findall(regex, sql_content, re.IGNORECASE)
@@ -126,7 +40,7 @@ class SQLparser:
             
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
-            ctes = self.extract_cte_names(sql_content_filtered)
+            ctes = self._extract_cte_names(sql_content_filtered)
             not_wanted=['UNNEST', 'unnest']
             matches=set()
             for table in tables:
@@ -137,7 +51,7 @@ class SQLparser:
                 if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
                 if not retrieved_table in ctes and not retrieved_table in not_wanted:
-                    table_name=self.remove_junk_words(retrieved_table, not_wanted)
+                    table_name=self._remove_junk_words(retrieved_table, not_wanted)
                     if table_name is not None:
                         matches.add(table_name)
             return matches
@@ -433,6 +347,37 @@ class SQLparser:
         
         return result
 
+    # ------------------------------------------------------------
+    # ---- private methods ----
+    # ------------------------------------------------------------
+    def _normalize_sql(self, sql_script):
+        """
+        Normalize SQL script by removing comments and extra whitespace
+        Args:
+            sql_script (str): Original SQL script
+        Returns:
+            str: Normalized SQL script
+        """
+        # Remove multiple line comments /* */
+        sql = re.sub(r'/\*[^*]*\*+(?:[^*/][^*]*\*+)*/', ' ', sql_script)
+        
+        # Remove single line comments --
+        sql = re.sub(r'--[^\n]*', ' ', sql)
+        
+        # Replace newlines with spaces
+        sql = re.sub(r'\s+', ' ', sql)
+        
+        return sql.strip()
+
+    def _remove_junk_words(self, table_name: str, not_wanted: List[str]) -> str:
+        """
+        Remove words not wanted as table name
+        """
+        for not_wanted_word in not_wanted:
+            if not_wanted_word in table_name.upper():
+                return None
+        return table_name.strip()
+
     def _parse_sql_values(self, values_str: str) -> List[Any]:
         """
         Parse comma-separated SQL values, handling quotes and data types.
@@ -483,3 +428,61 @@ class SQLparser:
             values.append(current_value.strip())
         
         return values
+
+    
+
+    def _extract_cte_names(self, sql_script: str) -> List[str]:
+        """
+        Extract Common Table Expressions (CTEs) names from SQL script.
+        Supports both uppercase and lowercase WITH and AS keywords.
+        
+        Args:
+            sql_script (str): SQL script that may contain CTEs
+            
+        Returns:
+            List[str]: List of CTE names
+            
+        Example:
+            Input: "WITH cte1 AS (SELECT * FROM table1), cte2 AS (SELECT * FROM table2) SELECT * FROM cte1"
+            Output: ["cte1", "cte2"]
+        """
+        if not sql_script or not sql_script.strip():
+            return []
+            
+        # Normalize the SQL first
+        sql = self._normalize_sql(sql_script)
+        
+        # Check if there's a WITH clause
+        with_match = re.search(self.cte_start_pattern, sql)
+        if not with_match:
+            return []  # No CTEs found, return empty list
+        
+        cte_names = []
+        
+        # Extract the first CTE name using existing pattern
+        first_cte_matches = re.findall(self.cte_pattern_1, sql)
+        if first_cte_matches:
+            cte_names.extend(first_cte_matches)
+        
+        # Extract subsequent CTE names using existing pattern  
+        subsequent_cte_matches = re.findall(self.cte_pattern_2, sql)
+        if subsequent_cte_matches:
+            cte_names.extend(subsequent_cte_matches)
+        
+        # Alternative approach: use a comprehensive pattern to catch all CTE names
+        if not cte_names:
+            # Fallback pattern to catch CTE names in various formats
+            comprehensive_pattern = r'(?i)\b(?:WITH|,)\s+(\w+)\s+AS\s*\('
+            all_matches = re.findall(comprehensive_pattern, sql)
+            if all_matches:
+                cte_names.extend(all_matches)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_cte_names = []
+        for name in cte_names:
+            if name not in seen:
+                seen.add(name)
+                unique_cte_names.append(name)
+        
+        return unique_cte_names

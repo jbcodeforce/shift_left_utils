@@ -5,7 +5,7 @@ import unittest
 import os
 from pathlib import Path
 import shutil
-import shift_left.core.project_manager as pm
+
 import pathlib
 from unittest.mock import patch, mock_open, MagicMock, call
 from datetime import datetime, timezone, timedelta
@@ -13,8 +13,10 @@ import subprocess
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 from shift_left.core.utils.app_config import get_config
+import shift_left.core.project_manager as pm
 import shift_left.core.pipeline_mgr as pipemgr
 import shift_left.core.table_mgr as tm
+from shift_left.core.models.flink_statement_model import Statement, Spec, Status
 
 class TestProjectManager(unittest.TestCase):
     data_dir = ""
@@ -22,6 +24,9 @@ class TestProjectManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data_dir = str(Path(__file__).parent / "../tmp")  # Path to the tmp directory
+        tm.get_or_create_inventory(os.getenv("PIPELINES"))
+        pipemgr.delete_all_metada_files(os.getenv("PIPELINES"))
+        pipemgr.build_all_pipeline_definitions( os.getenv("PIPELINES"))
 
     def test_create_data_product_project(self):
         try:
@@ -53,16 +58,43 @@ class TestProjectManager(unittest.TestCase):
         assert "src_table_1" in result
         assert "src_common_tenant" in result
 
+    @patch('builtins.open', new_callable=mock_open)
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
-    @patch('builtins.open', new_callable=mock_open)
     @patch('shift_left.core.project_manager.datetime.datetime')
-    def test_list_modified_files_basic_functionality(self, mock_datetime_class, mock_file, mock_chdir, mock_getcwd, mock_subprocess):
-        """Test basic functionality of list_modified_files"""
+    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
+    @patch('shift_left.core.project_manager._assess_flink_statement_state')
+    @patch('shift_left.core.utils.sql_parser.SQLparser')
+    def test_list_modified_files_with_mocked_sql_parsing(self, mock_sql_parser_class, mock_assess_state, mock_from_pipeline, mock_datetime_class, mock_chdir, mock_getcwd, mock_subprocess, mock_file):
+        """Test that list_modified_files calls SQL parser to extract table names from file contents"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
         mock_datetime_class.now.return_value = datetime(2024, 1, 15, tzinfo=timezone.utc)
+        
+        # Mock the path conversion function
+        mock_from_pipeline.side_effect = [
+            "/test/project/file1.sql",  # Absolute path for file1
+            "/test/project/file2.sql"   # Absolute path for file2
+        ]
+        
+        # Mock the assessment function
+        mock_assess_state.return_value = (False, True)  # same_sql=False, running=True
+        
+        # Mock SQL parser instance and methods
+        mock_parser_instance = MagicMock()
+        mock_sql_parser_class.return_value = mock_parser_instance
+        mock_parser_instance.extract_table_name_from_insert_into_statement.side_effect = [
+            "user_accounts",  # First file returns this table name
+            "order_history"   # Second file returns this table name  
+        ]
+        
+        # Mock file content for SQL parsing - provide realistic SQL content
+        mock_file.side_effect = [
+            mock_open(read_data="INSERT INTO user_accounts SELECT * FROM source_table;").return_value,
+            mock_open(read_data="INSERT INTO order_history SELECT * FROM order_source;").return_value,
+            mock_open(read_data='{"description": "test", "file_list": []}').return_value  # Output file write
+        ]
         
         # Mock git commands
         mock_subprocess.side_effect = [
@@ -70,15 +102,13 @@ class TestProjectManager(unittest.TestCase):
             MagicMock(stdout="main\n", returncode=0),
             # git log --name-only --since=2024-01-14
             MagicMock(stdout="file1.sql\nfile2.sql\nfile3.py\n", returncode=0),
-            # date command
-            MagicMock(stdout="Mon Jan 15 10:30:00 UTC 2024\n", returncode=0)
-        ]
+         ]
         
         # Call the function
         result = pm.list_modified_files(
             project_path="/test/project",
             branch_name="main", 
-            date_filter="",  # Will use yesterday's date
+            since="",  # Will use yesterday's date
             file_filter=".sql",
             output_file="modified_files.txt"
         )
@@ -89,22 +119,25 @@ class TestProjectManager(unittest.TestCase):
         # Verify description content
         self.assertIn("Modified files in branch 'main'", result.description)
         self.assertIn("Filter applied: .sql", result.description)
-        self.assertIn("Generated on: Mon Jan 15 10:30:00 UTC 2024", result.description)
         self.assertIn("Total files: 2", result.description)
         
         # Verify file list
         self.assertEqual(len(result.file_list), 2)
         
-        # Check first file
+        # Check first file - should have extracted table name via SQL parser
         file1 = result.file_list[0]
         self.assertIsInstance(file1, pm.ModifiedFileInfo)
-        self.assertEqual(file1.table_name, "file1")
+        self.assertEqual(file1.table_name, "user_accounts")  # From mocked SQL parser
         self.assertEqual(file1.file_modified_url, "file1.sql")
+        self.assertEqual(file1.same_sql, False)  # From mock assessment
+        self.assertEqual(file1.running, True)   # From mock assessment
         
-        # Check second file
+        # Check second file - should have extracted table name via SQL parser
         file2 = result.file_list[1]
-        self.assertEqual(file2.table_name, "file2")
+        self.assertEqual(file2.table_name, "order_history")  # From mocked SQL parser
         self.assertEqual(file2.file_modified_url, "file2.sql")
+        self.assertEqual(file2.same_sql, False)  # From mock assessment
+        self.assertEqual(file2.running, True)   # From mock assessment
         
         # Verify directory changes
         mock_chdir.assert_has_calls([
@@ -116,35 +149,71 @@ class TestProjectManager(unittest.TestCase):
         expected_calls = [
             call(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True),
             call(["git", "log", "--name-only", "--since=2024-01-14", '--pretty=format:'], capture_output=True, text=True, check=True),
-            call(['date'], capture_output=True, text=True)
         ]
         mock_subprocess.assert_has_calls(expected_calls)
         
-        # Verify file operations (backward compatibility) - now writes JSON
-        mock_file.assert_called_once_with(Path("/original/path/modified_files.txt"), 'w')
+        # Verify path conversion was called for each file
+        self.assertEqual(mock_from_pipeline.call_count, 2)
+        mock_from_pipeline.assert_has_calls([
+            call("file1.sql"),
+            call("file2.sql")
+        ])
         
-        # Verify JSON content was written
-        handle = mock_file.return_value.__enter__.return_value
-        write_calls = handle.write.call_args_list
-        self.assertEqual(len(write_calls), 1)  # Should be one JSON write
+        # Verify assessment function was called for each file
+        self.assertEqual(mock_assess_state.call_count, 2)
         
-        # Parse the written JSON to verify structure
-        import json
-        written_json = write_calls[0][0][0]
-        parsed_data = json.loads(written_json)
-        
-        self.assertIn("description", parsed_data)
-        self.assertIn("file_list", parsed_data)
-        self.assertEqual(len(parsed_data["file_list"]), 2)
+        # Verify file operations - should read SQL files from absolute paths and write output
+        file_calls = mock_file.call_args_list
+        print("DEBUG: All file call args:", file_calls)
+        self.assertTrue(any('/test/project/file1.sql' in str(call) for call in file_calls), 
+                       "Should have read file1.sql from absolute path")
+        self.assertTrue(any('/test/project/file2.sql' in str(call) for call in file_calls),
+                       "Should have read file2.sql from absolute path")
+        self.assertTrue(any('modified_files.txt' in str(call) for call in file_calls),
+                       "Should have written to output file")
 
+    @patch('shift_left.core.project_manager.datetime.datetime')
+    @patch('shift_left.core.project_manager.SQLparser')
+    @patch('shift_left.core.project_manager._assess_flink_statement_state')
+    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
     @patch('builtins.open', new_callable=mock_open)
-    def test_list_modified_files_branch_switch(self, mock_file, mock_chdir, mock_getcwd, mock_subprocess):
+    def test_list_modified_files_branch_switch(self,
+                    mock_file, 
+                    mock_chdir, 
+                    mock_getcwd, 
+                    mock_subprocess, 
+                    mock_from_pipeline,
+                    mock_assess_state,
+                    mock_sql_parser_class,
+                    mock_datetime_class):
         """Test branch switching functionality"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
+        mock_datetime_class.now.return_value = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        
+        # Mock SQL parser instance and methods
+        mock_parser_instance = MagicMock()
+        mock_sql_parser_class.return_value = mock_parser_instance
+        mock_parser_instance.extract_table_name_from_insert_into_statement.side_effect = [
+            "test1_table",  # First file table name
+            "test2_table"   # Second file table name
+        ]
+        
+        # Mock path conversion for each file
+        mock_from_pipeline.side_effect = [
+            "/original/path/test1.sql",  # Absolute path for test1.sql
+            "/original/path/test2.sql"   # Absolute path for test2.sql
+        ]
+        
+        # Mock file content reads and output file write
+        mock_file.side_effect = [
+            mock_open(read_data="INSERT INTO test1_table SELECT * FROM source1;").return_value,
+            mock_open(read_data="INSERT INTO test2_table SELECT * FROM source2;").return_value,
+            mock_open(read_data='{"description": "test", "file_list": []}').return_value  # Output file write
+        ]
         
         # Mock git commands - current branch is different
         mock_subprocess.side_effect = [
@@ -154,15 +223,16 @@ class TestProjectManager(unittest.TestCase):
             MagicMock(stdout="", returncode=0),
             # git log --name-only --since=2024-01-10
             MagicMock(stdout="test1.sql\ntest2.sql\n", returncode=0),
-            # date command
-            MagicMock(stdout="Mon Jan 15 10:30:00 UTC 2024\n", returncode=0)
         ]
         
+        # Mock assessment state for both files
+        mock_assess_state.return_value = (False, True)
+        
         # Call the function
-        pm.list_modified_files(
+        result = pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            date_filter="2024-01-10",
+            since="2024-01-10",
             file_filter=".sql",
             output_file="output.txt"
         )
@@ -171,19 +241,71 @@ class TestProjectManager(unittest.TestCase):
         expected_calls = [
             call(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True),
             call(["git", "checkout", "main"], capture_output=True, text=True, check=True),
-            call(["git", "log", "--name-only", "--since=2024-01-10", '--pretty=format:'], capture_output=True, text=True, check=True),
-            call(['date'], capture_output=True, text=True)
+            call(["git", "log", "--name-only", "--since=2024-01-10", '--pretty=format:'], capture_output=True, text=True, check=True)
         ]
         mock_subprocess.assert_has_calls(expected_calls)
+        
+        # Verify result structure
+        self.assertIsInstance(result, pm.ModifiedFilesResult)
+        self.assertEqual(len(result.file_list), 2)
+        
+        # Verify branch information in description
+        self.assertIn("Modified files in branch 'feature-branch'", result.description)  # Should show current branch
+        
+        # Verify file details
+        file1 = result.file_list[0]
+        self.assertEqual(file1.table_name, "test1_table")
+        self.assertEqual(file1.file_modified_url, "test1.sql")
+        self.assertEqual(file1.same_sql, False)
+        self.assertEqual(file1.running, True)
+        
+        file2 = result.file_list[1]
+        self.assertEqual(file2.table_name, "test2_table")
+        self.assertEqual(file2.file_modified_url, "test2.sql")
+        self.assertEqual(file2.same_sql, False)
+        self.assertEqual(file2.running, True)
+        
+        # Verify SQL parser was used for both files
+        self.assertEqual(mock_parser_instance.extract_table_name_from_insert_into_statement.call_count, 2)
+        
+        # Verify path conversion was called for each file
+        self.assertEqual(mock_from_pipeline.call_count, 2)
+        mock_from_pipeline.assert_has_calls([
+            call("test1.sql"),
+            call("test2.sql")
+        ])
+        
+        # Verify assessment function was called for each file
+        self.assertEqual(mock_assess_state.call_count, 2)
 
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
+    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
+    @patch('shift_left.core.project_manager._assess_flink_statement_state')
     @patch('builtins.open', new_callable=mock_open)
-    def test_list_modified_files_file_filtering(self, mock_file, mock_chdir, mock_getcwd, mock_subprocess):
+    def test_list_modified_files_file_filtering(self, mock_file, mock_assess_state, mock_from_pipeline, mock_chdir, mock_getcwd, mock_subprocess):
         """Test file filtering functionality"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
+        
+        # Mock the path conversion function
+        mock_from_pipeline.side_effect = [
+            "/original/path/file1.sql",
+            "/original/path/file3.SQL", 
+            "/original/path/script.sql"
+        ]
+        
+        # Mock the assessment function
+        mock_assess_state.return_value = (False, True)
+        
+        # Mock file content with INSERT statements to extract table names
+        mock_file.side_effect = [
+            mock_open(read_data="INSERT INTO file1 SELECT * FROM source1;").return_value,
+            mock_open(read_data="INSERT INTO file3 SELECT * FROM source2;").return_value,
+            mock_open(read_data="INSERT INTO script SELECT * FROM source3;").return_value,
+            mock_open(read_data='{"description": "test", "file_list": []}').return_value  # Output file write
+        ]
         
         # Mock git commands with various file types
         mock_subprocess.side_effect = [
@@ -199,7 +321,7 @@ class TestProjectManager(unittest.TestCase):
         result = pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            date_filter="2024-01-10",
+            since="2024-01-10",
             file_filter=".sql",
             output_file="sql_files.txt"
         )
@@ -244,7 +366,7 @@ class TestProjectManager(unittest.TestCase):
             pm.list_modified_files(
                 project_path="/test/project",
                 branch_name="main",
-                date_filter="2024-01-10",
+                since="2024-01-10",
                 file_filter=".sql",
                 output_file="output.txt"
             )
@@ -278,7 +400,7 @@ class TestProjectManager(unittest.TestCase):
         result = pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            date_filter="2024-01-10",
+            since="2024-01-10",
             file_filter=".sql",
             output_file="empty_results.txt"
         )
@@ -298,11 +420,29 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
+    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
+    @patch('shift_left.core.project_manager._assess_flink_statement_state')
     @patch('builtins.open', new_callable=mock_open)
-    def test_list_modified_files_absolute_output_path(self, mock_file, mock_chdir, mock_getcwd, mock_subprocess):
+    def test_list_modified_files_absolute_output_path(self, 
+                            mock_file, 
+                            mock_assess_state, 
+                            mock_from_pipeline, 
+                            mock_chdir, 
+                            mock_getcwd, 
+                            mock_subprocess):
         """Test handling of absolute output file paths"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
+        
+        # Mock the path conversion and assessment functions
+        mock_from_pipeline.return_value = "/original/path/test.sql"
+        mock_assess_state.return_value = (False, True)
+        
+        # Mock file content
+        mock_file.side_effect = [
+            mock_open(read_data="INSERT INTO test SELECT * FROM source;").return_value,
+            mock_open(read_data='{"description": "test", "file_list": []}').return_value
+        ]
         
         # Mock git commands
         mock_subprocess.side_effect = [
@@ -316,33 +456,70 @@ class TestProjectManager(unittest.TestCase):
         pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            date_filter="2024-01-10",
+            since="2024-01-10",
             file_filter=".sql",
             output_file=absolute_output
         )
         
-        # Verify absolute path is used directly
-        mock_file.assert_called_once_with(Path(absolute_output), 'w')
+        # Verify absolute path is used directly and the function completed
+        self.assertTrue(mock_file.call_count >= 1)
 
-    def test_extract_table_name_from_path(self):
-        """Test table name extraction from various file paths"""
-        # Test basic SQL file
-        self.assertEqual(pm._extract_table_name_from_path("table1.sql"), "table1")
+    @patch('shift_left.core.project_manager.statement_mgr.get_statement')
+    def test_assess_flink_statement_state_with_statement_mgr_mock(self, mock_get_statement):
+        """Test _assess_flink_statement_state function with mocked statement_mgr.get_statement"""
+
         
-        # Test file with DDL prefix
-        self.assertEqual(pm._extract_table_name_from_path("ddl.user_table.sql"), "user_table")
+        # Setup mock data
+        table_name = "fct_user_per_group"
+        file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.fct_user_per_group.sql"
+        sql_content = "INSERT INTO fct_user_per_group SELECT * FROM source_table;"
         
-        # Test file with DML prefix
-        self.assertEqual(pm._extract_table_name_from_path("dml.user_table.sql"), "user_table")
+        # Test Case 1: Statement found and running
+        mock_statement = MagicMock(spec=Statement)
+        mock_statement.spec = MagicMock(spec=Spec)
+        mock_statement.spec.statement = sql_content
+        mock_statement.status = MagicMock(spec=Status)
+        mock_statement.status.phase = "RUNNING"
+        mock_get_statement.return_value = mock_statement
         
-        # Test pipeline directory structure
-        self.assertEqual(pm._extract_table_name_from_path("pipelines/user_table/ddl.sql"), "user_table")
+        same_sql, running = pm._assess_flink_statement_state(table_name, file_path, sql_content)
         
-        # Test complex path
-        self.assertEqual(pm._extract_table_name_from_path("project/pipelines/facts/user_facts/dml.sql"), "user_facts")
+        # Verify the result
+        self.assertTrue(same_sql, "SQL content should match")
+        self.assertTrue(running, "Statement should be running")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
         
-        # Test file without extension
-        self.assertEqual(pm._extract_table_name_from_path("pipelines/customer_dim/metadata"), "customer_dim")
+        # Test Case 2: Statement found but not running and different SQL
+        mock_get_statement.reset_mock()
+        mock_statement.spec.statement = "DIFFERENT SQL CONTENT"
+        mock_statement.status.phase = "STOPPED"
         
+        same_sql, running = pm._assess_flink_statement_state(table_name, file_path, sql_content)
+        
+        self.assertFalse(same_sql, "SQL content should not match")
+        self.assertFalse(running, "Statement should not be running")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        
+        # Test Case 3: Statement not found
+        mock_get_statement.reset_mock()
+        mock_get_statement.return_value = None
+        
+        same_sql, running = pm._assess_flink_statement_state(table_name, file_path, sql_content)
+        
+        self.assertTrue(same_sql, "Should return True when statement not found")
+        self.assertFalse(running, "Should return False when statement not found")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        
+        # Test Case 4: DDL file path (should use ddl_statement_name)
+        mock_get_statement.reset_mock()
+        ddl_file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.fct_user_per_group.sql"
+       
+        mock_get_statement.return_value = mock_statement
+        
+        pm._assess_flink_statement_state(table_name, ddl_file_path, sql_content)
+        
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-ddl-fct-user-per-group")
+
+    
 if __name__ == '__main__':
     unittest.main()

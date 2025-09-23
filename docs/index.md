@@ -12,10 +12,11 @@ The approach, supported that the tools in this repository, centers around the da
 
 The list of important features supported:
 
-* [x] Support taking SQL / dbt sql scripts and migrate them, using LLM to speed up a migration to Apache Flink SQL. It supports understanding the static relationship between source SQL tables
-* [x] Support defining code structure to manage Flink statements with DDL, DML, Makefile (wrapper on top of Confluent Cli).
+* [x] Migrate SQL / dbt sql scripts to Apache Flink SQL, using LLM compatible with OpenAI SDK. It supports understanding the static relationship between source SQL tables
+* [x] Define code structure to manage Flink statements with DDL, DML, Makefile (wrapper on top of Confluent Cli).
 * [x] Build table inventory for a project with metadata to help automate CI/CD work or supporting the shift_left tool itself
 * [x] Create metadata about a pipeline for a given Flink Statement: those metadata includes, name, type of Flink statement (stateless, stateful), what are the direct ancestors of the flink statement, what are the descendants, users of the current Flink statement.
+* [x] Assessing statement complexity in term of number of different type of joins: number_of_regular_joins, number_of_left_joins, number_of_right_joins, number_of_inner_joins, number_of_outer_joins
 * [x] Build an execution plan for each pipeline to understand what needs to be started and redeployed to avoid brute force deployment. Execution plan is a topological sorted graph which helps to start Flink statements that are needed before other statements
 * [x] Deploy execution plan, with constraints on forcing restart of ancestors (or not), update descendants or not.
 * [x] Support grouping Flink statements per directory (reflecting the medallion structure of the project: sources, intermediates, dimensions, facts and views), or as a product (data as a product) as an orthogonal view of the medallion view), or as a list of table / Flink statements or a unique table/Flink statement.
@@ -26,6 +27,8 @@ The list of important features supported:
 * [x] Support aggregating report on statements, like running Flink explain and reporting deployment errors for all statements within a Folder or for a product.
 * [x] Support adding custom table worker to do SQL content update during deployment: this is needed to support multi-tenancy into the same Kafka Cluster and Schema Registry, or apply some table changes names. Some default transformations are available:
 * [x] Unit tests creation from DML with test definition metadata to be able to run unit tests with mock data on Confluent Cloud, by using REST API to deploy statement.
+* [x] Report on cross-product tables as sensitive tables: Some tables are becoming common and shared between data product, adding risk to change them over time, this function helps assessing the risk.
+* [x] Getting the list of modified files from a specific date to assess the difference of SQL semantic between the running statement and the one on disk. Uses `git log`.
 
 ## Introduction
 

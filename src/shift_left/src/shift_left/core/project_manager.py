@@ -11,12 +11,15 @@ from datetime import timezone
 from typing import Tuple, List
 from pydantic import BaseModel, Field
 from shift_left.core.table_mgr import get_or_build_inventory
-from shift_left.core.utils.file_search import create_folder_if_not_exist
+from shift_left.core.utils.file_search import create_folder_if_not_exist, from_pipeline_to_absolute
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.utils.file_search import PIPELINE_JSON_FILE_NAME, get_table_ref_from_inventory
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
+from shift_left.core.utils.sql_parser import SQLparser
+import shift_left.core.statement_mgr as statement_mgr
+from shift_left.core.models.flink_statement_model import Statement
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
 TMPL_FOLDER="templates"
@@ -26,6 +29,8 @@ class ModifiedFileInfo(BaseModel):
     """Information about a modified file"""
     table_name: str = Field(description="Extracted table name")
     file_modified_url: str = Field(description="File path/URL of the modified file")
+    same_sql: bool = Field(description="Whether the SQL is the same as the running statement")
+    running: bool = Field(description="Whether the statement is running")
 
 
 class ModifiedFilesResult(BaseModel):
@@ -108,13 +113,13 @@ def report_table_cross_products(project_path: str):
                     break
     return risky_tables
 
-def list_modified_files(project_path: str, branch_name: str, date_filter: str, file_filter: str, output_file: str = None) -> ModifiedFilesResult:
+def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str = None) -> ModifiedFilesResult:
     """List modified files and return structured result.
     
     Args:
         project_path: Path to the project directory
         branch_name: Git branch name to check
-        date_filter: Date filter for git log (YYYY-MM-DD format)
+        since: Date filter for git log (YYYY-MM-DD format)
         file_filter: File extension filter (e.g., '.sql')
         output_file: Optional output file path (for backward compatibility)
         
@@ -148,13 +153,13 @@ def list_modified_files(project_path: str, branch_name: str, date_filter: str, f
                 text=True,
                 check=True
             )
-        if not date_filter:
+        if not since:
             # If no date_filter is provided, set it to yesterday's date in YYYY-MM-DD format
             yesterday = (datetime.datetime.now(timezone.utc) - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-            date_filter = yesterday
+            since = yesterday
         # Get list of modified files compared to the specified branch
         git_diff_result = subprocess.run(
-            ["git", "log", "--name-only", f"--since={date_filter}", '--pretty=format:'],
+            ["git", "log", "--name-only", f"--since={since}", '--pretty=format:'],
             capture_output=True,
             text=True,
             check=True
@@ -166,14 +171,15 @@ def list_modified_files(project_path: str, branch_name: str, date_filter: str, f
         # Filter for specific file types (default: SQL files)
         filtered_files = []
         for file_path in all_modified_files:
-            if file_filter in file_path.lower():
+            lowered_file_path = file_path.lower()
+            if file_filter in lowered_file_path and "/tests/" not in lowered_file_path:
                 filtered_files.append(file_path)
         
         logger.info(f"Found {len(all_modified_files)} total modified files")
         logger.info(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
         
         # Generate timestamp
-        generated_on = subprocess.run(['date'], capture_output=True, text=True).stdout.strip()
+        generated_on = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         
         # Create description from lines 123-126 equivalent
         description = (
@@ -185,11 +191,22 @@ def list_modified_files(project_path: str, branch_name: str, date_filter: str, f
         
         # Create file list with extracted table names
         file_list = []
+        parser = SQLparser()
         for file_path in sorted(filtered_files):
-            table_name = _extract_table_name_from_path(file_path)
+            absolute_file_path = from_pipeline_to_absolute(file_path)
+            with open(absolute_file_path, 'r') as file:
+                sql_content = file.read()
+                if "CREATE TABLE" in sql_content:
+                    table_name = parser.extract_table_name_from_create_statement(sql_content)
+                else:
+                    table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
+                
+                same_sql, running = _assess_flink_statement_state(table_name, file_path, sql_content)
             file_list.append(ModifiedFileInfo(
                 table_name=table_name,
-                file_modified_url=file_path
+                file_modified_url=file_path,
+                same_sql=same_sql,
+                running=running
             ))
         
         # Create result object
@@ -280,3 +297,33 @@ def _add_important_files(project_folder: str):
     shutil.copyfile(template_path, os.path.join(project_folder, ".gitignore"))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath("config_tmpl.yaml")
     shutil.copyfile(template_path, os.path.join(shift_left_dir, "config.yaml"))
+
+
+def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: str) -> Tuple[bool, bool]:
+    """
+    Assess the state of a Flink statement for the given table.
+    Returns (same_sql, running) where same_sql indicates if the SQL is the same as the running statement and running indicates if the statement is running.
+    """
+
+    inventory = get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), False)
+    table_ref = get_table_ref_from_inventory(table_name, inventory)
+    if not table_ref:
+        print(f"Error: Table {table_name} not found in inventory")
+        return False, False
+    pipeline_definition = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    if not pipeline_definition:
+        print(f"Error: pipeline definition not found for table {table_name}")
+        return False, False
+    statement_node = pipeline_definition.to_node()
+    if 'ddl' in file_path:
+        statement_name = statement_node.ddl_statement_name
+    else:
+        statement_name = statement_node.dml_statement_name
+    flink_statement = statement_mgr.get_statement(statement_name)
+    if not flink_statement:
+        print(f"Error: statement {statement_name} not found")
+        return True, False
+    if isinstance(flink_statement, Statement):
+        return flink_statement.spec.statement == sql_content, flink_statement.status.phase == "RUNNING"
+    else:
+        return False, False

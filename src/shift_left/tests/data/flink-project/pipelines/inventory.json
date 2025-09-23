@@ -67,8 +67,8 @@
         "table_name": "fct_user_per_group",
         "product_name": "c360",
         "type": "fact",
-        "dml_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.users_fct_user_per_group.sql",
-        "ddl_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.users_fct_user_per_group.sql",
+        "dml_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql",
+        "ddl_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql",
         "table_folder_name": "pipelines/facts/c360/fct_user_per_group"
     },
     "int_common_tenant": {

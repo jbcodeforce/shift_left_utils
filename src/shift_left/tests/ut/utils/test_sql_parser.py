@@ -1151,7 +1151,7 @@ WHERE row_num = 1
         SELECT * FROM user_data ORDER BY name
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data"]
         self.assertEqual(result, expected)
 
@@ -1166,7 +1166,7 @@ WHERE row_num = 1
         select * from user_data order by name
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data"]
         self.assertEqual(result, expected)
 
@@ -1184,7 +1184,7 @@ WHERE row_num = 1
         Select * From user_data u Left Join order_data o On u.user_id = o.user_id
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data"]
         self.assertEqual(result, expected)
 
@@ -1205,7 +1205,7 @@ WHERE row_num = 1
         SELECT * FROM combined_data WHERE order_count > 5
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data", "combined_data"]
         self.assertEqual(result, expected)
 
@@ -1223,7 +1223,7 @@ WHERE row_num = 1
         SELECT * FROM complex_cte WHERE order_count > 5
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["complex_cte"]
         self.assertEqual(result, expected)
 
@@ -1232,7 +1232,7 @@ WHERE row_num = 1
         parser = SQLparser()
         
         sql = "SELECT * FROM users WHERE active = 1"
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         
         # Should return empty list when no CTEs found
         self.assertEqual(result, [])
@@ -1242,15 +1242,15 @@ WHERE row_num = 1
         parser = SQLparser()
         
         # Empty string
-        result = parser.extract_cte_names("")
+        result = parser._extract_cte_names("")
         self.assertEqual(result, [])
         
         # None
-        result = parser.extract_cte_names(None)
+        result = parser._extract_cte_names(None)
         self.assertEqual(result, [])
         
         # Whitespace only
-        result = parser.extract_cte_names("   ")
+        result = parser._extract_cte_names("   ")
         self.assertEqual(result, [])
 
     def test_extract_cte_names_insert_statement(self):
@@ -1265,7 +1265,7 @@ WHERE row_num = 1
         SELECT user_id, name, 'active' as status FROM active_users
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["active_users"]
         self.assertEqual(result, expected)
 
@@ -1286,7 +1286,7 @@ WHERE row_num = 1
         SELECT * FROM user_data u JOIN order_summary o ON u.user_id = o.user_id
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_summary"]
         self.assertEqual(result, expected)
 
@@ -1301,7 +1301,7 @@ WHERE row_num = 1
         SELECT * FROM user_data u JOIN order_data o ON u.id = o.user_id
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data"]
         self.assertEqual(result, expected)
         
@@ -1337,7 +1337,7 @@ WHERE row_num = 1
         LEFT JOIN attachment a ON s.tenant_id = a.tenant_id
         """
         
-        result = parser.extract_cte_names(sql)
+        result = parser._extract_cte_names(sql)
         expected = ["section_detail", "tenant", "attachment"]
         self.assertEqual(result, expected)
 

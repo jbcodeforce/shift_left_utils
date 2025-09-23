@@ -1,361 +1,119 @@
 {
-  "description": "Modified files in branch 'main'\nFilter applied: .sql\nGenerated on: Tue Sep 23 09:47:16 PDT 2025\nTotal files: 89",
+  "description": "Modified files in branch 'main'\nFilter applied: .sql\nGenerated on: 2025-09-23 23:16:40\nTotal files: 19",
   "file_list": [
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_capture_type/tests/ddl_int_amx_all_captures.sql"
+      "table_name": "amx_dim_production_record",
+      "file_modified_url": "pipelines/dimensions/amx/dim_production_record/sql-scripts/dml.amx_dim_production_record.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_capture_type/tests/ddl_src_tenant_metadata.sql"
+      "table_name": "amx_dim_user",
+      "file_modified_url": "pipelines/dimensions/amx/dim_user/sql-scripts/ddl.amx_dim_user.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_capture_type/tests/insert_int_amx_all_captures_1.sql"
+      "table_name": "amx_dim_user",
+      "file_modified_url": "pipelines/dimensions/amx/dim_user/sql-scripts/dml.amx_dim_user.sql",
+      "same_sql": false,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_capture_type/tests/insert_src_tenant_metadata_1.sql"
+      "table_name": "aqem_dim_event_element",
+      "file_modified_url": "pipelines/dimensions/aqem/dim_event_element/sql-scripts/dml.aqem_dim_event_element.sql",
+      "same_sql": true,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_capture_type/tests/validate_amx_dim_capture_type_1.sql"
+      "table_name": "amx_fct_capture_correction",
+      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/sql-scripts/ddl.amx_fct_capture_correction.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_correction_reason/tests/ddl_src_amx_correction.sql"
+      "table_name": "amx_fct_capture_correction",
+      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/sql-scripts/dml.amx_fct_capture_correction.sql",
+      "same_sql": true,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_correction_reason/tests/ddl_src_tenant_metadata.sql"
+      "table_name": "int_amx_all_captures",
+      "file_modified_url": "pipelines/intermediates/amx/all_captures/sql-scripts/ddl.int_amx_all_captures.sql",
+      "same_sql": false,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_correction_reason/tests/insert_src_amx_correction_1.sql"
+      "table_name": "int_amx_all_captures",
+      "file_modified_url": "pipelines/intermediates/amx/all_captures/sql-scripts/dml.int_amx_all_captures.sql",
+      "same_sql": false,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_correction_reason/tests/insert_src_tenant_metadata_1.sql"
+      "table_name": "int_amx_capture_correction",
+      "file_modified_url": "pipelines/intermediates/amx/capture_correction/sql-scripts/ddl.int_amx_capture_correction.sql",
+      "same_sql": false,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_correction_reason/tests/validate_amx_dim_correction_reason_1.sql"
+      "table_name": "int_amx_capture_correction",
+      "file_modified_url": "pipelines/intermediates/amx/capture_correction/sql-scripts/dml.int_amx_capture_correction.sql",
+      "same_sql": true,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/ddl_src_amx_node.sql"
+      "table_name": "int_amx_user",
+      "file_modified_url": "pipelines/intermediates/amx/user/sql-scripts/ddl.int_amx_user.sql",
+      "same_sql": false,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/ddl_src_tenant_metadata.sql"
+      "table_name": "int_amx_user",
+      "file_modified_url": "pipelines/intermediates/amx/user/sql-scripts/dml.int_amx_user.sql",
+      "same_sql": false,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/insert_src_amx_node_1.sql"
+      "table_name": "int_qx_infocard_helper_get_full_result_for_training",
+      "file_modified_url": "pipelines/intermediates/qx/infocard_helper_get_full_result_for_training/sql-scripts/ddl.int_qx_infocard_helper_get_full_result_for_training.sql",
+      "same_sql": false,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/insert_src_amx_node_1.sql"
+      "table_name": "int_qx_infocard_helper_get_full_result_for_training",
+      "file_modified_url": "pipelines/intermediates/qx/infocard_helper_get_full_result_for_training/sql-scripts/dml.int_qx_infocard_helper_get_full_result_for_training.sql",
+      "same_sql": true,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/insert_src_tenant_metadata_1.sql"
+      "table_name": "public_qx_mx_permissions_tenants",
+      "file_modified_url": "pipelines/seeds/permissions/public_qx_mx_permissions_tenants/sql-scripts/dml.public_qx_mx_permissions_tenants.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/insert_src_tenant_metadata_1.sql"
+      "table_name": "public_qx_mx_permissions_mfg_cfg_structures",
+      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/ddl.structures.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/validate_amx_dim_operation_1.sql"
+      "table_name": "public_qx_mx_permissions_mfg_cfg_structures",
+      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/ddl.structures.sql",
+      "same_sql": true,
+      "running": false
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_operation/tests/validate_amx_dim_operation_1.sql"
+      "table_name": "public_qx_mx_permissions_mfg_cfg_structures",
+      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/dml.structures.sql",
+      "same_sql": false,
+      "running": true
     },
     {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/ddl_src_amx_node.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/ddl_src_tenant_metadata.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/validate_amx_dim_phase_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/validate_amx_dim_phase_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/validate_amx_dim_phase_2.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase/tests/validate_amx_dim_phase_2.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/ddl_src_amx_node.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/ddl_src_tenant_metadata.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/validate_amx_dim_phase_step_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step/tests/validate_amx_dim_phase_step_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/ddl_src_amx_node.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/ddl_src_amx_tag_link.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/ddl_src_amx_tag_tag.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/ddl_src_tenant_metadata.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/insert_src_amx_tag_link_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/insert_src_amx_tag_tag_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_phase_step_tag/tests/validate_amx_dim_phase_step_tag_1.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/dimensions/amx/dim_production_record/sql-scripts/dml.amx_dim_production_record.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_of_measure/tests/ddl_src_amx_node_capture.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_of_measure/tests/ddl_src_tenant_metadata.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_of_measure/tests/insert_src_amx_node_capture_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_of_measure/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_of_measure/tests/validate_amx_dim_unit_of_measure_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/ddl_src_amx_node.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/ddl_src_tenant_metadata.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/insert_src_amx_node_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/insert_src_tenant_metadata_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/validate_amx_dim_unit_procedure_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/dimensions/amx/dim_unit_procedure/tests/validate_amx_dim_unit_procedure_1.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/dimensions/amx/dim_user/sql-scripts/ddl.amx_dim_user.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/dimensions/amx/dim_user/sql-scripts/dml.amx_dim_user.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/dimensions/aqem/dim_event_element/sql-scripts/dml.aqem_dim_event_element.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/sql-scripts/ddl.amx_fct_capture_correction.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/sql-scripts/dml.amx_fct_capture_correction.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/ddl_int_amx_capture_correction.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/ddl_int_amx_user.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/ddl_src_amx_note.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/ddl_src_amx_record.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/ddl_src_amx_signature.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/insert_int_amx_capture_correction_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/insert_int_amx_user_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/insert_src_amx_note_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/insert_src_amx_record_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/insert_src_amx_signature_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/facts/amx/fct_capture_correction/tests/validate_amx_fct_capture_correction_1.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/all_captures/sql-scripts/ddl.int_amx_all_captures.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/all_captures/sql-scripts/dml.int_amx_all_captures.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/capture_correction/sql-scripts/ddl.int_amx_capture_correction.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/capture_correction/sql-scripts/dml.int_amx_capture_correction.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/user/sql-scripts/ddl.int_amx_user.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/amx/user/sql-scripts/dml.int_amx_user.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/qx/infocard_helper_get_full_result_for_training/sql-scripts/ddl.int_qx_infocard_helper_get_full_result_for_training.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/intermediates/qx/infocard_helper_get_full_result_for_training/sql-scripts/dml.int_qx_infocard_helper_get_full_result_for_training.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/seeds/permissions/public_qx_mx_permissions_tenants/sql-scripts/dml.public_qx_mx_permissions_tenants.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/ddl.structures.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/ddl.structures.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/dml.structures.sql"
-    },
-    {
-      "table_name": "sql-scripts",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/dml.structures.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/tests/validate_public_qx_mx_permissions_mfg_cfg_structures_1.sql"
-    },
-    {
-      "table_name": "tests",
-      "file_modified_url": "pipelines/sources/adapt/permissions/structures/tests/validate_public_qx_mx_permissions_mfg_cfg_structures_1.sql"
+      "table_name": "public_qx_mx_permissions_mfg_cfg_structures",
+      "file_modified_url": "pipelines/sources/adapt/permissions/structures/sql-scripts/dml.structures.sql",
+      "same_sql": false,
+      "running": true
     }
   ]
 }
