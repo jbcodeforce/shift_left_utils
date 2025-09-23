@@ -14,6 +14,7 @@ from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
+import shift_left.core.integration_test_mgr as integration_mgr
 from shift_left.core.compute_pool_usage_analyzer import ComputePoolUsageAnalyzer
 
 
@@ -325,8 +326,8 @@ def init_integration_test(table_name: str = typer.Argument(help="The table name 
     Initialize the integration test for a given table.
     """
     print(f"Initialize integration test for table {table_name}")
-    pipeline_mgr.init_integration_test_for_pipeline(table_name, os.getenv("PIPELINES"))
-    print(f"Integration test initialized for table {table_name}")
+    integration_mgr.init_integration_tests(table_name, os.getenv("PIPELINES"))
+    print(f"Integration test initialized for table {table_name} in {os.getenv('PIPELINES')}/../tests")
 # ----- Private APIs -----
     
 def _build_deploy_pipeline(

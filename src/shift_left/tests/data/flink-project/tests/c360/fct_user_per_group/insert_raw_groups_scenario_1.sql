@@ -1,8 +1,8 @@
--- Integration test synthetic data for src_test_source
--- Generated on: 2025-09-22T23:43:36.305024+00:00
--- Unique test ID: a0540fba-f60a-4dae-a041-5a7bf0e5a6d5
+-- Integration test synthetic data for raw_groups
+-- Generated on: 2025-09-22T23:43:40.084124+00:00
+-- Unique test ID: 05fa4abd-487d-4db7-9137-b436b052ca04
 
-INSERT INTO src_test_source_it (
+INSERT INTO raw_groups_it (
     -- Add appropriate column names here
     id,
     test_unique_id,
@@ -12,8 +12,8 @@ INSERT INTO src_test_source_it (
 ) VALUES (
     -- Add appropriate test values here
     'test_id_1',
-    'a0540fba-f60a-4dae-a041-5a7bf0e5a6d5',
-    TIMESTAMP '2025-09-22T23:43:36.305024+00:00',
+    '05fa4abd-487d-4db7-9137-b436b052ca04',
+    TIMESTAMP '2025-09-22T23:43:40.084124+00:00',
     -- Add other test values...
     CURRENT_TIMESTAMP
 );

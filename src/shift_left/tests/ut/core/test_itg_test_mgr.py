@@ -8,12 +8,13 @@ import pathlib
 import shutil
 import unittest
 from unittest.mock import patch, mock_open, MagicMock, call
-from datetime import datetime, timezone
+import shift_left.core.statement_mgr as sm
 from shift_left.core.utils.file_search import (
     get_or_build_inventory,
+    from_pipeline_to_absolute,
 )
 # Set up environment variables before importing the module under test
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.integration_test_mgr import (
@@ -32,7 +33,7 @@ from shift_left.core.integration_test_mgr import (
 from shift_left.core.utils.file_search import FlinkTableReference
 from shift_left.core.utils.app_config import reset_all_caches
 import shift_left.core.pipeline_mgr as pm
-
+from shift_left.core.utils.sql_parser import SQLparser
 class TestIntegrationTestManager(unittest.TestCase):
     """
     Validate that init_integration_test_for_pipeline creates a tests folder structure
@@ -62,37 +63,45 @@ class TestIntegrationTestManager(unittest.TestCase):
         self.test_sink_table = "fct_user_per_group"
         self.test_product_name = "c360"
         
+    def test_find_source_tables_for_sink(self):
+        """Test finding source tables for a sink table."""
+        inventory = get_or_build_inventory(self.test_pipeline_path, self.test_pipeline_path, False)
+        result = _find_source_tables_for_sink(self.test_sink_table, inventory, self.test_pipeline_path)
+        self.assertCountEqual(result, ["raw_users", "raw_tenants","raw_groups"])
+
 
     def test_init_integration_tests_success_with_project_path(self):
         """
         Test if the test definition has all the expected fields.
         And files are created under the integration tests path.
         """
-        pm.build_all_pipeline_definitions(self.test_pipeline_path)
         itg_test_def = init_integration_tests(self.test_sink_table, self.test_pipeline_path)
         assert itg_test_def is not None
         assert itg_test_def.sink_test_path is not None
         expected_path = os.path.join(self.test_pipeline_path, "..", INTEGRATION_TEST_FOLDER, self.test_product_name, self.test_sink_table)
         self.assertEqual(itg_test_def.sink_test_path, expected_path)
-        assert itg_test_def.product_name is not None
-        assert itg_test_def.sink_table is not None
+        assert itg_test_def.product_name == self.test_product_name
+        assert itg_test_def.sink_table == self.test_sink_table
         assert itg_test_def.scenarios is not None
         assert len(itg_test_def.scenarios) == 1
         assert itg_test_def.scenarios[0].name is not None
-        assert itg_test_def.scenarios[0].sink_table is not None
         assert itg_test_def.scenarios[0].source_data is not None
-        assert itg_test_def.scenarios[0].validation_queries is not None
-        assert itg_test_def.scenarios[0].measure_latency is not None
-        assert itg_test_def.scenarios[0].source_data[0].table_name is not None
-        assert itg_test_def.scenarios[0].source_data[0].file_name is not None
-        assert itg_test_def.scenarios[0].source_data[0].file_type is not None
-        assert itg_test_def.scenarios[0].validation_queries[0].table_name is not None
-        assert itg_test_def.scenarios[0].validation_queries[0].file_name is not None
-        assert itg_test_def.scenarios[0].validation_queries[0].file_type is not None
-        self._assert_files_exist(expected_path, ["insert_src_test_source_scenario_1.sql", "validate_fct_user_per_group_scenario_1.sql"])
+        assert len(itg_test_def.scenarios[0].source_data) == 3
+        for source_data in itg_test_def.scenarios[0].source_data:
+            assert source_data.table_name in ["raw_groups", "raw_users", "raw_tenants"]
+            assert source_data.file_name in ["./insert_raw_groups_scenario_1.sql", "./insert_raw_users_scenario_1.sql", "./insert_raw_tenants_scenario_1.sql"]
+        assert len(itg_test_def.scenarios[0].validation_queries) == 1
+        assert len(itg_test_def.foundations) == 3
+        for foundation in itg_test_def.foundations:
+            assert foundation.table_name in ["raw_groups", "raw_users", "raw_tenants"]
+            assert foundation.ddl_for_test in ["./ddl_raw_groups.sql", "./ddl_raw_users.sql", "./ddl_raw_tenants.sql"]
+        for validation_query in itg_test_def.scenarios[0].validation_queries:
+            assert validation_query.table_name == self.test_sink_table
+            assert validation_query.file_name == "./validate_fct_user_per_group_scenario_1.sql"
+        self._assert_files_exist(expected_path, ["alter_raw_groups.sql", "alter_raw_users.sql", "alter_raw_tenants.sql", "insert_raw_groups_scenario_1.sql", "insert_raw_users_scenario_1.sql", "insert_raw_tenants_scenario_1.sql", "validate_fct_user_per_group_scenario_1.sql"])
             
         
-    def _test_init_integration_tests_success_with_env_var(self):
+    def test_init_integration_tests_success_with_env_var(self):
         """Test successful initialization using PIPELINES environment variable."""
         with patch('shift_left.core.integration_test_mgr._find_source_tables_for_sink') as mock_find_sources:
             mock_find_sources.return_value = ["src_test_source"]      
@@ -103,7 +112,7 @@ class TestIntegrationTestManager(unittest.TestCase):
             assert itg_test_def is not None
             self.assertEqual(itg_test_def.sink_test_path, expected_path)
 
-    def _test_init_integration_tests_no_project_path_or_env(self):
+    def test_init_integration_tests_no_project_path_or_env(self):
         """Test error when no project path provided and no PIPELINES env var."""
         with patch.dict(os.environ, {}, clear=True):
             # Restore CONFIG_FILE for the test
@@ -114,7 +123,7 @@ class TestIntegrationTestManager(unittest.TestCase):
             
             self.assertIn("Project path must be provided", str(context.exception))
 
-    def _test_init_integration_tests_table_not_found(self):
+    def test_init_integration_tests_table_not_found(self):
         """Test error when sink table not found in inventory."""
         with self.assertRaises(ValueError) as context:
             init_integration_tests("non_existent_table", self.test_pipeline_path)
@@ -122,13 +131,6 @@ class TestIntegrationTestManager(unittest.TestCase):
         self.assertIn("Sink table 'non_existent_table' not found in inventory", str(context.exception))
 
 
-    def _test_find_source_tables_for_sink(self):
-        """Test finding source tables for a sink table."""
-        inventory = get_or_build_inventory(self.test_pipeline_path, self.test_pipeline_path, False)
-        result = _find_source_tables_for_sink(self.test_sink_table, inventory, self.test_pipeline_path)
-        
-        # Should find both source tables
-        self.assertCountEqual(result, ["src_c360_users", "src_c360_groups"])
 
    
     def _test_create_synthetic_data_files(self):

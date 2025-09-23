@@ -1,0 +1,32 @@
+created_at: 2025-09-22 19:52:11.331928+00:00
+product_name: c360
+scenarios:
+- description: End-to-end integration test for fct_user_per_group
+  intermediate_validations: []
+  measure_latency: true
+  name: test_fct_user_per_group_scenario_1
+  sink_table: fct_user_per_group
+  source_data:
+  - file_name: ./insert_src_c360_users_scenario_1.sql
+    file_type: sql
+    table_name: src_c360_users
+    timestamp: null
+    unique_id: null
+  - file_name: ./insert_src_c360_groups_scenario_1.sql
+    file_type: sql
+    table_name: src_c360_groups
+    timestamp: null
+    unique_id: null
+  - file_name: ./insert_src_common_tenant_scenario_1.sql
+    file_type: sql
+    table_name: src_common_tenant
+    timestamp: null
+    unique_id: null
+  validation_queries:
+  - file_name: ./validate_fct_user_per_group_scenario_1.sql
+    file_type: sql
+    table_name: fct_user_per_group
+    timestamp: null
+    unique_id: null
+sink_table: fct_user_per_group
+sink_test_path: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/../tests/c360/fct_user_per_group

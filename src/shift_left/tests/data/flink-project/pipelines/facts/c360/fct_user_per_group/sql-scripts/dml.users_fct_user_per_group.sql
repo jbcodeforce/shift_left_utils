@@ -8,7 +8,7 @@ with append_users as (
     is_active,
     LAST_VALUE(created_date) as last_update_date,
     tumble_end(`$rowtime`, interval '10' second) as window_end_time
-  from dim_users
+  from c360_dim_users
   group by
     user_id, group_id, group_name, group_type, is_active,
     tumble_end(`$rowtime`, interval '10' second) 

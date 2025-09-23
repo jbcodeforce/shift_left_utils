@@ -199,7 +199,7 @@ class SQLparser:
         sql_content = ' '.join(sql_content.split())
         
         # Extract the column definitions
-        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\w+)\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
+        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[`"]?[\w.-]+[`"]?(?:\.[`"]?[\w.-]+[`"]?)*)\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
         if not match:
             return []
 

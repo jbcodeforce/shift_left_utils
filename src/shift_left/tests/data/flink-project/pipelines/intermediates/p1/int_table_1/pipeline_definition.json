@@ -1,0 +1,118 @@
+{
+   "table_name": "int_p1_table_1",
+   "product_name": "p1",
+   "type": "intermediate",
+   "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_p1_table_1.sql",
+   "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_p1_table_1.sql",
+   "path": "pipelines/intermediates/p1/int_table_1",
+   "complexity": {
+      "number_of_regular_joins": 0,
+      "number_of_left_joins": 1,
+      "number_of_right_joins": 0,
+      "number_of_inner_joins": 0,
+      "number_of_outer_joins": 0,
+      "complexity_type": "Simple",
+      "state_form": "Stateful"
+   },
+   "parents": [
+      {
+         "table_name": "src_table_1",
+         "product_name": "common",
+         "type": "source",
+         "dml_ref": "pipelines/sources/common/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "ddl_ref": "pipelines/sources/common/src_table_1/sql-scripts/ddl.src_table_1.sql",
+         "path": "pipelines/sources/common/src_table_1",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateful"
+         },
+         "parents": [],
+         "children": [
+            {
+               "table_name": "int_p1_table_1",
+               "product_name": "p1",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_p1_table_1.sql",
+               "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_p1_table_1.sql",
+               "path": "pipelines/intermediates/p1/int_table_1",
+               "complexity": {
+                  "number_of_regular_joins": 0,
+                  "number_of_left_joins": 1,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": []
+            }
+         ]
+      },
+      {
+         "table_name": "src_p1_table_3",
+         "product_name": "p1",
+         "type": "source",
+         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
+         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
+         "path": "pipelines/sources/p1/src_table_3",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateless"
+         },
+         "parents": [],
+         "children": [
+            {
+               "table_name": "int_p1_table_1",
+               "product_name": "p1",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_p1_table_1.sql",
+               "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_p1_table_1.sql",
+               "path": "pipelines/intermediates/p1/int_table_1",
+               "complexity": {
+                  "number_of_regular_joins": 0,
+                  "number_of_left_joins": 1,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": [
+      {
+         "table_name": "p1_fct_order",
+         "product_name": "p1",
+         "type": "fact",
+         "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
+         "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
+         "path": "pipelines/facts/p1/fct_order",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 1,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateful"
+         },
+         "parents": [],
+         "children": []
+      }
+   ]
+}

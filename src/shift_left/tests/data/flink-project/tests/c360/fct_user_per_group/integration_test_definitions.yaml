@@ -1,22 +1,30 @@
-created_at: 2025-09-22 17:40:30.941587+00:00
+created_at: 2025-09-22 23:43:40.079707+00:00
+description: End-to-end integration test for fct_user_per_group
+foundations:
+- ddl_for_test: ./ddl_raw_groups.sql
+  table_name: raw_groups
+- ddl_for_test: ./ddl_raw_tenants.sql
+  table_name: raw_tenants
+- ddl_for_test: ./ddl_raw_users.sql
+  table_name: raw_users
+measure_latency: true
 product_name: c360
 scenarios:
-- description: End-to-end integration test for fct_user_per_group
-  intermediate_validations: []
-  measure_latency: true
+- intermediate_validations: []
   name: test_fct_user_per_group_scenario_1
-  sink_table: fct_user_per_group
   source_data:
-  - file_name: ./insert_src_test_source_scenario_1.sql
-    file_type: sql
-    table_name: src_test_source
-    timestamp: null
-    unique_id: null
+  - file_name: ./insert_raw_groups_scenario_1.sql
+    table_name: raw_groups
+    unique_id: 0a8e4951-e86e-4efe-92b1-e826d176ed7c
+  - file_name: ./insert_raw_tenants_scenario_1.sql
+    table_name: raw_tenants
+    unique_id: ccd7a028-ea80-4ae9-b762-0d8fec8f679c
+  - file_name: ./insert_raw_users_scenario_1.sql
+    table_name: raw_users
+    unique_id: 96467442-e167-4b48-8a0e-da5d05dd7168
   validation_queries:
   - file_name: ./validate_fct_user_per_group_scenario_1.sql
-    file_type: sql
     table_name: fct_user_per_group
-    timestamp: null
     unique_id: null
 sink_table: fct_user_per_group
 sink_test_path: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/../tests/c360/fct_user_per_group
