@@ -369,9 +369,7 @@ INSERT INTO {source_table}{CONFIGURED_POST_FIX_INTEGRATION_TEST} ("""
                 sql_content += f"TIMESTAMP '2021-01-01 00:00:00', "
             else: # string
                 sql_content += f"'{column}_1', "
-        sql_content = sql_content[:-2] + """
-);
-"""
+        sql_content = sql_content[:-2] + ");"
         with open(insert_file_path, 'w') as f:
             f.write(sql_content)
 

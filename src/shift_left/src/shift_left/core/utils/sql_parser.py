@@ -13,8 +13,10 @@ class SQLparser:
     def __init__(self):
         # extract table name declared after FROM, JOIN, INNER JOIN, LEFT JOIN, CREATE TABLE IF NOT EXISTS, INSERT INTO
         self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*`?([a-zA-Z_][a-zA-Z0-9_]*\.)*[a-zA-Z_][a-zA-Z0-9_]*`?)'
-        self.cte_pattern_1 = r'WITH\s+(\w+)\s+AS\s*\('
-        self.cte_pattern_2 = r'\s+(\w+)\s+AS+\s*\('
+        self.cte_pattern_1 = r'(?i)\bWITH\s+(\w+)\s+AS\s*\('
+        self.cte_pattern_2 = r'(?i),\s*(\w+)\s+AS\s*\('
+        # Pattern to identify the start of WITH clause for CTE removal
+        self.cte_start_pattern = r'(?i)\bWITH\s+'
         self.not_wanted_words = r'\b(CROSS\s+JOIN\s+UNNEST)\s*\('
         # Pattern to identify specific SQL functions that use FROM as a keyword (TRIM, SUBSTRING, etc.)
         # Only target specific functions that legitimately use FROM as part of their syntax
@@ -39,6 +41,62 @@ class SQLparser:
         sql = re.sub(r'\s+', ' ', sql)
         
         return sql.strip()
+
+    def extract_cte_names(self, sql_script: str) -> List[str]:
+        """
+        Extract Common Table Expressions (CTEs) names from SQL script.
+        Supports both uppercase and lowercase WITH and AS keywords.
+        
+        Args:
+            sql_script (str): SQL script that may contain CTEs
+            
+        Returns:
+            List[str]: List of CTE names
+            
+        Example:
+            Input: "WITH cte1 AS (SELECT * FROM table1), cte2 AS (SELECT * FROM table2) SELECT * FROM cte1"
+            Output: ["cte1", "cte2"]
+        """
+        if not sql_script or not sql_script.strip():
+            return []
+            
+        # Normalize the SQL first
+        sql = self._normalize_sql(sql_script)
+        
+        # Check if there's a WITH clause
+        with_match = re.search(self.cte_start_pattern, sql)
+        if not with_match:
+            return []  # No CTEs found, return empty list
+        
+        cte_names = []
+        
+        # Extract the first CTE name using existing pattern
+        first_cte_matches = re.findall(self.cte_pattern_1, sql)
+        if first_cte_matches:
+            cte_names.extend(first_cte_matches)
+        
+        # Extract subsequent CTE names using existing pattern  
+        subsequent_cte_matches = re.findall(self.cte_pattern_2, sql)
+        if subsequent_cte_matches:
+            cte_names.extend(subsequent_cte_matches)
+        
+        # Alternative approach: use a comprehensive pattern to catch all CTE names
+        if not cte_names:
+            # Fallback pattern to catch CTE names in various formats
+            comprehensive_pattern = r'(?i)\b(?:WITH|,)\s+(\w+)\s+AS\s*\('
+            all_matches = re.findall(comprehensive_pattern, sql)
+            if all_matches:
+                cte_names.extend(all_matches)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_cte_names = []
+        for name in cte_names:
+            if name not in seen:
+                seen.add(name)
+                unique_cte_names.append(name)
+        
+        return unique_cte_names
 
     def remove_junk_words(self, table_name: str, not_wanted: List[str]) -> str:
         """
@@ -68,8 +126,7 @@ class SQLparser:
             
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
-            ctes1 = re.findall(self.cte_pattern_1, sql_content_filtered, re.IGNORECASE)
-            ctes2 = re.findall(self.cte_pattern_2, sql_content_filtered, re.IGNORECASE)
+            ctes = self.extract_cte_names(sql_content_filtered)
             not_wanted=['UNNEST', 'unnest']
             matches=set()
             for table in tables:
@@ -79,7 +136,7 @@ class SQLparser:
                 retrieved_table=table[1].replace('`','')
                 if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
-                if not retrieved_table in ctes1 and not retrieved_table in ctes2 and not retrieved_table in not_wanted:
+                if not retrieved_table in ctes and not retrieved_table in not_wanted:
                     table_name=self.remove_junk_words(retrieved_table, not_wanted)
                     if table_name is not None:
                         matches.add(table_name)
