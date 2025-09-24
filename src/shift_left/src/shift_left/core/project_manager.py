@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import datetime
 import os
 from pathlib import Path
+import re
 import subprocess
 import shutil
 import importlib.resources 
@@ -29,7 +30,7 @@ class ModifiedFileInfo(BaseModel):
     """Information about a modified file"""
     table_name: str = Field(description="Extracted table name")
     file_modified_url: str = Field(description="File path/URL of the modified file")
-    same_sql: bool = Field(description="Whether the SQL is the same as the running statement")
+    same_sql_content: bool = Field(description="Whether the SQL is the same as the running statement")
     running: bool = Field(description="Whether the statement is running")
 
 
@@ -205,7 +206,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             file_list.append(ModifiedFileInfo(
                 table_name=table_name,
                 file_modified_url=file_path,
-                same_sql=same_sql,
+                same_sql_content=same_sql,
                 running=running
             ))
         
@@ -324,6 +325,88 @@ def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: 
         print(f"Error: statement {statement_name} not found")
         return True, False
     if isinstance(flink_statement, Statement):
-        return flink_statement.spec.statement == sql_content, flink_statement.status.phase == "RUNNING"
+        same_sql = _assess_sql_difference(table_name, sql_content, flink_statement.spec.statement)
+        return same_sql, flink_statement.status.phase == "RUNNING"
     else:
         return False, False
+
+def _assess_sql_difference(table_name: str, file_sql_content: str, running_sql_content: str) -> bool:
+    """
+    Assess the difference between the SQL content on disk and the running statement.
+    Returns True if the normalized SQL content is the same after removing comments and normalizing whitespace.
+    """
+    # Normalize both SQL content strings
+    normalized_file_sql = _normalize_sql_content(file_sql_content)
+    normalized_running_sql = _normalize_sql_content(running_sql_content)
+    
+    logger.info(f"Normalized FILE SQL: \n {normalized_file_sql}")
+    logger.info(f"Normalized RUNNING SQL: \n {normalized_running_sql}")
+    
+    return normalized_file_sql == normalized_running_sql
+
+
+def _normalize_sql_content(sql_content: str) -> str:
+    """
+    Normalize SQL content by removing comments and normalizing whitespace.
+    
+    Args:
+        sql_content: Raw SQL content string
+        
+    Returns:
+        Normalized SQL content string
+    """
+    if not sql_content:
+        return ""
+    
+    # Remove SQL comments
+    sql_without_comments = _remove_sql_comments(sql_content)
+    
+    # Normalize whitespace
+    normalized_sql = _normalize_whitespace(sql_without_comments)
+    
+    return normalized_sql
+
+
+def _remove_sql_comments(sql_content: str) -> str:
+    """
+    Remove SQL comments from the content.
+    Handles both single-line comments (--) and multi-line comments (/* */).
+    
+    Args:
+        sql_content: SQL content with potential comments
+        
+    Returns:
+        SQL content with comments removed
+    """
+    # Remove multi-line comments /* ... */
+    # Use re.DOTALL to make . match newlines
+    sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+    
+    # Remove single-line comments -- ...
+    # Match -- followed by anything until end of line
+    sql_content = re.sub(r'--.*?$', '', sql_content, flags=re.MULTILINE)
+    
+    return sql_content
+
+
+def _normalize_whitespace(sql_content: str) -> str:
+    """
+    Normalize whitespace in SQL content.
+    
+    Args:
+        sql_content: SQL content string
+        
+    Returns:
+        SQL content with normalized whitespace
+    """
+    # Replace multiple whitespace characters (spaces, tabs, newlines) with single space
+    normalized = re.sub(r'\s+', ' ', sql_content)
+    
+    # Strip leading and trailing whitespace
+    normalized = normalized.strip()
+    
+    # Convert to uppercase for case-insensitive comparison
+    normalized = normalized.upper()
+    
+    return normalized
+   

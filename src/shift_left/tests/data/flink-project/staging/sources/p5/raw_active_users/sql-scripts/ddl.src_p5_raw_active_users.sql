@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS src_p5_raw_active_users (
 
-  -- add columns
+  -- put here column definitions
   PRIMARY KEY(__db) NOT ENFORCED
 ) DISTRIBUTED BY HASH(__db) INTO 1 BUCKETS
 WITH (
