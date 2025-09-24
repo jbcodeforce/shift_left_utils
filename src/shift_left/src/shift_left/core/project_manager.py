@@ -257,7 +257,47 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         # Restore original working directory
         os.chdir(original_cwd)
 
+
+
+def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
+    logger.info(f"isolate_data_product({product_name}, {source_folder}, {target_folder})")
+    """
+    go to the facts and build a list of tables for this product name.
+    add any children of the tables in the list of facts, recursively.
+    build an integrated execution plan from the list of tables.
+    move all the folder to the target folder.
+    """
+    inventory = get_or_build_inventory(source_folder, source_folder, False)
+    tables = [table for table in inventory if inventory[table]['product_name'] == product_name]
+    tables_to_process = {}
+    visited = set()
+    
+    # Process each table and recursively find all its parents
+    for table in tables:
+        logger.info(f"Processing table {table} and finding all its dependencies")
+        _find_all_parent_tables_recursive(table, inventory, visited, tables_to_process)
+    
+    logger.info(f"Found {len(tables_to_process)} total tables to process (including all dependencies)")
+    
+    # Copy all tables (original + all dependencies) to target folder
+    
+    for table, table_folder_name in tables_to_process.items():
+        logger.info(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+        
+        # Keep the hierarchy of folder in the table_folder_name
+        print(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+        shutil.copytree(
+            os.path.join(source_folder, '..', table_folder_name),
+            os.path.join(target_folder, table_folder_name),
+            dirs_exist_ok=True
+        )
+    with open(os.path.join(shift_left_dir, "tables_to_process.txt"), "w") as f:
+        for table, table_folder_name in tables_to_process.items():
+            f.write(f"{table},{table_folder_name}\n")
+    
+# ---------------------------------
 # --- Private APIs ---
+# ---------------------------------
 
 def _initialize_git_repo(project_folder: str):
     print(f"initialize_git_repo({project_folder})")
@@ -410,3 +450,39 @@ def _normalize_whitespace(sql_content: str) -> str:
     
     return normalized
    
+def _find_all_parent_tables_recursive(table_name: str, inventory: dict, visited: set, tables_to_process: dict):
+    """
+    Recursively find all parent tables for a given table.
+    
+    Args:
+        table_name: The table to find parents for
+        inventory: The complete inventory of tables
+        visited: Set of already visited tables to avoid circular dependencies
+        tables_to_process: Dictionary to accumulate all tables that need processing
+    """
+    if table_name in visited:
+        # Avoid circular dependencies
+        logger.debug(f"Table {table_name} already visited, skipping to avoid circular dependency")
+        return
+    
+    visited.add(table_name)
+    
+    # Get table reference from inventory
+    if table_name not in inventory:
+        logger.warning(f"Table {table_name} not found in inventory")
+        return
+    
+    tableRef = inventory[table_name]
+    tables_to_process[table_name] = tableRef['table_folder_name']
+    
+    # Read pipeline definition to find parents
+    pipeline_definition = read_pipeline_definition_from_file(
+        os.path.join(tableRef['table_folder_name'], PIPELINE_JSON_FILE_NAME)
+    )
+    
+    if pipeline_definition and pipeline_definition.parents:
+        logger.debug(f"Found {len(pipeline_definition.parents)} parents for table {table_name}")
+        for parent in pipeline_definition.parents:
+            logger.debug(f"Processing parent {parent.table_name} for table {table_name}")
+            # Recursively process each parent
+            _find_all_parent_tables_recursive(parent.table_name, inventory, visited, tables_to_process)

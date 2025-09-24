@@ -163,6 +163,29 @@ Each topic has a json object to describe its metadata.
     }
     ```
 
+### Copy all the statements for a given product name
+
+The goal is to extract all the Flink statements for a given product with their cross-product parents. 
+
+* First be sure $PIPELINES is from the source git repository folder
+
+* Run the command that will copy all the table part of the product (c360 is the product name), fro, $PIPELINES to a target folder:
+    ```sh
+    shift_left project isolate-data-product c360 $PIPELINES ~/Code/data/c360-only
+    ```
+
+* Change the PIPELINES environment variables, build table inventory and metadata:
+    ```sh
+    export PIPELINES=/Users/jerome/Documents/Code/customers/mc/aqem-only/pipelines
+    shift_left table build-inventory
+    shift_left pipeline build-all-metadata
+    ```
+
+* Assess a build execution plan, after configuring the config.yaml, to verify the coherence of the statement relationships:
+    ```sh
+    shift_left pipeline build-execution-plan --product-name c360
+    ```
+
 ## Table related tasks
 
 On a day to day basis Data Engineer may need to add a table and the SQL statements to create and insert records to the new table. The table has to land in one of the hierarchy: **facts, dimensions, views, intermediates, sources**.

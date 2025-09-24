@@ -58,6 +58,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init-integration-tests`: Initialize integration test structure for...
 * `run-integration-tests`: Run integration tests for a given sink table.
 * `delete-integration-tests`: Delete all integration test artifacts...
+* `isolate-data-product`: Isolate the data product from the project
 
 ### `project init`
 
@@ -277,6 +278,26 @@ $ project delete-integration-tests [OPTIONS] SINK_TABLE_NAME
 * `--no-confirm`: Skip confirmation prompt and delete immediately
 * `--help`: Show this message and exit.
 
+### `project isolate-data-product`
+
+Isolate the data product from the project
+
+**Usage**:
+
+```console
+$ project isolate-data-product [OPTIONS] PRODUCT_NAME SOURCE_FOLDER TARGET_FOLDER
+```
+
+**Arguments**:
+
+* `PRODUCT_NAME`: Product name to isolate  [required]
+* `SOURCE_FOLDER`: Source folder to isolate the data product  [required]
+* `TARGET_FOLDER`: Target folder to isolate the data product  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ## `table`
 
 **Usage**:
@@ -463,7 +484,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x110f37980&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x110f74830&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -743,7 +764,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/aqem-only/pipelines]
 
 **Options**:
 
@@ -765,7 +786,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/aqem-only/pipelines]
 
 **Options**:
 

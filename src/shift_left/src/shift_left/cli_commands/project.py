@@ -348,3 +348,16 @@ def _get_status_emoji(status: str) -> str:
         "ERROR": "🚫"
     }
     return emoji_map.get(status, "❓")
+
+@app.command()
+def isolate_data_product(
+    product_name: Annotated[str, typer.Argument(help="Product name to isolate")],
+    source_folder: Annotated[str, typer.Argument(help="Source folder to isolate the data product")],
+    target_folder: Annotated[str, typer.Argument(help="Target folder to isolate the data product")]
+    ):
+    """
+    Isolate the data product from the project
+    """
+    print("#" * 30 + f" Isolate data product {product_name} from {source_folder} to {target_folder}")
+    project_manager.isolate_data_product(product_name, source_folder, target_folder)
+    print(f"Data product isolated in {target_folder}")
