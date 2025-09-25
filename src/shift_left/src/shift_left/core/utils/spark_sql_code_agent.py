@@ -53,57 +53,10 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         fname = importlib.resources.files("shift_left.core.utils.prompts.spark_fsql").joinpath("ddl_creation.txt")
         with fname.open("r") as f:
             self.ddl_creation_system_prompt= f.read()
-        
-        # Load or create refinement prompt
-        self._load_refinement_prompt()
+        fname = importlib.resources.files("shift_left.core.utils.prompts.spark_fsql").joinpath("refinement.txt")
+        with fname.open("r") as f:
+            self.refinement_system_prompt= f.read()
 
-    def _load_refinement_prompt(self):
-        """Load or create the refinement prompt for error correction"""
-        self.refinement_system_prompt = """You are an expert Apache Flink SQL error correction agent. Your task is to fix Flink SQL errors based on error messages from Confluent Cloud Flink.
-
-## Your Role:
-- Analyze Flink SQL errors and categorize them
-- Apply targeted fixes based on error patterns
-- Ensure streaming semantics are preserved
-- Maintain data correctness while fixing syntax/semantic issues
-
-## Common Error Patterns and Fixes:
-
-### Syntax Errors:
-- Missing semicolons or incorrect SQL syntax
-- Invalid function calls or parameter counts
-- Incorrect table/column references
-
-### Function Incompatibility:
-- Replace Spark-specific functions with Flink equivalents
-- Fix function parameter ordering and types
-- Handle unsupported Spark functions
-
-### Type Mismatches:
-- Convert between compatible types using CAST/TRY_CAST
-- Fix precision/scale issues with DECIMAL types
-- Handle NULL/NOT NULL constraints
-
-### Watermark Issues:
-- Add proper WATERMARK definitions for event-time processing
-- Fix timestamp column references
-- Correct watermark delay specifications
-
-### Connector Issues:
-- Fix table property syntax
-- Correct connector configurations
-- Handle missing required properties
-
-## Output Requirements:
-- Provide refined DDL and DML statements
-- Explain what changes were made and why
-- List specific changes in bullet points
-- Ensure the fix addresses the root cause
-
-Current error to fix: {error_message}
-Previous attempts: {history}
-Original DDL: {ddl_sql}
-Original DML: {dml_sql}"""
 
     def _translator_agent(self, sql: str) -> Tuple[str, str]:
         """Enhanced translator agent with better error handling"""
@@ -326,8 +279,8 @@ Original DML: {dml_sql}"""
             return ""
 
     def translate_to_flink_sql(self, sql: str, validate: bool = True) -> Tuple[str, str]:
-        """Enhanced translation with validation enabled by default"""
-        print(f"🚀 Starting enhanced Spark SQL to Flink SQL translation with {self.model_name}")
+        """Translation with validation enabled by default"""
+        print(f"🚀 Starting  Spark SQL to Flink SQL translation with {self.model_name}")
         logger.info(f"Starting translation with validation={validate}")
         
         # Reset validation history
