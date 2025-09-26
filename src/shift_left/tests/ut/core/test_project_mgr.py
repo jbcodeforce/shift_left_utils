@@ -526,9 +526,9 @@ class TestProjectManager(unittest.TestCase):
 
         pm.isolate_data_product("c360", os.getenv("PIPELINES"), tgt_folder)
         assert os.path.exists(tgt_folder)
-        assert os.path.exists(tgt_folder + "/fct_user_per_group")
-        assert os.path.exists(tgt_folder + "/fct_user_per_group/sql-scripts")
-        assert os.path.exists(tgt_folder + "/fct_user_per_group/sql-scripts/dml.fct_user_per_group.sql")
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group")
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts")
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql")
     
 if __name__ == '__main__':
     unittest.main()

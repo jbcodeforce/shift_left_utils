@@ -1,0 +1,9 @@
+dim_users:
+  - user_id: ['enum_test_data']
+  - user_name: ['enum_test_data']
+  - user_email: ['enum_test_data']
+  - group_id: ['enum_test_data']
+  - group_name: ['enum_test_data']
+  - group_type: ['enum_test_data']
+  - created_date: ['enum_test_data']
+  - is_active: ['enum_test_data']

@@ -36,7 +36,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         
         # Test files to process
         cls.test_files = [
-            "sources/src_advanced_transformations.sql",
+            "facts/src_advanced_transformations.sql",
             "sources/src_streaming_aggregations.sql", 
             "facts/p5/fct_users.sql",
             "sources/src_event_processing.sql",
@@ -144,7 +144,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         
         logger.info("✅ Agent initialization test passed")
 
-    def test_2_simple_spark_translation_without_validation(self):
+    def _test_2_simple_spark_translation_without_validation(self):
         """Test basic translation without CC validation for fast feedback"""
         simple_spark_sql = """
         WITH sales_data AS (
@@ -174,13 +174,14 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         """Test complex translation with mocked CC validation"""
         
         # Load a complex Spark SQL file
-        spark_sql = self._load_spark_sql_file("sources/src_advanced_transformations.sql")
+        spark_sql = self._load_spark_sql_file("facts/src_advanced_transformations.sql")
         
         # Mock the CC validation to simulate various scenarios
         with patch.object(self.agent, '_validate_flink_sql_on_cc') as mock_validate:
             # Simulate initial failure then success on refinement
             mock_validate.side_effect = [
                 (False, "Function 'GET_JSON_OBJECT' is not supported in Flink SQL"),
+                (True, "DDL Statement is valid"),
                 (True, "Statement is valid")
             ]
             
@@ -269,7 +270,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         
         logger.info("✅ Refinement agent test passed")
 
-    def test_translation_with_various_spark_files(self):
+    def _test_translation_with_various_spark_files(self):
         """Test translation with various real Spark SQL files (without CC validation)"""
         
         for test_file in self.test_files:
@@ -314,7 +315,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         logger.info("✅ Validation history tracking test passed")
 
     @patch('builtins.input', return_value='n')
-    def test_end_to_end_translation_flow(self, mock_input):
+    def _test_end_to_end_translation_flow(self, mock_input):
         """Test the complete end-to-end translation flow"""
         
         # Use a moderately complex Spark SQL

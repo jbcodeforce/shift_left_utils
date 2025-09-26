@@ -211,7 +211,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         for iteration in range(max_iterations):
             print(f"\n--- Validation Iteration {iteration + 1} ---")
             
-            # Validate with Confluent Cloud
+            # Validate with Flink Engine
             is_valid, error_message = self._validate_with_confluent_cloud(current_ddl, current_dml)
             
             # Track validation history

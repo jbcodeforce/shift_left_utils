@@ -840,6 +840,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "requests" },
     { name = "rich" },
+    { name = "sqlglot" },
     { name = "toml" },
     { name = "typer" },
 ]
@@ -859,6 +860,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", specifier = ">=13.9.4" },
+    { name = "sqlglot", specifier = ">=27.19.0" },
     { name = "toml", specifier = ">=0.10.2" },
     { name = "typer", specifier = ">=0.15.2" },
 ]
@@ -891,6 +893,15 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pyspark", specifier = ">=4.0.0" }]
+
+[[package]]
+name = "sqlglot"
+version = "27.19.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/39/59c0feb9c29bd122b9492b6f51d583401ba977957b614d4ac0481cf380bc/sqlglot-27.19.0.tar.gz", hash = "sha256:4986ab43443263144c1783aeafe116e68a46f9be43f813c0ce4b914700063dbc", size = 5479756, upload-time = "2025-09-26T16:49:37.45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/3d/35d33f0e167ac5a3acec1b66bd3b6e2cf62285c779474004d44a17745b52/sqlglot-27.19.0-py3-none-any.whl", hash = "sha256:2bb4a9522c835bb41ff274497973906b42f8ec2cf7776a18b1035b1253bc81e5", size = 520489, upload-time = "2025-09-26T16:49:35.428Z" },
+]
 
 [[package]]
 name = "toml"

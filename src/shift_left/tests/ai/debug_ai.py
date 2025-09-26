@@ -28,7 +28,8 @@ class TestDebugIntegrationTests(unittest.TestCase):
         if not os.getenv('SRC_FOLDER'):
             os.environ["SRC_FOLDER"] =  data_dir + "/spark-project"
         runner = CliRunner()
-        result = runner.invoke(app, ['table', 'migrate', 'customer_journey', os.getenv('SRC_FOLDER','.') + '/sources/c360/src_customer_journey.sql', os.getenv('STAGING'),'--source-type', 'spark'])
+        #result = runner.invoke(app, ['table', 'migrate', 'customer_journey', os.getenv('SRC_FOLDER','.') + '/sources/c360/src_customer_journey.sql', os.getenv('STAGING'),'--source-type', 'spark'])
+        result = runner.invoke(app, ['table', 'migrate', 'aggregate_insight', os.getenv('SRC_FOLDER','.') + '/facts/src_advanced_transformations.sql', os.getenv('STAGING'),'--source-type', 'spark'])
         print(result.stdout)
 
 

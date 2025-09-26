@@ -10,21 +10,23 @@ from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
 from shift_left.core.utils.spark_sql_code_agent import SparkToFlinkSqlAgent
 #from shift_left.core.utils.flink_sql_code_agent_lg import define_flink_sql_agent
 
+"""
+Factory method to create the appropriate translator to Flink SQL agent, with two implementations:
+- SparkTranslatorToFlinkSqlAgent: for Spark SQL
+- KsqlTranslatorToFlinkSqlAgent: for KsqlDB SQL
+"""
+
 class TranslatorToFlinkSqlAgent(BaseModel):
     def __init__(self):
         pass
 
-    def translate_to_flink_sqls(self, table_name: str,sql: str) -> Tuple[str, str]:
-        return sql, ''
+    def translate_to_flink_sqls(self, table_name: str,sql: str) -> Tuple[List[str], List[str]]:
+        return [sql], [sql]
 
 
-class DbtTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
+class SparkTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     def  translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
         logger.info(f"Start translating dbt to flink sql for table {table_name}")
-        #app = define_flink_sql_agent()
-        #inputs = {"sql_input": sql, "table_name" : table_name}
-        #result=app.invoke(inputs)
-        #return [result['flink_sql']], [result['derived_ddl']]
         agent = SparkToFlinkSqlAgent()
         ddl, dml = agent.translate_to_flink_sql(sql, validate=validate)
         return [ddl], [dml]
@@ -54,5 +56,5 @@ def get_or_build_sql_translator_agent():
             mod = import_module(module_path)
             _agent_class = getattr(mod, class_name)()
         else:
-            _agent_class = DbtTranslatorToFlinkSqlAgent()
+            _agent_class = SparkTranslatorToFlinkSqlAgent()
     return _agent_class
