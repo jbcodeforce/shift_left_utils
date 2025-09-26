@@ -17,12 +17,12 @@ from shift_left.core.statement_mgr import post_flink_statement, delete_statement
 from shift_left.core.models.flink_statement_model import Statement
 from shift_left.core.utils.llm_code_agent_base import AnySqlToFlinkSqlAgent
 
-class SparkSqlFlinkSql(BaseModel):
-    flink_ddl_output: str
+class SparkSqlFlinkDml(BaseModel):
     flink_dml_output: str
 
 class SparkSqlFlinkDdl(BaseModel):
     flink_ddl_output: str
+    key_name: str
 
 class SqlRefinement(BaseModel):
     refined_ddl: str
@@ -45,6 +45,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         super().__init__()
         self.refinement_system_prompt = ""
         self.validation_history: List[Dict] = []
+        self._load_prompts()
         
     def _load_prompts(self):
         fname = importlib.resources.files("shift_left.core.utils.prompts.spark_fsql").joinpath("translator.txt")
@@ -58,8 +59,8 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             self.refinement_system_prompt= f.read()
 
 
-    def _translator_agent(self, sql: str) -> Tuple[str, str]:
-        """Enhanced translator agent with better error handling"""
+    def _translator_agent(self, sql: str) -> str:
+        """Translator agent with error handling"""
         translator_prompt_template = "spark_sql_input: {sql_input}"
         messages=[
             {"role": "system", "content": self.translator_system_prompt},
@@ -69,7 +70,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         try:
             response= self.llm_client.chat.completions.parse(
                 model=self.model_name, 
-                response_format=SparkSqlFlinkSql,
+                response_format=SparkSqlFlinkDml,
                 messages=messages
             )
             obj_response = response.choices[0].message
@@ -77,7 +78,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             print(f"Translation response: {obj_response.parsed}")
             
             if obj_response.parsed:
-                return obj_response.parsed.flink_ddl_output, obj_response.parsed.flink_dml_output
+                return obj_response.parsed.flink_dml_output
             else:
                 return "", ""
         except Exception as e:
@@ -191,7 +192,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         return True, "Validation successful"
 
     def _mandatory_validation_agent(self, ddl_sql: str, dml_sql: str) -> Tuple[str, str]:
-        """Enhanced validation agent with iterative refinement"""
+        """Validation agent with iterative refinement and human in the loop"""
         print("Starting enhanced validation process...")
         logger.info("Starting enhanced validation with Confluent Cloud")
         
@@ -248,7 +249,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         return current_ddl, current_dml
 
     def _ddl_generation(self, dml_sql: str) -> str:
-        """Enhanced DDL generation with better error handling"""
+        """DDL generationfrom the dml content """
         if not dml_sql.strip():
             logger.warning("No DML provided for DDL generation")
             return ""
@@ -278,6 +279,10 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             print(f"DDL generation failed: {str(e)}")
             return ""
 
+
+    # -------------------------
+    # Public API
+    # -------------------------
     def translate_to_flink_sql(self, sql: str, validate: bool = True) -> Tuple[str, str]:
         """Translation with validation enabled by default"""
         print(f"🚀 Starting  Spark SQL to Flink SQL translation with {self.model_name}")
@@ -287,19 +292,18 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
         self.validation_history = []
         
         # Step 1: Translate Spark SQL to Flink SQL
-        print("\n📝 Step 1: Translating Spark SQL to Flink SQL...")
-        ddl_sql, dml_sql = self._translator_agent(sql)
-        print(f"Initial DDL: {ddl_sql[:100]}..." if len(ddl_sql) > 100 else f"Initial DDL: {ddl_sql}")    
-        print(f"Initial DML: {dml_sql[:100]}..." if len(dml_sql) > 100 else f"Initial DML: {dml_sql}")
+        print("\nStep 1: Translating Spark SQL to Flink SQL...")
+        dml_sql = self._translator_agent(sql)
+        print(f"Initial Migrated DML: {dml_sql[:300]}..." if len(dml_sql) > 300 else f"Initial DML: {dml_sql}")
         
-        if not ddl_sql and not dml_sql:
+        if not dml_sql:
             print("❌ Translation failed - no output generated")
             return "", ""
         
         # Step 2: Generate DDL from DML if needed
-        if not ddl_sql and dml_sql:
-            print("\n🏗️  Step 2: Generating DDL from DML...")
-            ddl_sql = self._ddl_generation(dml_sql)
+        print("\n🏗️  Step 2: Generating DDL from DML...")
+        ddl_sql = self._ddl_generation(dml_sql)
+        print(f"Initial Migrated DDL: {ddl_sql[:300]}..." if len(ddl_sql) > 300 else f"Initial DDL: {ddl_sql}")
         
         # Step 3: Validation (if enabled)
         if validate:

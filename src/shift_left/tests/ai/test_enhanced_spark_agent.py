@@ -14,7 +14,7 @@ from shift_left.core.utils.spark_sql_code_agent import SparkToFlinkSqlAgent, Err
 from shift_left.core.utils.app_config import get_config, logger
 
 
-class TestEnhancedSparkAgent(unittest.TestCase):
+class TestSparkToFlinkSqlAgent(unittest.TestCase):
     """
     Integration tests for the enhanced Spark SQL to Flink SQL agent with:
     - Agentic validation flow
@@ -120,7 +120,31 @@ class TestEnhancedSparkAgent(unittest.TestCase):
             self.assertIn('md5', all_sql, f"surrogate_key should be translated to MD5 in {source_file}")
             self.assertIn('concat_ws', all_sql, f"surrogate_key should use CONCAT_WS in {source_file}")
 
-    def test_simple_spark_translation_without_validation(self):
+    def test_1_agent_initialization_and_prompts(self):
+        """Test that the agent initializes correctly and loads prompts"""
+        
+        self.assertIsNotNone(self.agent.translator_system_prompt, 
+                           "Translator prompt should be loaded")
+        self.assertIsNotNone(self.agent.ddl_creation_system_prompt,
+                           "DDL creation prompt should be loaded")
+        self.assertIsNotNone(self.agent.refinement_system_prompt,
+                           "Refinement prompt should be loaded")
+        
+        # Check that prompts contain expected content
+        
+        self.assertIn("code assistant specializing in Apache Flink SQL", 
+                    self.agent.translator_system_prompt,
+                     "Translator prompt should mention Flink SQL")
+        self.assertIn("Use CREATE TABLE IF NOT EXISTS", 
+                    self.agent.ddl_creation_system_prompt,
+                   "DDL creation prompt should handle CREATE TABLE IF NOT EXISTS")
+        self.assertIn("SQL error correction agent", 
+                    self.agent.refinement_system_prompt,
+                     "Refinement prompt should handle SQL error correction")
+        
+        logger.info("✅ Agent initialization test passed")
+
+    def test_2_simple_spark_translation_without_validation(self):
         """Test basic translation without CC validation for fast feedback"""
         simple_spark_sql = """
         WITH sales_data AS (
@@ -141,11 +165,12 @@ class TestEnhancedSparkAgent(unittest.TestCase):
         self._validate_translation_output(ddl, dml, "simple_test", simple_spark_sql)
         self.assertEqual(len(self.agent.get_validation_history()), 0, 
                         "No validation history should exist when validation is disabled")
-        
+        print(f"Final DDL: {ddl}")
+        print(f"Final DML: {dml}")
         logger.info("✅ Simple translation test passed")
 
     @patch('builtins.input', return_value='n')  # Auto-decline continuation prompts
-    def test_complex_spark_translation_with_mocked_validation(self, mock_input):
+    def test_3_complex_spark_translation_with_mocked_validation(self, mock_input):
         """Test complex translation with mocked CC validation"""
         
         # Load a complex Spark SQL file
@@ -263,23 +288,7 @@ class TestEnhancedSparkAgent(unittest.TestCase):
                     logger.error(f"❌ Translation failed for {test_file}: {str(e)}")
                     self.fail(f"Translation failed for {test_file}: {str(e)}")
 
-    def test_agent_initialization_and_prompts(self):
-        """Test that the agent initializes correctly and loads prompts"""
-        
-        self.assertIsNotNone(self.agent.translator_system_prompt, 
-                           "Translator prompt should be loaded")
-        self.assertIsNotNone(self.agent.ddl_creation_system_prompt,
-                           "DDL creation prompt should be loaded")
-        self.assertIsNotNone(self.agent.refinement_system_prompt,
-                           "Refinement prompt should be loaded")
-        
-        # Check that prompts contain expected content
-        self.assertIn("Apache Flink SQL", self.agent.translator_system_prompt,
-                     "Translator prompt should mention Flink SQL")
-        self.assertIn("surrogate_key", self.agent.translator_system_prompt,
-                     "Translator prompt should handle surrogate_key")
-        
-        logger.info("✅ Agent initialization test passed")
+ 
 
     def test_validation_history_tracking(self):
         """Test that validation history is properly tracked"""
