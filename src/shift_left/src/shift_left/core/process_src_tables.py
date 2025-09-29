@@ -1,19 +1,14 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 
-The processing of dbt sql statements for defining sources adopt a different approach than sink tables.
-
-Processes per application, and generates the sql in the existing pipelines. 
-So this script needs to be created after the pipeline folder structure is created from the sink, as 
-there is one pipeline per sink table.
-
+Service to process sources script to migrate to Flink SQL.
 """
 import os
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 
-from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent, KsqlTranslatorToFlinkSqlAgent
-
+from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
+from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist, 
     SCRIPTS_DIR,
@@ -42,24 +37,28 @@ def migrate_one_file(table_name: str,
                     process_parents: bool = False,
                     source_type: str = "spark",
                     validate: bool = False):
-    """ Process one source sql file to extract code from and migrate to Flink SQL.
-    This is the enry point of migration, and routes to the different type of migration.
+    """ 
+    Process one source sql file and migrate to Flink SQL.
+    This is the entry point of any source migration, and routes to the different type of migration supported.
     """
     print(f"Migrate source {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:
         if sql_src_file.endswith(".sql"):
-            # TODO revisit  this logic
-            product_name= extract_product_name(sql_src_file)
-            if sql_src_file.find("source") > 0:
-                _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name, validate)
-            else:
-                _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents, validate)
+            _process_spark_sql_file(table_name=table_name, 
+                                    sql_src_file_name=sql_src_file, 
+                                    target_path=staging_target_folder, 
+                                    src_folder_path=src_folder_path, 
+                                    walk_parent=process_parents, 
+                                    validate=validate)
         else:
-            raise Exception("Error: the sql_src_file parameter needs to be a sql or ksql file")
+            raise Exception("Error: the sql_src_file parameter needs to be a sql file")
     elif source_type == "ksql":
-        _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate)
+        _process_ksql_sql_file(table_name=table_name, 
+                               sql_src_file=sql_src_file, 
+                               staging_target_folder=staging_target_folder, 
+                               validate=validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
 
@@ -227,12 +226,12 @@ def _process_source_sql_file(table_name: str,
     _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
     
 
-def _process_non_source_sql_file(table_name: str, 
-                                sql_src_file_name: str, 
-                                target_path: str, 
-                                src_folder_path: str,
-                                walk_parent: bool = False,
-                                validate: bool = False):
+def _process_spark_sql_file(table_name: str, 
+                            sql_src_file_name: str, 
+                            target_path: str, 
+                            src_folder_path: str,
+                            walk_parent: bool = False,
+                            validate: bool = False):
     """
     Transform intermediate or fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
@@ -255,12 +254,13 @@ def _process_non_source_sql_file(table_name: str,
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        dml, ddl = translator_agent.translate_to_flink_sqls(table_name, sql_content, validate=validate)
+        dml, ddl = translator_agent.translate_to_flink_sqls(sql=sql_content, 
+                                                            validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dml, ddl)
-    if walk_parent:
-        parents=_remove_already_processed_table(parents)
-        for parent_table_name in parents:
-            _process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
+        if walk_parent:
+            parents=_remove_already_processed_table(parents)
+            for parent_table_name in parents:
+                _process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
 
 
 def _search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
@@ -333,9 +333,9 @@ def _process_ksql_sql_file(table_name: str,
     logger.info(f"Process ksql SQL file {ksql_src_file} to {staging_target_folder}")
     table_folder = table_name.lower()
     table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, None)
-    agent = KsqlTranslatorToFlinkSqlAgent()
+    agent = KsqlToFlinkSqlAgent()
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
-        ddl_content, dml_content  = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
+        ddl_content, dml_content  = agent.translate_to_flink_sqls( ksql_content, validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dml_content, ddl_content)
         return ddl_content, dml_content

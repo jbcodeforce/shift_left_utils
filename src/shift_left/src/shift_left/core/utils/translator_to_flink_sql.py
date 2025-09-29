@@ -1,49 +1,66 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
-from pydantic import BaseModel
+import os
 from importlib import import_module
 from typing import Tuple, List
 from shift_left.core.utils.app_config import get_config, logger
-
-from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
-from shift_left.core.utils.spark_sql_code_agent import SparkToFlinkSqlAgent
-#from shift_left.core.utils.flink_sql_code_agent_lg import define_flink_sql_agent
+from openai import OpenAI
+from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
+from shift_left.core.models.flink_statement_model import Statement
 
 """
 Factory method to create the appropriate translator to Flink SQL agent, with two implementations:
 - SparkTranslatorToFlinkSqlAgent: for Spark SQL
 - KsqlTranslatorToFlinkSqlAgent: for KsqlDB SQL
 """
-
-class TranslatorToFlinkSqlAgent(BaseModel):
+class TranslatorToFlinkSqlAgent():
     def __init__(self):
+        self.qwen_model_name="qwen2.5-coder:32b"
+        self.qwen3_model_name="qwen3:30b"
+        self.mistral_model_name="mistral-small:latest"
+        self.cogito_model_name="cogito:32b"
+        self.kimi_k2_model_name="moonshotai/Kimi-K2-Instruct:novita"
+        #self.model_name=self.cogito_model_name
+        self.model_name=os.getenv("SL_LLM_MODEL",self.qwen3_model_name) # default to qwen3
+        self.llm_base_url=os.getenv("SL_LLM_BASE_URL","http://localhost:11434/v1")
+        self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_test_key")
+        self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
+        self._load_prompts()
+        print("-"*50 + f"\n\tUsing {self.model_name} with {self.llm_base_url} and {self.llm_api_key[:25]}...\n" + "-"*50)
+
+    def _load_prompts(self):
+        print("To implement")
         pass
 
-    def translate_to_flink_sqls(self, table_name: str,sql: str) -> Tuple[List[str], List[str]]:
+    def _validate_flink_sql_on_cc(self, sql_to_validate: str) -> Tuple[bool, str]:
+        config = get_config()
+        compute_pool_id = config.get('flink').get('compute_pool_id')
+        statement = None
+        if sql_to_validate:
+            statement_name = "syntax-check"
+            delete_statement_if_exists(statement_name)
+            statement = post_flink_statement(compute_pool_id, statement_name, sql_to_validate)
+            print(f"CC Flink Statement: {statement}")
+            logger.info(f"CC Flink Statement: {statement}")
+            if statement and statement.status:
+                if statement.status.phase in ["RUNNING", "COMPLETED"]:
+                    # Stop the statement as it is not needed anymore
+                    delete_statement_if_exists(statement_name)
+                    return True, statement.status.detail
+                else:
+                    return False, statement.status.detail
+            else:
+                return False, "No statement found"
+        else:
+            return False, "No sql to validate"
+
+    def translate_to_flink_sqls(self, sql: str, validate: bool = True) -> Tuple[List[str], List[str]]:
         return [sql], [sql]
 
 
-class SparkTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
-    def  translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
-        logger.info(f"Start translating dbt to flink sql for table {table_name}")
-        agent = SparkToFlinkSqlAgent()
-        ddl, dml = agent.translate_to_flink_sql(sql, validate=validate)
-        return [ddl], [dml]
-
-class KsqlTranslatorToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
-    """
-    ksqlDB translator to Flink SQL
-    """
-    def translate_to_flink_sqls(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
-        logger.info(f"Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
-        print(f"Start translating ksql to flink sql for table {table_name} using KsqlToFlinkSqlAgent")
-        agent = KsqlToFlinkSqlAgent()
-        ddl, dml = agent.translate_from_ksql_to_flink_sql(table_name, ksql, validate=validate)
-        return ddl, dml
-
 _agent_class = None
-def get_or_build_sql_translator_agent():
+def get_or_build_sql_translator_agent()-> TranslatorToFlinkSqlAgent:
     """
     Factory to get the SQL translator agent using external configuration file, or
     the default one: DbtTranslatorToFlinkSqlAgent
@@ -53,8 +70,10 @@ def get_or_build_sql_translator_agent():
         if get_config().get('app').get('translator_to_flink_sql_agent'):
             class_to_use = get_config().get('app').get('translator_to_flink_sql_agent')
             module_path, class_name = class_to_use.rsplit('.',1)
+            logger.info(f"Using {class_to_use} for SQL translator agent")
             mod = import_module(module_path)
             _agent_class = getattr(mod, class_name)()
         else:
-            _agent_class = SparkTranslatorToFlinkSqlAgent()
+            logger.error("No SQL translator agent specified in config")
+            raise ValueError("No SQL translator agent specified in config")
     return _agent_class

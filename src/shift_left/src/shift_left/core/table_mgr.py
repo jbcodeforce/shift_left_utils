@@ -59,7 +59,7 @@ def build_folder_structure_for_table(table_folder_name: str,
     """
     logger.info(f"Create folder {table_folder_name} in {target_path}")
     table_type = get_table_type_from_file_path(target_path)
-    if not product_name:
+    if not product_name or product_name != 'None':
         table_folder = f"{target_path}/{table_folder_name}"
         product_name= extract_product_name(table_folder)
         

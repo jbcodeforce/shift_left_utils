@@ -11,12 +11,12 @@ import re
 import json
 import importlib.resources 
 from enum import Enum
+import sqlglot
 
 from shift_left.core.utils.app_config import get_config, logger
-from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
-from shift_left.core.models.flink_statement_model import Statement
-from shift_left.core.utils.llm_code_agent_base import AnySqlToFlinkSqlAgent
+from shift_left.core.utils.translator_to_flink_sql import TranslatorToFlinkSqlAgent
 
+# data models for LLM response.
 class SparkSqlFlinkDml(BaseModel):
     flink_dml_output: str
 
@@ -40,13 +40,13 @@ class ErrorCategory(Enum):
     UNKNOWN = "unknown"
 
 
-class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
+class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     def __init__(self):
         super().__init__()
-        self.refinement_system_prompt = ""
         self.validation_history: List[Dict] = []
         self._load_prompts()
-        
+
+    # inheritence to implement    
     def _load_prompts(self):
         fname = importlib.resources.files("shift_left.core.utils.prompts.spark_fsql").joinpath("translator.txt")
         with fname.open("r") as f:
@@ -59,6 +59,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             self.refinement_system_prompt= f.read()
 
 
+    # specific to spark migration
     def _translator_agent(self, sql: str) -> str:
         """Translator agent with error handling"""
         translator_prompt_template = "spark_sql_input: {sql_input}"
@@ -115,6 +116,16 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             
         if ddl_sql and not ddl_sql.strip().upper().startswith('CREATE'):
             issues.append("DDL must start with CREATE")
+        
+        try:
+            parsed = sqlglot.parse_one(ddl_sql)
+        except Exception as e:
+            issues.append(f"DDL is not a valid Spark SQL: {str(e)}")
+        
+        try:
+            parsed = sqlglot.parse_one(dml_sql)
+        except Exception as e:
+            issues.append(f"DML is not a valid Spark SQL: {str(e)}")
         
         # Check for balanced parentheses
         for sql_type, sql in [("DDL", ddl_sql), ("DML", dml_sql)]:
@@ -175,7 +186,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             print(f"Refinement agent failed: {str(e)}")
             return ddl_sql, dml_sql
 
-    def _validate_with_confluent_cloud(self, ddl_sql: str, dml_sql: str) -> Tuple[bool, str]:
+    def validate_with_flink_engine(self, ddl_sql: str, dml_sql: str) -> Tuple[bool, str]:
         """Validate SQL statements using Confluent Cloud Flink"""
         # First validate DDL if provided
         if ddl_sql.strip():
@@ -212,7 +223,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
             print(f"\n--- Validation Iteration {iteration + 1} ---")
             
             # Validate with Flink Engine
-            is_valid, error_message = self._validate_with_confluent_cloud(current_ddl, current_dml)
+            is_valid, error_message = self.validate_with_flink_engine(current_ddl, current_dml)
             
             # Track validation history
             validation_entry = {
@@ -283,7 +294,7 @@ class SparkToFlinkSqlAgent(AnySqlToFlinkSqlAgent):
     # -------------------------
     # Public API
     # -------------------------
-    def translate_to_flink_sql(self, sql: str, validate: bool = True) -> Tuple[str, str]:
+    def translate_to_flink_sqls(self, sql: str, validate: bool = True) -> Tuple[str, str]:
         """Translation with validation enabled by default"""
         print(f"🚀 Starting  Spark SQL to Flink SQL translation with {self.model_name}")
         logger.info(f"Starting translation with validation={validate}")
