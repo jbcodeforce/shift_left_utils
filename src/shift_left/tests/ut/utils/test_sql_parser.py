@@ -1315,6 +1315,7 @@ WHERE row_num = 1
         sql = """
         WITH section_detail as (
             SELECT s.event_section_id, sc.name, s.tenant_id
+                s.operation_id IS NOT DISTINCT FROM first_element.operation_id
             FROM src_execution_plan as s
             INNER JOIN src_configuration_section as sc
                 ON sc.id = s.config_section_id

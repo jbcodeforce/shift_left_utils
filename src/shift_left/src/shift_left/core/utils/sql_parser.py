@@ -21,6 +21,8 @@ class SQLparser:
         # Pattern to identify specific SQL functions that use FROM as a keyword (TRIM, SUBSTRING, etc.)
         # Only target specific functions that legitimately use FROM as part of their syntax
         self.function_from_pattern = r'\b(TRIM|OVERLAY|SUBSTRING|EXTRACT)\s*\([^)]*FROM[^)]*\)'
+        # Pattern to identify comparison operators that use FROM (IS [NOT] DISTINCT FROM)
+        self.comparison_from_pattern = r'\bIS\s+(?:NOT\s+)?DISTINCT\s+FROM\s+\w+(?:\.\w+)?'
     
 
     def extract_table_references(self, sql_content) -> Set[str]:
@@ -35,8 +37,9 @@ class SQLparser:
         matches = re.findall(regex, sql_content, re.IGNORECASE)
         if len(matches) == 0:
             # Remove SQL functions that contain FROM keyword (like TRIM(BOTH '[]' FROM value))
-            # to avoid false positive table name matches
+            # and comparison operators (like IS NOT DISTINCT FROM) to avoid false positive table name matches
             sql_content_filtered = re.sub(self.function_from_pattern, '', sql_content, flags=re.IGNORECASE)
+            sql_content_filtered = re.sub(self.comparison_from_pattern, '', sql_content_filtered, flags=re.IGNORECASE)
             
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
