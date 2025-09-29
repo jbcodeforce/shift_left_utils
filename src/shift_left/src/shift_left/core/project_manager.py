@@ -377,7 +377,6 @@ def _assess_sql_difference(table_name: str, file_sql_content: str, running_sql_c
     Returns True if the normalized SQL content is the same after removing comments and normalizing whitespace.
     """
     # Normalize both SQL content strings
-    print ('####### Srinivas')
     normalized_file_sql = _normalize_sql_content(file_sql_content)
     normalized_running_sql = _normalize_sql_content(running_sql_content)
     
