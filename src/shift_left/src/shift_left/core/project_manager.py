@@ -5,6 +5,7 @@ import datetime
 import os
 from pathlib import Path
 import re
+import hashlib
 import subprocess
 import shutil
 import importlib.resources 
@@ -376,13 +377,20 @@ def _assess_sql_difference(table_name: str, file_sql_content: str, running_sql_c
     Returns True if the normalized SQL content is the same after removing comments and normalizing whitespace.
     """
     # Normalize both SQL content strings
+    print ('####### Srinivas')
     normalized_file_sql = _normalize_sql_content(file_sql_content)
     normalized_running_sql = _normalize_sql_content(running_sql_content)
     
     logger.info(f"Normalized FILE SQL: \n {normalized_file_sql}")
     logger.info(f"Normalized RUNNING SQL: \n {normalized_running_sql}")
     
-    return normalized_file_sql == normalized_running_sql
+    hash_normalized_file_sql = hashlib.md5(normalized_file_sql.encode('utf-8')).hexdigest()
+    hash_normalized_running_sql = hashlib.md5(normalized_running_sql.encode('utf-8')).hexdigest()
+    
+    logger.info(f"Hash normalized file SQL: {hash_normalized_file_sql}")
+    logger.info(f"Hash normalized running SQL: {hash_normalized_running_sql}")
+    
+    return hash_normalized_file_sql == hash_normalized_running_sql
 
 
 def _normalize_sql_content(sql_content: str) -> str:
