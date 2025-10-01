@@ -1,6 +1,16 @@
 # CHANGELOG
 
 <!-- version list -->
+v0.1.40
+- Enhance sql diff with a hash based diff
+- Work on spark agent, and unit tests
+- Fix issue related to DDL could return RUNNING now. 
+- Improve table reference extraction for table with unnest string in the table name, improve unit tests execution. 
+- Improve SLQ parser for is disctinct from construct
+- Add a command at the project level to isolate a data product: copying all Flink statements to a separate folder by keeping the interdependencies with cross product parents
+- Migrate unit test with AI to use local qwen3:30b
+- Update to list of modified file report, and get a better sql_content diff algorithm
+
 v0.1.39
 - integration tests creation
 - enhancement to the sql parser to better identify CTEs

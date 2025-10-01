@@ -148,7 +148,7 @@ cd ../..
 
 # Step 6: Update changelog
 print_info "Updating CHANGELOG.md with recent commits"
-CHANGELOG_FILE="../../CHANGELOG.md"
+CHANGELOG_FILE="./CHANGELOG.md"
 
 # Get recent commits between main and develop
 RECENT_COMMITS=$(git log --oneline main..develop --reverse)
@@ -180,7 +180,6 @@ else
     print_warning "No new commits found between main and develop"
 fi
 
-cd ../..
 
 # Step 7: Commit the changes
 print_info "Committing version update changes"
