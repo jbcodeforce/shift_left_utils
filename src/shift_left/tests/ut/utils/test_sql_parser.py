@@ -505,7 +505,12 @@ WITH (
         """
         rep=parser.extract_table_references(query)
         assert rep
-        assert "UNNEST" not in rep
+        assert "int_element_data_unnest" in rep
+        assert "src_element_data" in rep
+        assert "src_record" in rep
+        assert "src_plan_element" in rep
+        assert "src_form_element" in rep
+        assert not "UNNEST" in rep
 
     def test_extract_statement_complexity_no_joins(self):
         """Test complexity extraction with no joins - should be Simple"""

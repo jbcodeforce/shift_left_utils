@@ -1,4 +1,4 @@
-## Fact Table: None_fct_aggregate_insight
+## Fact Table: int_p3_it2
 
 Status date:
 

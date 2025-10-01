@@ -40,11 +40,12 @@ class SQLparser:
             # and comparison operators (like IS NOT DISTINCT FROM) to avoid false positive table name matches
             sql_content_filtered = re.sub(self.function_from_pattern, '', sql_content, flags=re.IGNORECASE)
             sql_content_filtered = re.sub(self.comparison_from_pattern, '', sql_content_filtered, flags=re.IGNORECASE)
+            # Remove CROSS JOIN UNNEST patterns to avoid extracting UNNEST as a table name
+            sql_content_filtered = re.sub(self.not_wanted_words, '', sql_content_filtered, flags=re.IGNORECASE)
             
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
             ctes = self._extract_cte_names(sql_content_filtered)
-            not_wanted=['UNNEST', 'unnest']
             matches=set()
             for table in tables:
                 logger.debug(table)
@@ -53,10 +54,8 @@ class SQLparser:
                 retrieved_table=table[1].replace('`','')
                 if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
-                if not retrieved_table in ctes and not retrieved_table in not_wanted:
-                    table_name=self._remove_junk_words(retrieved_table, not_wanted)
-                    if table_name is not None:
-                        matches.add(table_name)
+                if not retrieved_table in ctes:
+                    matches.add(retrieved_table)
             return matches
         return matches
 
@@ -371,15 +370,6 @@ class SQLparser:
         sql = re.sub(r'\s+', ' ', sql)
         
         return sql.strip()
-
-    def _remove_junk_words(self, table_name: str, not_wanted: List[str]) -> str:
-        """
-        Remove words not wanted as table name
-        """
-        for not_wanted_word in not_wanted:
-            if not_wanted_word in table_name.upper():
-                return None
-        return table_name.strip()
 
     def _parse_sql_values(self, values_str: str) -> List[Any]:
         """

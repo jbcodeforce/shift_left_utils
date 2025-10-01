@@ -66,7 +66,10 @@ class TestComputePoolMgr(unittest.TestCase):
     def test_4_test_pool_validation_and_delete(self):
         try:    
             print("test_4_test_pool_validation and delete the compute pool")
-            compute_pool_id, compute_pool_name = compute_mgr.create_compute_pool("p1-test-table")
+            compute_pool_list = compute_mgr.search_for_matching_compute_pools("p1-test-table")
+            assert len(compute_pool_list) > 0
+            compute_pool_id = compute_pool_list[0].id
+            compute_pool_name = compute_pool_list[0].name
             assert compute_pool_id is not None
             assert compute_pool_name is not None
             assert compute_mgr.is_pool_valid(compute_pool_id)

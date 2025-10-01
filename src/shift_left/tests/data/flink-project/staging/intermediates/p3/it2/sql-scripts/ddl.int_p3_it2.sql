@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS None_fct_aggregate_insight (
+CREATE TABLE IF NOT EXISTS int_p3_it2 (
 
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

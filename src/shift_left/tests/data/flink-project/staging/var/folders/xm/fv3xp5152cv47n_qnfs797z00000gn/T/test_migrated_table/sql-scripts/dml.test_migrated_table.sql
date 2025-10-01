@@ -1,4 +1,4 @@
-INSERT INTO None_fct_aggregate_insight
+INSERT INTO test_migrated_table
 SELECT 
 -- part to select stuff
 FROM src_table

@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- None_fct_aggregate_insight
-TABLE_NAME=None_fct_aggregate_insight
-SCRIPT_PRE_KEBAB=dev-usw2-None
+# --- int_p3_it2
+TABLE_NAME=int_p3_it2
+SCRIPT_PRE_KEBAB=dev-usw2-p3
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_None_fct_aggregate_insight: create_flink_ddl  create_flink_dml
+create_int_p3_it2: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source

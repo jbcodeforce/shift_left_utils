@@ -176,7 +176,7 @@ def init_unit_tests(
 @app.command()
 def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
-                run_all: bool = typer.Option(False, "--run-all", help="RBy default run insert sqls and foundations, with this flag it will also run validation sql too."),
+                run_all: bool = typer.Option(False, "--run-all", help="By default run insert sqls and foundations, with this flag it will also run validation sql too."),
                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
@@ -208,6 +208,15 @@ def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name o
     print(f"Test suite report saved into {file_name}")
     print("#" * 30 + f" Unit tests validation execution for {table_name} - {compute_pool_id}")
 
+@app.command()
+def validate_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+                test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+    """
+    just a synonym for run-validation-tests
+    """
+    run_validation_tests(table_name, test_case_name, compute_pool_id=compute_pool_id)
+    
 @app.command()
 def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                  compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):

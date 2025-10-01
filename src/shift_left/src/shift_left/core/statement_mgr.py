@@ -121,13 +121,16 @@ def post_flink_statement(compute_pool_id: str,
             auth_header = client._get_flink_auth()
             response = client.make_request(method="POST", url=f"{url}/statements", data=statement_data, auth_header=auth_header)
             logger.debug(f"> POST response= {response}")
-            if response.get('errors'):
-                logger.error(f"Error executing rest call: {response['errors']}")
-                return  None
+            if isinstance(response, dict):
+                if response.get('errors'):
+                    logger.error(f"Error executing rest call: {response['errors']}")
+                    return  None
                 #raise Exception(response['errors'][0]['detail'])
-            elif response["status"]["phase"] == "PENDING":
-                return client.wait_response(url, statement_name, start_time)
-            return  Statement(**response)
+                elif response["status"]["phase"] == "PENDING":
+                    return client.wait_response(url, statement_name, start_time)
+                return  Statement(**response)
+            else:
+                return None
         except Exception as e:
             logger.error(f"Error executing rest call: {e}")
             raise e
