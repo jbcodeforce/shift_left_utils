@@ -45,13 +45,13 @@ class AIBasedDataTuning:
     """
 
     def __init__(self):
-        self.qwen_model_name=os.getenv("SL_LLM_MODEL","qwen2.5-coder:32b")
+        self.qwen_model_name=os.getenv("SL_LLM_MODEL","qwen3:30b")
         self.mistral_model_name=os.getenv("SL_LLM_MODEL","mistral-small:latest")
         self.cogito_model_name=os.getenv("SL_LLM_MODEL","cogito:32b")
         self.kimi_k2_model_name=os.getenv("SL_LLM_MODEL","moonshotai/Kimi-K2-Instruct:novita")
         self.model_name=self.qwen_model_name
         self.llm_base_url=os.getenv("SL_LLM_BASE_URL","http://localhost:11434/v1")
-        self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_test_key")
+        self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_local_key")
         print(f"Test content tuning using {self.model_name} model from {self.llm_base_url} and {self.llm_api_key[:25]}...")
         self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
         self._load_prompts()

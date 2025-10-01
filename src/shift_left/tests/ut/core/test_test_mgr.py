@@ -445,7 +445,7 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_test_suite(self, 
+    def test_onte_test_case_execution(self, 
                         mock_post_flink_statement, 
                         mock_get_statement_info, 
                         mock_get_statement_results,
@@ -488,7 +488,7 @@ class TestTestManager(unittest.TestCase):
         mock_delete_statement.return_value = None  # Mock delete operation
 
         table_name = "p1_fct_order"
-        suite_result = test_mgr.execute_one_or_all_tests(table_name, run_validation=True)
+        suite_result = test_mgr.execute_one_or_all_tests(test_case_name="", table_name=table_name, run_validation=True)
         assert suite_result
         assert len(suite_result.test_results) == 2
         assert len(suite_result.foundation_statements) == 4
@@ -1330,6 +1330,30 @@ class TestTestManager(unittest.TestCase):
         assert "case when a.latest_user_created_date = e.expected_latest_user_created_date then 'PASS' else 'FAIL' end as latest_user_created_date_check" in sql_content
         assert "case when a.fact_updated_at = e.expected_fact_updated_at then 'PASS' else 'FAIL' end as fact_updated_at_check" in sql_content
    
-
+    def test_same_inputs_multiple_validations(self):
+        """
+        The test definition should support using the same input but getting multiple validations sql.
+        """
+        table_ref = FlinkTableReference(
+            table_name="test_table",
+            dml_ref="test.sql",
+            ddl_ref="test_ddl.sql"
+        )
+        foundation_1 = Foundation(table_name="test_table_1", ddl_for_test="./tests/ddl_test_table_1.sql")
+        foundation_2 = Foundation(table_name="test_table_2", ddl_for_test="./tests/ddl_test_table_2.sql")
+        test_definition = SLTestDefinition(foundations=[foundation_1, foundation_2], test_suite=[])
+        input_1 = SLTestData(table_name="test_table_1", file_name="./tests/insert_test_table_1.sql", file_type="sql")
+        input_2 = SLTestData(table_name="test_table_2", file_name="./tests/insert_test_table_2.sql", file_type="sql")
+        output_1 = SLTestData(table_name="test_table_1", file_name="./tests/validate_test_table_1.sql", file_type="sql")
+        output_2 = SLTestData(table_name="test_table_2", file_name="./tests/validate_test_table_2.sql", file_type="sql")
+        output_3 = SLTestData(table_name="test_table_3", file_name="./tests/validate_test_table_3.sql", file_type="sql")
+        test_case_1 = SLTestCase(name="test_case_1", inputs=[input_1, input_2], outputs=[output_1])
+        test_case_2 = SLTestCase(name="test_case_2", inputs=[input_1, input_2], outputs=[output_2])
+        test_case_3 = SLTestCase(name="test_case_3", inputs=[input_1, input_2], outputs=[output_3])
+        test_definition.test_suite.append(test_case_1)
+        test_definition.test_suite.append(test_case_2)  
+        test_definition.test_suite.append(test_case_3)
+        print(test_definition.model_dump_json(indent=4))    
+        
 if __name__ == '__main__':
     unittest.main()

@@ -11,7 +11,7 @@ Provides testing capabilities including:
 - YAML-based test suite definitions and CSV test data support
 """
 from pydantic import BaseModel, Field
-from typing import List, Final, Optional, Dict, Tuple, Union, Any, Callable
+from typing import List, Final, Optional, Dict, Tuple, Any, Callable
 import yaml
 import time
 import os
@@ -102,7 +102,7 @@ def execute_one_or_all_tests(table_name: str,
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, "", compute_pool_id, prefix)
+    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id, prefix)
     
     test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
 
@@ -256,6 +256,7 @@ def _execute_flink_test_statement(
         # Statement exists - check if it's running
         if statement.status and statement.status.phase != "RUNNING":
             should_execute = True
+            statement_mgr.delete_statement_if_exists(statement_name)
         else:
             print(f"{statement_name} statement already exists -> do nothing")
             return statement, False  # Return existing statement, not new
@@ -426,7 +427,7 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
     if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
-        print(f"Statement {statement_name} already exists and is running -> do nothing")
+        print(f"Statement {statement_name} already exists and is running or completed-> do nothing")
         return statements  # Return same list when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
@@ -443,7 +444,13 @@ def _load_sql_and_execute_statement(table_name: str,
             print(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
             raise ValueError(f"Failed to create test foundations for {table_name}.. {statement.status.detail}")
         else:
-            print(f"Executed test foundations for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}.. {statement.status.phase}\n")
+            while "-ddl-" in statement_name and statement.status.phase not in ["COMPLETED", "FAILED"]:
+                time.sleep(2)
+                statement = statement_mgr.get_statement(statement_name)
+                logger.info(f"DDL deployment status is: {statement.status.phase}")
+            if statement.status.phase in ["FAILED"]:
+                raise RuntimeError(f"Deployment failed for {table_name} {statement_name} with error: {statement.status.detail}")
+            print(f"Executed test foundations for table: {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} statement: {statement_name}... {statement.status.phase}\n")
     return statements
 
 def _execute_test_inputs(test_case: SLTestCase, 
@@ -785,7 +792,7 @@ def _table_exists(table_name: str) -> bool:
                 if _topic_list_cache.created_at and (datetime.now() - datetime.strptime(_topic_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
                     reload = False
             except Exception as e:
-                logger.error(f"Error loading topic list: {e}")
+                logger.warning(f"Error loading topic list from file {TOPIC_LIST_FILE}: {e}")
                 reload = True
                 os.remove(TOPIC_LIST_FILE)
         if reload:

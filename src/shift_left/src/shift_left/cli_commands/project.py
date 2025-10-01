@@ -170,15 +170,6 @@ def report_table_cross_products():
         else:
             print(f"No table cross products found")
        
-@app.command()
-def report_table_cross_products():
-        """
-        Report the list of tables that are referenced in other products
-        """
-        print("#" * 30 + f" Report table cross products")
-        result = project_manager.report_table_cross_products(os.getenv("PIPELINES"))
-        print(result)
-        print(f"Table cross products saved in {os.getenv('PIPELINES')}/table_cross_products.txt")
 
 @app.command()
 def list_modified_files(
@@ -199,10 +190,15 @@ def list_modified_files(
     # Display structured result summary
     print(f"\n📊 Summary:")
     print(f"   Total modified files: {len(result.file_list)}")
+    print(f"   Tables affected:")
     if result.file_list:
-        print(f"   Tables affected: {', '.join([f.table_name for f in result.file_list[:5]])}")
-        if len(result.file_list) > 5:
-            print(f"   ... and {len(result.file_list) - 5} more")
+        
+        for file in result.file_list:
+           if  not file.same_sql_content:
+                print(f"   {file.table_name} {file.file_modified_url} \t\t -> not same sql content")
+           elif not file.running:
+                print(f"   {file.table_name} {file.file_modified_url} \t\t -> not running")
+
     
     return result
 
@@ -352,3 +348,16 @@ def _get_status_emoji(status: str) -> str:
         "ERROR": "🚫"
     }
     return emoji_map.get(status, "❓")
+
+@app.command()
+def isolate_data_product(
+    product_name: Annotated[str, typer.Argument(help="Product name to isolate")],
+    source_folder: Annotated[str, typer.Argument(help="Source folder to isolate the data product")],
+    target_folder: Annotated[str, typer.Argument(help="Target folder to isolate the data product")]
+    ):
+    """
+    Isolate the data product from the project
+    """
+    print("#" * 30 + f" Isolate data product {product_name} from {source_folder} to {target_folder}")
+    project_manager.isolate_data_product(product_name, source_folder, target_folder)
+    print(f"Data product isolated in {target_folder}")

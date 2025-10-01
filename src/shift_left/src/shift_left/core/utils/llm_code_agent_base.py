@@ -16,12 +16,13 @@ from shift_left.core.models.flink_statement_model import Statement
 class AnySqlToFlinkSqlAgent:
 
     def __init__(self):
-        self.qwen_model_name=os.getenv("SL_LLM_MODEL","qwen2.5-coder:32b")
-        self.mistral_model_name=os.getenv("SL_LLM_MODEL","mistral-small:latest")
-        self.cogito_model_name=os.getenv("SL_LLM_MODEL","cogito:32b")
-        self.kimi_k2_model_name=os.getenv("SL_LLM_MODEL","moonshotai/Kimi-K2-Instruct:novita")
+        self.qwen_model_name="qwen2.5-coder:32b"
+        self.qwen3_model_name="qwen3:30b"
+        self.mistral_model_name="mistral-small:latest"
+        self.cogito_model_name="cogito:32b"
+        self.kimi_k2_model_name="moonshotai/Kimi-K2-Instruct:novita"
         #self.model_name=self.cogito_model_name
-        self.model_name=self.qwen_model_name
+        self.model_name=os.getenv("SL_LLM_MODEL",self.qwen3_model_name) # default to qwen3
         self.llm_base_url=os.getenv("SL_LLM_BASE_URL","http://localhost:11434/v1")
         self.llm_api_key=os.getenv("SL_LLM_API_KEY","ollama_test_key")
         print(f"Using {self.model_name} with {self.llm_base_url} and {self.llm_api_key[:25]}...")

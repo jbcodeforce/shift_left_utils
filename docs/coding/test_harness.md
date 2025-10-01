@@ -1,9 +1,10 @@
 # Testing Flink Statement in isolation
 
 ???- info "Version"
-    Created Mars 21- 2025 
+    Created March 21 - 2025 
+    Updated Sept 24 -2025
 
-The goals of this chapter is to present the requirements, design and how to use a test harness tool for Flink statement validation in the context of Confluent Cloud Flink. The tool is packaged as a command in the `shift-left` CLI.
+The goals of this chapter is to present the requirements, design and how to use the shift_left test harness commands for Flink statement validation in the context of Confluent Cloud Flink. The tool is packaged as a command in the `shift-left` CLI.
 
 ```sh
 shift_left table --help
@@ -14,16 +15,16 @@ run-unit-tests    Run all the unit tests or a specified test case by sending dat
 delete-unit-tests      Delete the Flink statements and kafka topics used for unit tests for a given table.
 ```
 
-[See usage paragraph](#usage-and-recipe)
+[See usage paragraph](#unit-test-usage-and-recipes)
 
 ## Context
 
-We should differentiate two types of testing: Flink statement developer's tests, like unit testing of one flink statement, and Flink statement integration tests which group multiple Flink statements and process data end to end.
+We should differentiate two types of testing: Flink statement developer's tests, like **unit testing** of one flink statement, and Flink statement **integration tests** which group multiple Flink statements and process data end-to-end.
 
 The objectives of a test harness for developers and system testers, is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud for Flink and therefore address the following needs:
 
-1. be able to deploy a flink statement under test (the ones we want to focus on are DMLs, or CTAS)
-1. be able to generate test data from table definition and DML script content - with the developers being able to tune generated test data for each test cases.
+1. be able to deploy a unique flink statement under test (the ones we want to focus on are DMLs, or CTAS)
+1. be able to generate test data from the table definition and DML script content - with the developers being able to tune generated test data for each test cases.
 1. produce synthetic test data for the n source tables using SQL insert statements or via csv files.
 
     <figure markdown="span">
@@ -38,7 +39,8 @@ The objectives of a test harness for developers and system testers, is to valida
   ) 
   SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END from result_table;
   ```
-1. the flow of defining input data and validation scripts is a test case. 
+
+1. the flow of defining input data and validation scripts is a test case. The following Yaml definition, define one test with input and output SQL references:
   ```yaml
   - name: test_p5_dim_event_element_1
     inputs:
@@ -52,7 +54,7 @@ The objectives of a test harness for developers and system testers, is to valida
       file_type: sql
   ```
 
-1. Support multiple testcase definitions as a test suite. Test suite may be automated for non-regression testing to ensure continuous quality.
+1. Support multiple testcase definitions as a test suite. Test suite execution may be automated for non-regression testing to ensure continuous quality.
 1. Once tests are completed, tear down tables and data.
   ```sh
   shift_left table delete-unit-tests <table-name>
@@ -72,10 +74,10 @@ The following diagram illustrates the global infrastructure deployment context:
 </figure>
 
 
-* One the left, the developer mahchine is used to run the test harness tool and send statements to Confluent cloud environment using the REST API. The Flink API key and secrets are used. 
-* The Flink statement under test is the same as the one going to production, except the tool may change the name of the source table to use the '_ut' postfix. 
-* The green cylenders represent Kafka Topics which are mapped to Flink tables. They are defined specifically by the tool.
-* As any tables created view Flink on Confluent Cloud have schema defined in schema registry, then schema contest is used to avoid conflict within the same cluster. 
+* One the left, the developer's computer is used to run the test harness tool and send Flink statements to Confluent Cloud environment/ compute pool using the REST API. The Flink API key and secrets are used. 
+* The Flink statement under test is the same as the one going to production, except the tool may change the name of the source tables to use the specified postfix. The postfix is defined in the config.yaml file as `app.post_fix_unit_test` parameter.
+* The green cylenders represent Kafka Topics which are mapped to Flink source and sink tables. They are defined specifically by the tool.
+* As any tables created view Flink on Confluent Cloud have schema defined in schema registry, then schema context is used to avoid conflict within the same cluster. 
 
 The following diagram illustrates the target unit testing environment:
 
@@ -85,7 +87,7 @@ The following diagram illustrates the target unit testing environment:
 </figure>
 
 
-## Usage and Recipe
+## Unit-test Usage and Recipes
 
 * Select a table to test the logic from. This test tool is relevant for DML with complex logic. In this example `user_role` has a join between three tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`:
   ```sql
@@ -114,10 +116,12 @@ The following diagram illustrates the target unit testing environment:
 * Verify the ddl and dml files for the selected table are defined under `sql-scripts`, verify the table inventory exists and is up-to-date, if not run `shift_left table build-inventory $PIPELINES`
 * Initialize the test code by running the following command:
   ```sh
-  shift_left table init-unit-tests <table_name>
+  shift_left table init-unit-tests <table_name> --nb-test-cases 2 
   # example with the user_role (using the naming convention)
-  shift_left table init-unit-tests int_p3_user_role
+  shift_left table init-unit-tests int_p3_user_role --nb-test-cases 2 
   ```
+
+  In long run it is recommended to define only one test case.
 
 * For each input table, of the dml under test, there will be ddl and dml script files created with the numbered postfix to match the unit test it supports (e.g _1 in `insert_src_p3_roles_1.sql`) for inserting records to the table `src_p3_roles` in the context of test case # 1.  In the example below the `dml_user_role.sql` has 3 input tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`. For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix (or the prefix defined in `app.post_fix_unit_test` in the config.yaml), this is used for test isolation: `ddl_src_p3_roles.sql`, `ddl_src_p3_users.sql` and `ddl_src_p3_tenants.sql`
   ```sh
@@ -141,7 +145,7 @@ The following diagram illustrates the target unit testing environment:
   │   └── validate_int_p3_user_role_2.sq
   ```
 
-Then 2 test cases are created as you can see in the `test_definitions.yaml`
+The 2 test cases are created as you can see in the `test_definitions.yaml`
   ```yaml
   test_suite:
   - name: test_int_p3_user_role_1
@@ -188,7 +192,7 @@ A test execution may take some time as it performs the following steps:
 1. Read the test definition.
 1. Execute the ddl for the input tables with '_ut' postfix to keep specific test data.
 1. Insert records in input tables.
-1. Create a new output table with '_ut' postfix.
+1. Create a new output table with the specified postfix.
 1. Deploy the DML to test
 1. Deploy the validation SQL for each test case.
 1. Build test report
@@ -200,9 +204,11 @@ A test execution may take some time as it performs the following steps:
   shift_left table run-unit-tests <table_name> --test-case-name <test_case_1> 
   ```
 
-  This command executes the creation of the DDLs to create the input tables with a postfix like ('_ut') and the insert SQLs to inject synthetic data
+  This command executes the creation of the DDLs to create the input tables with a postfix like ('_ut') and the insert SQLs to inject synthetic data.
 
-* Run your validation script to see :
+  This execution is re-entrant, which means it will NOT recreate the DDLs if the topics are already present, and skill to the next step. But executing multiple times the insert data will generate duplicates to the input tables. What we do observed is that the most complex SQL script to develop is the validation one, so the command support running the validation as a separate command and multiple times.
+
+* Run your validation script:
   ```sh
   shift_left table run-validation-tests  <table_name> --test-case-name <test_case_1> 
   ```
@@ -212,9 +218,9 @@ A test execution may take some time as it performs the following steps:
   shift_left table delete-unit-tests <table_name>
   ```
 
-## Running with more data
+### Running with more data
 
-The second test cases created by the `shift_left table init-unit-tests ` command use a csv file to demonstrate how the tool can manage more data. It is possible to extract data from an existing topics, as json or csv content and then persist it as csv file. The tool, as of now, is transforming the rows in the csv file as insert value SQL. 
+The second test case created by the `shift_left table init-unit-tests ` command uses a csv file to demonstrate how the tool can manage more data. It is possible to extract data from an existing topics, as csv file. The tool, as of now, is transforming the rows in the csv file as SQL insert values. 
 
 In the future it could direcly write to a Kafka topics that are the input tables for the dml under test.
 
@@ -222,9 +228,11 @@ Data engineers may use the csv format to create a lot of records. Now the challe
 
 ## Integration tests
 
+### Context 
+
 The logic of integration tests is to validate end-to-end processing for a given pipeline and assess the time to process records from sources to facts or sink tables. Integration tests are designed to test end-to-end data flow across multiple tables and pipelines within a project. This is inherently a project-level concern and not a pipelines concern.
 
-The approach is to keep those integration tests at the same level as the `pipelines` folder of the project, but organize the tests by data product. As an example for the product `c360`, and the analytical data build from the `fact_users`, the hierarchy will look like:
+The approach is to keep those integration tests at the same level as the `pipelines` folder of the project, but organize the tests by data product. As an example for the data product, `c360`, and the analytical data build from the `fact_users`, the hierarchy will look like:
 
 ```sh
 pipelines
@@ -233,18 +241,29 @@ tests
       └── fact_users
 ```
 
-The content of the folder will include all the insert statements for the raw topics of the pipeline and the validation SQLs for intermediates and facts. The synthetic data are injected at the raw topics with unique identifier and time stamp in the headers so raw_tables need to be altered with something like:
+The content of the folder will include all the insert statements for the raw topics of the pipeline and the validation SQLs for intermediates and facts. 
 
-```sql
-ALTER TABLE raw_groups add headers MAP<STRING, STRING> METADATA;
-```
+The synthetic data are injected at the raw topics with unique identifier and time stamp so it will be easier to develop the validation script and compute the end-to-end latency:
 
 The following figure illustrates those principles:
 
 ![](./images/test_frwk_flink_pipeline.drawio.png)
 
-The data to build is F, so integration tests will validate all the purple Flink statements. The integration tests insert data for the two input topics used to build the src_.
-Intermediate validation can be added to assess the state of the intermediate Flink statement output.
+The data to build is for the sink `F`, so integration tests will validate all the purple Flink statements which are ancestors to `F`. The integration tests insert data for the two input raw topics used to build the `src_x` ans `src_y`.
+
+Intermediate validations may be added to assess the state of the intermediate Flink statement output, but the most important one is the SQL validation of the output of `F`. 
+
+The tool supports to create insert SQLs and the last validation script. But there are challenges to address. It was assessed that we could use Kafka header to add to metadata attribute: a unique id and a timestamp. The classical way to do so is to alter the tables
+
+```sql
+ALTER TABLE raw_groups add headers MAP<STRING, STRING> METADATA;
+```
+
+but this approach means we need to modidy all the intermediates Flink statements to pass those metadata to their output table. If the approach was designed on day one, it will be transparent. 
+
+So the solution is to adapt and use existing fields in the input to set a tx_id and a timestamp. When the raw_topic is an outcome of Debezium CDC there is a the `ts_ms` field that can be used for timestamp, but it also needs to be propagated. 
+
+### Initialize the integration test 
 
 The command to create a scaffolding:
 
@@ -252,13 +271,13 @@ The command to create a scaffolding:
 shift_left project init-integration-tests F
 ```
 
-Running the integration tests:
+### Running the integration tests:
 
 ```sh
 shift_left project run-integration-tests F
 ```
 
-Tearsdown:
+### Tearsdown:
 
 ```sh
 shift_left project delete-integration-tests F
@@ -270,8 +289,13 @@ With these capabilities, we can also assess the time to process records from sou
 
 - [x] init tests folder, with data product and sink table folder
 - [ ] For test isolation in shared environment and cluster, the name of the table will have a postfix defined in config.yaml and defaulted with `_it`
-- [] get all alter table for the raw tables
-- [] get all the insert synthetic data for raw_table
-- [] build a validation SQL query to validate the message arrive and compute a delta, insert this to a it_test_topic
+- [ ] get all alter table for the raw tables
+- [ ] get all the insert synthetic data for raw_table
+- [ ] build a validation SQL query to validate the message arrive and compute a delta, insert this to a it_test_topic
 - [ ] Support Kafka consumer created for output sink table
-  
+
+## Unit Test Harness Code Explanation
+
+The classes to support unit tests processing are:
+
+![](./images/th_classes.drawio.png){ width=900 }

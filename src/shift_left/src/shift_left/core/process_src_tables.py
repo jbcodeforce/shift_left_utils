@@ -42,26 +42,32 @@ def migrate_one_file(table_name: str,
                     process_parents: bool = False,
                     source_type: str = "spark",
                     validate: bool = False):
-    """ Process one source sql file to extract code from and migrate to Flink SQL """
+    """ Process one source sql file to extract code from and migrate to Flink SQL.
+    This is the enry point of migration, and routes to the different type of migration.
+    """
     print(f"Migrate source {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:
         if sql_src_file.endswith(".sql"):
+            # TODO revisit  this logic
             product_name= extract_product_name(sql_src_file)
             if sql_src_file.find("source") > 0:
                 _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name, validate)
             else:
                 _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents, validate)
         else:
-            raise Exception("Error: the sql_src_file parameter needs to be a sql or ksqlfile")
+            raise Exception("Error: the sql_src_file parameter needs to be a sql or ksql file")
     elif source_type == "ksql":
         _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
-        
 
-def process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
+# ------------------------------------------------------------
+# --- private functions
+# ------------------------------------------------------------
+
+def _process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
     """
     Load matching sql file given the table name as input.
     This method may be useful when we get the table name from the dependencies list of another table.
@@ -76,7 +82,6 @@ def process_from_table_name(table_name: str, staging_folder: str, src_folder_pat
     else:
         logger.error(f"Matching sql file {table_name} not found in {all_files}!")
 
-# --- utilities functions
 
 def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
     """
@@ -232,7 +237,7 @@ def _process_non_source_sql_file(table_name: str,
     Transform intermediate or fact or dimension sql file to Flink SQL. 
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
 
-    :param src_file_name: the file name of the dbt or SQL source file
+    :param src_file_name: the file name of the dbt, spark SQL source file
     :param target_path 
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
@@ -255,7 +260,7 @@ def _process_non_source_sql_file(table_name: str,
     if walk_parent:
         parents=_remove_already_processed_table(parents)
         for parent_table_name in parents:
-            process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
+            _process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
 
 
 def _search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:

@@ -1,0 +1,3 @@
+src_x:
+  - default_key: ['enum_test_data']
+  - x_value: ['enum_test_data']

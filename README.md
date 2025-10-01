@@ -29,5 +29,7 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 📋 **[Quick Start & Commands](docs/command.md)** - CLI reference and usage examples
 
-🚀 **[Blue-Green Deployment](docs/blue_green_deploy.md)** - Git-based change tracking and deployment strategies
+🚀 **[Blue-Green Deployment](https://jbcodeforce.github.io/shift_left_utils/blue_green_deploy.md)** - Git-based change tracking and deployment strategies
+
+🤖 **[AI based migration](https://jbcodeforce.github.io/shift_left_utils/coding/llm_based_translation)**
 

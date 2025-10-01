@@ -1,0 +1,13 @@
+foundations:
+- table_name: dim_users
+  ddl_for_test: ./tests/ddl_dim_users.sql
+test_suite:
+- name: test_fct_user_per_group_1
+  inputs:
+  - table_name: dim_users
+    file_name: ./tests/insert_dim_users_1.sql
+    file_type: sql
+  outputs:
+  - table_name: fct_user_per_group
+    file_name: ./tests/validate_fct_user_per_group_1.sql
+    file_type: sql

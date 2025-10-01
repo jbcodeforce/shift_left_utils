@@ -4,6 +4,8 @@ Copyright 2024-2025 Confluent, Inc.
 import datetime
 import os
 from pathlib import Path
+import re
+import hashlib
 import subprocess
 import shutil
 import importlib.resources 
@@ -29,7 +31,7 @@ class ModifiedFileInfo(BaseModel):
     """Information about a modified file"""
     table_name: str = Field(description="Extracted table name")
     file_modified_url: str = Field(description="File path/URL of the modified file")
-    same_sql: bool = Field(description="Whether the SQL is the same as the running statement")
+    same_sql_content: bool = Field(description="Whether the SQL is the same as the running statement")
     running: bool = Field(description="Whether the statement is running")
 
 
@@ -205,7 +207,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             file_list.append(ModifiedFileInfo(
                 table_name=table_name,
                 file_modified_url=file_path,
-                same_sql=same_sql,
+                same_sql_content=same_sql,
                 running=running
             ))
         
@@ -256,7 +258,47 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         # Restore original working directory
         os.chdir(original_cwd)
 
+
+
+def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
+    logger.info(f"isolate_data_product({product_name}, {source_folder}, {target_folder})")
+    """
+    go to the facts and build a list of tables for this product name.
+    add any children of the tables in the list of facts, recursively.
+    build an integrated execution plan from the list of tables.
+    move all the folder to the target folder.
+    """
+    inventory = get_or_build_inventory(source_folder, source_folder, False)
+    tables = [table for table in inventory if inventory[table]['product_name'] == product_name]
+    tables_to_process = {}
+    visited = set()
+    
+    # Process each table and recursively find all its parents
+    for table in tables:
+        logger.info(f"Processing table {table} and finding all its dependencies")
+        _find_all_parent_tables_recursive(table, inventory, visited, tables_to_process)
+    
+    logger.info(f"Found {len(tables_to_process)} total tables to process (including all dependencies)")
+    
+    # Copy all tables (original + all dependencies) to target folder
+    
+    for table, table_folder_name in tables_to_process.items():
+        logger.info(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+        
+        # Keep the hierarchy of folder in the table_folder_name
+        print(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+        shutil.copytree(
+            os.path.join(source_folder, '..', table_folder_name),
+            os.path.join(target_folder, table_folder_name),
+            dirs_exist_ok=True
+        )
+    with open(os.path.join(shift_left_dir, "tables_to_process.txt"), "w") as f:
+        for table, table_folder_name in tables_to_process.items():
+            f.write(f"{table},{table_folder_name}\n")
+    
+# ---------------------------------
 # --- Private APIs ---
+# ---------------------------------
 
 def _initialize_git_repo(project_folder: str):
     print(f"initialize_git_repo({project_folder})")
@@ -324,6 +366,130 @@ def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: 
         print(f"Error: statement {statement_name} not found")
         return True, False
     if isinstance(flink_statement, Statement):
-        return flink_statement.spec.statement == sql_content, flink_statement.status.phase == "RUNNING"
+        same_sql = _assess_sql_difference(table_name, sql_content, flink_statement.spec.statement)
+        return same_sql, flink_statement.status.phase == "RUNNING"
     else:
         return False, False
+
+def _assess_sql_difference(table_name: str, file_sql_content: str, running_sql_content: str) -> bool:
+    """
+    Assess the difference between the SQL content on disk and the running statement.
+    Returns True if the normalized SQL content is the same after removing comments and normalizing whitespace.
+    """
+    # Normalize both SQL content strings
+    normalized_file_sql = _normalize_sql_content(file_sql_content)
+    normalized_running_sql = _normalize_sql_content(running_sql_content)
+    
+    logger.info(f"Normalized FILE SQL: \n {normalized_file_sql}")
+    logger.info(f"Normalized RUNNING SQL: \n {normalized_running_sql}")
+    
+    hash_normalized_file_sql = hashlib.md5(normalized_file_sql.encode('utf-8')).hexdigest()
+    hash_normalized_running_sql = hashlib.md5(normalized_running_sql.encode('utf-8')).hexdigest()
+    
+    logger.info(f"Hash normalized file SQL: {hash_normalized_file_sql}")
+    logger.info(f"Hash normalized running SQL: {hash_normalized_running_sql}")
+    
+    return hash_normalized_file_sql == hash_normalized_running_sql
+
+
+def _normalize_sql_content(sql_content: str) -> str:
+    """
+    Normalize SQL content by removing comments and normalizing whitespace.
+    
+    Args:
+        sql_content: Raw SQL content string
+        
+    Returns:
+        Normalized SQL content string
+    """
+    if not sql_content:
+        return ""
+    
+    # Remove SQL comments
+    sql_without_comments = _remove_sql_comments(sql_content)
+    
+    # Normalize whitespace
+    normalized_sql = _normalize_whitespace(sql_without_comments)
+    
+    return normalized_sql
+
+
+def _remove_sql_comments(sql_content: str) -> str:
+    """
+    Remove SQL comments from the content.
+    Handles both single-line comments (--) and multi-line comments (/* */).
+    
+    Args:
+        sql_content: SQL content with potential comments
+        
+    Returns:
+        SQL content with comments removed
+    """
+    # Remove multi-line comments /* ... */
+    # Use re.DOTALL to make . match newlines
+    sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+    
+    # Remove single-line comments -- ...
+    # Match -- followed by anything until end of line
+    sql_content = re.sub(r'--.*?$', '', sql_content, flags=re.MULTILINE)
+    
+    return sql_content
+
+
+def _normalize_whitespace(sql_content: str) -> str:
+    """
+    Normalize whitespace in SQL content.
+    
+    Args:
+        sql_content: SQL content string
+        
+    Returns:
+        SQL content with normalized whitespace
+    """
+    # Replace multiple whitespace characters (spaces, tabs, newlines) with single space
+    normalized = re.sub(r'\s+', ' ', sql_content)
+    
+    # Strip leading and trailing whitespace
+    normalized = normalized.strip()
+    
+    # Convert to uppercase for case-insensitive comparison
+    normalized = normalized.upper()
+    
+    return normalized
+   
+def _find_all_parent_tables_recursive(table_name: str, inventory: dict, visited: set, tables_to_process: dict):
+    """
+    Recursively find all parent tables for a given table.
+    
+    Args:
+        table_name: The table to find parents for
+        inventory: The complete inventory of tables
+        visited: Set of already visited tables to avoid circular dependencies
+        tables_to_process: Dictionary to accumulate all tables that need processing
+    """
+    if table_name in visited:
+        # Avoid circular dependencies
+        logger.debug(f"Table {table_name} already visited, skipping to avoid circular dependency")
+        return
+    
+    visited.add(table_name)
+    
+    # Get table reference from inventory
+    if table_name not in inventory:
+        logger.warning(f"Table {table_name} not found in inventory")
+        return
+    
+    tableRef = inventory[table_name]
+    tables_to_process[table_name] = tableRef['table_folder_name']
+    
+    # Read pipeline definition to find parents
+    pipeline_definition = read_pipeline_definition_from_file(
+        os.path.join(tableRef['table_folder_name'], PIPELINE_JSON_FILE_NAME)
+    )
+    
+    if pipeline_definition and pipeline_definition.parents:
+        logger.debug(f"Found {len(pipeline_definition.parents)} parents for table {table_name}")
+        for parent in pipeline_definition.parents:
+            logger.debug(f"Processing parent {parent.table_name} for table {table_name}")
+            # Recursively process each parent
+            _find_all_parent_tables_recursive(parent.table_name, inventory, visited, tables_to_process)

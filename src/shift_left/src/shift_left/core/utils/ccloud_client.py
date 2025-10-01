@@ -59,7 +59,7 @@ class ConfluentCloudClient:
         encoded_credentials = b64encode(credentials.encode('utf-8')).decode('utf-8')
         return f"Basic {encoded_credentials}"
     
-    def make_request(self, method, url, auth_header=None, data=None):
+    def make_request(self, method, url, auth_header=None, data=None) -> str:
         """Make HTTP request to Confluent Cloud API"""
         version_str = VersionInfo.get_version()
         headers = {
@@ -91,9 +91,12 @@ class ConfluentCloudClient:
                     result = json.loads(response.text)
                     logger.info(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
                     return result
+                elif response.status_code == 409:
+                    logger.info(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
+                    return json.loads(response.text)
                 else:
                     logger.error(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
-                    return json.loads(response.text)
+                    return response.text
             else:
                 logger.error(f">>>> Response to {method} at {url} has reported error: {e}")
                 raise e
@@ -270,7 +273,7 @@ class ConfluentCloudClient:
         Returns:
             int: The total number of messages in the topic
         """
-        url=self._build_confluent_cloud_url()
+        url=self._build_confluent_cloud_kafka_url()
         url=f"{url}/{topic_name}/partitions"
         auth_header = self._get_kafka_auth()
         response = self.make_request(method="GET", url=url, auth_header=auth_header)
@@ -290,7 +293,7 @@ class ConfluentCloudClient:
         example of url https://lkc-23456-doqmp5.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-23456/topics \
  
         """
-        url=self._build_confluent_cloud_url()
+        url=self._build_confluent_cloud_kafka_url()
         logger.info(f"List topic from {url}")
         auth_header = self._get_kafka_auth()
         try:
@@ -412,18 +415,22 @@ class ConfluentCloudClient:
 
 
 
-    def _build_confluent_cloud_url(self) -> str:
-        cluster_info = self._extract_cluster_info_from_bootstrap(self.config["kafka"]["bootstrap.servers"])
-        cluster_id=cluster_info["cluster_id"]
-        base_url=cluster_info["base_url"]
-        
-        # Convert pkc- to lkc- for the URL construction
-        url_cluster_id = cluster_id.replace("pkc-", "lkc-") if cluster_id and cluster_id.startswith("pkc-") else cluster_id
+    def _build_confluent_cloud_kafka_url(self) -> str:
+        cluster_info = self._extract_cluster_info_from_bootstrap(self.config.get("kafka",{}).get("bootstrap.servers",""))
+        cluster_url_id  = cluster_info.get("cluster_id")
+        base_url=cluster_info.get("base_url")
+        config_cluster_id=self.config.get("kafka").get("cluster_id","")
+        if config_cluster_id and config_cluster_id != cluster_url_id:
+            cluster_id = config_cluster_id
+        else:
+            cluster_id = cluster_url_id
         
         # For lkc- format with multiple components, use dash; for pkc- format, use dot
-        if cluster_id and cluster_id.startswith("lkc-"):
-            url=f"https://{url_cluster_id}-{base_url}/kafka/v3/clusters/{url_cluster_id}/topics"
+        # lkc-7...3p-dm8me7.us-west-2.aws  -> cluster_id is lkc-7...3p and base_url is dm8me7.us-west-2.aws
+        # pkc-n9..k.us-west-2.aws  -> cluster_id is pkc-n9..k and base_url is us-west-2.aws
+        if cluster_url_id and cluster_url_id.startswith("lkc-"):
+            url=f"https://{cluster_url_id}-{base_url}/kafka/v3/clusters/{cluster_id}/topics"
         else:
-            url=f"https://{url_cluster_id}.{base_url}/kafka/v3/clusters/{url_cluster_id}/topics"
+            url=f"https://{cluster_url_id}.{base_url}/kafka/v3/clusters/{cluster_id}/topics"
         return url
     

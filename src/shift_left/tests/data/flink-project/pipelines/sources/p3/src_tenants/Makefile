@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- src_p3_tenants
 TABLE_NAME=src_p3_tenants
-SCRIPT_PRE_KEBAB=dev
+SCRIPT_PRE_KEBAB=dev-usw2-p3
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -32,7 +32,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table_src_p3_tenants: 
+drop_table: 
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -62,4 +62,4 @@ delete_schemas:
 
 delete_flink_statements: delete_flink_ddl delete_flink_dml
 
-delete_data: delete_schemas delete_topic_src_p3_tenants
+delete_data: delete_schemas

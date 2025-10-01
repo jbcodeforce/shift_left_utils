@@ -1174,12 +1174,12 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
                                                                             node_to_process.ddl_ref, 
                                                                             node_to_process.ddl_statement_name)
-    while statement.status.phase in ["PENDING"]:
+    while statement.status.phase not in ["COMPLETED"]:
         time.sleep(2)
         statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
         logger.info(f"DDL deployment status is: {statement.status.phase}")
-    if statement.status.phase not in ["COMPLETED", "RUNNING"]:
-        raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
+        if statement.status.phase not in ["FAILED"]:
+            raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
     return _deploy_dml(node_to_process, True)
 
 

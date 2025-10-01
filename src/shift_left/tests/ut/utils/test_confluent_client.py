@@ -66,14 +66,15 @@ class TestConfluentClient(unittest.TestCase):
         """Test building of confluent cloud url"""
         config = get_config()
         config["kafka"]["bootstrap.servers"] = "lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092"
+        config["kafka"]["cluster_id"] = "clusterid1"
         cclient = ConfluentCloudClient(config)
-        url = cclient._build_confluent_cloud_url()
-        self.assertEqual(url, "https://lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud/kafka/v3/clusters/lkc-79kg3p/topics")
+        url = cclient._build_confluent_cloud_kafka_url()
+        self.assertEqual(url, "https://lkc-79kg3p-dm8me7.us-west-2.aws.glb.confluent.cloud/kafka/v3/clusters/clusterid1/topics")
 
         config["kafka"]["bootstrap.servers"] = "pkc-n98pk.us-west-2.aws.confluent.cloud:9092"
         cclient = ConfluentCloudClient(config)
-        url = cclient._build_confluent_cloud_url()
-        self.assertEqual(url, "https://lkc-n98pk.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-n98pk/topics")
+        url = cclient._build_confluent_cloud_kafka_url()    
+        self.assertEqual(url, "https://pkc-n98pk.us-west-2.aws.confluent.cloud/kafka/v3/clusters/clusterid1/topics")
 
     def test_auth_header(self):
         """Test authentication header"""

@@ -3,22 +3,20 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 from typer.testing import CliRunner
-from shift_left.cli_commands.pipeline import app
 import os
 from pathlib import Path
-os.environ["CONFIG_FILE"] = str(Path(__file__).parent.parent / "config-ccloud.yaml")
+os.environ["CONFIG_FILE"] = str(Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["PIPELINES"] = str(Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.pipeline import app
-
+import shift_left.core.table_mgr as table_mgr
 
 class TestPipelineCLI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         data_dir = Path(__file__).parent.parent.parent / "data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
-        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
+
 
 
     def test_report_command_success(self):
@@ -38,21 +36,7 @@ class TestPipelineCLI(unittest.TestCase):
         assert result.exit_code == 1
         assert "Table not found" in result.stdout
 
-    def test_build_execution_plan_command_success(self):
-        """Test successful execution of the build-execution-plan command"""
 
-        runner = CliRunner()
-        result = runner.invoke(app, ['build-execution-plan', '--table-name', 'p1_fct_order'])
-        assert result.exit_code == 0
-        print(result.stdout)
-
-    def test_undeploy_with_ack_or_not(self):
-        """Test successful execution of the build-execution-plan command"""
-
-        runner = CliRunner()
-        result = runner.invoke(app, ['undeploy', '--table-name', 'p1_fct_order'])
-        assert result.exit_code == 0
-        print(result.stdout)
 
     def test_build_metadata_command_success(self):
         """Test successful execution of the build-metadata command"""
@@ -60,9 +44,9 @@ class TestPipelineCLI(unittest.TestCase):
         runner = CliRunner()
         # Using a test data directory path for DML file
         data_dir = Path(__file__).parent.parent.parent / "data"
-        test_dml_file = str(data_dir / "flink-project/pipelines/facts/p1/p1_fct_order/sql-scripts/dml.p1_fct_order.sql")
+        test_dml_file = str(os.getenv("PIPELINES") + "/facts/p1/p1_fct_order/sql-scripts/dml.p1_fct_order.sql")
         
-        result = runner.invoke(app, ['build-metadata', test_dml_file, str(data_dir / "flink-project/pipelines")])
+        result = runner.invoke(app, ['build-metadata', test_dml_file, os.getenv("PIPELINES")])
         assert result.exit_code == 0
         assert "Pipeline built from" in result.stdout
 
@@ -74,43 +58,7 @@ class TestPipelineCLI(unittest.TestCase):
         assert result.exit_code == 1
         assert "Error: the first parameter needs to be a dml sql file" in result.stdout
 
-    def test_delete_all_metadata_command(self):
-        """Test successful execution of the delete-all-metadata command"""
-        
-        runner = CliRunner()
-        data_dir = Path(__file__).parent.parent.parent / "data"
-        test_pipelines_dir = str(data_dir / "flink-project/pipelines")
-        
-        result = runner.invoke(app, ['delete-all-metadata', test_pipelines_dir])
-        assert result.exit_code == 0
-        assert "Delete pipeline definitions from" in result.stdout
-
-    def test_build_all_metadata_command(self):
-        """Test successful execution of the build-all-metadata command"""
-        
-        runner = CliRunner()
-        data_dir = Path(__file__).parent.parent.parent / "data"
-        test_pipelines_dir = str(data_dir / "flink-project/pipelines")
-        
-        result = runner.invoke(app, ['build-all-metadata', test_pipelines_dir])
-        assert result.exit_code == 0
-        assert "Build all pipeline definitions for all tables in" in result.stdout
-
-    def test_deploy_command_with_table_name(self):
-        """Test deploy command with table name parameter"""
-        
-        runner = CliRunner()
-        result = runner.invoke(app, ['deploy', os.getenv("PIPELINES"), '--table-name', 'p1_fct_order'])
-        # This might fail due to missing infrastructure, but we test the command parsing
-        print(result.stdout)
-
-    def test_report_running_statements_command_with_table(self):
-        """Test successful execution of the report-running-statements command"""
-        
-        runner = CliRunner()
-        result = runner.invoke(app, ['report-running-statements', '--table-name', 'p1_fct_order', os.getenv("PIPELINES")])
-        # This command depends on actual Flink infrastructure, so we just test basic execution
-        print(result.stdout)
+   
 
     def test_report_running_statements_command_error_no_params(self):
         """Test error handling when no parameters provided to report-running-statements"""

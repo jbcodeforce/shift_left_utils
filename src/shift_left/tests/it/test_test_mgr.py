@@ -18,28 +18,37 @@ import  shift_left.core.test_mgr as test_mgr
 
 class TestTestManager(unittest.TestCase):
     
-    def test_execute_one_test(self):
+    def test_1_execute_one_test(self):
         print("test_execute_one_test")
-        table_name= "p1_fct_order"
-        compute_pool_id = "compute_pool_id"
-        test_case_name = "test_case_1"
-        result = test_mgr.execute_one_test(table_name, test_case_name, compute_pool_id)
+        table_name= "c360_dim_users"
+        compute_pool_id = get_config()["flink"]["compute_pool_id"]
+        test_case_name = "test_c360_dim_users_1"
+        result = test_mgr.execute_one_or_all_tests(table_name, test_case_name, compute_pool_id)
         assert result
 
 
-    def test_get_topic_list(self):
+    def test_2_get_topic_list(self):
         table_exist = test_mgr._table_exists("products")
         print(f"table_exist: {table_exist}")
-        assert test_mgr._topic_list
-        assert table_exist
-        table_exist = test_mgr._table_exists("p1_fct_order")
+        assert table_exist == False
+        assert test_mgr._topic_list_cache
+        assert test_mgr._topic_list_cache.topic_list
+        print(f"test_mgr._topic_list: {test_mgr._topic_list_cache.topic_list}")
+        table_exist = test_mgr._table_exists("c360_dim_users")
         print(f"table_exist: {table_exist}")
         assert table_exist
 
+    def test_3_execute_validation_tests(self):
+        print("test_execute_one_test")
+        table_name= "c360_dim_users"
+        compute_pool_id = get_config()["flink"]["compute_pool_id"]
+        test_case_name = "test_c360_dim_users_1"
+        result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id)
+        assert result
 
-    def test_delete_test_artifacts(self):
+    def test_4_delete_test_artifacts(self):
         config = get_config()
-        table_name = "src_p1_table_2"
+        table_name = "c360_dim_users"
         compute_pool_id = config["flink"]["compute_pool_id"]
         test_mgr.delete_test_artifacts(table_name=table_name, 
                                        compute_pool_id=compute_pool_id,

@@ -129,14 +129,14 @@ class TestProjectManager(unittest.TestCase):
         self.assertIsInstance(file1, pm.ModifiedFileInfo)
         self.assertEqual(file1.table_name, "user_accounts")  # From mocked SQL parser
         self.assertEqual(file1.file_modified_url, "file1.sql")
-        self.assertEqual(file1.same_sql, False)  # From mock assessment
+        self.assertEqual(file1.same_sql_content, False)  # From mock assessment
         self.assertEqual(file1.running, True)   # From mock assessment
         
         # Check second file - should have extracted table name via SQL parser
         file2 = result.file_list[1]
         self.assertEqual(file2.table_name, "order_history")  # From mocked SQL parser
         self.assertEqual(file2.file_modified_url, "file2.sql")
-        self.assertEqual(file2.same_sql, False)  # From mock assessment
+        self.assertEqual(file2.same_sql_content, False)  # From mock assessment
         self.assertEqual(file2.running, True)   # From mock assessment
         
         # Verify directory changes
@@ -256,13 +256,13 @@ class TestProjectManager(unittest.TestCase):
         file1 = result.file_list[0]
         self.assertEqual(file1.table_name, "test1_table")
         self.assertEqual(file1.file_modified_url, "test1.sql")
-        self.assertEqual(file1.same_sql, False)
+        self.assertEqual(file1.same_sql_content, False)
         self.assertEqual(file1.running, True)
         
         file2 = result.file_list[1]
         self.assertEqual(file2.table_name, "test2_table")
         self.assertEqual(file2.file_modified_url, "test2.sql")
-        self.assertEqual(file2.same_sql, False)
+        self.assertEqual(file2.same_sql_content, False)
         self.assertEqual(file2.running, True)
         
         # Verify SQL parser was used for both files
@@ -520,6 +520,15 @@ class TestProjectManager(unittest.TestCase):
         
         mock_get_statement.assert_called_once_with("dev-usw2-c360-ddl-fct-user-per-group")
 
+    def test_isolate_data_product(self):
+        """Test isolate_data_product function"""
+        tgt_folder = os.getenv("PIPELINES") + "/../c360_isolated"
+
+        pm.isolate_data_product("c360", os.getenv("PIPELINES"), tgt_folder)
+        assert os.path.exists(tgt_folder)
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group")
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts")
+        assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql")
     
 if __name__ == '__main__':
     unittest.main()

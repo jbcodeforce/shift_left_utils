@@ -1,8 +1,8 @@
 include ../../../common.mk
 
-# --- users_dim_user
+# --- c360_dim_users
 TABLE_NAME=c360_dim_users
-SCRIPT_PRE_KEBAB=j9r
+SCRIPT_PRE_KEBAB=dev-usw2-c360
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_users_dim_user: create_flink_ddl  create_flink_dml
+create_c360_dim_users: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source

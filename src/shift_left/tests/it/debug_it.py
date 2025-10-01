@@ -24,7 +24,7 @@ import shift_left.core.deployment_mgr as dm
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
-    def test_at_cli_level(self):
+    def _test_at_cli_level(self):
         runner = CliRunner()
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'])
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'])
@@ -38,7 +38,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'])
         #result = runner.invoke(app,['pipeline', 'build-all-metadata'])
         #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'])
-        result = runner.invoke(app, ['table', 'init-unit-tests',  '--nb-test-cases', '1', 'qx_fct_training_document'])
+        result = runner.invoke(app, ['table', 'init-unit-tests',  '--nb-test-cases', '1', 'aqem_dim_event_element'])
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--product-name', 'aqem'])
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--directory', os.getenv('PIPELINES') + '/sources])
         #result = runner.invoke(app, ['project', 'list-compute-pools'])
