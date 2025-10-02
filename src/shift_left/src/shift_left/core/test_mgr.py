@@ -213,7 +213,7 @@ def _init_test_foundations(table_name: str,
     print(f"1. Create table foundations for unit tests for {table_name}")
     print("-"*60)
     test_suite_def, table_ref = _load_test_suite_definition(table_name)
-    test_result = TestResult(test_case_name=test_case_name, result="")
+    test_result = TestResult(test_case_name="" if test_case_name is None else test_case_name, result="")
     test_result.foundation_statements = _execute_foundation_statements(test_suite_def, 
                                             table_ref, 
                                             prefix, 

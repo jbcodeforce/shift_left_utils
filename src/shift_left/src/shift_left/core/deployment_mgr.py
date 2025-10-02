@@ -1178,7 +1178,7 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
         time.sleep(2)
         statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
         logger.info(f"DDL deployment status is: {statement.status.phase}")
-        if statement.status.phase not in ["FAILED"]:
+        if statement.status.phase in ["FAILED"]:
             raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
     return _deploy_dml(node_to_process, True)
 
