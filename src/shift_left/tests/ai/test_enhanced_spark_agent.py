@@ -160,7 +160,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         SELECT * FROM sales_data WHERE total_amount > 100;
         """
         
-        ddl, dml = self.agent.translate_to_flink_sql(simple_spark_sql, validate=False)
+        ddl, dml = self.agent.translate_to_flink_sqls(simple_spark_sql, validate=False)
         
         self._validate_translation_output(ddl, dml, "simple_test", simple_spark_sql)
         self.assertEqual(len(self.agent.get_validation_history()), 0, 
@@ -185,7 +185,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
                 (True, "Statement is valid")
             ]
             
-            ddl, dml = self.agent.translate_to_flink_sql(spark_sql, validate=True)
+            ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=True)
             
             self._validate_translation_output(ddl, dml, "advanced_transformations", spark_sql)
             
@@ -279,7 +279,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
                     spark_sql = self._load_spark_sql_file(test_file)
                     
                     # Test without validation for speed
-                    ddl, dml = self.agent.translate_to_flink_sql(spark_sql, validate=False)
+                    ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=False)
                     
                     self._validate_translation_output(ddl, dml, test_file, spark_sql)
                     
@@ -300,7 +300,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         with patch.object(self.agent, '_validate_flink_sql_on_cc') as mock_validate:
             mock_validate.return_value = (True, "Valid")
             
-            ddl, dml = self.agent.translate_to_flink_sql(simple_sql, validate=True)
+            ddl, dml = self.agent.translate_to_flink_sqls(simple_sql, validate=True)
             
             history = self.agent.get_validation_history()
             self.assertGreater(len(history), 0, "History should be recorded")
@@ -326,7 +326,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
             mock_validate.return_value = (True, "Statement is valid")
             
             # Test complete flow
-            ddl, dml = self.agent.translate_to_flink_sql(spark_sql, validate=True)
+            ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=True)
             
             # Comprehensive validation
             self._validate_translation_output(ddl, dml, "fct_users.sql", spark_sql)

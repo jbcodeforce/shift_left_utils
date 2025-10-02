@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 
-from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent, KsqlTranslatorToFlinkSqlAgent
+from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
 
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist, 
@@ -255,7 +255,7 @@ def _process_non_source_sql_file(table_name: str,
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        ddls, dmls = translator_agent.translate_to_flink_sqls(table_name, sql_content, validate=validate)
+        ddls, dmls = translator_agent.translate_to_flink_sqls(table_name=table_name, sql=sql_content, validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dmls, ddls)
     if walk_parent:
         parents=_remove_already_processed_table(parents)
