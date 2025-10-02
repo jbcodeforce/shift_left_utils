@@ -253,15 +253,38 @@ The data to build is for the sink `F`, so integration tests will validate all th
 
 Intermediate validations may be added to assess the state of the intermediate Flink statement output, but the most important one is the SQL validation of the output of `F`. 
 
-The tool supports to create insert SQLs and the last validation script. But there are challenges to address. It was assessed that we could use Kafka header to add to metadata attribute: a unique id and a timestamp. The classical way to do so is to alter the tables
+The tool supports to create insert SQLs and the last validation script. But there are challenges to address. It was assessed that we could use Kafka header to add to metadata attribute: a unique id and a timestamp. The classical way to do so, is to alter the raw tables with:
 
 ```sql
 ALTER TABLE raw_groups add headers MAP<STRING, STRING> METADATA;
 ```
 
-but this approach means we need to modidy all the intermediates Flink statements to pass those metadata to their output table. If the approach was designed on day one, it will be transparent. 
+Then each input statement to the raw topic includes a map construct to define the correlation id and the timestamp:
 
-So the solution is to adapt and use existing fields in the input to set a tx_id and a timestamp. When the raw_topic is an outcome of Debezium CDC there is a the `ts_ms` field that can be used for timestamp, but it also needs to be propagated. 
+```sql
+INSERT INTO raw_users (user_id, user_name, user_email, group_id, tenant_id, created_date, is_active, headers) VALUES
+-- User 1: Initial record
+('user_001', 'Alice Johnson', 'alice.johnson@example.com', 'admin', 'tenant_id_001', '2023-01-15', true, map('cor_id', 'cor_01', 'timestamp', now()));
+```
+
+but this approach means we need to modify all the intermediate Flink statements to pass those metadata to their output table. 
+
+```sql
+select
+  -- ...
+  headers
+from final_table;
+```
+
+Also at each intermediate statement there will be the following challenges to address:
+
+* On any join, which tx_id to use, or does a concatenation approach being used?
+* Which timestamp to use from the two tables joined?
+* Finally how to ensure that, at each table, records are created to the output table(s): it is possible that input record may be filtered out, and not output record is created, meaning the latency is becoming infinite.
+
+So the solution is to adapt and use existing fields in the input to set a `cor_id` and a `timestamp`. 
+
+Instead if generating a timestamp. when the raw_topic is the outcome of Debezium CDC, there is a the `ts_ms` field that can be used as timestamp, but it also needs to be propagated down the sink.
 
 ### Initialize the integration test 
 
