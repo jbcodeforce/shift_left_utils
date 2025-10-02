@@ -255,8 +255,8 @@ def _process_non_source_sql_file(table_name: str,
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        dml, ddl = translator_agent.translate_to_flink_sqls(table_name, sql_content, validate=validate)
-        _save_dml_ddl(table_folder, internal_table_name, dml, ddl)
+        ddls, dmls = translator_agent.translate_to_flink_sqls(table_name, sql_content, validate=validate)
+        _save_dml_ddl(table_folder, internal_table_name, dmls, ddls)
     if walk_parent:
         parents=_remove_already_processed_table(parents)
         for parent_table_name in parents:
