@@ -279,7 +279,16 @@ from final_table;
 Also at each intermediate statement there will be the following challenges to address:
 
 * On any join, which tx_id to use, or does a concatenation approach being used?
-* Which timestamp to use from the two tables joined?
+* Which timestamp to use from the two tables joined? min or max?
+  ```sql
+  select
+    -- ..
+    max(a.headers.timestamp, b.header.timestamp)
+  from table_a a
+  left join table_b b on a.condition = b.condition
+  ```
+
+
 * Finally how to ensure that, at each table, records are created to the output table(s): it is possible that input record may be filtered out, and not output record is created, meaning the latency is becoming infinite.
 
 So the solution is to adapt and use existing fields in the input to set a `cor_id` and a `timestamp`. 
