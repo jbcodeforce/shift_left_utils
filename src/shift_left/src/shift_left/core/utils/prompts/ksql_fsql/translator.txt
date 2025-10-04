@@ -25,6 +25,7 @@ Your task is to convert ksqlDB streaming SQL into equivalent Apache Flink SQL wi
 * For last occurrence: `INSTR(field, ' ', -1, 1)` → `LOCATE(' ', field, LENGTH(field) - OFFSET)`
 * `SUBSTRING(string, start, length)` → `SUBSTRING(string, start, length)` (same syntax)
 * `LENGHT(string)` → `CHARACTER_LENGTH(string)
+* `EXPLODE(array)`  → CROSS JOIN UNNEST(array) AS u (element);  change 
 
 ### Aggregation and Windowing:
 * `WINDOW TUMBLING (SIZE X SECONDS)` → `TABLE(TUMBLE(TABLE source, DESCRIPTOR($rowtime), INTERVAL 'X' SECOND))`
@@ -39,6 +40,7 @@ Your task is to convert ksqlDB streaming SQL into equivalent Apache Flink SQL wi
 * Use `DISTRIBUTED BY HASH(key_column) INTO N BUCKETS` for partitioning
 
 ### Connector Properties:
+*  VALUE_FORMAT='JSON_SR' → `'value.format' = 'json-registry'`
 * `'value_format' = 'JSON'` → `'value.format' = 'json-registry'`
 * `'value_format' = 'AVRO'` → `'value.format' = 'avro-registry'`
 * `'key_format' = 'KAFKA'` → `'key.format' = 'json-registry'`
@@ -101,7 +103,7 @@ WITH (VALUE_FORMAT='JSON', PARTITIONS=1, KAFKA_TOPIC='movements');
 **Flink Output:**
 ```json
 {
-  "flink_ddl_output": "CREATE TABLE IF NOT EXISTS movements (\n    person STRING PRIMARY KEY NOT ENFORCED,\n    location STRING,\n    $rowtime TIMESTAMP(3) METADATA FROM 'timestamp'\n) DISTRIBUTED BY HASH(person) INTO 1 BUCKETS WITH (\n    'connector' = 'kafka',\n    'topic' = 'movements',\n    'key.format' = 'json-registry',\n    'value.format' = 'json-registry',\n    'key.avro-registry.schema-context' = '.flink-dev',\n    'value.avro-registry.schema-context' = '.flink-dev',\n    'value.fields-include' = 'all',\n    'scan.startup.mode' = 'earliest-offset'\n);",
+  "flink_ddl_output": "CREATE TABLE IF NOT EXISTS movements (\n    person STRING PRIMARY KEY NOT ENFORCED,\n    location STRING\n) DISTRIBUTED BY HASH(person) INTO 1 BUCKETS WITH (\n   'value.format' = 'json-registry',\n    'key.avro-registry.schema-context' = '.flink-dev',\n    'value.avro-registry.schema-context' = '.flink-dev',\n    'value.fields-include' = 'all',\n    'scan.startup.mode' = 'earliest-offset'\n);",
   "flink_dml_output": ""
 }
 ```

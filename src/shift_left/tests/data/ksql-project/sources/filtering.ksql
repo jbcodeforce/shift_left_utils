@@ -1,0 +1,10 @@
+/* Create stream for source topic */
+CREATE STREAM "orders" WITH (KAFKA_TOPIC='app.dev.orders', VALUE_FORMAT='JSON_SR');
+
+ 
+
+/* Create stream for destination topic */
+CREATE STREAM "filtered-orders" WITH (KAFKA_TOPIC='app.dev.filtered-orders', VALUE_FORMAT='JSON_SR') 
+AS SELECT * FROM "orders" 
+WHERE order_sum > 100 
+EMIT CHANGES;

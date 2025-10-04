@@ -15,7 +15,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 
 from pydantic import BaseModel
-from typing import Tuple, List, Optional  
+from typing import Tuple, List, Optional, Dict
 import os
 import importlib.resources 
 
@@ -108,6 +108,11 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     The agent uses structured LLM responses via Pydantic models to ensure
     consistent and parseable output from the language model.
     """
+    def __init__(self):
+        super().__init__()
+        self.refinement_system_prompt = ""
+        self.validation_history: List[Dict] = []
+        self._load_prompts()
 
     def _clean_ksql_input(self, ksql: str) -> str:
         """
@@ -359,7 +364,10 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         # - Resource usage optimization
         return sql
 
-    def translate_from_ksql_to_flink_sql(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
+    # -------------------------
+    # Public API
+    # -------------------------
+    def translate_to_flink_sqls(self, table_name: str, ksql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
         """
         Main entry point for KSQL to Flink SQL translation workflow.
         

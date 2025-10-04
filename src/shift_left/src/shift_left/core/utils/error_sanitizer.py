@@ -4,7 +4,6 @@ Copyright 2024-2025 Confluent, Inc.
 Error sanitization utilities to prevent sensitive information exposure in logs and error messages.
 """
 import re
-from typing import Any
 
 
 def sanitize_error_message(error_msg: str) -> str:

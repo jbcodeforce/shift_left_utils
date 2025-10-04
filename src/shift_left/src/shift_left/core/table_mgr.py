@@ -61,8 +61,7 @@ def build_folder_structure_for_table(table_folder_name: str,
     table_type = get_table_type_from_file_path(target_path)
     if not product_name:
         table_folder = f"{target_path}/{table_folder_name}"
-        product_name= extract_product_name(table_folder)
-        
+        product_name= extract_product_name(table_folder) 
     else:
         table_folder = f"{target_path}/{product_name}/{table_folder_name}"
 
@@ -74,8 +73,8 @@ def build_folder_structure_for_table(table_folder_name: str,
     prefix= _get_statement_prefix(product_name)
     _create_makefile(internal_table_name, table_folder, prefix)
     _create_tracking_doc(internal_table_name, "", table_folder)
-    _create_ddl_skeleton(internal_table_name, table_folder, product_name)
-    _create_dml_skeleton(internal_table_name, table_folder, product_name)
+    _create_ddl_skeleton(internal_table_name, table_folder)
+    _create_dml_skeleton(internal_table_name, table_folder)
     logger.debug(f"Created folder {table_folder} for the table {table_folder_name}")
     return table_folder, internal_table_name
 
@@ -345,7 +344,7 @@ def _create_tracking_doc(table_name: str, src_file_name: str,  out_dir: str):
     with open(out_dir + '/tracking.md', 'w') as f:
         f.write(rendered_tracking_md)
 
-def _create_ddl_skeleton(table_name: str, out_dir: str, product_name: str):
+def _create_ddl_skeleton(table_name: str, out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     ddl_name = "ddl." + table_name
     ddl_tmpl = env.get_template(f"create_table_skeleton.jinja")
@@ -358,7 +357,7 @@ def _create_ddl_skeleton(table_name: str, out_dir: str, product_name: str):
     with open(out_dir + '/sql-scripts/' + ddl_name + '.sql', 'w') as f:
         f.write(rendered_ddl)
 
-def _create_dml_skeleton(table_name: str, out_dir: str, product_name: str):
+def _create_dml_skeleton(table_name: str, out_dir: str):
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     dml_tmpl = env.get_template(f"dml_src_tmpl.jinja")
     dml_name = "dml." + table_name
@@ -382,8 +381,10 @@ def _get_statement_prefix (product_name: str):
     cluster_type = get_config().get('kafka').get('cluster_type')
     cloud_region = get_config().get('confluent_cloud').get('region')
     abbv_region = cloud_region.replace('-','').replace('east','e').replace('west','w').replace('south','s').replace('north','n').replace('central','c')
-    prefix=cluster_type + '-' + abbv_region + '-' + product_name
-
+    if not product_name or product_name == "None":
+        prefix=cluster_type + '-' + abbv_region
+    else:
+        prefix=cluster_type + '-' + abbv_region + '-' + product_name
     return prefix
 
 def _create_makefile(table_name: str, 

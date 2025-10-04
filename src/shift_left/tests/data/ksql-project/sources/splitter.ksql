@@ -1,0 +1,8 @@
+/* Create stream for source topic */
+CREATE STREAM "multi_message_stream" WITH (KAFKA_TOPIC='app.dev.multiMessages', VALUE_FORMAT='JSON_SR');
+
+
+/* Create stream for destination topic */
+CREATE STREAM "single_message_stream" WITH (KAFKA_TOPIC='app.dev.singleMessage', VALUE_FORMAT='JSON_SR')
+AS SELECT EXPLODE(MESSAGES) as MESSAGE FROM "multi_message_stream"
+EMIT CHANGES;

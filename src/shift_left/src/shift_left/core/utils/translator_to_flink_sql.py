@@ -84,8 +84,10 @@ class TranslatorToFlinkSqlAgent():
                 print(f"SQL is valid and runs on CC after {iteration_count} iterations")
         return translated_sql, sql_validated
 
-    def translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = False) -> Tuple[List[str], List[str]]:
-        print("To implement")
+    def translate_to_flink_sqls(self, table_name: str, 
+                                sql: str, 
+                                validate: bool = False) -> Tuple[List[str], List[str]]:
+        print("To implement via subclasses like SparkTranslatorToFlinkSqlAgent or KsqlTranslatorToFlinkSqlAgent")
         return [sql], [sql]
 
 
