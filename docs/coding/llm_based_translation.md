@@ -16,7 +16,7 @@ The core idea is to leverage LLMs to understand the source SQL semantics and tra
 
 **This is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
 
-The implementation use the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen2.5-coder` model can be used locally using Ollama on Mac M3 Pro with 36GB RAM. Other models like the more recent `qwen3-coder` is giving better results. However, since it requires 512GB of RAM, it must be accessed remotely. The same applies to the new KimiAI K2 model. 
+The implementation use the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` model can be used locally using Ollama on Mac M3 Pro with 36GB RAM. Other models running remotely and supporting OpenAI APIs may be used. 
 
 ## Migration Context
 

@@ -1,8 +1,7 @@
 CREATE TABLE IF NOT EXISTS single_message_stream (
-    message_id STRING,
+    message_id STRING primary key not enforced,
     message STRING
 ) DISTRIBUTED BY HASH(message_id) INTO 1 BUCKETS WITH (
-    'changelog.mode' = 'append',
     'key.json-registry.schema-context' = '.flink-dev',
     'value.json-registry.schema-context' = '.flink-dev',
     'value.format' = 'json-registry',

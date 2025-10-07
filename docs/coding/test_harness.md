@@ -267,18 +267,19 @@ INSERT INTO raw_users (user_id, user_name, user_email, group_id, tenant_id, crea
 ('user_001', 'Alice Johnson', 'alice.johnson@example.com', 'admin', 'tenant_id_001', '2023-01-15', true, map('cor_id', 'cor_01', 'timestamp', now()));
 ```
 
-but this approach means we need to modify all the intermediate Flink statements to pass those metadata to their output table. 
+but this approach means we need to modify all the intermediate Flink statements to pass those metadata to their output table and the declare the headers in the DDL of the output table(s). 
 
 ```sql
+insert to output_table
 select
-  -- ...
+  -- ... columns to match output_table
   headers
 from final_table;
 ```
 
 Also at each intermediate statement there will be the following challenges to address:
 
-* On any join, which tx_id to use, or does a concatenation approach being used?
+* On any join, which correlation id to use, or does a concatenation approach being used?
 * Which timestamp to use from the two tables joined? min or max?
   ```sql
   select
