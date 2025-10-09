@@ -1,5 +1,25 @@
 # Shift Left Utils CLI Integration
 
+## MCP Server Integration
+
+This project includes an MCP (Model Context Protocol) server that exposes all shift_left CLI commands as tools.
+
+### Location
+- Source: `src/shift_left/shift_left_mcp/`
+- Documentation: `docs/mcp/`
+
+### Running the MCP Server
+```bash
+cd src/shift_left
+uv run python -m shift_left_mcp
+```
+
+### Testing
+```bash
+cd src/shift_left  
+uv run python -m shift_left_mcp.test_server
+```
+
 ## Available CLI Commands
 
 The `shift_left` CLI is available in this project with the following main commands:
@@ -9,6 +29,8 @@ The `shift_left` CLI is available in this project with the following main comman
 - `shift_left project validate-config` - Validate configuration file
 - `shift_left project list-topics <project_path>` - List Kafka topics
 - `shift_left project list-compute-pools [--environment-id <id>]` - List Flink compute pools
+- `shift_left project report-table-cross-products` - Report tables referenced in other products
+- `shift_left project list-tables-with-one-child` - List tables that have exactly one child table
 - `shift_left project list-modified-files <branch_name> [--output-file <file>] [--file-filter <ext>] [--project-path <path>]` - Track git changes for blue-green deployment
 
 ### Table Management  
@@ -42,3 +64,15 @@ When suggesting CLI commands:
 - SRC_FOLDER: Source SQL files directory  
 - STAGING: Staging area for migrations
 - CONFIG_FILE: Configuration file path
+
+## MCP Tools for Cursor
+
+All shift_left commands are exposed as MCP tools with the prefix `shift_left_`:
+- `shift_left_project_init`
+- `shift_left_project_validate_config`
+- `shift_left_table_init`
+- `shift_left_table_migrate`
+- `shift_left_pipeline_deploy`
+- etc.
+
+See `docs/mcp/README.md` for complete documentation.

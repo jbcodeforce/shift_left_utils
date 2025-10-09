@@ -110,6 +110,7 @@ def execute_one_or_all_tests(table_name: str,
         # loop over all the test cases of the test suite
         if test_case_name and test_case.name != test_case_name:
             continue
+        logger.info(f"Execute test inputs for {test_case.name}")
         statements = _execute_test_inputs(test_case=test_case,
                                         table_ref=table_ref,
                                         prefix=prefix+"-ins-"+str(idx + 1),
@@ -258,7 +259,7 @@ def _execute_flink_test_statement(
             should_execute = True
             statement_mgr.delete_statement_if_exists(statement_name)
         else:
-            print(f"{statement_name} statement already exists -> do nothing")
+            logger.info(f"{statement_name} statement already exists -> do nothing")
             return statement, False  # Return existing statement, not new
     
     if should_execute:
@@ -268,7 +269,9 @@ def _execute_flink_test_statement(
             transformer = statement_mgr.get_or_build_sql_content_transformer()
             _, sql_out= transformer.update_sql_content(sql_content, column_name_to_select_from, product_name)
             post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
-            logger.debug(f"Executed flink test statement table {post_statement}")
+            logger.info(f"Executed flink test statement table {post_statement}")
+            if "Exists but deleted so retry" in post_statement:
+                post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             return post_statement, True  # Return new statement
         except Exception as e:
             logger.error(e)
@@ -427,7 +430,7 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check if statement already exists and is running
     statement_info = statement_mgr.get_statement_info(statement_name)
     if statement_info and statement_info.status_phase in ["RUNNING", "COMPLETED"]:
-        print(f"Statement {statement_name} already exists and is running or completed-> do nothing")
+        logger.info(f"Statement {statement_name} already exists and is running or completed-> do nothing")
         return statements  # Return same list when statement is already running
 
     sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
@@ -514,17 +517,23 @@ def _execute_test_validation(test_case: SLTestCase,
     for output_step in test_case.outputs:
         sql_path = os.path.join(table_ref.table_folder_name, output_step.file_name)
         statement_name = _build_statement_name(output_step.table_name, prefix)
-        statement_mgr.delete_statement_if_exists(statement_name)
-        statements = _load_sql_and_execute_statement(table_name=output_step.table_name,
-                                    sql_path=sql_path,
-                                    prefix=prefix,
-                                    compute_pool_id=compute_pool_id,
-                                    fct=_replace_table_name_ut_with_configured_postfix,
-                                    statements=statements)
-        result, statement_result=_poll_response(statement_name)
-        result_text+=result
-    return statements,result_text, statement_result
-    
+        delete_result = statement_mgr.delete_statement_if_exists(statement_name)
+        if "deleted" in delete_result:
+            statements = _load_sql_and_execute_statement(table_name=output_step.table_name,
+                                        sql_path=sql_path,
+                                        prefix=prefix,
+                                        compute_pool_id=compute_pool_id,
+                                        fct=_replace_table_name_ut_with_configured_postfix,
+                                        statements=statements)
+            result, statement_result=_poll_response(statement_name)
+            result_text+=result
+            delete_result = statement_mgr.delete_statement_if_exists(statement_name)
+            return statements,result_text, statement_result
+        else:
+            logger.info(f"Delete statement {statement_name} result: {delete_result}")
+            print(f"Delete statement {statement_name} result: {delete_result}")
+    return statements,result_text, None
+
 def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]:
     #Get result from the validation query
     resp = None
@@ -546,7 +555,7 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
             if resp and resp.results and resp.results.data:
                 logger.info(f"Received results on poll {poll}")
                 logger.info(f"resp: {resp}")
-                logger.info(resp.results.data)
+                logger.info(f"data: {resp.results.data}")
                 break
             elif resp:
                 logger.info(f"Attempt {poll}: Empty results, retrying in {retry_delay}s...")

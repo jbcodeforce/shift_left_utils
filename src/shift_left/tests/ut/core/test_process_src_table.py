@@ -305,7 +305,7 @@ class TestProcessSrcTable(unittest.TestCase):
         """Test migrate_one_file with KSQL source type"""
         # Mock the KSQL agent
         mock_agent_instance = mock_ksql_agent.return_value
-        mock_agent_instance.translate_from_ksql_to_flink_sql.return_value = ([DDL], [DML])
+        mock_agent_instance.translate_to_flink_sqls.return_value = ([DDL], [DML])
         
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a test KSQL file
@@ -317,7 +317,7 @@ class TestProcessSrcTable(unittest.TestCase):
                            source_type="ksql")
             
             # Verify the KSQL agent was called
-            mock_agent_instance.translate_from_ksql_to_flink_sql.assert_called_once()
+            mock_agent_instance.translate_to_flink_sqls.assert_called_once()
             
             # Verify folder structure was created
             assert os.path.exists(os.path.join(temp_dir, "test_stream"))

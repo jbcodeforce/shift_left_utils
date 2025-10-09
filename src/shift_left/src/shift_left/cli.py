@@ -8,7 +8,7 @@ from shift_left.core.utils.secure_typer import create_secure_typer_app, install_
 
 
 # Create secure Typer app that shows locals but sanitizes sensitive data
-app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=True)
+app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 # Install global secure exception handler for unhandled exceptions
 install_secure_exception_handler()

@@ -12,6 +12,12 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 **Test Harness**: Develop unit test SQL template with synthetic data to unit test a Flink SQL statement. 
 
+
+## Cursor AI Integration
+
+This project includes **MCP (Model Context Protocol)** integration for Cursor AI! Use shift_left commands naturally in Cursor conversations. See **[Quick Start Guide](docs/mcp/index.md)** to get started in 5 minutes.
+
+
 ## Project status
 
 * This project is still under tuning and development.

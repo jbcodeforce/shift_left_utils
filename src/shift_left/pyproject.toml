@@ -25,6 +25,7 @@ dependencies = [
     "pytz>=2025.2",
     "openai>=1.97.1",
     "sqlglot>=27.19.0",
+    "mcp>=1.16.0",
 ]
 
 

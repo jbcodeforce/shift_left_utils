@@ -54,6 +54,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `housekeep-statements`: Delete statements in FAILED or COMPLETED...
 * `validate-config`: Validate the config.yaml file
 * `report-table-cross-products`: Report the list of tables that are...
+* `list-tables-with-one-child`: Report the list of tables that have...
 * `list-modified-files`: Get the list of files modified in the...
 * `init-integration-tests`: Initialize integration test structure for...
 * `run-integration-tests`: Run integration tests for a given sink table.
@@ -179,6 +180,20 @@ Report the list of tables that are referenced in other products
 
 ```console
 $ project report-table-cross-products [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project list-tables-with-one-child`
+
+Report the list of tables that have exactly one child table
+
+**Usage**:
+
+```console
+$ project list-tables-with-one-child [OPTIONS]
 ```
 
 **Options**:
@@ -323,6 +338,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `init-unit-tests`: Initialize the unit test folder and...
 * `run-unit-tests`: Run all the unit tests or a specified test...
 * `run-validation-tests`: Run only the validation tests (1 to n...
+* `validate-unit-tests`: just a synonym for run-validation-tests
 * `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
@@ -484,7 +500,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x110f74830&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x10646c530&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -527,7 +543,7 @@ $ table run-unit-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
-* `--run-all`: RBy default run insert sqls and foundations, with this flag it will also run validation sql too.
+* `--run-all`: By default run insert sqls and foundations, with this flag it will also run validation sql too.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
@@ -539,6 +555,26 @@ Run only the validation tests (1 to n validation tests) for a given table.
 
 ```console
 $ table run-validation-tests [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
+* `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table validate-unit-tests`
+
+just a synonym for run-validation-tests
+
+**Usage**:
+
+```console
+$ table validate-unit-tests [OPTIONS] TABLE_NAME
 ```
 
 **Arguments**:
@@ -764,7 +800,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/aqem-only/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/flink_project_demos/c360_flink_processing/pipelines]
 
 **Options**:
 
@@ -786,7 +822,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/aqem-only/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/flink_project_demos/c360_flink_processing/pipelines]
 
 **Options**:
 

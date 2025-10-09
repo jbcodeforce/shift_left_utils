@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from rich import print
-from shift_left.core.utils.app_config import get_config, validate_config as validate_config_impl
+from shift_left.core.utils.app_config import get_config, shift_left_dir, validate_config as validate_config_impl
 from shift_left.core.compute_pool_mgr import get_compute_pool_list
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
@@ -163,12 +163,29 @@ def report_table_cross_products():
         result = project_manager.report_table_cross_products(os.getenv("PIPELINES"))
         print(result)
         if result:
-            with open(os.getenv("PIPELINES") + "/table_cross_products.txt", "w") as f:
+            with open(shift_left_dir + "/table_cross_products.txt", "w") as f:
                 for table in result:
                     f.write(table + "\n")
             print(f"Table cross products saved in {os.getenv('PIPELINES')}/table_cross_products.txt")
         else:
             print(f"No table cross products found")
+
+
+@app.command()
+def list_tables_with_one_child():
+        """
+        Report the list of tables that have exactly one child table
+        """
+        print("#" * 30 + f" List tables with one child")
+        result = project_manager.list_tables_with_one_child(os.getenv("PIPELINES"))
+        print(result)
+        if result:
+            with open(shift_left_dir + "/tables_with_one_child.txt", "w") as f:
+                for table in result:
+                    f.write(table + "\n")
+            print(f"Tables with one child saved in {os.getenv('PIPELINES')}/tables_with_one_child.txt")
+        else:
+            print(f"No tables with one child found")
        
 
 @app.command()
@@ -188,7 +205,7 @@ def list_modified_files(
     result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, output_file)
     
     # Display structured result summary
-    print(f"\n📊 Summary:")
+    print(f"\nSummary:")
     print(f"   Total modified files: {len(result.file_list)}")
     print(f"   Tables affected:")
     if result.file_list:
@@ -217,8 +234,8 @@ def init_integration_tests(
     try:
         test_path = integration_test_mgr.init_integration_tests(sink_table_name, project_path)
         print(f"✅ Integration test structure created successfully")
-        print(f"📁 Test location: {test_path}")
-        print(f"\n💡 Next steps:")
+        print(f"Test location: {test_path}")
+        print(f"\nNext steps:")
         print(f"   1. Review and update synthetic data files in the test directory")
         print(f"   2. Customize validation queries based on your business logic")
         print(f"   3. Run tests with: shift_left project run-integration-tests {sink_table_name}")
@@ -248,12 +265,12 @@ def run_integration_tests(
         compute_pool_id = get_config().get('flink', {}).get('compute_pool_id')
     
     if scenario_name:
-        print(f"🎯 Running specific scenario: {scenario_name}")
+        print(f"Running specific scenario: {scenario_name}")
     else:
-        print(f"🔄 Running all test scenarios")
+        print(f"Running all test scenarios")
         
-    print(f"📊 Latency measurement: {'enabled' if measure_latency else 'disabled'}")
-    print(f"🏊 Compute pool: {compute_pool_id}")
+    print(f"Latency measurement: {'enabled' if measure_latency else 'disabled'}")
+    print(f"Compute pool: {compute_pool_id}")
     
     try:
         results = integration_test_mgr.run_integration_tests(
@@ -266,7 +283,7 @@ def run_integration_tests(
         
         # Display results summary
         print(f"\n{'=' * 60}")
-        print(f"🏁 Integration Test Results Summary")
+        print(f"Integration Test Results Summary")
         print(f"{'=' * 60}")
         print(f"Suite: {results.suite_name}")
         print(f"Overall Status: {_get_status_emoji(results.overall_status)} {results.overall_status}")
@@ -291,7 +308,7 @@ def run_integration_tests(
         if output_file:
             with open(output_file, 'w') as f:
                 f.write(results.model_dump_json(indent=2))
-            print(f"\n📄 Detailed results saved to: {output_file}")
+            print(f"\nDetailed results saved to: {output_file}")
         
         print(f"\n{'=' * 60}")
         
@@ -334,7 +351,7 @@ def delete_integration_tests(
         )
         
         print(f"✅ Integration test artifacts deleted successfully")
-        print(f"🧹 All test resources for '{sink_table_name}' have been cleaned up")
+        print(f"All test resources for '{sink_table_name}' have been cleaned up")
         
     except Exception as e:
         print(f"❌ Error deleting integration test artifacts: {e}")
