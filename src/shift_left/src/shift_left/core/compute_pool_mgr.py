@@ -35,8 +35,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                 reload = False
         if reload:
             logger.info(f"Get the compute pool list for environment {env_id}, {region} using API {get_config().get('confluent_cloud').get('api_key')}")
-            print(f"Get the compute pool list for environment {env_id}, {region} using API {get_config().get('confluent_cloud').get('api_key')}")
-            start_time = time.perf_counter()
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Get the compute pool list for environment [{env_id}] Region [{region}] API_Key [{get_config().get('confluent_cloud').get('api_key')}]")
             client = ConfluentCloudClient(get_config())
             response: ComputePoolListResponse = client.get_compute_pool_list(env_id, region)
             _compute_pool_list = ComputePoolList(created_at=datetime.now())
@@ -51,8 +50,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                 _compute_pool_list.pools.append(cp_pool)
             _save_compute_pool_list(_compute_pool_list)
             logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} compute pools")
-            stop_time = time.perf_counter()
-            print(f"Compute pool list has {len(_compute_pool_list.pools)} compute pools in {int(stop_time - start_time)} seconds")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Compute pool list has {len(_compute_pool_list.pools)} compute pools")
     elif (_compute_pool_list.created_at 
          and (datetime.now() - _compute_pool_list.created_at).total_seconds() > get_config()['app']['cache_ttl']):
         logger.info("Compute pool list cache is expired, reload it")

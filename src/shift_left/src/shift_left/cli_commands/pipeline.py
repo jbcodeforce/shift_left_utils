@@ -2,9 +2,11 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import os
+import time
 import networkx as nx
 from pydantic_yaml import to_yaml_str
 import typer
+import builtins
 from rich import print
 from rich.tree import Tree
 from rich.console import Console
@@ -56,9 +58,9 @@ def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argumen
     """
     Delete all pipeline definition json files from a given folder path
     """
-    print(f"Delete pipeline definitions from {path_from_where_to_delete}")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Delete pipeline definitions from {path_from_where_to_delete}")
     pipeline_mgr.delete_all_metada_files(path_from_where_to_delete)
-    print(f"Done")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done")
 
 
 @app.command()
@@ -66,9 +68,9 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
     """
     Go to the hierarchy of folders for dimensions, views and facts and build the pipeline definitions for each table found using recursing walk through
     """
-    print(f"Build all pipeline definitions for all tables in {pipeline_path}")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build all pipeline definitions for all tables in {pipeline_path}")
     pipeline_mgr.build_all_pipeline_definitions(pipeline_path)
-    print("Done")
+    print("{time.strftime('%Y%m%d_%H:%M:%S')} Done")
     
 
 @app.command()
@@ -178,17 +180,22 @@ def deploy(
     """
     Deploy a pipeline from a given table name , product name or a directory.
     """
-    print(f"Deploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
-    if product_name:
-        print(f"Command parameters: may_start_descendants: False, force_ancestors: {force_ancestors}, pool_creation: {pool_creation}")
-    else:
-        print(f"Command parameters: may_start_descendants: {may_start_descendants}, force_ancestors: {force_ancestors}, cross_product_deployment: {cross_product_deployment}, pool_creation: {pool_creation}")
-    
+
     if max_thread > 1:
-        print(f"Deploying pipeline in parallel with {max_thread} threads")
         parallel = True
     else:
-        print(f"Deploying pipeline in sequential")
+        parallel = False
+    
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploying pipeline in Env [ {get_config()['kafka']['cluster_type']} ] Id [ {get_config()['confluent_cloud']['environment_id']} ]", flush=True)
+    builtins.print(f"------------------------------------------ Command Parameters ---------------------------------------------")
+    builtins.print(f"| may_start_descendants | force_ancestors | cross_product_deployment | pool_creation | Parallel | Threads |")
+
+    if product_name:
+        builtins.print(f"| {'False':>21} | {str(bool(force_ancestors)):>15} | {'False':>24} | {str(bool(pool_creation)):>13} | {str(bool(parallel)):>8} | {str(max_thread):>7} |")
+    else:
+        builtins.print(f"| {str(bool(may_start_descendants)):>21} | {str(bool(force_ancestors)):>15} | {str(bool(cross_product_deployment)):>24} | {str(bool(pool_creation)):>13} | {str(bool(parallel)):>8} | {str(max_thread):>7} |")
+    builtins.print(f"----------------------------------------------------------------------------------------------------------")
+
     _build_deploy_pipeline( 
         table_name=table_name, 
         product_name=product_name, 
@@ -205,7 +212,7 @@ def deploy(
         execute_plan=True,
         pool_creation=pool_creation)
     
-    print(f"#### Pipeline deployed ####")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline DEPLOYED")
 
 @app.command()
 def build_execution_plan(
@@ -288,7 +295,7 @@ def undeploy(
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
-    print(f"Undeploying pipeline on the following {get_config()['kafka']['cluster_type']} environment with id: {get_config()['confluent_cloud']['environment_id']}")
+    print(f"Undeploying pipeline in Env [ {get_config()['kafka']['cluster_type']} ] Id [ {get_config()['confluent_cloud']['environment_id']} ]")
     if not no_ack:
         print("Are you sure you want to undeploy? (y/n)")
         answer = input()
@@ -296,11 +303,11 @@ def undeploy(
             print("Undeploy cancelled")
             raise typer.Exit(1)
     if table_name:
-        print(f"#### Full undeployment of a pipeline from the table {table_name} for not shareable tables")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Full undeployment of a pipeline from the table {table_name} for not shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_table(table_name, inventory_path)
     elif product_name:
         product_name = product_name.lower()
-        print(f"#### Full undeployment of all tables for product: {product_name} except shareable tables")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Full undeployment of all tables for product: {product_name} except shareable tables")
         result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
     else:
         print(f"[red]Error: either table-name or product-name must be provided[/red]")
@@ -350,7 +357,7 @@ def _build_deploy_pipeline(
         report=None
         if table_name:
             table_name = table_name.lower()
-            print(f"Build an execution plan for table {table_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for table {table_name}")
             summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
@@ -362,7 +369,7 @@ def _build_deploy_pipeline(
                                                         max_thread=max_thread,
                                                         execute_plan=execute_plan,
                                                         pool_creation=pool_creation)
-            print(f"Execution plan built and persisted for table {table_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
             for node in execution_plan.nodes:
                 if node.to_run or node.to_restart:
@@ -371,7 +378,7 @@ def _build_deploy_pipeline(
 
         elif product_name:
             product_name = product_name.lower()
-            print(f"Build an execution plan for product {product_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for product {product_name}")
             summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
@@ -383,10 +390,10 @@ def _build_deploy_pipeline(
                                                         execute_plan=execute_plan,
                                                         max_thread=max_thread,
                                                         pool_creation=pool_creation)
-            print(f"Execution plan built and persisted for product {product_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution plan built and persisted for product {product_name}")
 
         elif dir:
-            print(f"Build an execution plan for directory {dir}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')}Build an execution plan for directory {dir}")
             summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir, 
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
@@ -399,7 +406,7 @@ def _build_deploy_pipeline(
                                                                     max_thread=max_thread,
                                                                     pool_creation=pool_creation)
         elif table_list_file_name:
-            print(f"Build an execution plan for tables in {table_list_file_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for tables in {table_list_file_name}")
             summary, report=deployment_mgr.build_and_deploy_all_from_table_list(table_list_file_name=table_list_file_name,
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
@@ -418,11 +425,13 @@ def _build_deploy_pipeline(
         if not execute_plan:
             print(summary)
         if report:
-            print(f"Table_name | Status | Pending Records | Num Records Out")
+            builtins.print("-"*104)
+            builtins.print(f"{'Table_name':55} | {'Status':10} | {'Pending Records':15} | {'Num Records Out':15}")
+            builtins.print("-"*104)
             for table_info in report.tables:
-                print(f"{table_info.table_name} | {table_info.status} | {table_info.pending_records} | {table_info.num_records_out}")
-        print("Done.")
-        
+                builtins.print(f"{table_info.table_name:<55} | {table_info.status:<10} | {table_info.pending_records:<15} | {table_info.num_records_out:<15}")
+            builtins.print("-"*104)
+
     except Exception as e:
         sanitized_error = safe_error_display(e)
         print(f"[red]Error: {sanitized_error}[/red]")

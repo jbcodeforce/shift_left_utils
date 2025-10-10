@@ -9,6 +9,7 @@ import shift_left.core.compute_pool_mgr as compute_pool_mgr
 from shift_left.core.utils.app_config import shift_left_dir, get_config, logger
 from pydantic import Field
 from datetime import datetime
+import time
 
 class StatementBasicInfo(BaseModel):
     name: str
@@ -93,9 +94,9 @@ def build_TableReport(report_name: str,
     table_report.database_name = get_config().get('flink').get('database_name')
     table_report.created_at = datetime.now()
     if from_date:
-        print(f"Building table report for {report_name} with {len(nodes)} nodes for {from_date}")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes for {from_date}")
     else:
-        print(f"Building table report for {report_name} with {len(nodes)} nodes for {table_report.created_at.strftime('%Y-%m-%d %H:%M:%S')} and 60 minutes ago")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes")
     if get_metrics:
         compute_pool_ids = [node.compute_pool_id for node in nodes]
         pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date=from_date)
@@ -177,7 +178,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
 
     
     summary_parts = [
-        f"\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} To deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
+        f"\nTo deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
     ]
     
     # Separate nodes into parents and children
@@ -189,7 +190,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
         summary_parts.extend([
             f"\n--- Ancestors: {len(parents)} ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
-            "-" * 125
+            "-" * 155
         ])
         for node in parents:
             action = "To run" if node.to_run else "Skip"
@@ -205,7 +206,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
         summary_parts.extend([
             f"\n--- Children to restart ---",
             "Statement Name".ljust(60) + "\tStatus\t\tCompute Pool\tAction\tUpgrade Mode\tTable Name",
-            "-" * 125
+            "-" * 155
         ])
         for node in children:
             action = "To run" if node.to_run else "Restart" if node.to_restart else "Skip"
@@ -218,7 +219,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     
     summary= "\n".join(summary_parts)
     summary+="\n---Matching compute pools: " 
-    summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 125
+    summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 140
     for node in execution_plan.nodes:
         pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
         if pool:

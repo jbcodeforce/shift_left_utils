@@ -161,9 +161,11 @@ file_handler = RotatingFileHandler(
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
-print("-" * 80)
-print(f"| SHIFT_LEFT - CONFIG_FILE used: {os.getenv('CONFIG_FILE')} - Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - LOGS folder is : {session_log_dir} |")
-print("-" * 80)
+print("-" * 40 + " SHIFT_LEFT " + "-" * 40)
+print(f"""| CONFIG_FILE     : {os.getenv('CONFIG_FILE')} 
+| LOGS folder     : {session_log_dir}
+| Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}""")
+print("-" * 92)
 #console_handler = logging.StreamHandler()
 #console_handler.setLevel(logging.INFO)
 #logger.addHandler(console_handler)
