@@ -212,7 +212,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 _statement_list_cache = StatementListCache(created_at=datetime.now())
                 config = get_config()
                 logger.info("Load the current list of Flink statements using REST API")
-                print(f"Load the current list of Flink statements using REST API {config['confluent_cloud']['organization_id']}")
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Load current flink statements using REST API {config['confluent_cloud']['organization_id']}")
                 start_time = time.perf_counter()
                 page_size = config["confluent_cloud"].get("page_size", 100)
                 client = ConfluentCloudClient(config)
@@ -239,7 +239,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 _save_statement_list(_statement_list_cache)
                 stop_time = time.perf_counter()
                 logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
-                print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement list has {len(_statement_list_cache.statement_list)} statements")
         elif (_statement_list_cache.created_at 
             and (datetime.now() - _statement_list_cache.created_at).total_seconds() > get_config()['app']['cache_ttl']):
             logger.info("Statement list cache is expired, reload it")

@@ -12,6 +12,7 @@ This module provides functionality to:
 from collections import deque
 
 import os
+import time
 from pathlib import Path
 from typing import Dict, Optional, Any, Set, Tuple
 
@@ -108,7 +109,7 @@ def build_all_pipeline_definitions(pipeline_path: str):
         # it is possible the pipeline path is not a kimball structure but a flat structure
         count=_process_table_folder_build_pipeline_def(Path(pipeline_path), pipeline_path, count)
     logger.info(f"Total number of pipeline definitions created: {count}")
-    print(f"Total number of pipeline definitions created: {count}")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Total number of pipeline definitions created: {count}")
 
     
 def get_static_pipeline_report_from_table(
