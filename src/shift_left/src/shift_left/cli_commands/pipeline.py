@@ -429,7 +429,7 @@ def _build_deploy_pipeline(
             builtins.print(f"{'Table_name':55} | {'Status':10} | {'Pending Records':15} | {'Num Records Out':15}")
             builtins.print("-"*104)
             for table_info in report.tables:
-                builtins.print(f"{table_info.table_name:<55} | {table_info.status:<10} | {table_info.pending_records:<15} | {table_info.num_records_out:<15}")
+                builtins.print(f"{table_info.table_name:<55} | {table_info.status:<10} | {table_info.pending_records:>15,} | {table_info.num_records_out:>15,}")
             builtins.print("-"*104)
 
     except Exception as e:

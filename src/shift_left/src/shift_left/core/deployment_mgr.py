@@ -1051,7 +1051,7 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
         for future in as_completed(futures):
             try:
                 result = future.result(timeout=60)  # will wait up to timeout seconds.
-                #print(result)
+                logger.info(f"{result}")
                 if result is not None:  # Only append if we got a valid result
                     statements.append(result)
                     if result.status.phase not in ["COMPLETED", "RUNNING"]:
