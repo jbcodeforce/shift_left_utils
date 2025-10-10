@@ -39,3 +39,9 @@ This project includes **MCP (Model Context Protocol)** integration for Cursor AI
 
 🤖 **[AI based migration](https://jbcodeforce.github.io/shift_left_utils/coding/llm_based_translation)**
 
+
+## 🙏 Support my work
+
+Love it? Give it a ⭐️ by clicking below:
+
+<a href="https://github.com/jbcodeforce/shift_left_utils/stargazers"><img src="https://img.shields.io/github/stars/jbcodeforce/shift_left_utils?style=social" style="margin-left:0;box-shadow:none;border-radius:0;height:24px"></a>

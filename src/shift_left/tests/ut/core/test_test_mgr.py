@@ -323,11 +323,9 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_info')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
     def test_exec_one_testcase(self, 
                                 mock_post_flink_statement, 
-                                mock_get_statement_info, 
                                 mock_get_statement_results,
                                 mock_table_exists,
                                 mock_get_statement,
@@ -362,11 +360,10 @@ class TestTestManager(unittest.TestCase):
             return result
 
         mock_get_statement_results.side_effect = _mock_statement_results
-        mock_get_statement_info.side_effect = _mock_statement_info
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
-        mock_get_statement.side_effect = self._mock_get_None_statement
-        mock_delete_statement.return_value = None  # Mock delete operation
+        mock_get_statement.side_effect = self._mock_statement_info
+        mock_delete_statement.return_value = "deleted"  # Mock delete operation
 
         table_name = "p1_fct_order"
         test_suite_result = test_mgr.execute_one_or_all_tests(table_name, "test_case_1", run_validation=True)
@@ -485,7 +482,7 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
-        mock_delete_statement.return_value = None  # Mock delete operation
+        mock_delete_statement.return_value = 'deleted'  # Mock delete operation
 
         table_name = "p1_fct_order"
         suite_result = test_mgr.execute_one_or_all_tests(test_case_name="", table_name=table_name, run_validation=True)

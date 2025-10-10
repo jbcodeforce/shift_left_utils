@@ -78,6 +78,8 @@ class ConfluentCloudClient:
             )
             response.raise_for_status()
             try:
+                if response.status_code == 202 and method == "DELETE":
+                    return 'deleted'
                 json_response = response.json()
                 logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
                 return json_response
@@ -344,10 +346,10 @@ class ConfluentCloudClient:
         timer= self.config['flink'].get("poll_timer", 10)
         try:
             resp = self.make_request("DELETE",f"{url}/statements/{statement_name}", auth_header=auth_header)
-            if resp and resp.get("errors") and "does not exist" in resp.get("errors")[0].get("detail"):
+            if resp and isinstance(resp, dict) and resp.get("errors") and "does not exist" in resp.get("errors")[0].get("detail"):
                 logger.info(f"Statement {statement_name} not found")
                 return "deleted"
-            if resp == '':
+            if resp == '' or resp == 'deleted':
                 return "deleted"
             counter=0
             while True:

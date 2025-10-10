@@ -20,7 +20,7 @@ from shift_left.core.utils.app_config import session_log_dir, get_config
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.table_mgr as table_mgr
 import shift_left.core.test_mgr as test_mgr
-from shift_left.core.utils.logger import logger
+from shift_left.core.utils.app_config import logger
 """
 Manage the table entities.
 - build an inventory of all the tables in the project with the basic metadata per table
@@ -186,12 +186,15 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get('flink').get('database_name')}")
     logger.info(f"Unit tests execution for {table_name} test: {test_case_name} - {compute_pool_id} Cluster name: {get_config().get('flink').get('database_name')}")
-    test_suite_result  = test_mgr.execute_one_or_all_tests(table_name, test_case_name, compute_pool_id, run_all)
-    if run_all:
-        file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
-        with open(file_name, "w") as f:
-            f.write(test_suite_result.model_dump_json(indent=2))
-        print(f"Test suite report saved into {file_name}")
+    test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name, 
+                                                test_case_name=test_case_name, 
+                                                compute_pool_id=compute_pool_id,
+                                                run_validation=run_all)
+
+    file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
+    with open(file_name, "w") as f:
+        f.write(test_suite_result.model_dump_json(indent=2))
+    print(f"Test suite report saved into {file_name}")
     print("#" * 30 + f" Unit tests execution for {table_name} completed")
 
 @app.command()

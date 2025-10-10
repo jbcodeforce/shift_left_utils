@@ -33,12 +33,14 @@ class TestResult(BaseModel):
     test_case_name: str
     result: str
     validation_result: StatementResult = None
-    foundation_statements: List[Statement] = []
-    statements: List[Statement] = []
+    foundation_statements: Set[Statement] = set()
+    statements: Set[Statement] = set()
+    status: str = "pending"  # pending, completed, error
 
 class TestSuiteResult(BaseModel):
     foundation_statements: List[Statement] = []
     test_results: Dict[str, TestResult] = {}
+    cleanup_errors: Optional[str] = None
 
 
 class IntegrationTestData(BaseModel):
