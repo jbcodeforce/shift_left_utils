@@ -89,7 +89,7 @@ def get_statement(statement_name: str) -> Statement | StatementError:
     client = ConfluentCloudClient(config)
     url, auth_header = client.build_flink_url_and_auth_header()
     response = client.make_request(method="GET", url=url + "/statements/" + statement_name, auth_header=auth_header)
-    if response.get('errors'):
+    if response and response.get('errors'):
         return StatementError(**response)
     return Statement(**response)
 

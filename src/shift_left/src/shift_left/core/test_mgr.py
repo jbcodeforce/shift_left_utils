@@ -253,8 +253,12 @@ def _init_test_foundations(table_name: str,
         prefix: str = "dev"
 ) -> Tuple[SLTestDefinition, FlinkTableReference, str, TestResult]:
     """
-    Create input tables as defined in the test suite foundations for the given table.
-    And modify the dml of the given table to use the input tables for the unit tests.
+    For each input table as defined in the test suite foundations:
+    run the ddl of the input table.
+    the ddl of the table under test.
+    and modify the dml 
+    modify the dml of the given table to use the input tables for the unit tests.
+    return the test suite definition, the table reference, the prefix and the test result.
     """
     print("-"*60)
     print(f"1. Create foundation tables for unit tests for {table_name}")
@@ -277,28 +281,30 @@ def _execute_flink_test_statement(
         sql_content: str, 
         statement_name: str, 
         compute_pool_id: Optional[str] = None,
-        product_name: Optional[str] = None  
+        product_name: Optional[str] = None ,
+        existing_statement: Optional[Statement] = None
 ) -> Tuple[Optional[Statement], bool]:
     """
     Execute the Flink statement and return the statement object and whether it was newly created.
     Returns (statement, is_new) where is_new indicates if this was a newly executed statement.
     """
     logger.info(f"Run flink statement {statement_name}")
-    statement = statement_mgr.get_statement(statement_name)
+    if existing_statement:
+        statement = existing_statement
+    else:
+        statement = statement_mgr.get_statement(statement_name)
     
     # Check if we need to create/execute the statement
     should_execute = False
+    is_new = False
     if statement is None:
         should_execute = True
+        is_new = True
     elif isinstance(statement, StatementError):
-        # Handle StatementError - check if it's a 404 or similar
         if hasattr(statement, 'errors') and statement.errors and len(statement.errors) > 0:
-            # Statement exists but has errors, might need to recreate
-            if statement.errors[0].status == '404':
-                should_execute = True
-        else:
-            # StatementError without errors attribute or empty errors
-            should_execute = True
+            if statement.errors[0].status == "404":
+                is_new = True
+        should_execute = True
     elif isinstance(statement, Statement):
         # Statement exists - check if it's running
         if statement.status and statement.status.phase != "RUNNING":
@@ -306,7 +312,7 @@ def _execute_flink_test_statement(
             statement_mgr.delete_statement_if_exists(statement_name)
         else:
             logger.info(f"{statement_name} statement already exists -> do nothing")
-            return statement, False  # Return existing statement, not new
+            return statement, is_new  # Return existing statement, not new
     
     if should_execute:
         try:
@@ -317,10 +323,10 @@ def _execute_flink_test_statement(
             post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
             print(f"Execute statement {statement_name}  on: {compute_pool_id}")
-    
+
             if "Exists but deleted so retry" in post_statement:
                 post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
-            return post_statement, True  # Return new statement
+            return post_statement, is_new  # Return new statement
         except Exception as e:
             logger.error(e)
             raise e
@@ -329,7 +335,7 @@ def _execute_flink_test_statement(
         if isinstance(statement, Statement):
             logger.info(f"{statement.name} statement already exists -> {statement.status.phase}")
             print(f"{statement_name} statement already exists -> {statement.status.phase}")
-            return statement, False
+            return statement, is_new
         else:
             logger.error(f"Error executing test statement {statement_name}")
             raise ValueError(f"Error executing test statement {statement_name}")
@@ -492,8 +498,8 @@ def _load_sql_and_execute_statement(table_name: str,
         statement_info = statement_mgr.get_statement(statement_name)
         if statement_info:
             if statement_info.status.phase in ["RUNNING", "COMPLETED"]:
-                logger.info(f"Statement {statement_name} already exists and is {statement_info.status_phase}")
-                print(f"Statement {statement_name} already exists and is {statement_info.status_phase}")
+                logger.info(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
+                print(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
                 statements.add(statement_info)
                 return statements
             elif statement_info.status.phase == "FAILED":
@@ -503,19 +509,15 @@ def _load_sql_and_execute_statement(table_name: str,
                     statement_mgr.delete_statement_if_exists(statement_name)
                 except Exception as e:
                     logger.warning(f"Error deleting failed statement: {e}")
-    except Exception as e:
-        logger.warning(f"Error checking statement status: {e}")
-        # Continue execution - we'll try to create the statement
 
-    # Load and execute SQL
-    try:
         sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
           
         statement, is_new = _execute_flink_test_statement(
             sql_content=sql_content, 
             statement_name=statement_name, 
             compute_pool_id=compute_pool_id, 
-            product_name=product_name
+            product_name=product_name,
+            existing_statement=statement_info
         )
         
         if statement and is_new:
@@ -548,14 +550,8 @@ def _load_sql_and_execute_statement(table_name: str,
             print(f"Executed statement for table: {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} status: {statement.status.phase}\n")
             
     except Exception as e:
-        logger.error(f"Error executing statement {statement_name}: {e}")
-        # Try to clean up on error
-        try:
-            statement_mgr.delete_statement_if_exists(statement_name)
-        except Exception as cleanup_error:
-            logger.warning(f"Error cleaning up failed statement: {cleanup_error}")
-        raise  # Re-raise the original error
-    
+        logger.warning(f"Error checking statement status: {e}")
+        # Continue execution - we'll try to create the statement    
     return statements
 
 def _execute_test_inputs(test_case: SLTestCase, 
@@ -640,6 +636,7 @@ def _execute_test_validation(test_case: SLTestCase,
                 prefix=prefix,
                 compute_pool_id=compute_pool_id,
                 fct=_replace_table_name_ut_with_configured_postfix,
+                product_name=table_ref.product_name,
                 statements=statements
             )
             
