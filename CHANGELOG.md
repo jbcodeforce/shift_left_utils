@@ -1,7 +1,7 @@
 # CHANGELOG
 
 <!-- version list -->
-### v0.1.43 - 2025-10-08
+### v0.1.42 - 2025-10-15
 - **NEW: MCP (Model Context Protocol) Integration for Cursor AI**
   - Added `shift_left.mcp` module for seamless Cursor AI integration
   - All CLI commands now available as MCP tools
@@ -12,6 +12,7 @@
 
 - Add `project list-tables-with-one-child` command to report tables that have zero to one only child table in the pipeline hierarchy
 - Add `project isolate-data-product` command to take all tables of the given product and copy to another folder, taking into account the complete execution graph. This function is for integrated backup.
+- Add `project list-modified-files` to get the list of modified tables using git logs to build of list of tables to deploy in a context of a PR or between two dates,
 - Improve `project init-integration-tests` command. 
 
 ### v0.1.41 - 2025-10-02
