@@ -1,0 +1,10 @@
+/* Create stream for source topic */
+CREATE STREAM "daily-spend" WITH (KAFKA_TOPIC='app.dev.daily-spend', VALUE_FORMAT='JSON_SR');    
+
+ 
+
+/* Create stream for destination topic */
+CREATE STREAM "orders" WITH (KAFKA_TOPIC='app.dev.orders', VALUE_FORMAT='JSON_SR') 
+AS SELECT customer_id, sum(order_amount) FROM "daily-spend" WINDOW TUMBLING (SIZE 24 HOUR) 
+WHERE order_amount > 0 GROUP BY customer_id 
+EMIT CHANGES;

@@ -53,18 +53,9 @@ class TestTableCLI(unittest.TestCase):
         assert result.exit_code == 0
         assert os.path.exists(os.getenv("PIPELINES") + "/sources/p2/src_a/Makefile")
 
-    def test_init_unit_tests(self):
-        runner = CliRunner()
-        result = runner.invoke(app, ["init-unit-tests", "a"])
-        assert result.exit_code == 0
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests")
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests/test_definitions.yaml")
 
-    def test_run_unit_tests(self):
-        runner = CliRunner()
-        result = runner.invoke(app, ["run-test-suite", "a"])
-        assert result.exit_code == 0
-        assert "Unit tests execution" in result.stdout
+    # !!!Test Mamagement of Unit Tests and Integration Tests are done in separate tests. see it/ folder.
+    
 
     def test_migrate_command(self):
         """Test migrate command with basic parameters"""
@@ -142,21 +133,6 @@ class TestTableCLI(unittest.TestCase):
         assert result.exit_code == 0
         assert "Done: processed:" in result.stdout
 
-    def test_run_validation_tests_command(self):
-        """Test run-validation-tests command"""
-        runner = CliRunner()
-        
-        result = runner.invoke(app, ["run-validation-tests", "a"])
-        # This command depends on actual test infrastructure
-        print(result.stdout)
-
-    def test_delete_unit_tests_command(self):
-        """Test delete-unit-tests command"""
-        runner = CliRunner()
-        
-        result = runner.invoke(app, ["delete-unit-tests", "a"])
-        # This command depends on actual Flink infrastructure
-        print(result.stdout)
 
     def test_explain_command_with_table_name(self):
         """Test explain command with table name"""

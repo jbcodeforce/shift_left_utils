@@ -89,7 +89,7 @@ def get_statement(statement_name: str) -> Statement | StatementError:
     client = ConfluentCloudClient(config)
     url, auth_header = client.build_flink_url_and_auth_header()
     response = client.make_request(method="GET", url=url + "/statements/" + statement_name, auth_header=auth_header)
-    if response.get('errors'):
+    if response and response.get('errors'):
         return StatementError(**response)
     return Statement(**response)
 
@@ -124,7 +124,9 @@ def post_flink_statement(compute_pool_id: str,
             if isinstance(response, dict):
                 if response.get('errors'):
                     logger.error(f"Error executing rest call: {response['errors']}")
-                    return  None
+                    if response.get("errors")[0].get("status") == "409":
+                        delete_statement_if_exists(statement_name)
+                    return  "Exists but deleted so retry"
                 #raise Exception(response['errors'][0]['detail'])
                 elif response["status"]["phase"] == "PENDING":
                     return client.wait_response(url, statement_name, start_time)
@@ -139,22 +141,14 @@ def post_flink_statement(compute_pool_id: str,
 def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"Enter with {statement_name}")
     statement_list = get_statement_list()
-    if statement_name in statement_list:
-        logger.info(f"{statement_name} in the cached statement list, delete it")
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        result = client.delete_flink_statement(statement_name)
-        logger.info(f"Delete statement {statement_name} result: {result}")
-    else: # not found in cache, do remote API call
-        logger.info(f"{statement_name} not found in cache")
-        config = get_config()
-        client = ConfluentCloudClient(config)
-        # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
-        #  so return None
-        result=client.delete_flink_statement(statement_name)
+    config = get_config()
+    client = ConfluentCloudClient(config)
+    # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
+    #  so return None
+    result=client.delete_flink_statement(statement_name)
     if result == "deleted" and statement_name in statement_list:
         statement_list.pop(statement_name)
-    return "deleted"
+    return result
 
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """
@@ -218,7 +212,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 _statement_list_cache = StatementListCache(created_at=datetime.now())
                 config = get_config()
                 logger.info("Load the current list of Flink statements using REST API")
-                print(f"Load the current list of Flink statements using REST API {config['confluent_cloud']['organization_id']}")
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Load current flink statements using REST API {config['confluent_cloud']['organization_id']}")
                 start_time = time.perf_counter()
                 page_size = config["confluent_cloud"].get("page_size", 100)
                 client = ConfluentCloudClient(config)
@@ -245,7 +239,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 _save_statement_list(_statement_list_cache)
                 stop_time = time.perf_counter()
                 logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
-                print(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement list has {len(_statement_list_cache.statement_list)} statements")
         elif (_statement_list_cache.created_at 
             and (datetime.now() - _statement_list_cache.created_at).total_seconds() > get_config()['app']['cache_ttl']):
             logger.info("Statement list cache is expired, reload it")
@@ -289,12 +283,12 @@ def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] =
         'CREATE TABLE my_table (...) WITH (...)'
     """
     logger.debug(f"{table_name}")
-    statement_name = "show-" + table_name.replace('_','-')
+    statement_name = ("show-" + table_name.replace('_', '-').replace('.', '-'))[:99]
     result_str = None
     config = get_config()
     if not compute_pool_id:
         compute_pool_id=config['flink']['compute_pool_id']
-    sql_content = f"show create table {table_name};"
+    sql_content = f"show create table `{table_name}`;"
     delete_statement_if_exists(statement_name)
     try:
         statement = post_flink_statement(compute_pool_id, statement_name, sql_content)

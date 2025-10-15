@@ -1,4 +1,4 @@
-site_name: Shift Left Utilities v0.1.41
+site_name: Shift Left Utilities v0.1.42
 repo_url: https://github.com/jbcodeforce/shift_left_utils
 site_url: https://jeromeboyer.net/shift_left_utils
 copyright: Copyright &copy; 2024 Jerome Boyer
@@ -9,6 +9,7 @@ nav:
     - Environment Setup: setup.md
     - Recipes: recipes.md
     - CLI References: command.md
+    - MCP server: mcp/index.md
     - Test Harness: coding/test_harness.md
     - Pipeline Management: pipeline_mgr.md
     - Blue/Green Deployment: blue_green_deploy.md

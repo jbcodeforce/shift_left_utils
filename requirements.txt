@@ -8,3 +8,4 @@ pytest
 mkdocstrings-python
 pymdown-extensions
 mkdocs-table-reader-plugin
+mcp>=0.9.0

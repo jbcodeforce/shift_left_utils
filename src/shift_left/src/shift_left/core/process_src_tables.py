@@ -13,6 +13,7 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader
 
 from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
+from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
 
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist, 
@@ -50,14 +51,15 @@ def migrate_one_file(table_name: str,
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:
         if sql_src_file.endswith(".sql"):
-            # TODO revisit  this logic
-            product_name= extract_product_name(sql_src_file)
-            if sql_src_file.find("source") > 0:
-                _process_source_sql_file(table_name, sql_src_file, staging_target_folder, product_name, validate)
-            else:
-                _process_non_source_sql_file(table_name, sql_src_file, staging_target_folder, src_folder_path, process_parents, validate)
+            _process_spark_sql_file(table_name=table_name, 
+                                        sql_src_file_name=sql_src_file, 
+                                        target_path=staging_target_folder, 
+                                        src_folder_path=src_folder_path, 
+                                        walk_parent=process_parents, 
+                                        validate=validate)
+            logger.info(f"Processed {table_name} from {sql_src_file} to {staging_target_folder}")
         else:
-            raise Exception("Error: the sql_src_file parameter needs to be a sql or ksql file")
+            raise Exception("Error: the sql_src_file parameter needs to be a sql file")
     elif source_type == "ksql":
         _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate)
     else:
@@ -165,19 +167,33 @@ def _save_dml_ddl(content_path: str,
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
+    # Handle None or empty cases
+    if ddls is None:
+        ddls = []
+    if dmls is None:
+        dmls = []
+    
+    # Ensure we have lists, not strings (to avoid character iteration)
+    if isinstance(ddls, str):
+        ddls = [ddls] if ddls.strip() else []
+    if isinstance(dmls, str):
+        dmls = [dmls] if dmls.strip() else []
+    
     idx=0
     for ddl in ddls:
-        table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
-        ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
-        _save_one_file(ddl_fn, ddl)
-        _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
-        idx+=1
+        if ddl and ddl.strip():  # Only process non-empty DDLs
+            table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+            ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
+            _save_one_file(ddl_fn, ddl)
+            _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
+            idx+=1
     idx=0
     for dml in dmls:
-        table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
-        dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql"
-        _save_one_file(dml_fn,dml)
-        idx+=1
+        if dml and dml.strip():  # Only process non-empty DMLs
+            table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+            dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql"
+            _save_one_file(dml_fn,dml)
+            idx+=1
 
 def _remove_already_processed_table(parents: list[str]) -> list[str]:
     """
@@ -204,7 +220,7 @@ def _search_table_in_processed_tables(table_name: str) -> bool:
     else:
         return False
 
-
+# TODO this is dead code as of now, to remove later as we may need it.
 def _process_source_sql_file(table_name: str,
                             src_file_name: str, 
                              target_path: str, 
@@ -227,7 +243,7 @@ def _process_source_sql_file(table_name: str,
     _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
     
 
-def _process_non_source_sql_file(table_name: str, 
+def _process_spark_sql_file(table_name: str, 
                                 sql_src_file_name: str, 
                                 target_path: str, 
                                 src_folder_path: str,
@@ -245,8 +261,10 @@ def _process_non_source_sql_file(table_name: str,
     """
     logger.debug(f"process SQL file {sql_src_file_name}")
     product_path = os.path.dirname(sql_src_file_name).replace(src_folder_path, "",1)[1:]
-    where_to_write_path = os.path.join(target_path, product_path)
+    where_to_write_path = os.path.join(Path(target_path), table_name)
+    logger.info(f"where_to_write_path: {where_to_write_path}")
     table_folder, internal_table_name = build_folder_structure_for_table(table_name, where_to_write_path, None)
+    logger.info(f"table_folder: {table_folder}, internal_table_name: {internal_table_name}")
     parents=[]
     translator_agent = get_or_build_sql_translator_agent()
     with open(sql_src_file_name, "r") as f:
@@ -255,7 +273,10 @@ def _process_non_source_sql_file(table_name: str,
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        ddls, dmls = translator_agent.translate_to_flink_sqls(table_name=table_name, sql=sql_content, validate=validate)
+        ddl_result, dml_result = translator_agent.translate_to_flink_sqls(table_name=table_name, sql=sql_content, validate=validate)
+        # Convert to lists if they're strings (for consistency across different agents)
+        ddls = [ddl_result] if isinstance(ddl_result, str) else ddl_result
+        dmls = [dml_result] if isinstance(dml_result, str) else dml_result
         _save_dml_ddl(table_folder, internal_table_name, dmls, ddls)
     if walk_parent:
         parents=_remove_already_processed_table(parents)
@@ -333,9 +354,9 @@ def _process_ksql_sql_file(table_name: str,
     logger.info(f"Process ksql SQL file {ksql_src_file} to {staging_target_folder}")
     table_folder = table_name.lower()
     table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, None)
-    agent = KsqlTranslatorToFlinkSqlAgent()
+    agent = KsqlToFlinkSqlAgent()
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
-        ddl_content, dml_content  = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
+        ddl_content, dml_content = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
         _save_dml_ddl(table_folder, internal_table_name, dml_content, ddl_content)
         return ddl_content, dml_content

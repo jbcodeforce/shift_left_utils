@@ -236,10 +236,14 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
             fname = from_pipeline_to_absolute(table_ref.dml_ref)
             with open(fname, 'r') as file:
                 dml_sql_content = file.read()
-            source_topics = parser.extract_table_references(dml_sql_content)
+            source_topics = parser.extract_table_references(dml_sql_content, keep_topic_name=True)
             for source_topic in source_topics:
-                if source_topic != sink_table_name and source_topic != table_name:
-                    raw_tables.append(source_topic)
+                if (source_topic != sink_table_name 
+                    and source_topic != table_name 
+                    and not source_topic.startswith("src_") 
+                    and source_topic not in raw_tables):
+                        raw_tables.append(source_topic)
+        logger.info(f"raw_tables: {raw_tables}")
         print(f"raw_tables: {raw_tables}")
         return raw_tables
 
@@ -265,7 +269,7 @@ def _find_source_tables_for_sink(sink_table_name: str, inventory: dict, pipeline
                 raise ValueError(f"No pipeline definition found for table: {table_name} - ensure to have run build metadata first")
 
     _find_sources_recursive(sink_table_name)
-    print(f"source_tables: {source_tables}")
+    logger.info(f"source_tables: {source_tables}")
     source_tables = _find_raw_tables(source_tables)
     return source_tables
 

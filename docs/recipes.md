@@ -43,7 +43,7 @@ See the following **recipes** to support the management of those elements:
 [:material-table: Add table folder structure](#add-a-table-structure-to-the-flink-project){ .md-button }
 
 [:material-traffic-light: Validate development best practices](#validate-naming-convention-and-best-practices){ .md-button }
-[:material-ab-testing: Use the Test harness](./coding/test_harness.md/#usage-and-recipe){ .md-button }
+[:material-ab-testing: Use the Test harness](./coding/test_harness.md/#unit-test-usage-and-recipes){ .md-button }
 [:material-semantic-web: Understanding Flink semantic](#understand-flink-statement-physical-plan){ .md-button }
 
 [Validate running statements](#accessing-running-statements){ .md-button }

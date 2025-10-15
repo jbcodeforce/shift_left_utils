@@ -89,98 +89,75 @@ The following diagram illustrates the target unit testing environment:
 
 ## Unit-test Usage and Recipes
 
-* Select a table to test the logic from. This test tool is relevant for DML with complex logic. In this example `user_role` has a join between three tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`:
+* Select a table to test the logic from. This test tool is relevant for DML with complex logic. In this example `c360_dim_users` has a join between two tables: `src_c360_users`, `c360_dim_groups`:
   ```sql
-  INSERT INTO int_p3_user_role
-  WITH
-      users as (
-          select user_id,
-                tenant_id,
-                role_id,
-                status
-          from src_p3_users 
-          left join src_p3_tenants on src_p3_users.tenant_id = src_p3_tenants.id
-      ),
-      roles as (
-          select role_id
-                role_name,
-                u.tenant_id,
-                u.user_id,
-                u.status
-          from src_p3_roles
-          left join users u on src_p3_roles.role_id = u.role_id
-      )
-  SELECT * FROM roles;
+  INSERT INTO c360_dim_users
+    with valid_users as (
+      SELECT * FROM src_c360_users
+      WHERE user_id IS NOT NULL and group_id IS NOT NULL and tenant_id IS NOT NULL
+    )
+      SELECT
+      -- columns hidden
+      FROM valid_users u
+      LEFT JOIN c360_dim_groups g
+      ON  u.tenant_id = g.tenant_id and u.group_id = g.group_id
   ```
 
 * Verify the ddl and dml files for the selected table are defined under `sql-scripts`, verify the table inventory exists and is up-to-date, if not run `shift_left table build-inventory $PIPELINES`
-* Initialize the test code by running the following command:
+* Initialize the test code by running the following command: Do not create a lot of test cases upfront, you can add more tests later.
   ```sh
-  shift_left table init-unit-tests <table_name> --nb-test-cases 2 
+  shift_left table init-unit-tests <table_name> --nb-test-cases 1 
   # example with the user_role (using the naming convention)
-  shift_left table init-unit-tests int_p3_user_role --nb-test-cases 2 
+  shift_left table init-unit-tests c360_dim_users --nb-test-cases 1
   ```
 
-  In long run it is recommended to define only one test case.
+  To make it simple, it is recommended to define only one test case.
 
-* For each input table, of the dml under test, there will be ddl and dml script files created with the numbered postfix to match the unit test it supports (e.g _1 in `insert_src_p3_roles_1.sql`) for inserting records to the table `src_p3_roles` in the context of test case # 1.  In the example below the `dml_user_role.sql` has 3 input tables: `src_p3_users`, `src_p3_tenants`, `src_p3_roles`. For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix (or the prefix defined in `app.post_fix_unit_test` in the config.yaml), this is used for test isolation: `ddl_src_p3_roles.sql`, `ddl_src_p3_users.sql` and `ddl_src_p3_tenants.sql`
+* For each input table, of the dml under test, there will be ddl and dml script files created with the numbered postfix to match the unit test, it supports. For example for the test case with id = 1 the name of the sql is:  `insert_c360_dim_groups_1.sql`) for inserting records to the table `c360_dim_groups`.  For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix, this is used for test isolation: `ddl_c360_dim_groups.sql`, `ddl_src_c360_users.sql`
   ```sh
-  user_role
+  dim_users
   ├── Makefile
   ├── sql-scripts
-  │   ├── ddl.int_p3_user_role.sql
-  │   └── dml.int_p3_user_role.sql
+  │   ├── ddl.c360_dim_user.sql
+  │   └── dml.c360_dim_user.sql
   ├── tests
-  │   ├── ddl_src_p3_roles.sql
-  │   ├── ddl_src_p3_tenants.sql
-  │   ├── ddl_src_p3_users.sql
-  │   ├── insert_src_p3_roles_1.sql
-  │   ├── insert_src_p3_roles_2.csv
-  │   ├── insert_src_p3_tenants_1.sql
-  │   ├── insert_src_p3_tenants_2.csv
-  │   ├── insert_src_p3_users_1.sql
-  │   ├── insert_src_p3_users_2.csv
+  │   ├── README.md
+  │   ├── ddl_c360_dim_groups.sql
+  │   ├── ddl_src_c360_users.sql
+  │   ├── insert_c360_dim_groups_1.sql
+  │   ├── insert_c360_dim_groups_1.yaml
+  │   ├── insert_src_c360_users_1.sql
+  │   ├── insert_src_c360_users_1.yaml
   │   ├── test_definitions.yaml
-  │   ├── validate_int_p3_user_role_1.sql
-  │   └── validate_int_p3_user_role_2.sq
+  │   ├── validate_c360_dim_users_1.sql
+  │   └── validate_c360_dim_users_2.sql
   ```
 
-The 2 test cases are created as you can see in the `test_definitions.yaml`
+*Remarks: the yaml files are not yet used, it is a future extension*
+
+The test cases are created as you can see in the `test_definitions.yaml`
   ```yaml
-  test_suite:
-  - name: test_int_p3_user_role_1
-    inputs:
-    - table_name: src_p3_roles
-      file_name: ./tests/insert_src_p3_roles_1.sql
-      file_type: sql
-    - table_name: src_p3_users
-      file_name: ./tests/insert_src_p3_users_1.sql
-      file_type: sql
-    - table_name: src_p3_tenants
-      file_name: ./tests/insert_src_p3_tenants_1.sql
-      file_type: sql
-    outputs:
-    - table_name: int_p3_user_role
-      file_name: ./tests/validate_int_p3_user_role_1.sql
-      file_type: sql
-  - name: test_int_p3_user_role_2
-    inputs:
-    - table_name: src_p3_roles
-      file_name: ./tests/insert_src_p3_roles_2.csv
-      file_type: csv
-    - table_name: src_p3_users
-      file_name: ./tests/insert_src_p3_users_2.csv
-      file_type: csv
-    - table_name: src_p3_tenants
-      file_name: ./tests/insert_src_p3_tenants_2.csv
-      file_type: csv
-    outputs:
-    - table_name: int_p3_user_role
-      file_name: ./tests/validate_int_p3_user_role_2.sql
-      file_type: sql
+    foundations:
+    - table_name: c360_dim_groups
+      ddl_for_test: ./tests/ddl_c360_dim_groups.sql
+    - table_name: src_c360_users
+      ddl_for_test: ./tests/ddl_src_c360_users.sql
+    test_suite:
+    - name: test_c360_dim_users_1
+      inputs:
+      - table_name: c360_dim_groups
+        file_name: ./tests/insert_c360_dim_groups_1.sql
+        file_type: sql
+      - table_name: src_c360_users
+        file_name: ./tests/insert_src_c360_users_1.sql
+        file_type: sql
+      outputs:
+      - table_name: c360_dim_users
+        file_name: ./tests/validate_c360_dim_users_1.sql
+        file_type: sql
   ```
 
-The two test cases use different approaches to define the data: SQL and CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The csv data may come from an extract of kafka topic records.
+The two test cases use different approaches to define the data: SQL and CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The csv data may come from an extract of the kafka topic records.
 
 * Data engineers **update the content** of the insert statements and **the validation statements** to reflect business requirements. Once done, try unit testing with the command:
   ```sh
@@ -190,7 +167,7 @@ The two test cases use different approaches to define the data: SQL and CSV file
 A test execution may take some time as it performs the following steps:
 
 1. Read the test definition.
-1. Execute the ddl for the input tables with '_ut' postfix to keep specific test data.
+1. Execute the ddl for the input tables with '_ut' postfix or using the postfix as defined in the config.yaml parameter named: `app.post_fix_unit_test`
 1. Insert records in input tables.
 1. Create a new output table with the specified postfix.
 1. Deploy the DML to test
@@ -198,15 +175,47 @@ A test execution may take some time as it performs the following steps:
 1. Build test report
 
 
-* To run the one test :
-  ```sh
-  # change the table name and test case name
-  shift_left table run-unit-tests <table_name> --test-case-name <test_case_1> 
-  ```
+This execution is re-entrant, which means it will NOT recreate the DDLs if the topics are already present, and will skip to the next step. 
 
-  This command executes the creation of the DDLs to create the input tables with a postfix like ('_ut') and the insert SQLs to inject synthetic data.
+Here is an example of outputs: 3 DDLs run successfuly, and the dml under tests is now running ready to generate results.
+```
+------------------------------------------------------------
+1. Create foundation tables for unit tests for c360_dim_users
+------------------------------------------------------------
+May execute foundation statement for c360_dim_groups /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/dimensions/c360/dim_users/./tests/ddl_c360_dim_groups.sql on lfcp-xvrvmz
+Execute statement dev-ddl-c360-dim-groups-jb  on: lfcp-xvrvmz
+Executed statement for table: c360_dim_groups_jb status: COMPLETED
 
-  This execution is re-entrant, which means it will NOT recreate the DDLs if the topics are already present, and skill to the next step. But executing multiple times the insert data will generate duplicates to the input tables. What we do observed is that the most complex SQL script to develop is the validation one, so the command support running the validation as a separate command and multiple times.
+May execute foundation statement for src_c360_users /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/dimensions/c360/dim_users/./tests/ddl_src_c360_users.sql on lfcp-xvrvmz
+Execute statement dev-ddl-src-c360-users-jb  on: lfcp-xvrvmz
+Executed statement for table: src_c360_users_jb status: COMPLETED
+
+Execute statement dev-ddl-c360-dim-users-jb  on: lfcp-xvrvmz
+Executed statement for table: c360_dim_users_jb status: COMPLETED
+
+Wait dev-dml-c360-dim-users-jb deployment, increase wait response timer to 20 seconds
+Execute statement dev-dml-c360-dim-users-jb  on: lfcp-xvrvmz
+Executed statement for table: c360_dim_users_jb status: RUNNING
+```
+
+The second part is for the insert statements which should COMPLETE
+```
+----------------------------------------
+2. Deploy insert into statements for unit test test_c360_dim_users_1
+----------------------------------------
+Run insert test data for c360_dim_groups_jb
+Wait dev-ins-1-c360-dim-groups-jb deployment, increase wait response timer to 20 seconds
+Execute statement dev-ins-1-c360-dim-groups-jb  on: lfcp-xvrvmz
+Executed statement for table: c360_dim_groups_jb status: COMPLETED
+
+Run insert test data for src_c360_users_jb
+Execute statement dev-ins-1-src-c360-users-jb  on: lfcp-xvrvmz
+Executed statement for table: src_c360_users_jb status: COMPLETED
+```
+
+
+The tool is creating a `*-test-suite-result.json` file under the CLI session folder. 
+
 
 * Run your validation script:
   ```sh
@@ -225,6 +234,71 @@ The second test case created by the `shift_left table init-unit-tests ` command 
 In the future it could direcly write to a Kafka topics that are the input tables for the dml under test.
 
 Data engineers may use the csv format to create a lot of records. Now the challenge will be to define the validation SQL script, but this is another story.
+
+### Unit Test Harness FAQ
+
+???- question "What does 'foundation tables for unit tests' mean?"
+    Each input tables for a given DML to tests are foundation tables, as the DDL of the current DML. So create foundation tables means running all the DDLs. These are run only one time. As an example this is the part of the test_definition that will be run:
+    ```yaml
+    foundations:
+    - table_name: c360_dim_groups
+      ddl_for_test: ./tests/ddl_c360_dim_groups.sql
+    - table_name: src_c360_users
+      ddl_for_test: ./tests/ddl_src_c360_users.sql
+    ```
+    + the DDL of the `c360_dim_users` table as the name change.
+
+???- question "Where are the logs? (the session folder)"
+    When shift left is started, there is logs folder created under your `$HOME/.shift_left/logs` folder, and the name is specified at the beginning of the trace: `10-09-25-16-59-31-IZH7`
+    ```
+    --------------------------------------------------------------------------------
+    | SHIFT_LEFT - CONFIG_FILE used: ./tests/config-ccloud.yaml - Session started at 2025-10-09 16:59:31 - LOGS folder is : /Users/jerome/.shift_left/logs/10-09-25-16-59-31-IZH7 |
+    --------------------------------------------------------------------------------
+    ```
+    The logs is there with the name of the file = to `shift_left_cli.log`. Other file may be present, like the `*-test-suite-result.json`
+
+???- question "Should I change the name of the tables in the unit test scripts?"
+    NO. The table names of the generated SQL are using _ut. This has to be persisted in the git repository. The table names are changed automatically when running the tests, and the tool uses the config.yaml `app.post_fix_unit_test` to overwrite, at deployment time, those names.
+
+???- question "How to re-run my validation SQL?"
+    Validation SQL script may take some time to tune and make it works. This is why the command: `shift_left table run-validation-tests  <table_name> --test-case-name <test_case_1> ` is re-entrant and will reexecute the SQL. It will delete Flink previous validation statement.
+
+???- question "When I discover the input data is not coherent, what can I do?"
+    Better to delete all the test artifacts with the command
+    ```sh
+    shift_left table delete-unit-tests <table_name>
+    ```
+    and then re-run the unit test.
+
+???- question "Is it possible to have two validation scripts for the same input?"
+    Yes, and it is even recommended to simplify the validation SQLs as they become big. The test_definition supports this well as you can just specify the same input sqls and use another validation reference. It will be in another test case element.
+    ```yaml
+      test_suite:
+      - name: test_c360_dim_users_1
+        inputs:
+        - table_name: c360_dim_groups
+          file_name: ./tests/insert_c360_dim_groups_1.sql
+          file_type: sql
+        - table_name: src_c360_users
+          file_name: ./tests/insert_src_c360_users_1.sql
+          file_type: sql
+        outputs:
+        - table_name: c360_dim_users
+          file_name: ./tests/validate_c360_dim_users_1.sql
+          file_type: sql
+      - name: test_c360_dim_users_2
+        inputs:
+        - table_name: c360_dim_groups
+          file_name: ./tests/insert_c360_dim_groups_1.sql
+          file_type: sql
+        - table_name: src_c360_users
+          file_name: ./tests/insert_src_c360_users_1.sql
+          file_type: sql
+        outputs:
+        - table_name: c360_dim_users
+          file_name: ./tests/validate_c360_dim_users_2.sql
+          file_type: sql
+    ```
 
 ## Integration tests
 
@@ -267,18 +341,19 @@ INSERT INTO raw_users (user_id, user_name, user_email, group_id, tenant_id, crea
 ('user_001', 'Alice Johnson', 'alice.johnson@example.com', 'admin', 'tenant_id_001', '2023-01-15', true, map('cor_id', 'cor_01', 'timestamp', now()));
 ```
 
-but this approach means we need to modify all the intermediate Flink statements to pass those metadata to their output table. 
+but this approach means we need to modify all the intermediate Flink statements to pass those metadata to their output table and the declare the headers in the DDL of the output table(s). 
 
 ```sql
+insert to output_table
 select
-  -- ...
+  -- ... columns to match output_table
   headers
 from final_table;
 ```
 
 Also at each intermediate statement there will be the following challenges to address:
 
-* On any join, which tx_id to use, or does a concatenation approach being used?
+* On any join, which correlation id to use, or does a concatenation approach being used?
 * Which timestamp to use from the two tables joined? min or max?
   ```sql
   select

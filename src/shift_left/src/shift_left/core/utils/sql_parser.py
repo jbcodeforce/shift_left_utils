@@ -12,7 +12,8 @@ Dedicated class to parse a SQL statement and extract elements like table name
 class SQLparser:
     def __init__(self):
         # extract table name declared after FROM, JOIN, INNER JOIN, LEFT JOIN, CREATE TABLE IF NOT EXISTS, INSERT INTO
-        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*`?([a-zA-Z_][a-zA-Z0-9_]*\.)*[a-zA-Z_][a-zA-Z0-9_]*`?)'
+        # Updated to support table names with hyphens (e.g., clone.dev.ap-record-execution-dev.state.record)
+        self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*`?([a-zA-Z_][a-zA-Z0-9_-]*\.)*[a-zA-Z_][a-zA-Z0-9_-]*`?)'
         self.cte_pattern_1 = r'(?i)\bWITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'(?i),\s*(\w+)\s+AS\s*\('
         # Pattern to identify the start of WITH clause for CTE removal
@@ -25,7 +26,7 @@ class SQLparser:
         self.comparison_from_pattern = r'\bIS\s+(?:NOT\s+)?DISTINCT\s+FROM\s+\w+(?:\.\w+)?'
     
 
-    def extract_table_references(self, sql_content) -> Set[str]:
+    def extract_table_references(self, sql_content: str, keep_topic_name: bool = False) -> Set[str]:
         """
         Extract the table reference from the sql_content, using different reg expressions to
         do not consider CTE name and kafka topic name. To extract kafka topic name, it removes 
@@ -52,7 +53,7 @@ class SQLparser:
                 if 'REPLACE' in table[1].upper():
                     continue
                 retrieved_table=table[1].replace('`','')
-                if retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
+                if not keep_topic_name and retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
                 if not retrieved_table in ctes:
                     matches.add(retrieved_table)

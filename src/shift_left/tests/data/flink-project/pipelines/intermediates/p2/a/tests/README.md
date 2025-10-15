@@ -19,8 +19,8 @@ Running source data analysis, from the env-nknqp3 environment:
 
 | Table Name | # messages in topic | Information of interest |
 |------------|------------|--------------|
-| src_x |  |  |
 | src_p2_a |  |  |
+| src_x |  |  |
 
 
 ## Unit tests creation and execution:
@@ -35,21 +35,6 @@ DDL ->
 
 
 
-### src_x
-
-* Example of record in topic:
-
-```json
-# add an example here as json object from the kafka topic
-```
-
-Analyze **data skew** with
-
-```sql
-select id, tenant_id, count(*) as record_count from src_x  group by id, tenant_id
-```
-
-
 ### src_p2_a
 
 * Example of record in topic:
@@ -62,5 +47,20 @@ Analyze **data skew** with
 
 ```sql
 select id, tenant_id, count(*) as record_count from src_p2_a  group by id, tenant_id
+```
+
+
+### src_x
+
+* Example of record in topic:
+
+```json
+# add an example here as json object from the kafka topic
+```
+
+Analyze **data skew** with
+
+```sql
+select id, tenant_id, count(*) as record_count from src_x  group by id, tenant_id
 ```
 

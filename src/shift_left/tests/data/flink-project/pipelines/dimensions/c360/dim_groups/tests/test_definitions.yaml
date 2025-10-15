@@ -1,0 +1,30 @@
+foundations:
+- table_name: src_c360_groups
+  ddl_for_test: ./tests/ddl_src_c360_groups.sql
+- table_name: src_common_tenant
+  ddl_for_test: ./tests/ddl_src_common_tenant.sql
+test_suite:
+- name: test_c360_dim_groups_1
+  inputs:
+  - table_name: src_c360_groups
+    file_name: ./tests/insert_src_c360_groups_1.sql
+    file_type: sql
+  - table_name: src_common_tenant
+    file_name: ./tests/insert_src_common_tenant_1.sql
+    file_type: sql
+  outputs:
+  - table_name: c360_dim_groups
+    file_name: ./tests/validate_c360_dim_groups_1.sql
+    file_type: sql
+- name: test_c360_dim_groups_2
+  inputs:
+  - table_name: src_c360_groups
+    file_name: ./tests/insert_src_c360_groups_2.csv
+    file_type: csv
+  - table_name: src_common_tenant
+    file_name: ./tests/insert_src_common_tenant_2.csv
+    file_type: csv
+  outputs:
+  - table_name: c360_dim_groups
+    file_name: ./tests/validate_c360_dim_groups_2.sql
+    file_type: sql

@@ -1,0 +1,11 @@
+/* Create streams for source topics */
+CREATE STREAM "engineers" WITH (KAFKA_TOPIC='app.dev.engineers', VALUE_FORMAT='JSON_SR');
+CREATE STREAM "tickets" WITH (KAFKA_TOPIC='app.dev.tickets', VALUE_FORMAT='JSON_SR');
+
+ 
+
+/* Create stream for destination topic */
+CREATE STREAM "destinations" WITH (KAFKA_TOPIC='app.dev.destinations', VALUE_FORMAT='JSON_SR') 
+AS SELECT engineer.engineer_id, ticket.longitude, ticket.latitude FROM "engineers" engineer 
+JOIN "tickets" ticket WITHIN 5 MINUTES ON GEO_DISTANCE(engineer.latitude, engineer.longitude, ticket.latitude, ticket.longitude) <= 500 
+EMIT CHANGES;

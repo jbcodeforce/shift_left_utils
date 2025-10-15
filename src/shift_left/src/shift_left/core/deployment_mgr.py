@@ -117,7 +117,7 @@ def build_deploy_pipeline_from_table(
                 f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}: "
                 f"{result.model_dump_json(indent=3)}"
             )
-            print(f"Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
             simple_report=report_mgr.build_simple_report(execution_plan, None)
             #logger.info(f"Execute the plan after deployment: {simple_report}")
             summary+=f"\n{simple_report}"
@@ -152,6 +152,7 @@ def build_deploy_pipelines_from_product(
     combined_node_map = {}
     visited_nodes = set()  # Shared across all calls to avoid redundant processing
     count=0
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building Node map")
     for table_name, table_ref_dict in table_inventory.items():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref.product_name == product_name:
@@ -162,9 +163,9 @@ def build_deploy_pipelines_from_product(
             # Pass shared visited_nodes and node_map to avoid reprocessing already analyzed nodes
             combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
-    print(f"Build node map in {time.perf_counter() - start_time} seconds.")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Finished Node map")
     if count > 0:
-        print(f"Building topological sorted parents for {count} tables")            
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building topological sorted parents for {count} tables")            
         ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
         ancestors = _filtering_descendant_nodes(ancestors, product_name, may_start_descendants)
         start_node = ancestors[-1]
@@ -177,6 +178,7 @@ def build_deploy_pipelines_from_product(
                                                                       table_name=start_node.table_name, 
                                                                       expected_product_name=start_node.product_name,
                                                                       pool_creation=pool_creation)
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Start building topological sorted parents for {count} tables")            
         if start_node.is_running() and not force_ancestors:
             start_node.to_restart = False
             start_node.to_run = False
@@ -184,13 +186,13 @@ def build_deploy_pipelines_from_product(
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
-            print(f"Executing plan: {summary}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan summary: {summary}")
             start_time = time.perf_counter()
             _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=True, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
-            print(f"Execution time: {execution_time} seconds")
-            summary+=f"\nExecution time: {execution_time} seconds"
-            print("... build table report now...")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
+            summary+=f"\n{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds"
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build table report now")
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
@@ -248,11 +250,11 @@ def build_and_deploy_all_from_directory(
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
-            print(f"Executing plan: {summary}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
             _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=accept_exceptions, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
-            print(f"Execution time: {execution_time} seconds")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
@@ -315,10 +317,10 @@ def build_and_deploy_all_from_table_list(
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
         if execute_plan:
-            print(f"Executing plan: {summary}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
             _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
-            print(f"Execution time: {execution_time} seconds")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
@@ -461,7 +463,7 @@ def full_pipeline_undeploy_from_table(
             statement_mgr.delete_statement_if_exists(node.dml_statement_name)
             rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
             trace+=f"Dropped table {node.table_name} with result: {rep}\n"
-            print(f"Dropped table {node.table_name}")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropped table {node.table_name}")
     execution_time = int(time.perf_counter() - start_time)
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {sink_table_name}")
     return trace
@@ -502,7 +504,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
                                                                       pool_creation=False)
        
         execution_plan.nodes.reverse()
-        print(f"Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
         for node in execution_plan.nodes:
             state = "EXISTS"
             if node.existing_statement_info == None or node.existing_statement_info.status_phase == "UNKNOWN":
@@ -541,7 +543,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
         
                 
     execution_time = int(time.perf_counter() - start_time)
-    print(f"Done in {execution_time} seconds to undeploy pipeline from product {product_name}")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Undeploy pipeline product {product_name} Done in {execution_time} seconds")
     return trace
 
 
@@ -580,7 +582,7 @@ def prepare_tables_from_sql_file(sql_file_name: str,
 def _drop_node_worker(node: FlinkStatementNode) -> str:
     """Worker function to drop a single node's table and statements."""
     try:
-        print(f"Dropping table {node.table_name}")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropping table {node.table_name}")
         statement_mgr.delete_statement_if_exists(node.dml_statement_name) 
         statement_mgr.delete_statement_if_exists(node.ddl_statement_name)   
         rep = statement_mgr.drop_table(node.table_name, node.compute_pool_id)
@@ -649,8 +651,8 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                         else:
                             logger.warning(f"Child {child.table_name} not found in node_map")
                             
-        logger.info(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
-        print(f"Done with execution plan construction: got {len(execution_plan.nodes)} nodes")
+        logger.info(f"Done with execution plan construction: [{len(execution_plan.nodes)} nodes]")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done with execution plan construction [{len(execution_plan.nodes)} nodes]")
         logger.debug(execution_plan)
         return execution_plan
     except Exception as e:
@@ -989,12 +991,11 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
         RuntimeError: If statement execution fails
     """
     logger.info(f"--- Execute Plan for {execution_plan.start_table_name} started ---")
-    print(f"--- Execute for {execution_plan.start_table_name} started ---")
     statements = []
     autonomous_nodes=[]
     started_nodes = []
     nodes_to_execute = _get_nodes_to_execute(execution_plan.nodes)
-    print(f"{len(nodes_to_execute)} statements to execute")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execute for {execution_plan.start_table_name} started. {len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
         if not sequential:
             # for parallel execution split the statements to execute into buckets for the one with no parent
@@ -1005,7 +1006,7 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                 max_thread = 10
             autonomous_nodes = _build_autonomous_nodes(nodes_to_execute, started_nodes)
             if len(autonomous_nodes) > 0:
-                print(f"Deploying {len(autonomous_nodes)} flink statements using parallel processing on {max_thread} workers")
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploying {len(autonomous_nodes)} flink statements using parallel processing on {max_thread} workers")
                 while len(autonomous_nodes) > 0:
                     _max_workers = max_thread
                     if len(autonomous_nodes) < max_thread:
@@ -1050,11 +1051,11 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
         for future in as_completed(futures):
             try:
                 result = future.result(timeout=60)  # will wait up to timeout seconds.
-                print(result)
+                logger.info(f"{result}")
                 if result is not None:  # Only append if we got a valid result
                     statements.append(result)
                     if result.status.phase not in ["COMPLETED", "RUNNING"]:
-                        print(f"Statement {result.name} failed, move to next node")
+                        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {result.name} failed, move to next node")
                         logger.error(f"Statement {result.name} failed, move to next node")
                         nodes_to_execute = _modify_impacted_nodes(result, nodes_to_execute)
                         pass
@@ -1077,7 +1078,7 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     """
     Execute statements in sequence.
     """
-    print(f"Still {len(nodes_to_execute)} statements to execute")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Still {len(nodes_to_execute)} statements to execute")
     node = nodes_to_execute.pop(0)
     statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
     if statement:
@@ -1143,8 +1144,8 @@ def _deploy_one_node(node: FlinkStatementNode,
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
     maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')        
-    logger.info(f"Deploy table: '{maintenant} - {node.table_name}'")
-    print(f"Deploy table: '{maintenant} - {   node.table_name}'")
+    logger.info(f"Deploy table: {node.table_name}'")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploy table {node.table_name}")
     try:
         if not node.dml_only:
             statement = _deploy_ddl_dml(node)
@@ -1155,7 +1156,7 @@ def _deploy_one_node(node: FlinkStatementNode,
     except Exception as e:
         if not accept_exceptions:
             logger.error(f"Failed to execute statement {node.dml_statement_name}: {str(e)}")
-            raise RuntimeError(f"Statement execution failed: {str(e)}")
+            raise RuntimeError(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement execution failed: {str(e)}")
         else:
             logger.error(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
     
@@ -1198,8 +1199,8 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
         logger.debug(f"DML deployment status is: {statement.status.phase}")
     if statement.status.phase == "FAILED":
         raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
-    logger.info(f"DML deployment completed for {to_process.table_name} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"DML deployment completed for {to_process.table_name} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"DML deployment completed for {to_process.table_name}")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} DML deployment completed for {to_process.table_name}")
     return statement
 
 

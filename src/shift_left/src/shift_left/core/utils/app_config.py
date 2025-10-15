@@ -161,9 +161,11 @@ file_handler = RotatingFileHandler(
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
-print("-" * 80)
-print(f"| SHIFT_LEFT - CONFIG_FILE used: {os.getenv('CONFIG_FILE')} - Session started at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - LOGS folder is : {session_log_dir} |")
-print("-" * 80)
+print("-" * 40 + " SHIFT_LEFT " + "-" * 40)
+print(f"""| CONFIG_FILE     : {os.getenv('CONFIG_FILE')} 
+| LOGS folder     : {session_log_dir}
+| Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}""")
+print("-" * 92)
 #console_handler = logging.StreamHandler()
 #console_handler.setLevel(logging.INFO)
 #logger.addHandler(console_handler)
@@ -490,11 +492,11 @@ def _check_deprecated_fields(config: dict[str,dict[str,str]]) -> list[str]:
           warnings.append(f"Warning: {section}.{field} is deprecated use environment variables instead")
         else:
           warnings.append(f"{section}.{field} is set via environment variable")
-  deprecated_fields = ["cluster_id", "security.protocol", "sasl.mechanism", "sasl.username", "sasl.password", "session.timeout.ms", "glb_name", "pkafka_cluster", "url_scope", "base_api", "page_size"]
+  deprecated_fields = ["security.protocol", "sasl.mechanism", "sasl.username", "sasl.password", "session.timeout.ms", "glb_name", "pkafka_cluster", "url_scope", "base_api", "page_size"]
   warnings.extend(_check_fields_in_sections(config, ["kafka", "confluent_cloud"], deprecated_fields))
   deprecated_fields = ["flink_url", "max_cfu", "max_cfu_percent_before_allocation", "statement_name_post_fix"]
   warnings.extend(_check_fields_in_sections(config, ["flink"], deprecated_fields))
-  deprecated_fields = ["delta_max_time_in_min", "default_PK", "timezone", "logging", "products", "accepted_common_products", "cache_ttl",  "translator_to_flink_sql_agent",  "data_limit_where_condition", "data_limit_replace_from_reg_ex", "data_limit_table_type", "data_limit_column_name_to_select_from", "post_fix_unit_test", "post_fix_integration_test"]
+  deprecated_fields = ["delta_max_time_in_min", "default_PK", "timezone", "logging", "products", "cache_ttl",   "data_limit_where_condition", "data_limit_replace_from_reg_ex", "data_limit_table_type", "data_limit_column_name_to_select_from"]
   warnings.extend(_check_fields_in_sections(config, ["app"], deprecated_fields))
   return warnings
 
@@ -504,5 +506,5 @@ def _check_fields_in_sections(config: dict[str,dict[str,str]], sections:list[str
   for section in sections:
     for field in deprecated_fields:
       if config.get(section) and config.get(section).get(field):
-        warnings.append(f"{section}.{field} is set to overide default value, or may be removed from config file")
+        warnings.append(f"{section}.{field} is set to overide default value, or may be removed from config file if not needed")
   return warnings

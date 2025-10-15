@@ -115,6 +115,29 @@ def report_table_cross_products(project_path: str):
                     break
     return risky_tables
 
+
+def list_tables_with_one_child(project_path: str):
+    """
+    Return the list of table names for tables that have exactly one child table.
+    
+    Args:
+        project_path: Path to the pipeline folder. If not provided, uses $PIPELINES environment variable.
+        
+    Returns:
+        List of table names that have exactly one child
+    """
+    if not project_path:
+        project_path = os.getenv("PIPELINES")
+    inventory = get_or_build_inventory(project_path, project_path, False)
+    tables_with_one_child = []
+    for table_name, table_ref in inventory.items():
+        table_hierarchy: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(
+            table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME
+        )
+        if table_hierarchy and table_hierarchy.children and len(table_hierarchy.children) <= 1:
+            tables_with_one_child.append(table_name)
+    return tables_with_one_child
+
 def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str = None) -> ModifiedFilesResult:
     """List modified files and return structured result.
     
@@ -177,13 +200,10 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             if file_filter in lowered_file_path and "/tests/" not in lowered_file_path:
                 filtered_files.append(file_path)
         
-        logger.info(f"Found {len(all_modified_files)} total modified files")
-        logger.info(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
+        print(f"Found {len(all_modified_files)} total modified files")
+        print(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
         
-        # Generate timestamp
         generated_on = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Create description from lines 123-126 equivalent
         description = (
             f"Modified files in branch '{current_branch}'\n"
             f"Filter applied: {file_filter}\n"
@@ -263,6 +283,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
 def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
     logger.info(f"isolate_data_product({product_name}, {source_folder}, {target_folder})")
     """
+    isolate a data product table hierarchy for a given product name to be copied to a target folder.
     go to the facts and build a list of tables for this product name.
     add any children of the tables in the list of facts, recursively.
     build an integrated execution plan from the list of tables.

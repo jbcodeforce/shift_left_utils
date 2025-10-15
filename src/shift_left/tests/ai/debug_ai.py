@@ -15,16 +15,16 @@ from shift_left.cli import app
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
-    def _test_ksql_migration(self):
+    def test_ksql_migration(self):
         os.environ["PIPELINES"] =  data_dir + "/ksql-project/flink-references"
         os.environ["STAGING"] =  data_dir + "/ksql-project/staging/ut"
         os.environ["SRC_FOLDER"] =  data_dir + "/ksql-project/sources"
         runner = CliRunner()
-        result = runner.invoke(app, ['table', 'migrate', 'big_table', os.getenv('SRC_FOLDER','.') + '/ddl-bigger-file.ksql', os.getenv('STAGING'),'--source-type', 'ksql'])
+        result = runner.invoke(app, ['table', 'migrate', 'splitter', os.getenv('SRC_FOLDER','.') + '/splitter.ksql', os.getenv('STAGING'),'--source-type', 'ksql'])
         print(result.stdout)
 
-    def test_spark_migration(self):
-        os.environ["STAGING"] =  data_dir + "/flink-project/staging/ut"
+    def _test_spark_migration(self):
+        os.environ["STAGING"] =  data_dir + "/flink-project/staging/"
         if not os.getenv('SRC_FOLDER'):
             os.environ["SRC_FOLDER"] =  data_dir + "/spark-project"
         runner = CliRunner()
@@ -34,4 +34,4 @@ class TestDebugIntegrationTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()--
+    unittest.main()

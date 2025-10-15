@@ -15,6 +15,12 @@ export CLOUD_PROVIDER=aws
 export CCLOUD_CONTEXT=login-<>@confluent.io-https://confluent.cloud
 export CCLOUD_COMPUTE_POOL_ID=lfcp-xvrvmz
 
-export SL_LLM_BASE_URL=https://openrouter.ai/api/v1
-export SL_LLM_MODE=qwen/qwen3-coder:free
-export SL_LLM_API_KEY
+export SL_LLM_BASE_URL=https://localhost:11434/v1
+export SL_LLM_MODE=qwen/qwen3:30b
+export SL_LLM_API_KEY=ollama_test_key
+export SL_KAFKA_API_KEY=
+export SL_KAFKA_API_SECRET=
+export SL_CONFLUENT_CLOUD_API_KEY=
+export SL_CONFLUENT_CLOUD_API_SECRET=
+export SL_FLINK_API_KEY=
+export SL_FLINK_API_SECRET=

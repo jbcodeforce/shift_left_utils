@@ -12,6 +12,12 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 **Test Harness**: Develop unit test SQL template with synthetic data to unit test a Flink SQL statement. 
 
+
+## Cursor AI Integration
+
+This project includes **MCP (Model Context Protocol)** integration for Cursor AI! Use shift_left commands naturally in Cursor conversations. See **[Quick Start Guide](docs/mcp/index.md)** to get started in 5 minutes.
+
+
 ## Project status
 
 * This project is still under tuning and development.
@@ -33,3 +39,9 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 🤖 **[AI based migration](https://jbcodeforce.github.io/shift_left_utils/coding/llm_based_translation)**
 
+
+## 🙏 Support my work
+
+Love it? Give it a ⭐️ by clicking below:
+
+<a href="https://github.com/jbcodeforce/shift_left_utils/stargazers"><img src="https://img.shields.io/github/stars/jbcodeforce/shift_left_utils?style=social" style="margin-left:0;box-shadow:none;border-radius:0;height:24px"></a>

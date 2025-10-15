@@ -5,9 +5,7 @@ An enhanced agentic flow to translate Spark SQL to Flink SQL with validation and
 """
 
 from pydantic import BaseModel
-from typing import Tuple, List, Dict, Optional
-import os
-import re
+from typing import Tuple, List, Dict
 import json
 import importlib.resources 
 from enum import Enum
@@ -283,7 +281,7 @@ class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     # -------------------------
     # Public API
     # -------------------------
-    def translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = True) -> Tuple[str, str]:
+    def translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = True) -> Tuple[List[str], List[str]]:
         """Translation with validation enabled by default"""
         print(f"🚀 Starting  Spark SQL to Flink SQL translation with {self.model_name}")
         logger.info(f"Starting translation with validation={validate}")
@@ -296,24 +294,24 @@ class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         dml_sql = self._translator_agent(sql)
         print(f"Initial Migrated DML: {dml_sql[:300]}..." if len(dml_sql) > 300 else f"Initial DML: {dml_sql}")
         
-        if not dml_sql:
-            print("❌ Translation failed - no output generated")
+        if not dml_sql or dml_sql.strip() == "":
+            print("Translation failed - no output generated")
             return "", ""
         
         # Step 2: Generate DDL from DML if needed
-        print("\n🏗️  Step 2: Generating DDL from DML...")
+        print("\nStep 2: Generating DDL from DML...")
         ddl_sql = self._ddl_generation(dml_sql)
         print(f"Initial Migrated DDL: {ddl_sql[:300]}..." if len(ddl_sql) > 300 else f"Initial DDL: {ddl_sql}")
         
         # Step 3: Validation (if enabled)
         if validate:
-            print("\n🔍 Step 3: Validating with agentic refinement...")
+            print("\nStep 3: Validating with agentic refinement...")
             final_ddl, final_dml = self._mandatory_validation_agent(ddl_sql, dml_sql)
         else:
-            print("\n⏭️  Step 3: Skipping validation (disabled)")
+            print("\nStep 3: Skipping validation (disabled)")
             final_ddl, final_dml = ddl_sql, dml_sql
         
-        print(f"\n✅ Translation complete!")
+        print(f"\nTranslation complete!")
         print(f"Final DDL length: {len(final_ddl)} characters")
         print(f"Final DML length: {len(final_dml)} characters")
         

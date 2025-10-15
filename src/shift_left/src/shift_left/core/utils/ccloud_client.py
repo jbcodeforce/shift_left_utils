@@ -78,6 +78,8 @@ class ConfluentCloudClient:
             )
             response.raise_for_status()
             try:
+                if response.status_code == 202 and method == "DELETE":
+                    return 'deleted'
                 json_response = response.json()
                 logger.debug(f">>>> Successful {method} request to {url}. \n\tResponse: {json_response}")
                 return json_response
@@ -89,7 +91,7 @@ class ConfluentCloudClient:
                 if response.status_code == 404:
                     logger.debug(f"Request to {url} has reported error: {e}, it may be fine when looking at non present element.")
                     result = json.loads(response.text)
-                    logger.info(f">>>> Exception with 404 response text: {result['errors'][0]['detail']}")
+                    logger.info(f">>>> Exception with 404 {result} response text: {result['errors'][0]['detail']}")
                     return result
                 elif response.status_code == 409:
                     logger.info(f">>>> Response to {method} at {url} has reported error: {e}, status code: {response.status_code}, Response text: {response.text}")
@@ -344,9 +346,10 @@ class ConfluentCloudClient:
         timer= self.config['flink'].get("poll_timer", 10)
         try:
             resp = self.make_request("DELETE",f"{url}/statements/{statement_name}", auth_header=auth_header)
-            if resp:  # could be a 404 too.
+            if resp and isinstance(resp, dict) and resp.get("errors") and "does not exist" in resp.get("errors")[0].get("detail"):
+                logger.info(f"Statement {statement_name} not found")
                 return "deleted"
-            if resp == '':
+            if resp == '' or resp == 'deleted':
                 return "deleted"
             counter=0
             while True:

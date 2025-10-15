@@ -1,6 +1,6 @@
 [project]
 name = "shift_left"
-version = "0.1.41"
+version = "0.1.42"
 description = "The shift-left CLI to manage your shift-left project"
 authors = [
     {name = "jbcodeforce",email = "jboyer@confluent.io"}
@@ -25,6 +25,7 @@ dependencies = [
     "pytz>=2025.2",
     "openai>=1.97.1",
     "sqlglot>=27.19.0",
+    "mcp>=1.16.0",
 ]
 
 
