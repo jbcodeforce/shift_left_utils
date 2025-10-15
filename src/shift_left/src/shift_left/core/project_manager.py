@@ -200,13 +200,10 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             if file_filter in lowered_file_path and "/tests/" not in lowered_file_path:
                 filtered_files.append(file_path)
         
-        logger.info(f"Found {len(all_modified_files)} total modified files")
-        logger.info(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
+        print(f"Found {len(all_modified_files)} total modified files")
+        print(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
         
-        # Generate timestamp
         generated_on = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Create description from lines 123-126 equivalent
         description = (
             f"Modified files in branch '{current_branch}'\n"
             f"Filter applied: {file_filter}\n"
