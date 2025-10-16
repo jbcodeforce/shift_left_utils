@@ -1,6 +1,10 @@
 # CHANGELOG
 
 <!-- version list -->
+### v0.1.43
+* fix processing statement result for unit test, by changing the scan.bounded.mode to latest-offset, so validation scripts will complete, and the results will be bounded
+* Add a run-all flag for running validation script:  `table validate-unit-tests <table_name> --run-all ` so all the validation SQLs will be executed.
+
 ### v0.1.42 - 2025-10-15
 - **NEW: MCP (Model Context Protocol) Integration for Cursor AI**
   - Added `shift_left.mcp` module for seamless Cursor AI integration
