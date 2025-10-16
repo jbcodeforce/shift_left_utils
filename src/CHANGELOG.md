@@ -1,3 +1,10 @@
+## [0.1.43] - 2025-10-16
+
+### Changes:
+- e5e5d66 Merge branch 'v0.1.42' into develop
+- 5285fc0 Merge branch 'main' into develop
+- c4d3ad0 fix processing statement result for unit test, by changing the scan.bounded.mode to latest-offset, so validation scripts will complete, and the results will be bounded
+
 ## [0.1.42] - 2025-10-15
 
 ### Changes:
