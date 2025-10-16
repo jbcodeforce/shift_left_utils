@@ -134,7 +134,8 @@ def execute_one_or_all_tests(table_name: str,
 
 def execute_validation_tests(table_name: str, 
                     test_case_name: str = None,
-                    compute_pool_id: Optional[str] = None
+                    compute_pool_id: Optional[str] = None,
+                    run_all: bool = False
 ) -> TestSuiteResult:
     """
     Execute all validation tests defined in the test suite definition for a given table.
@@ -162,7 +163,7 @@ def execute_validation_tests(table_name: str,
     
     try:
         for idx, test_case in enumerate(test_suite_def.test_suite):
-            if test_case_name and test_case.name != test_case_name:
+            if not run_all and test_case_name and test_case.name != test_case_name:
                 continue
                 
             logger.info(f"Executing validation for test case: {test_case.name}")
@@ -192,14 +193,10 @@ def execute_validation_tests(table_name: str,
             if test_case_name and test_case.name == test_case_name:
                 break
                 
-    finally:
-        # Always try to clean up, even if tests fail
-        try:
-            delete_test_artifacts(table_name, compute_pool_id)
-        except Exception as cleanup_error:
-            logger.error(f"Error during final cleanup: {cleanup_error}")
-            # Add cleanup error to results but don't fail the tests
-            test_suite_result.cleanup_errors = str(cleanup_error)
+
+    except Exception as error:
+        logger.error(f"Error during validation tests: {error}")
+        test_suite_result.cleanup_errors = str(error)
     
     return test_suite_result
 
@@ -320,11 +317,11 @@ def _execute_flink_test_statement(
             column_name_to_select_from = config['app']['data_limit_column_name_to_select_from']
             transformer = statement_mgr.get_or_build_sql_content_transformer()
             _, sql_out= transformer.update_sql_content(sql_content, column_name_to_select_from, product_name)
-            post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
             print(f"Execute statement {statement_name}  on: {compute_pool_id}")
-
+            post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             if "Exists but deleted so retry" in post_statement:
+                logger.info(f"Statement {statement_name} exists but deleted so retry")
                 post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
             return post_statement, is_new  # Return new statement
         except Exception as e:
@@ -410,6 +407,10 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
     Run DDL and DML statements for the given tested table
     """
     def replace_table_name(sql_content: str, table_name: str) -> str:
+        """
+        Replace the table names in the SQL content with the configured postfix for the unit test.
+        Change the scan.bounded.mode for DDL to stop dml.
+        """
         sql_parser = SQLparser()
         table_names =  sql_parser.extract_table_references(sql_content)
     
@@ -436,7 +437,15 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                 return f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}"
             
             sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
-        logger.info(f"Replaced table names: {sorted_table_names} in SQL content: {sql_content}")
+            if "CREATE TABLE" in sql_content:
+                if "scan.bounded.mode" in sql_content:
+                    sql_content = sql_content.replace("'scan.bounded.mode' = 'unbounded'", "'scan.bounded.mode' = 'latest-offset'")
+                else:
+                    # Find the last occurrence of ')' or ');' and replace it with ", 'scan.bounded.mode'= 'lastest-offset')" or ", 'scan.bounded.mode'= 'lastest-offset');"
+                    pattern = r"\)(\s*;?)\s*$"
+                    replacement = r", 'scan.bounded.mode'= 'lastest-offset')\1"
+                    sql_content = re.sub(pattern, replacement, sql_content)
+            logger.info(f"Replaced table names: {sorted_table_names} in SQL content: {sql_content}")
         return sql_content
 
     # Initialize statements list if None
@@ -496,7 +505,7 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check existing statement status
     try:
         statement_info = statement_mgr.get_statement(statement_name)
-        if statement_info:
+        if statement_info and isinstance(statement_info, Statement):
             if statement_info.status.phase in ["RUNNING", "COMPLETED"]:
                 logger.info(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
                 print(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
@@ -509,7 +518,7 @@ def _load_sql_and_execute_statement(table_name: str,
                     statement_mgr.delete_statement_if_exists(statement_name)
                 except Exception as e:
                     logger.warning(f"Error deleting failed statement: {e}")
-
+        # at this point it is possible statement_info is a StatementError because of 404 for statement not found. we can then continue
         sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
           
         statement, is_new = _execute_flink_test_statement(
@@ -607,6 +616,13 @@ def _execute_test_validation(test_case: SLTestCase,
                           prefix: str = 'dev', 
                           compute_pool_id: Optional[str] = None
 ) -> Tuple[Set[Statement], str, Optional[StatementResult]]:
+    """
+    Execute the validation SQL statements for a given test case.
+    It is possible that the validation SQL statements are not immediately available after the execution of the insert statements.
+    So we need to poll for the results.
+    We poll for the results until the statement is completed or failed.
+
+    """
     print("-"*40)
     print(f"3. Run validation SQL statements for unit test {test_case.name}")
     print("-"*40)
@@ -639,7 +655,8 @@ def _execute_test_validation(test_case: SLTestCase,
                 product_name=table_ref.product_name,
                 statements=statements
             )
-            
+
+            time.sleep(2)
             # Poll for results
             result, statement_result = _poll_response(statement_name)
             if result:
@@ -705,7 +722,6 @@ def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]
     final_row= 'FAIL'
     if resp and resp.results and resp.results.data:
         # Take the last record in the list
-        logger.info(f"resp.results.data: {resp.results.data}")
         final_row = resp.results.data[len(resp.results.data) - 1].row[0]
     logger.info(f"Final Result for {statement_name}: {final_row}")
     print(f"Final Result for {statement_name}: {final_row}")

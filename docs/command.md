@@ -339,7 +339,6 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `run-unit-tests`: Run all the unit tests or a specified test...
 * `run-validation-tests`: Run only the validation tests (1 to n...
 * `validate-unit-tests`: just a synonym for run-validation-tests
-* `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
 ### `table init`
@@ -500,7 +499,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x103cfa7e0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1086bd6d0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -564,6 +563,7 @@ $ table run-validation-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
+* `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
@@ -584,25 +584,7 @@ $ table validate-unit-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
-* `--help`: Show this message and exit.
-
-### `table delete-unit-tests`
-
-Delete the Flink statements and kafka topics used for unit tests for a given table.
-
-**Usage**:
-
-```console
-$ table delete-unit-tests [OPTIONS] TABLE_NAME
-```
-
-**Arguments**:
-
-* `TABLE_NAME`: Name of the table to unit tests.  [required]
-
-**Options**:
-
+* `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
@@ -829,6 +811,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 * `--table-name TEXT`: The sink table name from where the undeploy will run.
 * `--product-name TEXT`: The product name to undeploy from
 * `--no-ack / --no-no-ack`: By default the undeploy will ask for confirmation. This flag will undeploy without confirmation.  [default: no-no-ack]
+* `--cross-product / --no-cross-product`: By default the undeployment will process tables from the same product (valid with product-name). This flag allows to undeploy tables from different products.  [default: no-cross-product]
 * `--help`: Show this message and exit.
 
 ### `pipeline prepare`

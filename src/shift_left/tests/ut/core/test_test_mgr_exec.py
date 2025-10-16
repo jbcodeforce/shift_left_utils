@@ -198,6 +198,27 @@ class TestTestManager(unittest.TestCase):
         assert results.results.data[1].row == ["PASS"]
 
 
+    @patch('shift_left.core.test_mgr._poll_response')
+    @patch('shift_left.core.test_mgr._load_sql_and_execute_statement')
+    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
+    def test_execute_all_validations(self, mock_delete_statement_if_exists, mock_load_sql_and_execute_statement, mock_poll_response):
+        """Test the execution of the validation statements for a test case."""
+        table_name = "p1_fct_order"
+        test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
+        test_case = test_suite_def.test_suite[0]
+        mock_delete_statement_if_exists.return_value = "deleted"
+        mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
+        mock_poll_response.side_effect = self._mock_poll_response
+        results = test_mgr.execute_validation_tests(table_name=table_name, 
+                                                                            test_case_name="", 
+                                                                            compute_pool_id="test_pool", 
+                                                                            run_all=True)
+
+        print(f"results: {results.model_dump_json(indent=2)}")
+        assert len(results.test_results) == 2
+        for result in results.test_results.values():
+            assert result.result == "PASS"
+
 
     # NON HAPPY PATHS
     # -------------

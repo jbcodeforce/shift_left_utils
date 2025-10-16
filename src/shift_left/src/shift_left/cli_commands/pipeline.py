@@ -291,6 +291,7 @@ def undeploy(
         table_name:  str = typer.Option(default= None, help="The sink table name from where the undeploy will run."),
         product_name: str =  typer.Option(default= None, help="The product name to undeploy from"),
         no_ack: bool = typer.Option(False, help="By default the undeploy will ask for confirmation. This flag will undeploy without confirmation."),
+        cross_product: bool = typer.Option(False, help="By default the undeployment will process tables from the same product (valid with product-name). This flag allows to undeploy tables from different products."),
         inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
@@ -308,7 +309,7 @@ def undeploy(
     elif product_name:
         product_name = product_name.lower()
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Full undeployment of all tables for product: {product_name} except shareable tables")
-        result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path)
+        result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path, cross_product)
     else:
         print(f"[red]Error: either table-name or product-name must be provided[/red]")
         raise typer.Exit(1)

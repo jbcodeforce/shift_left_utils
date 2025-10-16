@@ -38,7 +38,7 @@ def sanitize_error_message(error_msg: str) -> str:
         
         # Tokens (bearer, general tokens)
         (r'bearer\s+([a-zA-Z0-9_.-]{8,})', r'bearer ***MASKED***', re.IGNORECASE),
-        (r'token["\']?\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{8,})["\']?', r'token=***MASKED***'),
+        #(r'token["\']?\s*[=:]\s*["\']?([a-zA-Z0-9_.-]{8,})["\']?', r'token=***MASKED***'),
         
         # Authorization headers
         (r'authorization["\']?\s*[=:]\s*["\']?(bearer\s+[a-zA-Z0-9_.-]+)["\']?', r'authorization=***MASKED***', re.IGNORECASE),

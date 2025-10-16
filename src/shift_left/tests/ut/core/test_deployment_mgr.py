@@ -328,7 +328,7 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    def test_full_pipeline_undeploy(
+    def test_full_pipeline_undeploy_from_table(
         self,
         mock_assign_compute_pool_id,
         mock_get_status,
@@ -343,7 +343,7 @@ class TestDeploymentManager(BaseUT):
             print(f"mock_statement {statement_name}")
             return self._create_mock_get_statement_info(status_phase="RUNNING")
  
-        def drop_table(table_name: str, compute_pool_id: str) -> str:
+        def mock_drop_table(table_name: str, compute_pool_id: str) -> str:
             print(f"drop_table {table_name} {compute_pool_id}")
             self.count += 1 
             return "deleted"
@@ -352,7 +352,7 @@ class TestDeploymentManager(BaseUT):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_delete.return_value = "deleted"
-        mock_drop.side_effect = drop_table
+        mock_drop.side_effect = mock_drop_table
         
         # Execute
         result = dm.full_pipeline_undeploy_from_table(

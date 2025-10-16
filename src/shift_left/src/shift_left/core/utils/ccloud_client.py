@@ -203,15 +203,15 @@ class ConfluentCloudClient:
                     timer+= 10
                     print(f"Wait {statement_name} deployment, increase wait response timer to {timer} seconds")
                 if pending_counter >= 23:
-                    logger.error(f"Done waiting with response= {statement.model_dump_json(indent=3)}") 
+                    logger.error(f"Too long waiting with response= {statement.model_dump_json(indent=3)}") 
                     execution_time = time.perf_counter() - start_time
                     error_statement = Statement.model_validate({"name": statement_name, 
                                                                 "spec": statement.spec,
                                                                 "status": {"phase": "FAILED", "detail": "Done waiting with response"},
                                                                 "loop_counter": pending_counter, 
                                                                 "execution_time": execution_time, 
-                                                                "result" : None})
-                    raise Exception(f"Done waiting with response= {error_statement.model_dump_json(indent=3)}")   
+                                                                "result" : statement.result})
+                    raise Exception(f"Too long waiting with response= {error_statement.model_dump_json(indent=3)}")   
             else:
                 execution_time = time.perf_counter() - start_time
                 statement.loop_counter= pending_counter

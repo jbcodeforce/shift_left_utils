@@ -437,18 +437,18 @@ def report_running_flink_statements_for_a_product(
 
 
 def full_pipeline_undeploy_from_table(
-    sink_table_name: str, 
+    table_name: str, 
     inventory_path: str
 ) -> str:
     """
     Stop DML statement and drop tables: look at the parents of the current table 
     and remove the parent that has one running child. Delete all the children of the current table.
     """
-    logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {sink_table_name}\n" + "#"*20)
+    logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
     start_time = time.perf_counter()
-    sink_table_pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(sink_table_name, inventory_path)
+    table_pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
     config = get_config()
-    summary, execution_plan = build_deploy_pipeline_from_table(table_name=sink_table_pipeline_def.table_name,  
+    summary, execution_plan = build_deploy_pipeline_from_table(table_name=table_pipeline_def.table_name,  
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
@@ -456,7 +456,7 @@ def full_pipeline_undeploy_from_table(
                                                         force_ancestors=False,
                                                         pool_creation=False)
     config = get_config()
-    trace = f"Full pipeline delete from table {sink_table_name}\n"
+    trace = f"Full pipeline delete from table {table_name}\n"
     print(f"{trace}")
     for node in reversed(execution_plan.nodes):
         if node.to_restart: # remove only the tables that was marked as to restart to avoid stopping ancestors
@@ -465,10 +465,10 @@ def full_pipeline_undeploy_from_table(
             trace+=f"Dropped table {node.table_name} with result: {rep}\n"
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropped table {node.table_name}")
     execution_time = int(time.perf_counter() - start_time)
-    logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {sink_table_name}")
+    logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
     return trace
 
-def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, compute_pool_id: str = None) -> str:
+def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, compute_pool_id: str = None, cross_product: bool = False) -> str:
     """
     To undeploy we need to build an integrated execution plan for all the tables in the product.
     Undeploy in the reverse order of the execution plan, but keep table that have other product(s) as children

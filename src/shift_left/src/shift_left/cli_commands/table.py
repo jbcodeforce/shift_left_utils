@@ -200,13 +200,14 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
 @app.command()
 def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                run_all: bool = typer.Option(False, "--run-all", help="With this flag, and not test case name provided, it will run all the validation sqls."),
                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
     Run only the validation tests (1 to n validation tests) for a given table.
     """
     logger.info(f"Run valdiation test for {table_name} test: {test_case_name} - {compute_pool_id}")
    
-    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id)
+    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id, run_all)
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
     with open(file_name, "w") as f:
         f.write(test_suite_result.model_dump_json(indent=2))
@@ -217,22 +218,13 @@ def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name o
 @app.command()
 def validate_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
+                run_all: bool = typer.Option(False, "--run-all", help="With this flag, and not test case name provided, it will run all the validation sqls."),
                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
     """
     just a synonym for run-validation-tests
     """
-    run_validation_tests(table_name, test_case_name, compute_pool_id=compute_pool_id)
-    
-@app.command()
-def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
-                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
-    """
-    Delete the Flink statements and kafka topics used for unit tests for a given table.
-    """
-    print("#" * 30 + f" Unit tests deletion for {table_name}")
-    test_mgr.delete_test_artifacts(table_name, compute_pool_id)
-    print("#" * 30 + f" Unit tests deletion for {table_name} completed")
-
+    run_validation_tests(table_name, test_case_name, run_all, compute_pool_id=compute_pool_id)
+   
 @app.command()
 def explain(table_name: str=  typer.Option(None,help= "Name of the table to get Flink execution plan explanations from."),
             product_name: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),

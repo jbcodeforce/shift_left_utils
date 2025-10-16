@@ -15,6 +15,7 @@ from .error_sanitizer import sanitize_error_message
 _config: dict[str, dict[str,str]] = {}
 
 BASE_CC_API = "api.confluent.cloud/org/v2"
+__version__ = "0.1.42"
 
 # Environment variable mapping for sensitive values
 ENV_VAR_MAPPING = {
@@ -61,6 +62,7 @@ def get_missing_env_vars(config: Dict[str, Any]) -> set[str]:
     Returns:
         List of missing environment variable names
     """
+    logger.info(f"version {__version__}")
     missing_env_vars = set()
     
     for config_path, env_var_name in ENV_VAR_MAPPING.items():
@@ -80,7 +82,7 @@ def print_env_var_help():
     """
     Print helpful information about supported environment variables.
     """
-    print("\n" + "="*80)
+    print("\n" + "="*80 + f" version {__version__}")
     print("SHIFT_LEFT ENVIRONMENT VARIABLES")
     print("="*80)
     print("You can set the following environment variables to provide API keys and secrets")

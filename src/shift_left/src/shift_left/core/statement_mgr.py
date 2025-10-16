@@ -120,7 +120,7 @@ def post_flink_statement(compute_pool_id: str,
             start_time = time.perf_counter()
             auth_header = client._get_flink_auth()
             response = client.make_request(method="POST", url=f"{url}/statements", data=statement_data, auth_header=auth_header)
-            logger.debug(f"> POST response= {response}")
+            logger.info(f"> POST response= {response}")
             if isinstance(response, dict):
                 if response.get('errors'):
                     logger.error(f"Error executing rest call: {response['errors']}")
@@ -170,12 +170,22 @@ def get_statement_results(statement_name: str)-> StatementResult:
         client = ConfluentCloudClient(get_config())
         url, auth_header = client.build_flink_url_and_auth_header() 
         try:
-            resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
-            logger.info(resp)
-
-            if resp["metadata"]["next"]:
-                resp=client.make_request(method="GET", url=resp["metadata"]["next"], auth_header=auth_header)
-                logger.debug(f"After next called: {resp}")
+            next_page_token = None
+            previous_step = None
+            while True:
+                if next_page_token and previous_step != next_page_token:
+                    logger.info(f"Get next page token: {next_page_token} for {statement_name}")  
+                    resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
+                else:
+                    logger.info(f"Get results from {url}/statements/{statement_name}/results")  
+                    resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
+                logger.info(f"response: {resp} same tokens: {previous_step == next_page_token}")
+                if (resp and "metadata" in resp and "next" in resp["metadata"] and resp["metadata"]["next"]):
+                    previous_step = next_page_token
+                    next_page_token = resp["metadata"]["next"]
+                else:
+                    logger.info(f"Data received for {statement_name}: data: {resp.get("results").get("data")}")
+                    break
             return StatementResult(**resp)
         except Exception as e:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
@@ -202,7 +212,7 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 try:
                     with open(STATEMENT_LIST_FILE, "r") as f:
                         _statement_list_cache = StatementListCache.model_validate(json.load(f))
-                    if _statement_list_cache.created_at and (datetime.now() - datetime.strptime(_statement_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
+                    if _statement_list_cache.created_at and (datetime.now() - datetime.strptime(str(_statement_list_cache.created_at), "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
                         reload = False
                 except Exception as e:
                     logger.warning(f"Loading statement list cache file failed: {e} -> delete the cache file")
