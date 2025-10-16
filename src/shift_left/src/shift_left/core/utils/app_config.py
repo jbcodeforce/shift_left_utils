@@ -15,7 +15,7 @@ from .error_sanitizer import sanitize_error_message
 _config: dict[str, dict[str,str]] = {}
 
 BASE_CC_API = "api.confluent.cloud/org/v2"
-__version__ = "0.1.42"
+__version__ = "0.1.43"
 
 # Environment variable mapping for sensitive values
 ENV_VAR_MAPPING = {
