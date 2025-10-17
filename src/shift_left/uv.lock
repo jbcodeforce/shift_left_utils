@@ -1059,7 +1059,7 @@ wheels = [
 
 [[package]]
 name = "shift-left"
-version = "0.1.42"
+version = "0.1.43"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
