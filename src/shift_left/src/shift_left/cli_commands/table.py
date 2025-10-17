@@ -224,7 +224,17 @@ def validate_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of
     just a synonym for run-validation-tests
     """
     run_validation_tests(table_name, test_case_name, run_all, compute_pool_id=compute_pool_id)
-   
+
+@app.command()
+def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
+                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+    """
+    Delete the Flink statements and kafka topics used for unit tests for a given table.
+    """
+    print("#" * 30 + f" Unit tests deletion for {table_name}")
+    test_mgr.delete_test_artifacts(table_name, compute_pool_id)
+    print("#" * 30 + f" Unit tests deletion for {table_name} completed")
+    
 @app.command()
 def explain(table_name: str=  typer.Option(None,help= "Name of the table to get Flink execution plan explanations from."),
             product_name: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),

@@ -339,6 +339,7 @@ $ table [OPTIONS] COMMAND [ARGS]...
 * `run-unit-tests`: Run all the unit tests or a specified test...
 * `run-validation-tests`: Run only the validation tests (1 to n...
 * `validate-unit-tests`: just a synonym for run-validation-tests
+* `delete-unit-tests`: Delete the Flink statements and kafka...
 * `explain`: Get the Flink execution plan explanations...
 
 ### `table init`
@@ -499,7 +500,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1086bd6d0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1239be3c0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -585,6 +586,25 @@ $ table validate-unit-tests [OPTIONS] TABLE_NAME
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--help`: Show this message and exit.
+
+### `table delete-unit-tests`
+
+Delete the Flink statements and kafka topics used for unit tests for a given table.
+
+**Usage**:
+
+```console
+$ table delete-unit-tests [OPTIONS] TABLE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Name of the table to unit tests.  [required]
+
+**Options**:
+
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
 * `--help`: Show this message and exit.
 
@@ -782,7 +802,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -804,7 +824,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
