@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "shift-left-tools": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "shift_left_mcp"
+      ],
+      "cwd": "/Users/jerome/Documents/Code/shift_left_utils/src/shift_left",
+      "env": {
+        "PIPELINES": "${env:PIPELINES}",
+        "CONFIG_FILE": "${env:CONFIG_FILE}",
+        "STAGING": "${env:STAGING}"
+      }
+    }
+  }
+}
+
