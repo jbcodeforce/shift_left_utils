@@ -500,7 +500,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1239be3c0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x7ffa9605c1d0&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -545,6 +545,7 @@ $ table run-unit-tests [OPTIONS] TABLE_NAME
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: By default run insert sqls and foundations, with this flag it will also run validation sql too.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--post-fix-unit-test TEXT`: Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.
 * `--help`: Show this message and exit.
 
 ### `table run-validation-tests`
@@ -566,6 +567,7 @@ $ table run-validation-tests [OPTIONS] TABLE_NAME
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
 * `--help`: Show this message and exit.
 
 ### `table validate-unit-tests`
@@ -587,6 +589,7 @@ $ table validate-unit-tests [OPTIONS] TABLE_NAME
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
 * `--help`: Show this message and exit.
 
 ### `table delete-unit-tests`
@@ -606,6 +609,7 @@ $ table delete-unit-tests [OPTIONS] TABLE_NAME
 **Options**:
 
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
 * `--help`: Show this message and exit.
 
 ### `table explain`
@@ -645,6 +649,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `delete-all-metadata`: Delete all pipeline definition json files...
 * `build-all-metadata`: Go to the hierarchy of folders for...
 * `report`: Generate a report showing the static...
+* `healthcheck`: Generate a healthcheck report of a given...
 * `deploy`: Deploy a pipeline from a given table name...
 * `build-execution-plan`: From a given table, this command goes all...
 * `report-running-statements`: Assess for a given table, what are the...
@@ -732,6 +737,25 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--output-file-name TEXT`: Output file name to save the report.
 * `--help`: Show this message and exit.
 
+### `pipeline healthcheck`
+
+Generate a healthcheck report of a given product pipeline
+
+**Usage**:
+
+```console
+$ pipeline healthcheck [OPTIONS] PRODUCT_NAME INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `PRODUCT_NAME`: The product name. e.g. qx, aqem, mx. The name has to exist in inventory as a key.  [required]
+* `INVENTORY_PATH`: Pipeline path, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ### `pipeline deploy`
 
 Deploy a pipeline from a given table name , product name or a directory.
@@ -802,7 +826,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /home/ubuntu/customer/mastercontrol/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -824,7 +848,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /home/ubuntu/customer/mastercontrol/data-platform-flink/pipelines]
 
 **Options**:
 
