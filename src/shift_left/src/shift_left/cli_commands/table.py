@@ -177,18 +177,26 @@ def init_unit_tests(
 def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
                 run_all: bool = typer.Option(False, "--run-all", help="By default run insert sqls and foundations, with this flag it will also run validation sql too."),
-                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."), 
+                post_fix_unit_test: str = typer.Option(default=None, help="Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.")):
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
     """
     if not compute_pool_id:
         compute_pool_id = get_config().get('flink').get('compute_pool_id')
+    if post_fix_unit_test:
+        pfut = post_fix_unit_test.lstrip('_')
+        if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
+            print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
+            raise typer.Exit(1)
+
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get('flink').get('database_name')}")
-    logger.info(f"Unit tests execution for {table_name} test: {test_case_name} - {compute_pool_id} Cluster name: {get_config().get('flink').get('database_name')}")
+    logger.info(f"Unit tests execution for {table_name} test: {test_case_name} - {compute_pool_id} Cluster name: {get_config().get('flink').get('database_name')} post_fix_unit_test: {post_fix_unit_test}")
     test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name, 
                                                 test_case_name=test_case_name, 
                                                 compute_pool_id=compute_pool_id,
+                                                post_fix_unit_test=post_fix_unit_test,
                                                 run_validation=run_all)
 
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
@@ -201,13 +209,20 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
 def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
                 run_all: bool = typer.Option(False, "--run-all", help="With this flag, and not test case name provided, it will run all the validation sqls."),
-                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
+                post_fix_unit_test: str = typer.Option(default=None, help="By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.")):
     """
     Run only the validation tests (1 to n validation tests) for a given table.
     """
     logger.info(f"Run valdiation test for {table_name} test: {test_case_name} - {compute_pool_id}")
-   
-    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id, run_all)
+
+    if post_fix_unit_test:
+        pfut = post_fix_unit_test.lstrip('_')
+        if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
+            print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
+            raise typer.Exit(1)
+
+    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id, post_fix_unit_test, run_all)
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
     with open(file_name, "w") as f:
         f.write(test_suite_result.model_dump_json(indent=2))
@@ -219,20 +234,35 @@ def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name o
 def validate_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
                 run_all: bool = typer.Option(False, "--run-all", help="With this flag, and not test case name provided, it will run all the validation sqls."),
-                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
+                post_fix_unit_test: str = typer.Option(default=None, help="By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.")):
     """
     just a synonym for run-validation-tests
     """
-    run_validation_tests(table_name, test_case_name, run_all, compute_pool_id=compute_pool_id)
+
+    if post_fix_unit_test:
+        pfut = post_fix_unit_test.lstrip('_')
+        if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
+            print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
+            raise typer.Exit(1)
+
+    run_validation_tests(table_name, test_case_name, run_all, compute_pool_id=compute_pool_id, post_fix_unit_test=post_fix_unit_test)
 
 @app.command()
 def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
-                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one.")):
+                 compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
+                post_fix_unit_test: str = typer.Option(default=None, help="By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.")):
     """
     Delete the Flink statements and kafka topics used for unit tests for a given table.
     """
+    if post_fix_unit_test:
+        pfut = post_fix_unit_test.lstrip('_')
+        if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
+            print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
+            raise typer.Exit(1)
+            
     print("#" * 30 + f" Unit tests deletion for {table_name}")
-    test_mgr.delete_test_artifacts(table_name, compute_pool_id)
+    test_mgr.delete_test_artifacts(table_name, compute_pool_id, post_fix_unit_test)
     print("#" * 30 + f" Unit tests deletion for {table_name} completed")
     
 @app.command()

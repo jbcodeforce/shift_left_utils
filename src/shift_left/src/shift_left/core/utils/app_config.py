@@ -238,6 +238,12 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
       if config["app"].get("logging"):
         if config["app"]["logging"] not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
           errors.append("Configuration app.logging must be a valid log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+
+      if config["app"].get("post_fix_unit_test"):
+        pfut = config["app"]["post_fix_unit_test"].lstrip('_')
+        if not config["app"]["post_fix_unit_test"].startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
+          errors.append("post_fix_unit_test must start with _, be 2 or 3 characters and be alpha numeric")
+
   
   # Check for placeholder values that need to be filled
   placeholders = ["<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"]

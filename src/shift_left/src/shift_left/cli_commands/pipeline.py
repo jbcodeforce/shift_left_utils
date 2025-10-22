@@ -3,6 +3,8 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 import time
+from datetime import datetime, timezone
+import json
 import networkx as nx
 from pydantic_yaml import to_yaml_str
 import typer
@@ -12,12 +14,16 @@ from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
 from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.file_search import get_or_build_inventory, get_ddl_dml_names_from_pipe_def
 from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
+import shift_left.core.statement_mgr as statement_mgr
+import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.integration_test_mgr as integration_mgr
 from shift_left.core.compute_pool_usage_analyzer import ComputePoolUsageAnalyzer
+from shift_left.core.utils.app_config import logger
 
 
 """
@@ -160,6 +166,211 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console.print(tree)
     console.print(f"\n[bold]table names only:[/bold]")
     console.print(summary)
+
+@app.command()
+def healthcheck(product_name: Annotated[str, typer.Argument(help="The product name. e.g. qx, aqem, mx. The name has to exist in inventory as a key.")],
+          inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],):
+    """
+    Generate a healthcheck report of a given product pipeline
+    """
+    product_name = product_name.lower()
+    console = Console()
+    print(f"Generating pipeline healthcheck for product {product_name}")
+    try:
+        # get all the views, facts, dimension tables for a given product and build the pipeline hierarchy
+        # This approach covers all the intermediates & sources and tables cross products.
+        inventory = get_or_build_inventory(inventory_path, inventory_path, False)
+        sink_tables = {
+            k: v
+            for k, v in inventory.items()
+            if v.get('product_name') == product_name and v.get('type') in ('view','dimension','fact')
+        }
+        logger.info(f"Inventory for product {product_name}: {json.dumps(sink_tables, indent=2)}")
+
+        # get all statements created time & status
+        #statement_list={}
+        statement_list = statement_mgr.get_statement_list().copy()
+        statement_info = {}
+        for statement_name in statement_list:
+            statement = statement_list[statement_name]
+            statement_info[statement.name] = {
+                'created_at': statement.created_at,
+                'status_phase': statement.status_phase,
+                'compute_pool_id': statement.compute_pool_id,
+                'compute_pool_name': statement.compute_pool_name    #-- TODO: why is this None for all statements?
+            }
+        logger.info(f"Statement Info: {statement_info}")
+
+        # get all compute pools CFU information
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+
+        class PipelineHealthChecker:
+            def __init__(self, statement_info):
+                self.statement_info = statement_info
+                self.summary = {}
+
+            def healthcheck_tree(self, child_table, node_data, tree_node):
+
+                if node_data.parents:
+                    for parent in node_data.parents:
+                        c_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(child_table, inventory_path)
+                        c_ddl_n, c_dml_n = get_ddl_dml_names_from_pipe_def(c_pipeline_def)
+                        p_ddl_n, p_dml_n = get_ddl_dml_names_from_pipe_def(parent)
+                        product_name = c_pipeline_def.product_name
+                        if c_dml_n in statement_info:
+                            status_phase = statement_info[c_dml_n]['status_phase']
+                            compute_pool_id = statement_info[c_dml_n]['compute_pool_id']
+                            #compute_pool_name = statement_info[c_dml_n]['compute_pool_name']
+                        else:
+                            status_phase = 'UNKNOWN'
+                            compute_pool_id = 'UNKNOWN'
+
+                        # Initialize the status counters for the product
+                        if product_name not in self.summary:
+                            self.summary[product_name] = {}
+                            self.summary[product_name]["OUT_OF_ORDER"] = {}
+                            self.summary[product_name]["POOLS"] = []
+
+                        if compute_pool_id not in self.summary[product_name]["POOLS"]:
+                            self.summary[product_name]["POOLS"].append(compute_pool_id)
+                        if status_phase not in self.summary[product_name]:
+                            self.summary[product_name][status_phase] = {}
+                        if child_table not in self.summary[product_name][status_phase]:
+                            self.summary[product_name][status_phase][child_table] = 1
+                        if statement_info[c_dml_n]['created_at'] < statement_info[p_dml_n]['created_at']:
+                            if not parent.table_name in self.summary[product_name]["OUT_OF_ORDER"]:
+                                self.summary[product_name]["OUT_OF_ORDER"][parent.table_name] = f"child [ {c_dml_n} ] created at [ {statement_info[c_dml_n]['created_at']} ] < parent [ {p_dml_n} ] created at [ {statement_info[p_dml_n]['created_at']} ]"
+                        parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
+                        parent_node.add(f"[dim]Type: {parent.type}[/dim]")
+                        parent_node.add(f"[dim]Product: {parent.product_name}[/dim]")
+                        child=parent
+                        # Recursive call
+                        self.healthcheck_tree(child.table_name, parent, parent_node)
+                else:
+                    # this is the case of a table with no parents, so it is a source table
+                    s_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(node_data.table_name, inventory_path)
+                    s_ddl_n, s_dml_n = get_ddl_dml_names_from_pipe_def(s_pipeline_def)
+                    product_name = s_pipeline_def.product_name
+                    if s_dml_n in statement_info:
+                        status_phase = statement_info[s_dml_n]['status_phase']
+                        compute_pool_id = statement_info[s_dml_n]['compute_pool_id']
+                    else:
+                        status_phase = 'UNKNOWN'
+                        compute_pool_id = 'UNKNOWN'
+
+                    if product_name not in self.summary:
+                        self.summary[product_name] = {}
+                        self.summary[product_name]["OUT_OF_ORDER"] = {}
+                        self.summary[product_name]["POOLS"] = []
+
+                    if compute_pool_id not in self.summary[product_name]["POOLS"]:
+                        self.summary[product_name]["POOLS"].append(compute_pool_id)
+                    if status_phase not in self.summary[product_name]:
+                        self.summary[product_name][status_phase] = {}
+                    if not node_data.table_name in self.summary[product_name][status_phase]:
+                        self.summary[product_name][status_phase][node_data.table_name] = 1
+                return self.summary
+
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Generating Health Report for {product_name.upper()} ...")
+        health_report = {}
+        checker = PipelineHealthChecker(statement_info)
+
+        for table_name, _ in sink_tables.items():
+            #This tree gives all parents including the parents that are reapeated for multiple children.
+            pipeline_report=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path)
+            #This tree gives all parents of a table without the repeated ones
+            #pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
+            if pipeline_report is None:
+                print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
+                raise typer.Exit(1)
+            else:
+                # Create a rich tree for visualization for debugging purposes
+                tree = Tree(f"[bold blue]{table_name}[/bold blue]")
+                health_report = checker.healthcheck_tree( table_name, pipeline_report, tree)
+
+        logger.info(f"Tree: {tree}")
+        logger.info(f"Health Report: {json.dumps(health_report, indent=2)}")
+
+        header = f"{product_name.upper()} Health Report"
+        console.print(f"\n[bold]{header.center(80, '-')}[/bold]")
+        #---- Statement Health Report ----
+        console.print(f"[bold]{'Statements'.center(80, '-')}[/bold]")
+        console.print(f"[bold]Product | RUNNING | PENDING | DEGRADED | STOPPED | FAILED | OUT-OF-ORDER[/bold]")
+        console.print(f"[bold]{'-'*80}[/bold]")
+        running = pending = degraded = stopped = failed = out_of_order = 0
+        t_running = t_pending = t_degraded = t_stopped = t_failed = t_out_of_order = 0
+        for product_name in health_report:
+            if "RUNNING" in health_report[product_name]:
+                running = len(health_report[product_name]["RUNNING"])
+                t_running += running
+            if "PENDING" in health_report[product_name]:
+                pending = len(health_report[product_name]["PENDING"])
+                t_pending += pending
+            if "DEGRADED" in health_report[product_name]:
+                degraded = len(health_report[product_name]["DEGRADED"])
+                t_degraded += degraded
+            if "STOPPED" in health_report[product_name]:
+                stopped = len(health_report[product_name]["STOPPED"])
+                t_stopped += stopped
+            if "FAILED" in health_report[product_name]:
+                failed = len(health_report[product_name]["FAILED"])
+                t_failed += failed
+            if "OUT_OF_ORDER" in health_report[product_name]:
+                out_of_order = len(health_report[product_name]["OUT_OF_ORDER"])
+                t_out_of_order += out_of_order
+            total = running + degraded + stopped + failed
+            console.print(f"{product_name:<7} | {running:>7}   {pending:>7}   {degraded:>8}   {stopped:>7}   {failed:>6} | {out_of_order:>12}")
+        console.print(f"[bold]{'-'*80}[/bold]")
+        console.print(f"{'Total':<7} | {t_running:>7}   {t_pending:>7}   {t_degraded:>8}   {t_stopped:>7}   {t_failed:>6} | {t_out_of_order:>12}\n")
+        #---- statements out-of-order report ----
+        if t_out_of_order > 0:
+            console.print(f"[bold]{'Statements Out-Of-Order'.center(80, '-')}[/bold]")
+            for table_name in health_report[product_name]["OUT_OF_ORDER"]:
+                console.print(f"[red]{table_name}: {health_report[product_name]["OUT_OF_ORDER"][table_name]}[/red]")
+            console.print(f"[bold]{'-'*80}[/bold]")
+        #---- Compute Poool Health Report ----
+        # Get all compute pools CFU information in dictionary format
+        pool_info={}
+        for pool in compute_pool_list.pools:
+            if pool.id not in pool_info:
+                pool_info[pool.id]={}
+            pool_info[pool.id]["name"] = pool.name
+            pool_info[pool.id]["current_cfu"] = pool.current_cfu
+            pool_info[pool.id]["max_cfu"] = pool.max_cfu
+
+        console.print(f"[bold]{'Compute Pools'.center(80, '-')}[/bold]")
+        console.print(f"[bold]Product | #Pools | #CFUs | #Pools>1CFU | Max CFU ( pool )[/bold]")
+        console.print(f"[bold]{'-'*80}[/bold]")
+        t_cfus = t_pools = t_plus1pools = t_max_cfu = 0
+        t_max_cfu_pool = None
+        for product_name in health_report:
+            num_pools = num_cfus = plus1pools = max_cfu = 0
+            max_cfu_pool = None
+            if "POOLS" in health_report[product_name]:
+                unique_pool_ids = list(set(health_report[product_name]["POOLS"]))
+                num_pools = len(unique_pool_ids)
+                t_pools += num_pools
+                for pool_id in unique_pool_ids:
+                    if pool_id in pool_info:
+                        num_cfus += pool_info[pool_id]["current_cfu"]
+                        if pool_info[pool_id]["current_cfu"] > 1:
+                            plus1pools += 1
+                        if pool_info[pool_id]["current_cfu"] > max_cfu:
+                            max_cfu = pool_info[pool_id]["current_cfu"]
+                            max_cfu_pool = pool_id
+                t_cfus += num_cfus
+                t_plus1pools += plus1pools
+                if max_cfu > t_max_cfu:
+                    t_max_cfu = max_cfu
+                    t_max_cfu_pool = max_cfu_pool
+                console.print(f"{product_name:<7} | {num_pools:>6}   {num_cfus:>5}   {plus1pools:>11}   {f'{max_cfu} ({max_cfu_pool})':>15}")
+        console.print(f"[bold]{'-'*80}[/bold]")
+        console.print(f"{'Total':<7} | {t_pools:>6}   {t_cfus:>5}   {t_plus1pools:>11}   {f'{t_max_cfu} ({t_max_cfu_pool})':>15}\n")
+
+    except Exception as e:
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
+        raise typer.Exit(1)
 
 @app.command()
 def deploy(
