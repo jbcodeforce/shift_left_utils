@@ -189,6 +189,7 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
         if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
             print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
             raise typer.Exit(1)
+        test_mgr.CONFIGURED_POST_FIX_UNIT_TEST=post_fix_unit_test
 
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get('flink').get('database_name')}")
@@ -196,7 +197,6 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name, 
                                                 test_case_name=test_case_name, 
                                                 compute_pool_id=compute_pool_id,
-                                                post_fix_unit_test=post_fix_unit_test,
                                                 run_validation=run_all)
 
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
@@ -221,8 +221,9 @@ def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name o
         if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
             print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
             raise typer.Exit(1)
+        test_mgr.CONFIGURED_POST_FIX_UNIT_TEST=post_fix_unit_test
 
-    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id, post_fix_unit_test, run_all)
+    test_suite_result = test_mgr.execute_validation_tests(table_name, test_case_name, compute_pool_id, run_all)
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
     with open(file_name, "w") as f:
         f.write(test_suite_result.model_dump_json(indent=2))
@@ -260,9 +261,10 @@ def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of t
         if not post_fix_unit_test.startswith("_") or not (2<= len(pfut) <= 3) or not pfut.isalnum():
             print(f"[red]Error: post-fix-unit-test must start with _, be 2 or 3 characters and be alpha numeric[/red]")
             raise typer.Exit(1)
-            
+        test_mgr.CONFIGURED_POST_FIX_UNIT_TEST=post_fix_unit_test
+
     print("#" * 30 + f" Unit tests deletion for {table_name}")
-    test_mgr.delete_test_artifacts(table_name, compute_pool_id, post_fix_unit_test)
+    test_mgr.delete_test_artifacts(table_name, compute_pool_id)
     print("#" * 30 + f" Unit tests deletion for {table_name} completed")
     
 @app.command()
