@@ -500,7 +500,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x7ffa9605c1d0&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1080a5d60&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -826,7 +826,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /home/ubuntu/customer/mastercontrol/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -848,7 +848,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /home/ubuntu/customer/mastercontrol/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
