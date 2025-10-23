@@ -1,6 +1,10 @@
 # CHANGELOG
 
 <!-- version list -->
+### v0.1.44
+* Support post_fix to run and validate unit tests so they can be run in parallel with CI/CD workflow. New arguments to the unit test function
+* Add new command for creating a healthcheck report of a given product pipeline.
+
 ### v0.1.43
 * fix processing statement result for unit test, by changing the scan.bounded.mode to latest-offset, so validation scripts will complete, and the results will be bounded
 * Add a run-all flag for running validation script:  `table validate-unit-tests <table_name> --run-all ` so all the validation SQLs will be executed.
