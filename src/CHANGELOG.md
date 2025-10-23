@@ -1,3 +1,12 @@
+## [0.1.44] - 2025-10-22
+
+### Changes:
+- 63a3f46 post_fix parm for GHA, New feature healthcheck
+- ec862ad post_fix parm for GHA, New feature healthcheck
+- f918ae9 Merge pull request #68 from jbcodeforce/postfix_N_healthcheck
+- c8f3348 post_fix parm for GHA, New feature healthcheck
+- 5208606 Merge pull request #69 from jbcodeforce/postfix_N_healthcheck2
+
 ## [0.1.43] - 2025-10-16
 
 ### Changes:

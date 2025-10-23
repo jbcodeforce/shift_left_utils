@@ -16,12 +16,12 @@
    },
    "parents": [
       {
-         "table_name": "src_table_1",
-         "product_name": "common",
+         "table_name": "src_p1_table_3",
+         "product_name": "p1",
          "type": "source",
-         "dml_ref": "pipelines/sources/common/src_table_1/sql-scripts/dml.src_table_1.sql",
-         "ddl_ref": "pipelines/sources/common/src_table_1/sql-scripts/ddl.src_table_1.sql",
-         "path": "pipelines/sources/common/src_table_1",
+         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
+         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
+         "path": "pipelines/sources/p1/src_table_3",
          "complexity": {
             "number_of_regular_joins": 0,
             "number_of_left_joins": 0,
@@ -29,7 +29,7 @@
             "number_of_inner_joins": 0,
             "number_of_outer_joins": 0,
             "complexity_type": "Simple",
-            "state_form": "Stateful"
+            "state_form": "Stateless"
          },
          "parents": [],
          "children": [
@@ -55,12 +55,12 @@
          ]
       },
       {
-         "table_name": "src_p1_table_3",
-         "product_name": "p1",
+         "table_name": "src_table_1",
+         "product_name": "common",
          "type": "source",
-         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
-         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
-         "path": "pipelines/sources/p1/src_table_3",
+         "dml_ref": "pipelines/sources/common/src_table_1/sql-scripts/dml.src_table_1.sql",
+         "ddl_ref": "pipelines/sources/common/src_table_1/sql-scripts/ddl.src_table_1.sql",
+         "path": "pipelines/sources/common/src_table_1",
          "complexity": {
             "number_of_regular_joins": 0,
             "number_of_left_joins": 0,
@@ -68,7 +68,7 @@
             "number_of_inner_joins": 0,
             "number_of_outer_joins": 0,
             "complexity_type": "Simple",
-            "state_form": "Stateless"
+            "state_form": "Stateful"
          },
          "parents": [],
          "children": [

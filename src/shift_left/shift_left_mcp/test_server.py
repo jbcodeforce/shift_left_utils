@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
+
 """
 Test script for shift_left MCP server
 Validates that the MCP server can list and execute tools correctly
 """
 import asyncio
-from .server import handle_list_tools, handle_call_tool
-from .command_builder import build_command
+from shift_left_mcp.server import handle_list_tools, handle_call_tool
+from shift_left_mcp.command_builder import build_command
 
 
 async def test_list_tools():
@@ -113,7 +113,7 @@ async def main():
         print("=" * 60)
         print(f"\nThe MCP server is working correctly with {len(tools)} available tools.")
         print("\nNext steps:")
-        print("1. Configure Cursor (see docs/mcp/CURSOR_SETUP.md)")
+        print("1. Configure Cursor (see docs/mcp/index.md)")
         print("2. Restart Cursor")
         print("3. Start using shift_left tools in Cursor!\n")
         

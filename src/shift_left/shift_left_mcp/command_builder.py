@@ -31,6 +31,7 @@ def build_command(tool_name: str, arguments: dict) -> list[str]:
         "shift_left_table_migrate": ["shift_left", "table", "migrate"],
         "shift_left_table_init_unit_tests": ["shift_left", "table", "init-unit-tests"],
         "shift_left_table_run_unit_tests": ["shift_left", "table", "run-unit-tests"],
+        "shift_left_table_validate_unit_tests": ["shift_left", "table", "validate-unit-tests"],
         "shift_left_table_delete_unit_tests": ["shift_left", "table", "delete-unit-tests"],
         "shift_left_pipeline_deploy": ["shift_left", "pipeline", "deploy"],
         "shift_left_pipeline_build_metadata": ["shift_left", "pipeline", "build-metadata"],
@@ -80,8 +81,8 @@ def build_command(tool_name: str, arguments: dict) -> list[str]:
         if arguments.get("recursive"):
             cmd.append("--recursive")
     
-    elif tool_name in ["shift_left_table_init_unit_tests", "shift_left_table_run_unit_tests", "shift_left_table_delete_unit_tests"]:
-        cmd.append(arguments["table_name"])
+    elif tool_name in ["shift_left_table_init_unit_tests", "shift_left_table_run_unit_tests", "shift_left_validate_unit_tests","shift_left_table_delete_unit_tests"]:
+        cmd.append(arguments["table_name","testc_case_name"])
     
     elif tool_name == "shift_left_pipeline_deploy":
         cmd.append(arguments["inventory_path"])

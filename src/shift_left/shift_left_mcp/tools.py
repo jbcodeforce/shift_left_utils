@@ -245,6 +245,24 @@ TOOLS = [
             "required": ["table_name"]
         }
     },
+       {
+        "name": "shift_left_table_validate_unit_tests",
+        "description": "Run the Validation querie of the given table and a test case name.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Name of the table to run unit tests for"
+                },
+                "test_case_name": {
+                    "type": "string",
+                    "description": "Name of the test case to validate unit tests for"
+                }
+            },
+            "required": ["table_name"]
+        }
+    },
     {
         "name": "shift_left_table_delete_unit_tests",
         "description": "Remove/undeploy the unit test artifacts on Confluent Cloud.",

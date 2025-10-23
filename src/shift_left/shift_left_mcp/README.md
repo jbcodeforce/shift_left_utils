@@ -38,7 +38,7 @@ uv run python -m shift_left_mcp.test_server
 
 ## Usage in Cursor
 
-Once configured (see [docs/mcp/CURSOR_SETUP.md](../../../../docs/mcp/CURSOR_SETUP.md)), the server runs automatically when Cursor needs to execute shift_left commands.
+Once configured (see [docs/mcp/index.md](../../../../docs/mcp/index.md)), the server runs automatically when Cursor needs to execute shift_left commands.
 
 ## Architecture
 
@@ -141,16 +141,6 @@ All errors are returned as text content to the AI assistant.
 
 - Commands run with the user's permissions
 - No privilege escalation
-- Respects shift_left's security model
-- Inherits credential management from shift_left
-
-## Performance
-
-- Lightweight server process
-- Minimal memory footprint
-- Fast command execution
-- Efficient subprocess handling
-- 5-minute timeout for long-running operations
 
 ## Version
 
