@@ -32,7 +32,8 @@ from shift_left.core.utils.file_search import (
     get_or_build_inventory,
     get_table_type_from_file_path,
     create_folder_if_not_exist,
-    read_pipeline_definition_from_file
+    read_pipeline_definition_from_file,
+    get_ddl_dml_names_from_pipe_def
 )
 
 
@@ -56,6 +57,88 @@ class PipelineReport(BaseModel):
     parents: Optional[Set[Any]] = Field(default=set(),   description="parents of this flink dml")
     children: Optional[Set[Any]] = Field(default=set(),  description="users of the table created by this flink dml")
 
+class PipelineStatusTree:
+    """
+    Class to provide the status of each statement in a pipeline given the child table.
+    """
+    def __init__(self, statement_info: Dict[str, Dict[str, Any]], inventory_path: str):
+        self.statement_info = statement_info
+        self.inventory_path = inventory_path
+        self.summary = {}
+
+    def pipeline_status(self, child_table, node_data, tree_node):
+
+        logger.info(f"child_table: {child_table}")
+        if node_data.parents:
+            for parent in node_data.parents:
+                logger.info(f"Parent: {parent.table_name}")
+                c_pipeline_def = get_pipeline_definition_for_table(child_table, self.inventory_path)
+                c_ddl_n, c_dml_n = get_ddl_dml_names_from_pipe_def(c_pipeline_def)
+                p_ddl_n, p_dml_n = get_ddl_dml_names_from_pipe_def(parent)
+                product_name = c_pipeline_def.product_name
+                if c_dml_n in self.statement_info:
+                    status_phase = self.statement_info[c_dml_n]['status_phase']
+                    compute_pool_id = self.statement_info[c_dml_n]['compute_pool_id']
+                    #compute_pool_name = self.statement_info[c_dml_n]['compute_pool_name']
+                else:
+                    status_phase = 'UNKNOWN'
+                    compute_pool_id = None
+
+                # Initialize the status counters for the product
+                logger.info(f"Product: {product_name}")
+                if product_name not in self.summary:
+                    self.summary[product_name] = {}
+                    self.summary[product_name]["OUT_OF_ORDER"] = {}
+                    self.summary[product_name]["POOLS"] = []
+
+                logger.info(f"compute_pool_id: {compute_pool_id} status_phase: {status_phase}")
+                if compute_pool_id and compute_pool_id not in self.summary[product_name]["POOLS"]:
+                    self.summary[product_name]["POOLS"].append(compute_pool_id)
+                if status_phase not in self.summary[product_name]:
+                    self.summary[product_name][status_phase] = {}
+                #if child_table not in self.summary[product_name][status_phase]:
+                #    self.summary[product_name][status_phase][child_table] = 1
+                if c_dml_n not in self.summary[product_name][status_phase]:
+                    self.summary[product_name][status_phase][c_dml_n] = 1
+                if  c_dml_n in self.statement_info and p_dml_n in self.statement_info:   #-- Not RUNNING statements  
+                    if self.statement_info[c_dml_n]['created_at'] < self.statement_info[p_dml_n]['created_at']:
+                        if not parent.table_name in self.summary[product_name]["OUT_OF_ORDER"]:
+                            self.summary[product_name]["OUT_OF_ORDER"][parent.table_name] = f"{p_dml_n},{self.statement_info[p_dml_n]['created_at']},{c_dml_n},{self.statement_info[c_dml_n]['created_at']}"
+
+                parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
+                parent_node.add(f"[dim]Type: {parent.type}[/dim]")
+                parent_node.add(f"[dim]Product: {parent.product_name}[/dim]")
+                child=parent
+                # Recursive call
+                logger.info(f"recursive call : {child.table_name}")
+                self.pipeline_status(child.table_name, parent, parent_node)
+        else:
+            # this is the case of a source table with no parents 
+            logger.info(f"Source: {node_data.table_name}")
+            s_pipeline_def = get_pipeline_definition_for_table(node_data.table_name, self.inventory_path)
+            s_ddl_n, s_dml_n = get_ddl_dml_names_from_pipe_def(s_pipeline_def)
+            product_name = s_pipeline_def.product_name
+            if s_dml_n in self.statement_info:
+                status_phase = self.statement_info[s_dml_n]['status_phase']
+                compute_pool_id = self.statement_info[s_dml_n]['compute_pool_id']
+            else:
+                status_phase = 'UNKNOWN'
+                compute_pool_id = None
+
+            if product_name not in self.summary:
+                self.summary[product_name] = {}
+                self.summary[product_name]["OUT_OF_ORDER"] = {}
+                self.summary[product_name]["POOLS"] = []
+
+            if compute_pool_id and compute_pool_id not in self.summary[product_name]["POOLS"]:
+                self.summary[product_name]["POOLS"].append(compute_pool_id)
+            if status_phase not in self.summary[product_name]:
+                self.summary[product_name][status_phase] = {}
+            #if not node_data.table_name in self.summary[product_name][status_phase]:
+            #    self.summary[product_name][status_phase][node_data.table_name] = 1
+            if s_dml_n not in self.summary[product_name][status_phase]:
+                self.summary[product_name][status_phase][s_dml_n] = 1
+        return self.summary
 
 def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> FlinkTablePipelineDefinition:
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
