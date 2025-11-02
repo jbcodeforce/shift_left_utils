@@ -14,7 +14,7 @@ from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import get_or_build_inventory, get_ddl_dml_names_from_pipe_def
+from shift_left.core.utils.file_search import get_or_build_inventory 
 from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
@@ -178,7 +178,7 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
     print(f"Generating pipeline healthcheck for product {product_name}")
     try:
         # get all the views, facts, dimension tables for a given product and build the pipeline hierarchy
-        # This approach covers all the intermediates & sources and tables cross products.
+        # This approach covers all the intermediates & sources and cross product tables. .
         inventory = get_or_build_inventory(inventory_path, inventory_path, False)
         sink_tables = {
             k: v
@@ -188,7 +188,7 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
         logger.info(f"Inventory for product {product_name}: {json.dumps(sink_tables, indent=2)}")
 
         # get all statements created time & status
-        #statement_list={}
+        statement_list={}
         statement_list = statement_mgr.get_statement_list().copy()
         statement_info = {}
         for statement_name in statement_list:
@@ -204,78 +204,13 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
         # get all compute pools CFU information
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
 
-        class PipelineHealthChecker:
-            def __init__(self, statement_info):
-                self.statement_info = statement_info
-                self.summary = {}
 
-            def healthcheck_tree(self, child_table, node_data, tree_node):
-
-                if node_data.parents:
-                    for parent in node_data.parents:
-                        c_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(child_table, inventory_path)
-                        c_ddl_n, c_dml_n = get_ddl_dml_names_from_pipe_def(c_pipeline_def)
-                        p_ddl_n, p_dml_n = get_ddl_dml_names_from_pipe_def(parent)
-                        product_name = c_pipeline_def.product_name
-                        if c_dml_n in statement_info:
-                            status_phase = statement_info[c_dml_n]['status_phase']
-                            compute_pool_id = statement_info[c_dml_n]['compute_pool_id']
-                            #compute_pool_name = statement_info[c_dml_n]['compute_pool_name']
-                        else:
-                            status_phase = 'UNKNOWN'
-                            compute_pool_id = 'UNKNOWN'
-
-                        # Initialize the status counters for the product
-                        if product_name not in self.summary:
-                            self.summary[product_name] = {}
-                            self.summary[product_name]["OUT_OF_ORDER"] = {}
-                            self.summary[product_name]["POOLS"] = []
-
-                        if compute_pool_id not in self.summary[product_name]["POOLS"]:
-                            self.summary[product_name]["POOLS"].append(compute_pool_id)
-                        if status_phase not in self.summary[product_name]:
-                            self.summary[product_name][status_phase] = {}
-                        if child_table not in self.summary[product_name][status_phase]:
-                            self.summary[product_name][status_phase][child_table] = 1
-                        if statement_info[c_dml_n]['created_at'] < statement_info[p_dml_n]['created_at']:
-                            if not parent.table_name in self.summary[product_name]["OUT_OF_ORDER"]:
-                                self.summary[product_name]["OUT_OF_ORDER"][parent.table_name] = f"child [ {c_dml_n} ] created at [ {statement_info[c_dml_n]['created_at']} ] < parent [ {p_dml_n} ] created at [ {statement_info[p_dml_n]['created_at']} ]"
-                        parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
-                        parent_node.add(f"[dim]Type: {parent.type}[/dim]")
-                        parent_node.add(f"[dim]Product: {parent.product_name}[/dim]")
-                        child=parent
-                        # Recursive call
-                        self.healthcheck_tree(child.table_name, parent, parent_node)
-                else:
-                    # this is the case of a table with no parents, so it is a source table
-                    s_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(node_data.table_name, inventory_path)
-                    s_ddl_n, s_dml_n = get_ddl_dml_names_from_pipe_def(s_pipeline_def)
-                    product_name = s_pipeline_def.product_name
-                    if s_dml_n in statement_info:
-                        status_phase = statement_info[s_dml_n]['status_phase']
-                        compute_pool_id = statement_info[s_dml_n]['compute_pool_id']
-                    else:
-                        status_phase = 'UNKNOWN'
-                        compute_pool_id = 'UNKNOWN'
-
-                    if product_name not in self.summary:
-                        self.summary[product_name] = {}
-                        self.summary[product_name]["OUT_OF_ORDER"] = {}
-                        self.summary[product_name]["POOLS"] = []
-
-                    if compute_pool_id not in self.summary[product_name]["POOLS"]:
-                        self.summary[product_name]["POOLS"].append(compute_pool_id)
-                    if status_phase not in self.summary[product_name]:
-                        self.summary[product_name][status_phase] = {}
-                    if not node_data.table_name in self.summary[product_name][status_phase]:
-                        self.summary[product_name][status_phase][node_data.table_name] = 1
-                return self.summary
-
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Generating Health Report for {product_name.upper()} ...")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Generating Health Report for {product_name.upper()} ( ETA <1min ) ...")
         health_report = {}
-        checker = PipelineHealthChecker(statement_info)
+        pipeline_status = pipeline_mgr.PipelineStatusTree(statement_info, inventory_path)
 
         for table_name, _ in sink_tables.items():
+            logger.info(f"Table: {table_name}")
             #This tree gives all parents including the parents that are reapeated for multiple children.
             pipeline_report=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path)
             #This tree gives all parents of a table without the repeated ones
@@ -286,48 +221,58 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
             else:
                 # Create a rich tree for visualization for debugging purposes
                 tree = Tree(f"[bold blue]{table_name}[/bold blue]")
-                health_report = checker.healthcheck_tree( table_name, pipeline_report, tree)
+                # Accumulates the pipeline status for each table called.
+                health_report = pipeline_status.pipeline_status( table_name, pipeline_report, tree)
 
         logger.info(f"Tree: {tree}")
         logger.info(f"Health Report: {json.dumps(health_report, indent=2)}")
 
         header = f"{product_name.upper()} Health Report"
-        console.print(f"\n[bold]{header.center(80, '-')}[/bold]")
+        header_width = 75
+        console.print(f"\n[bold]{header.center(header_width, '-')}[/bold]")
         #---- Statement Health Report ----
-        console.print(f"[bold]{'Statements'.center(80, '-')}[/bold]")
-        console.print(f"[bold]Product | RUNNING | PENDING | DEGRADED | STOPPED | FAILED | OUT-OF-ORDER[/bold]")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        running = pending = degraded = stopped = failed = out_of_order = 0
-        t_running = t_pending = t_degraded = t_stopped = t_failed = t_out_of_order = 0
+        console.print(f"[bold]{'Statements'.center(header_width, '-')}[/bold]")
+        console.print(f"[bold]Product    | RUNNING PENDING DEGRADED STOPPED FAILED | UNKNOWN OUT-OF-ORDER[/bold]")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        t_running = t_pending = t_degraded = t_stopped = t_failed = t_unknown = t_out_of_order = 0
         for product_name in health_report:
+            running = pending = degraded = stopped = failed = unknown = out_of_order = 0
             if "RUNNING" in health_report[product_name]:
-                running = len(health_report[product_name]["RUNNING"])
-                t_running += running
+                t_running += (running := len(health_report[product_name]["RUNNING"]))
             if "PENDING" in health_report[product_name]:
-                pending = len(health_report[product_name]["PENDING"])
-                t_pending += pending
+                t_pending += (pending := len(health_report[product_name]["PENDING"]))
             if "DEGRADED" in health_report[product_name]:
-                degraded = len(health_report[product_name]["DEGRADED"])
-                t_degraded += degraded
+                t_degraded += (degraded := len(health_report[product_name]["DEGRADED"]))
             if "STOPPED" in health_report[product_name]:
-                stopped = len(health_report[product_name]["STOPPED"])
-                t_stopped += stopped
+                t_stopped += (stopped := len(health_report[product_name]["STOPPED"]))
             if "FAILED" in health_report[product_name]:
-                failed = len(health_report[product_name]["FAILED"])
-                t_failed += failed
+                t_failed += (failed := len(health_report[product_name]["FAILED"]))
+            if "UNKNOWN" in health_report[product_name]:
+                t_unknown += (unknown := len(health_report[product_name]["UNKNOWN"]))
             if "OUT_OF_ORDER" in health_report[product_name]:
-                out_of_order = len(health_report[product_name]["OUT_OF_ORDER"])
-                t_out_of_order += out_of_order
-            total = running + degraded + stopped + failed
-            console.print(f"{product_name:<7} | {running:>7}   {pending:>7}   {degraded:>8}   {stopped:>7}   {failed:>6} | {out_of_order:>12}")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        console.print(f"{'Total':<7} | {t_running:>7}   {t_pending:>7}   {t_degraded:>8}   {t_stopped:>7}   {t_failed:>6} | {t_out_of_order:>12}\n")
+                t_out_of_order += (out_of_order := len(health_report[product_name]["OUT_OF_ORDER"]))
+            total = running + pending + degraded + stopped + failed + unknown
+            console.print(f"{product_name:<10} | {running:>7} {pending:>7} {degraded:>8} {stopped:>7} {failed:>6} | {unknown:>7} {out_of_order:>12}")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        console.print(f"{'Total':<10} | {t_running:>7} {t_pending:>7} {t_degraded:>8} {t_stopped:>7} {t_failed:>6} | {t_unknown:>7} {t_out_of_order:>12}")
+
         #---- statements out-of-order report ----
         if t_out_of_order > 0:
-            console.print(f"[bold]{'Statements Out-Of-Order'.center(80, '-')}[/bold]")
-            for table_name in health_report[product_name]["OUT_OF_ORDER"]:
-                console.print(f"[red]{table_name}: {health_report[product_name]["OUT_OF_ORDER"][table_name]}[/red]")
-            console.print(f"[bold]{'-'*80}[/bold]")
+            console.print(f"\n[bold]{'Statements Out-Of-Order'.center(header_width, '-')}[/bold]")
+            for product_name in health_report:
+                if "OUT_OF_ORDER" in health_report[product_name]:
+                    for p_c_dml_info in health_report[product_name]["OUT_OF_ORDER"].values():
+                        p_dml_n, p_created_at, c_dml_n, c_created_at = p_c_dml_info.split(',')
+                        console.print(f"[bold]{p_dml_n:<65} created at {p_created_at:>20}[/bold]")
+                        console.print(f"[bold]└─{c_dml_n:<63} created at {c_created_at:>20}[/bold]")
+        #---- statements not-running report ----
+        if t_unknown > 0:
+            console.print(f"\n[bold]{'Statements Not RUNNING'.center(header_width, '-')}[/bold]")
+            for product_name in health_report:
+                if "UNKNOWN" in health_report[product_name]:
+                    for dml_name in health_report[product_name]["UNKNOWN"].keys():
+                        console.print(f"[bold]{dml_name}[/bold]")
+
         #---- Compute Poool Health Report ----
         # Get all compute pools CFU information in dictionary format
         pool_info={}
@@ -338,9 +283,9 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
             pool_info[pool.id]["current_cfu"] = pool.current_cfu
             pool_info[pool.id]["max_cfu"] = pool.max_cfu
 
-        console.print(f"[bold]{'Compute Pools'.center(80, '-')}[/bold]")
-        console.print(f"[bold]Product | #Pools | #CFUs | #Pools>1CFU | Max CFU ( pool )[/bold]")
-        console.print(f"[bold]{'-'*80}[/bold]")
+        console.print(f"\n[bold]{'Compute Pools'.center(header_width, '-')}[/bold]")
+        console.print(f"[bold]Product    | #Pools | #CFUs | #Pools>1CFU | Max Pool ( CFU )[/bold]")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
         t_cfus = t_pools = t_plus1pools = t_max_cfu = 0
         t_max_cfu_pool = None
         for product_name in health_report:
@@ -363,9 +308,9 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
                 if max_cfu > t_max_cfu:
                     t_max_cfu = max_cfu
                     t_max_cfu_pool = max_cfu_pool
-                console.print(f"{product_name:<7} | {num_pools:>6}   {num_cfus:>5}   {plus1pools:>11}   {f'{max_cfu} ({max_cfu_pool})':>15}")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        console.print(f"{'Total':<7} | {t_pools:>6}   {t_cfus:>5}   {t_plus1pools:>11}   {f'{t_max_cfu} ({t_max_cfu_pool})':>15}\n")
+                console.print(f"{product_name:<10} | {num_pools:>6}   {num_cfus:>5}   {plus1pools:>11}   {f'{max_cfu_pool} ({max_cfu})':<15}")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        console.print(f"{'Total':<10} | {t_pools:>6}   {t_cfus:>5}   {t_plus1pools:>11}   {f'{t_max_cfu_pool} ({t_max_cfu})':<15}\n")
 
     except Exception as e:
         sanitized_error = safe_error_display(e)
