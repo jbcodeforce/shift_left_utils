@@ -92,13 +92,16 @@ def build_project_structure(project_name: str,
 def get_topic_list(file_name: str):
     ccloud = ConfluentCloudClient(get_config())
     topics = ccloud.list_topics()
-    with open(file_name, "w") as f:
-        for topic in topics["data"]:
-            f.write(topic['cluster_id'] + "," + topic['topic_name'] + "," + str(topic['partitions_count']) + "\n")
-    return topics["data"]
+    if topics and topics.get('data'):
+        with open(file_name, "w") as f:
+            for topic in topics.get('data'):
+                f.write(topic['cluster_id'] + "," + topic['topic_name'] + "," + str(topic['partitions_count']) + "\n")
+        return topics["data"]
+    else:
+        return []
 
 
-def report_table_cross_products(project_path: str):
+def report_table_cross_products(project_path: str | None):
     """
     Return the lit of table names for tables that are referenced in other products.
     """

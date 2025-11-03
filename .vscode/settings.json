@@ -1,0 +1,12 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/src/shift_left/src"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/src/shift_left/src"
+  ],
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.typeCheckingMode": "basic"
+}
+
+

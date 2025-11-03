@@ -8,7 +8,7 @@ MCP (Model Context Protocol) is a protocol that allows AI assistants like Cursor
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Install Dependencies
 
 Using `uv` (recommended):
 
@@ -23,42 +23,71 @@ Or using pip:
 pip install mcp
 ```
 
-### 2. Test the MCP Server
+### Test the MCP Server
+
+This is optional but helps to verify the MCP server will work in your environment:
 
 ```bash
 in shift_left_utils/src/shift_left
 uv run python -m shift_left_mcp.test_server
 ```
+### Set environment variables
 
-### 3. Configure Cursor
+Environment variables must be set **before** starting Cursor.
 
-1. Modify the Cursor mcp configuration: Cursor > Settings > Cursor Settings, then select `Tools & MCP`. Add the mcp configuration:
+### Configure Cursor
+
+1. Modify the Cursor mcp configuration: **Cursor > Settings > Cursor Settings,** then select `Tools & MCP`. Add the mcp configuration but change the cwd path below:
     ```json
       "mcpServers": {
             "shift-left-tools": {
-            "command": "uv",
-            "args": [
-                "run",
-                "python",
-                "-m",
-                "shift_left_mcp"
-            ],
-            "cwd": "/Users/jerome/Documents/Code/shift_left_utils/src/shift_left",
-            "env": {
-                "PIPELINES": "${env:PIPELINES}",
-                "CONFIG_FILE": "${env:CONFIG_FILE}",
-                "STAGING": "${env:STAGING}"
-            }
+                "command": "uv",
+                "args": [
+                    "run",
+                    "python",
+                    "-m",
+                    "shift_left_mcp"
+                ],
+                "cwd": "/Users/jerome/Documents/Code/shift_left_utils/src/shift_left",
+                "env": {
+                    "PIPELINES": "${env:PIPELINES}",
+                    "CONFIG_FILE": "${env:CONFIG_FILE}",
+                    "STAGING": "${env:STAGING}",
+                    "SL_CONFLUENT_CLOUD_API_KEY": "${env:SL_CONFLUENT_CLOUD_API_KEY}",
+                    "SL_CONFLUENT_CLOUD_API_SECRET": "${env:SL_CONFLUENT_CLOUD_API_SECRET}",
+                    "SL_FLINK_API_KEY": "${env:SL_FLINK_API_KEY}",
+                    "SL_FLINK_API_SECRET": "${env:SL_FLINK_API_SECRET}",
+                    "SL_KAFKA_API_KEY": "${env:SL_KAFKA_API_KEY}",
+                    "SL_KAFKA_API_SECRET": "${env:SL_KAFKA_API_SECRET}"
+                }
             }
         }
     ```
 
-1. Be sure to define the environment variables before starting Cursor. Include the `SL_*` variables to connect to Confluent Cloud. Use a shell script to export those variables and source this script before starting Cursor, or VScode.
-1. **Restart Cursor**
-1. Try It Out
-In Cursor: "Show me the shift_left version"
-   Completely quit and restart Cursor for the changes to take effect.
+1. Be sure to define the environment variables before re-starting Cursor. Include the `SL_*` variables to connect to Confluent Cloud. Use a shell script to export those variables and source this script before starting Cursor, or VScode.
+1. **Restart Cursor**: Press **Cmd+Q** (don't just close the window)
+1. Start Cursor from this terminal
+    ```sh
+    open -a Cursor
+    ```
+1. In Cursor: "What is the version of shift_left?"
 
+### Potential Problem
+
+* When using prompts like "what is the version of shift left" or "list my kafka topics" in Cursor, the LLM tries to answer directly instead of calling the MCP tools.
+
+Check **View > Output > MCP** for connection status.
+
+This may come from:
+
+1. MCP server not configured in Cursor settings
+2. Environment variables not set before Cursor starts
+3. Cursor not restarted after configuration changes, and started from a Terminal with environment variables set.
+
+
+* Tools Not Being Called
+
+The MCP server registered but LLM not recognizing tool calling opportunity. Verify output, try to restart Cursor
 
 ### Example Prompts
 

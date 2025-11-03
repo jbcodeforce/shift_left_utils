@@ -4,13 +4,13 @@
 The goals of the process presented in this note are to:
 
 1. Reduce the impact on continuously running Flink statements: do not redeploy them when not necessary
-1. Reduce the cost of dual environments, and running parallel logic
-1. Simplify the overall deployment of Flink statement changes, and authorize quicker deployment time
-1. Avoid redeploying stateful processing with big state to construct
+1. Reduce the cost of dual environments (Kafka clusters, connectors), and running parallel logic
+1. Simplify the overall deployment of Flink statements, and authorize quicker deployment time
+1. Avoid redeploying stateful processing with big state to construct when not necessary
 
 ## Context
 
-In a classical blue-green deployment for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data products, switches to new content. The following figure illustrates this approach at a high level:
+In a classical blue-green deployment, for ETL jobs, the CI/CD process updates everything and once the batch is done, the consumer of the data products, switches to new content. The following figure illustrates this approach at a high level:
 
 <figure markdown="span">
 ![](./images/bg_current.drawio.png)
@@ -18,27 +18,41 @@ In a classical blue-green deployment for ETL jobs, the CI/CD process updates eve
 </figure>
 *Blue is the **production**, Green is the new logic to deploy*
 
-The processing includes reloading the data from the CDC output topics (clone topics), using S3 Sink Connector to new bucket folders, then re-run the batch processing to create the bronze, silver and gold records for consumption by the query engine to serve data to the business intelligence dashboard. When the blue data set is ready the query engine uses another location.
+The processing includes:
 
-While in real-time processing the concept of blue-green deployment should be limited to the Flink pipeline impacted, as presented in [the pipeline management chapter](./pipeline_mgr.md).
+* reloading the data from the CDC output topics, 
+* change S3 Sink Connector to write to new bucket folders
+* re-run the batch processing to create the bronze, silver and gold records for consumption by the query engine to serve data to the business intelligence dashboard. 
 
-The following figure illustrates Flink statements processing data across source, intermediate, and fact tables. Raw data originates from Change Data Capture on a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the necessity of retaining historical data for extended periods, these topics should be rarely re-created.
+When the blue data set is ready the query engine switch to an other location.
+
+While in real-time processing the concept of blue-green deployment should only be limited to the Flink pipeline impacted, as presented in [the pipeline management chapter](./pipeline_mgr.md).
+
+The following figure illustrates the Flink statements processing data across source, intermediate, and fact tables. 
 
 <figure markdown="span">
 ![](./images/bg_2_1.drawio.png)
 <caption>**Figure 2**:Real-time processing with Apache Flink within a Data Stream Plarform</caption>
 </figure>
 
-*To simplify the diagram above the sink Kafka connectors to the object storage buckets and Iceberg or Delta Lake format are not presented, but it is assumed that they support upsert semantic.* 
+On the left side, Raw data originates from Change Data Capture of a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the need to retain historical data for extended periods, these topics should be rarely re-created.
 
-Iceberg or Delta Lake tables, stored in Apache Parquet format, are directly queried by the query engine. Each pipeline writes records in table format to object storage, such as an S3 bucket, with tables partitioned within folders.
+*To simplify the diagram above the sink Kafka connectors to the object storage buckets and Iceberg or Delta Lake format are not presented, but it is assumed that those connectors support upsert semantic.* 
+
+On right side, Iceberg or Delta Lake tables, stored in Apache Parquet format, are directly queried by the query engine. Each pipeline writes records in table format to object storage, such as an S3 bucket, with data partitioned within folders.
 
 ### Git flow process
 
-As an example, the new code release goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short time period, modify the purple Flink statements, and then deploy those statements to development, testing, staging, environments. Once validated, these statements can be merged into the `main` branch. The gitflow process may look like:
+As Flink SQLs are managed in a git repository, the process starts by the identification of the files modified from a certain time on a given branch.
 
-* **main Branch**: This branch always reflects the production-ready, stable code. Only thoroughly tested and finalized code is merged into `main`. Commits are tagged in `main` with version numbers for easy tracking of releases.
-* **develop Branch**: This branch serves as the integration point for all new features and ongoing development. **Feature branches** are created from the `develop` branch and merged back into it after completion.
+As an example, the code release goal is to modify only the purple statements and redeploy them as part of a blue-green deployment. 
+
+The general strategy for query evolution involves replacing the existing statement and its corresponding tables with a new statement and new tables. A straightforward approach is to use a release branch for a short time period, modify the purple Flink statements, and then deploy those statements to the development, staging environments. Once validated, these statements can be merged into the `main` branch where production deploymment may be done. 
+
+The gitflow process may look like:
+
+* **main branch**: This branch always reflects the production-ready, stable code. Only thoroughly tested and finalized code is merged into `main`. Commits are tagged in `main` with version numbers for easy tracking of releases.
+* **develop branch**: This branch serves as the integration point for all new features and ongoing development. **Feature branches** are created from the `develop` branch and merged back into it after completion and PR review.
 * Creating a **Release Branch**: When a set of features in develop is deemed ready for release, a new release branch is created from `develop`. This branch allows for final testing, bug fixes, and release-specific tasks without interrupting the ongoing development work in develop.
 * **Finalizing the Release**: Only bug fixes and necessary adjustments are made on the `release` branch. New feature development is strictly avoided.
 * **Merging and Tagging**: Once the release branch is stable and ready for production deployment, it's merged into two places:
@@ -54,7 +68,7 @@ As an example, the new code release goal is to modify only the purple statements
 <caption>**Figure 3**:GitFlow branching for Flink Statement updates</caption>
 </figure>
 
-An alternate approach is to work directly to main branch:
+An alternate approach is to work directly to the `main` branch:
 
 <figure markdown="span">
 ![](./images/bg_2_2_main_branch.drawio.png)
@@ -63,24 +77,31 @@ An alternate approach is to work directly to main branch:
 
 ### Flink pipelines deployment
 
-Once unit tested, the pipeline deployment tool can deploy all impacted Flink statements without affecting existing "green" statements. The list of changed flink statements can be assessed via git commands like:
+To illustrate the needs, we will start by this flink pipeline topology, running in production:
+
+
+<figure markdown="span">
+![](./images/bg_2_3_0.drawio.png){ width=800 }
+<caption>**Figure 4**:Current Flink Statements in production</caption>
+</figure>
+
+The process needs to get the list of changed flink statements from a given tag or date on a given git branch. The shift left tool can get the list of statements modified from a date:
     
 ```sh
-git status --porcelain 
-# get the list of commits
-git log --oneline -b <release_branch>
-# get the list of file impacted
-git show --stat <commit_id> -b <release_branch>
+# At the project folder level do:
+shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 --output-file modified_sqls.txt main
 ```
 
-The figure below illustrates changes to the internal logic of one intermediate statement, one the fact statement and one added view: the blue statements. 
+The above command may list the tables: `int 3`, `fact 3` were modified and `view 1` was added. 
 
 <figure markdown="span">
 ![](./images/bg_2_3.drawio.png){ width=800 }
 <caption>**Figure 4**:Flink logic update and impacted statements</caption>
 </figure>
 
-The Flink statement to create the intermediate table needs to have a new table name for the output table (e.g. int_3_v2). Both DDL and DML are changed. 
+To support blue-green deployment at the statement level, the table names need to be changed. 
+
+The DDL Flink statements need to have a new table name with the next version postfix (e.g. int_3_v2). 
 
 ```sql
 --- DDL intermediate table
@@ -88,8 +109,7 @@ create table int_3_v2 (
     --- all columns, new columns, ...
 )
 ```
-
-and the from and joins are still using existing source tables:
+The DML insert into table name also needs to be modified.
 
 ```sql
 -- DML intermediate table
@@ -101,7 +121,7 @@ join src_b ...
 join src_c  ...
 ```
 
-The new Flink Fact statement needs to modify the input table names and the output table names as join statements are stateful, and descendants needs to be modified. 
+Any children of the modified statement needs to take into account the new table name and being modified. For example the fact table needs to use the ew versioned intermediate table:
 
 ```sql
 --- DML Fact table

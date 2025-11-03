@@ -12,7 +12,13 @@
       "env": {
         "PIPELINES": "${env:PIPELINES}",
         "CONFIG_FILE": "${env:CONFIG_FILE}",
-        "STAGING": "${env:STAGING}"
+        "STAGING": "${env:STAGING}",
+        "SL_CONFLUENT_CLOUD_API_KEY": "${env:SL_CONFLUENT_CLOUD_API_KEY}",
+        "SL_CONFLUENT_CLOUD_API_SECRET": "${env:SL_CONFLUENT_CLOUD_API_SECRET}",
+        "SL_FLINK_API_KEY": "${env:SL_FLINK_API_KEY}",
+        "SL_FLINK_API_SECRET": "${env:SL_FLINK_API_SECRET}",
+        "SL_KAFKA_API_KEY": "${env:SL_KAFKA_API_KEY}",
+        "SL_KAFKA_API_SECRET": "${env:SL_KAFKA_API_SECRET}"
       }
     }
   }
