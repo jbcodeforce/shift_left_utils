@@ -1,0 +1,8 @@
+src_c360_groups:
+  - group_id: ['enum_test_data']
+  - tenant_id: ['enum_test_data']
+  - group_name: ['enum_test_data']
+  - group_type: ['enum_test_data']
+  - created_date: ['enum_test_data']
+  - is_active: ['enum_test_data']
+  - updated_at: ['enum_test_data']

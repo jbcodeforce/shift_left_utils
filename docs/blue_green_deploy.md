@@ -79,7 +79,6 @@ An alternate approach is to work directly to the `main` branch:
 
 To illustrate the needs, we will start by this flink pipeline topology, running in production:
 
-
 <figure markdown="span">
 ![](./images/bg_2_3_0.drawio.png){ width=800 }
 <caption>**Figure 4**:Current Flink Statements in production</caption>
@@ -89,15 +88,28 @@ The process needs to get the list of changed flink statements from a given tag o
     
 ```sh
 # At the project folder level do:
-shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 --output-file modified_sqls.txt main
+shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 main
 ```
 
-The above command may list the tables: `int 3`, `fact 3` were modified and `view 1` was added. 
+The above command may list that the tables: `int 3`, `fact 3` were modified and `view 1` was added. 
 
 <figure markdown="span">
 ![](./images/bg_2_3.drawio.png){ width=800 }
 <caption>**Figure 4**:Flink logic update and impacted statements</caption>
 </figure>
+
+The command creates two files under the $HOME/.shift_left folder: 
+
+| File name | Type |<div style="width:600px">Content</div> |
+| --- | --- | --- |
+| modified_flink_files.txt | json | contains a filelist with element like: <code>{"table_name": "p1_dim_c2",</br>"file_modified_url": "...pipelines/dimensions/p1/dim_c2/sql-scripts/ddl.dim_c2.sql",</br>"same_sql_content": false,"running": false }</code> |
+| modified_flink_files_short.txt | txt | list of table name only |
+
+In this then possible to assess the execution plan with:
+
+```sql
+shift_left pipeline build-execution-plan --table-list-file-name  ~/.shift_left/modified_flink_files_short.txt
+```
 
 To support blue-green deployment at the statement level, the table names need to be changed. 
 
@@ -109,7 +121,7 @@ create table int_3_v2 (
     --- all columns, new columns, ...
 )
 ```
-The DML insert into table name also needs to be modified.
+The DML with the `insert into` table name also needs to be modified.
 
 ```sql
 -- DML intermediate table
@@ -121,7 +133,7 @@ join src_b ...
 join src_c  ...
 ```
 
-Any children of the modified statement needs to take into account the new table name and being modified. For example the fact table needs to use the ew versioned intermediate table:
+Any children of the modified statement needs to take into account the new table name. For example the fact table needs to use the new versioned intermediate table:
 
 ```sql
 --- DML Fact table
@@ -132,7 +144,7 @@ from int_3_v2
 join int_1
 ```
 
-For the 'view' creation, the Flink statement may be impacted as one of its source table is modified. So the same deployment logic applies.
+For the 'view' creation, the Flink statement may be impacted as one of its source table is modified. So the same renaming logic applies.
 
 During the tuning on the impacted statements, the pipeline dependencies can help assessing which statements to change. (e.g. `shift_left pipeline build-execution-plan --table-name <flink-intermediate> --may-start-descendants`).
 

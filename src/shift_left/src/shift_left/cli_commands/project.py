@@ -191,7 +191,6 @@ def list_tables_with_one_child():
 @app.command()
 def list_modified_files(
     branch_name: Annotated[str, typer.Argument(help="Git branch name to compare against (e.g., 'main', 'origin/main')")],
-    output_file: Annotated[str, typer.Option(help="Output file path to save the list")] = "modified_flink_files.txt",
     project_path: Annotated[str, typer.Option(help="Project path where git repository is located")] = ".",
     file_filter: Annotated[str, typer.Option(help="File extension filter (e.g., '.sql', '.py')")] = ".sql",
     since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = None
@@ -202,20 +201,27 @@ def list_modified_files(
     This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
     """
     print("#" * 30 + f" List modified files in current branch vs {branch_name}")
+    output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files.txt"
     result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, output_file)
     
     # Display structured result summary
     print(f"\nSummary:")
     print(f"   Total modified files: {len(result.file_list)}")
     print(f"   Tables affected:")
+    short_output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files_short.txt"
+    table_names = []
     if result.file_list:
-        
         for file in result.file_list:
-           if  not file.same_sql_content:
+            if  not file.same_sql_content:
                 print(f"   {file.table_name} {file.file_modified_url} \t\t -> not same sql content")
-           elif not file.running:
+            elif not file.running:
+                table_names.append(file.table_name)
                 print(f"   {file.table_name} {file.file_modified_url} \t\t -> not running")
-
+            table_names.append(file.table_name)
+    with open(short_output_file, "w") as f:
+        for table_name in table_names:
+            f.write(table_name + "\n")
+    print(f"Tables affected saved in {short_output_file}")
     
     return result
 

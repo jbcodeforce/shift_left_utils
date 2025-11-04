@@ -356,7 +356,7 @@ class TestDeploymentManager(BaseUT):
         
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
-            sink_table_name="z",
+            table_name="z",
             inventory_path=self.inventory_path
         )
         print(result)

@@ -1,18 +1,30 @@
 foundations:
-- table_name: src_users_groups
-  ddl_for_test: ./tests/ddl_src_users_groups.sql
-- table_name: src_users_users
-  ddl_for_test: ./tests/ddl_src_users_users.sql
+- table_name: c360_dim_groups
+  ddl_for_test: ./tests/ddl_c360_dim_groups.sql
+- table_name: src_c360_users
+  ddl_for_test: ./tests/ddl_src_c360_users.sql
 test_suite:
-- name: test_dim_users_1
+- name: test_c360_dim_users_1
   inputs:
-  - table_name: src_users_groups
-    file_name: ./tests/insert_src_users_groups_1.sql
+  - table_name: c360_dim_groups
+    file_name: ./tests/insert_c360_dim_groups_1.sql
     file_type: sql
-  - table_name: src_users_users
-    file_name: ./tests/insert_src_users_users_1.sql
+  - table_name: src_c360_users
+    file_name: ./tests/insert_src_c360_users_1.sql
     file_type: sql
   outputs:
-  - table_name: dim_users
-    file_name: ./tests/validate_dim_users_1.sql
+  - table_name: c360_dim_users
+    file_name: ./tests/validate_c360_dim_users_1.sql
+    file_type: sql
+- name: test_c360_dim_users_2
+  inputs:
+  - table_name: c360_dim_groups
+    file_name: ./tests/insert_c360_dim_groups_1.sql
+    file_type: sql
+  - table_name: src_c360_users
+    file_name: ./tests/insert_src_c360_users_1.sql
+    file_type: sql
+  outputs:
+  - table_name: c360_dim_users
+    file_name: ./tests/validate_c360_dim_users_2.sql
     file_type: sql

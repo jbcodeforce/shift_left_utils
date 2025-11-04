@@ -13,12 +13,17 @@ from datetime import timezone
 from typing import Tuple, List
 from pydantic import BaseModel, Field
 from shift_left.core.table_mgr import get_or_build_inventory
-from shift_left.core.utils.file_search import create_folder_if_not_exist, from_pipeline_to_absolute
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
-from shift_left.core.utils.file_search import PIPELINE_JSON_FILE_NAME, get_table_ref_from_inventory
-from shift_left.core.utils.file_search import read_pipeline_definition_from_file
+from shift_left.core.utils.file_search import (
+    PIPELINE_JSON_FILE_NAME, 
+    PIPELINE_FOLDER_NAME, 
+    get_table_ref_from_inventory, 
+    read_pipeline_definition_from_file,
+    from_pipeline_to_absolute,
+    create_folder_if_not_exist,
+)
 from shift_left.core.utils.sql_parser import SQLparser
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import Statement
@@ -200,12 +205,17 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         filtered_files = []
         for file_path in all_modified_files:
             lowered_file_path = file_path.lower()
-            if file_filter in lowered_file_path and "/tests/" not in lowered_file_path:
-                filtered_files.append(file_path)
+            if file_filter in lowered_file_path and "/tests/" not in lowered_file_path and PIPELINE_FOLDER_NAME in lowered_file_path:
+                absolute_file_path = from_pipeline_to_absolute(file_path)
+                if not os.path.exists(absolute_file_path):
+                    logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
+                    continue
+                filtered_files.append(absolute_file_path)
         
         print(f"Found {len(all_modified_files)} total modified files")
+
         print(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
-        
+
         generated_on = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         description = (
             f"Modified files in branch '{current_branch}'\n"
@@ -213,23 +223,25 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             f"Generated on: {generated_on}\n"
             f"Total files: {len(filtered_files)}"
         )
-        
+        logger.info(description)
         # Create file list with extracted table names
         file_list = []
         parser = SQLparser()
-        for file_path in sorted(filtered_files):
-            absolute_file_path = from_pipeline_to_absolute(file_path)
+        for absolute_file_path in sorted(filtered_files):
             with open(absolute_file_path, 'r') as file:
                 sql_content = file.read()
-                if "CREATE TABLE" in sql_content:
+                if "create table" in sql_content.lower() or "create or replace table" in sql_content.lower():
                     table_name = parser.extract_table_name_from_create_statement(sql_content)
+                    same_sql, running = False, False
                 else:
                     table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
-                
-                same_sql, running = _assess_flink_statement_state(table_name, file_path, sql_content)
+                    if table_name == "No-Table":
+                        logger.warning(f"No table name found in file {sql_content}, skipping")
+                        continue
+                    same_sql, running = _assess_flink_statement_state(table_name, absolute_file_path, sql_content)
             file_list.append(ModifiedFileInfo(
                 table_name=table_name,
-                file_modified_url=file_path,
+                file_modified_url=absolute_file_path,
                 same_sql_content=same_sql,
                 running=running
             ))
@@ -257,17 +269,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             for file_info in file_list:
                 logger.info(f"  {file_info.table_name}: {file_info.file_modified_url}")
         else:
-            logger.info(f"\nNo modified files found matching filter '{file_filter}'")
-        
-        # Additional information for blue-green deployment
-        if filtered_files:
-            print(f"\n💡 For blue-green deployment:")
-            print(f"   - Review the {len(filtered_files)} modified Flink statements")
-            print(f"   - Ensure table naming follows versioning strategy (e.g., table_name_v2)")
-            print(f"   - Update downstream dependencies as needed")
-            if output_file:
-                print(f"   - Use: shift_left pipeline deploy --table-list-file-name {output_file}")
-        
+            logger.info(f"\nNo modified files found matching filter '{file_filter}'")        
         return result
         
     except subprocess.CalledProcessError as e:
@@ -381,13 +383,9 @@ def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: 
         print(f"Error: pipeline definition not found for table {table_name}")
         return False, False
     statement_node = pipeline_definition.to_node()
-    if 'ddl' in file_path:
-        statement_name = statement_node.ddl_statement_name
-    else:
-        statement_name = statement_node.dml_statement_name
-    flink_statement = statement_mgr.get_statement(statement_name)
+    flink_statement = statement_mgr.get_statement(statement_node.dml_statement_name)
     if not flink_statement:
-        print(f"Error: statement {statement_name} not found")
+        print(f"Error: statement {statement_node.dml_statement_name} not found")
         return True, False
     if isinstance(flink_statement, Statement):
         same_sql = _assess_sql_difference(table_name, sql_content, flink_statement.spec.statement)

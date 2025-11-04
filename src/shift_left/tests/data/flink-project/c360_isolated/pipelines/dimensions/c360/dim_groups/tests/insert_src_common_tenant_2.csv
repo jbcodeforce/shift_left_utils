@@ -1,0 +1,1 @@
+INSERT INTO src_common_tenant_ut (tenant_id, tenant_name, tenant_description, tenant_status, tenant_created_at, tenant_updated_at, __op) VALUES ('test_id', 'test_name', 'test_description', 'active', TO_TIMESTAMP('2023-10-01 12:00:00', 'yyyy-MM-dd HH:mm:ss'), TO_TIMESTAMP('2023-10-01 12:00:00', 'yyyy-MM-dd HH:mm:ss'), 'u');
