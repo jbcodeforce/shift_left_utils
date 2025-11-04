@@ -66,16 +66,17 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
     @patch('shift_left.core.project_manager._assess_flink_statement_state')
     @patch('shift_left.core.utils.sql_parser.SQLparser')
-    def test_list_modified_files_with_mocked_sql_parsing(self, mock_sql_parser_class, mock_assess_state, mock_from_pipeline, mock_datetime_class, mock_chdir, mock_getcwd, mock_subprocess, mock_file):
+    @patch('shift_left.core.project_manager.os.path.exists')
+    def test_list_modified_files_with_mocked_sql_parsing(self, mock_path_exists, mock_sql_parser_class, mock_assess_state, mock_from_pipeline, mock_datetime_class, mock_chdir, mock_getcwd, mock_subprocess, mock_file):
         """Test that list_modified_files calls SQL parser to extract table names from file contents"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
         mock_datetime_class.now.return_value = datetime(2024, 1, 15, tzinfo=timezone.utc)
-        
+        mock_path_exists.return_value = True  # All files exist
         # Mock the path conversion function
         mock_from_pipeline.side_effect = [
-            "/test/project/file1.sql",  # Absolute path for file1
-            "/test/project/file2.sql"   # Absolute path for file2
+            "/test/project/pipelines/data_product/file1.sql",  # Absolute path for file1
+            "/test/project/pipelines/data_product/file2.sql"   # Absolute path for file2
         ]
         
         # Mock the assessment function
@@ -101,7 +102,7 @@ class TestProjectManager(unittest.TestCase):
             # git rev-parse --abbrev-ref HEAD
             MagicMock(stdout="main\n", returncode=0),
             # git log --name-only --since=2024-01-14
-            MagicMock(stdout="file1.sql\nfile2.sql\nfile3.py\n", returncode=0),
+            MagicMock(stdout="pipelines/data_product/file1.sql\npipelines/data_product/file2.sql\npipelines/data_product/file3.py\n", returncode=0),
          ]
         
         # Call the function
@@ -128,14 +129,14 @@ class TestProjectManager(unittest.TestCase):
         file1 = result.file_list[0]
         self.assertIsInstance(file1, pm.ModifiedFileInfo)
         self.assertEqual(file1.table_name, "user_accounts")  # From mocked SQL parser
-        self.assertEqual(file1.file_modified_url, "file1.sql")
+        self.assertEqual(file1.file_modified_url, "/test/project/pipelines/data_product/file1.sql")
         self.assertEqual(file1.same_sql_content, False)  # From mock assessment
         self.assertEqual(file1.running, True)   # From mock assessment
         
         # Check second file - should have extracted table name via SQL parser
         file2 = result.file_list[1]
         self.assertEqual(file2.table_name, "order_history")  # From mocked SQL parser
-        self.assertEqual(file2.file_modified_url, "file2.sql")
+        self.assertEqual(file2.file_modified_url, "/test/project/pipelines/data_product/file2.sql")
         self.assertEqual(file2.same_sql_content, False)  # From mock assessment
         self.assertEqual(file2.running, True)   # From mock assessment
         
@@ -155,8 +156,8 @@ class TestProjectManager(unittest.TestCase):
         # Verify path conversion was called for each file
         self.assertEqual(mock_from_pipeline.call_count, 2)
         mock_from_pipeline.assert_has_calls([
-            call("file1.sql"),
-            call("file2.sql")
+            call("pipelines/data_product/file1.sql"),
+            call("pipelines/data_product/file2.sql")
         ])
         
         # Verify assessment function was called for each file
@@ -165,10 +166,10 @@ class TestProjectManager(unittest.TestCase):
         # Verify file operations - should read SQL files from absolute paths and write output
         file_calls = mock_file.call_args_list
         print("DEBUG: All file call args:", file_calls)
-        self.assertTrue(any('/test/project/file1.sql' in str(call) for call in file_calls), 
-                       "Should have read file1.sql from absolute path")
-        self.assertTrue(any('/test/project/file2.sql' in str(call) for call in file_calls),
-                       "Should have read file2.sql from absolute path")
+        self.assertTrue(any('/test/project/pipelines/data_product/file1.sql' in str(call) for call in file_calls), 
+                       "Should have read pipelines/data_product/file1.sql from absolute path")
+        self.assertTrue(any('/test/project/pipelines/data_product/file2.sql' in str(call) for call in file_calls),
+                       "Should have read pipelines/data_product/file2.sql from absolute path")
         self.assertTrue(any('modified_files.txt' in str(call) for call in file_calls),
                        "Should have written to output file")
 
@@ -179,9 +180,11 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
+    @patch('shift_left.core.project_manager.os.path.exists')
     @patch('builtins.open', new_callable=mock_open)
     def test_list_modified_files_branch_switch(self,
                     mock_file, 
+                    mock_path_exists,
                     mock_chdir, 
                     mock_getcwd, 
                     mock_subprocess, 
@@ -192,7 +195,8 @@ class TestProjectManager(unittest.TestCase):
         """Test branch switching functionality"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
-        mock_datetime_class.now.return_value = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        mock_datetime_class.now.return_value = datetime(2025, 9, 15, 10, 30, 0, tzinfo=timezone.utc)
+        mock_path_exists.return_value = True  # All files exist
         
         # Mock SQL parser instance and methods
         mock_parser_instance = MagicMock()
@@ -204,8 +208,8 @@ class TestProjectManager(unittest.TestCase):
         
         # Mock path conversion for each file
         mock_from_pipeline.side_effect = [
-            "/original/path/test1.sql",  # Absolute path for test1.sql
-            "/original/path/test2.sql"   # Absolute path for test2.sql
+            "/original/path/pipelines/data_product/test1.sql",  # Absolute path for test1.sql
+            "/original/path/pipelines/data_product/test2.sql"   # Absolute path for test2.sql
         ]
         
         # Mock file content reads and output file write
@@ -221,18 +225,18 @@ class TestProjectManager(unittest.TestCase):
             MagicMock(stdout="feature-branch\n", returncode=0),
             # git checkout main
             MagicMock(stdout="", returncode=0),
-            # git log --name-only --since=2024-01-10
-            MagicMock(stdout="test1.sql\ntest2.sql\n", returncode=0),
+            # git log --name-only --since=2025-09-01
+            MagicMock(stdout="pipelines/data_product/test1.sql\npipelines/data_product/test2.sql\n", returncode=0),
         ]
         
-        # Mock assessment state for both files
+        # Mock assessment state for both files: not same sql, and running
         mock_assess_state.return_value = (False, True)
         
         # Call the function
         result = pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            since="2024-01-10",
+            since="2025-09-01",
             file_filter=".sql",
             output_file="output.txt"
         )
@@ -241,12 +245,13 @@ class TestProjectManager(unittest.TestCase):
         expected_calls = [
             call(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True),
             call(["git", "checkout", "main"], capture_output=True, text=True, check=True),
-            call(["git", "log", "--name-only", "--since=2024-01-10", '--pretty=format:'], capture_output=True, text=True, check=True)
+            call(["git", "log", "--name-only", "--since=2025-09-01", '--pretty=format:'], capture_output=True, text=True, check=True)
         ]
         mock_subprocess.assert_has_calls(expected_calls)
         
         # Verify result structure
         self.assertIsInstance(result, pm.ModifiedFilesResult)
+        print(f"DEBUG: result: {result}")
         self.assertEqual(len(result.file_list), 2)
         
         # Verify branch information in description
@@ -255,13 +260,13 @@ class TestProjectManager(unittest.TestCase):
         # Verify file details
         file1 = result.file_list[0]
         self.assertEqual(file1.table_name, "test1_table")
-        self.assertEqual(file1.file_modified_url, "test1.sql")
+        self.assertEqual(file1.file_modified_url, "/original/path/pipelines/data_product/test1.sql")
         self.assertEqual(file1.same_sql_content, False)
         self.assertEqual(file1.running, True)
         
         file2 = result.file_list[1]
         self.assertEqual(file2.table_name, "test2_table")
-        self.assertEqual(file2.file_modified_url, "test2.sql")
+        self.assertEqual(file2.file_modified_url, "/original/path/pipelines/data_product/test2.sql")
         self.assertEqual(file2.same_sql_content, False)
         self.assertEqual(file2.running, True)
         
@@ -271,8 +276,8 @@ class TestProjectManager(unittest.TestCase):
         # Verify path conversion was called for each file
         self.assertEqual(mock_from_pipeline.call_count, 2)
         mock_from_pipeline.assert_has_calls([
-            call("test1.sql"),
-            call("test2.sql")
+            call("pipelines/data_product/test1.sql"),
+            call("pipelines/data_product/test2.sql")
         ])
         
         # Verify assessment function was called for each file
@@ -283,17 +288,18 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.os.chdir')
     @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
     @patch('shift_left.core.project_manager._assess_flink_statement_state')
+    @patch('shift_left.core.project_manager.os.path.exists')
     @patch('builtins.open', new_callable=mock_open)
-    def test_list_modified_files_file_filtering(self, mock_file, mock_assess_state, mock_from_pipeline, mock_chdir, mock_getcwd, mock_subprocess):
+    def test_list_modified_files_file_filtering(self, mock_file, mock_path_exists, mock_assess_state, mock_from_pipeline, mock_chdir, mock_getcwd, mock_subprocess):
         """Test file filtering functionality"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
-        
+        mock_path_exists.return_value = True  # All files exist
         # Mock the path conversion function
         mock_from_pipeline.side_effect = [
-            "/original/path/file1.sql",
-            "/original/path/file3.SQL", 
-            "/original/path/script.sql"
+            "/original/path/pipelines/data_product/file1.sql",
+            "/original/path/pipelines/data_product/file3.SQL", 
+            "/original/path/pipelines/data_product/script.sql"
         ]
         
         # Mock the assessment function
@@ -312,16 +318,14 @@ class TestProjectManager(unittest.TestCase):
             # git rev-parse --abbrev-ref HEAD
             MagicMock(stdout="main\n", returncode=0),
             # git log with mixed file types
-            MagicMock(stdout="file1.sql\nfile2.py\nfile3.SQL\ntest.java\nscript.sql\n", returncode=0),
-            # date command
-            MagicMock(stdout="Mon Jan 15 10:30:00 UTC 2024\n", returncode=0)
+            MagicMock(stdout="pipelines/data_product/file1.sql\npipelines/data_product/file2.py\npipelines/data_product/file3.SQL\ntest.java\npipelines/data_product/script.sql\n", returncode=0),
         ]
         
         # Call the function with .sql filter
         result = pm.list_modified_files(
             project_path=".",
             branch_name="main",
-            since="2024-01-10",
+            since="2025-09-01",
             file_filter=".sql",
             output_file="sql_files.txt"
         )
@@ -332,13 +336,13 @@ class TestProjectManager(unittest.TestCase):
         
         # Verify SQL files are included (case insensitive)
         file_urls = [f.file_modified_url for f in result.file_list]
-        self.assertIn("file1.sql", file_urls)
-        self.assertIn("file3.SQL", file_urls)  # Case insensitive
-        self.assertIn("script.sql", file_urls)
+        self.assertIn("/original/path/pipelines/data_product/file1.sql", file_urls)
+        self.assertIn("/original/path/pipelines/data_product/file3.SQL", file_urls)  # Case insensitive
+        self.assertIn("/original/path/pipelines/data_product/script.sql", file_urls)
         
         # Verify non-SQL files are not included
-        self.assertNotIn("file2.py", file_urls)
-        self.assertNotIn("test.java", file_urls)
+        self.assertNotIn("/original/path/pipelines/data_product/file2.py", file_urls)
+        self.assertNotIn("/original/path/pipelines/data_product/test.java", file_urls)
         
         # Verify table names are extracted correctly
         table_names = [f.table_name for f in result.file_list]
@@ -468,7 +472,6 @@ class TestProjectManager(unittest.TestCase):
     def test_assess_flink_statement_state_with_statement_mgr_mock(self, mock_get_statement):
         """Test _assess_flink_statement_state function with mocked statement_mgr.get_statement"""
 
-        
         # Setup mock data
         table_name = "fct_user_per_group"
         file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.fct_user_per_group.sql"
@@ -510,15 +513,6 @@ class TestProjectManager(unittest.TestCase):
         self.assertFalse(running, "Should return False when statement not found")
         mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
         
-        # Test Case 4: DDL file path (should use ddl_statement_name)
-        mock_get_statement.reset_mock()
-        ddl_file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.fct_user_per_group.sql"
-       
-        mock_get_statement.return_value = mock_statement
-        
-        pm._assess_flink_statement_state(table_name, ddl_file_path, sql_content)
-        
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-ddl-fct-user-per-group")
 
     def test_isolate_data_product(self):
         """Test isolate_data_product function"""

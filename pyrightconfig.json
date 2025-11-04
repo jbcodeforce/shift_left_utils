@@ -1,0 +1,17 @@
+{
+  "include": [
+    "src/shift_left/src"
+  ],
+  "extraPaths": [
+    "src/shift_left/src"
+  ],
+  "venvPath": ".",
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Darwin",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false
+}
+
+
+

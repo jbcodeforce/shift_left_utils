@@ -1,6 +1,6 @@
 # Unit tests explanations
 
-The `c360_dim_users` uses 2 input tables as sources and generates record with the No primary key found in the statement. primary keys
+The `c360_dim_groups` uses 2 input tables as sources and generates record with the No primary key found in the statement. primary keys
 
 ## DML analysis
 
@@ -19,8 +19,8 @@ Running source data analysis, from the env-nknqp3 environment:
 
 | Table Name | # messages in topic | Information of interest |
 |------------|------------|--------------|
-| c360_dim_groups |  |  |
-| src_c360_users |  |  |
+| src_c360_groups |  |  |
+| src_common_tenant |  |  |
 
 
 ## Unit tests creation and execution:
@@ -35,7 +35,7 @@ DDL ->
 
 
 
-### c360_dim_groups
+### src_c360_groups
 
 * Example of record in topic:
 
@@ -46,11 +46,11 @@ DDL ->
 Analyze **data skew** with
 
 ```sql
-select id, tenant_id, count(*) as record_count from c360_dim_groups  group by id, tenant_id
+select id, tenant_id, count(*) as record_count from src_c360_groups  group by id, tenant_id
 ```
 
 
-### src_c360_users
+### src_common_tenant
 
 * Example of record in topic:
 
@@ -61,6 +61,6 @@ select id, tenant_id, count(*) as record_count from c360_dim_groups  group by id
 Analyze **data skew** with
 
 ```sql
-select id, tenant_id, count(*) as record_count from src_c360_users  group by id, tenant_id
+select id, tenant_id, count(*) as record_count from src_common_tenant  group by id, tenant_id
 ```
 

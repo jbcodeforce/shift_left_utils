@@ -76,7 +76,7 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
     """
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build all pipeline definitions for all tables in {pipeline_path}")
     pipeline_mgr.build_all_pipeline_definitions(pipeline_path)
-    print("{time.strftime('%Y%m%d_%H:%M:%S')} Done")
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done")
     
 
 @app.command()

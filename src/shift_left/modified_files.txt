@@ -1,0 +1,1745 @@
+{
+  "description": "Modified files in branch 'main'\nFilter applied: .sql\nGenerated on: 2025-11-03 22:25:07\nTotal files: 290",
+  "file_list": [
+    {
+      "table_name": "amx_dim_capture_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_capture_type/sql-scripts/ddl.amx_dim_capture_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_correction_reason",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_correction_reason/sql-scripts/ddl.amx_dim_correction_reason.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_operation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_operation/sql-scripts/ddl.amx_dim_operation.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_phase",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase/sql-scripts/ddl.amx_dim_phase.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_phase_step",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step/sql-scripts/ddl.amx_dim_phase_step.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_phase_step",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step/sql-scripts/ddl.amx_dim_phase_step.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_phase_step",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step/sql-scripts/dml.amx_dim_phase_step.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_phase_step",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step/sql-scripts/dml.amx_dim_phase_step.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_phase_step_tag",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step_tag/sql-scripts/ddl.amx_dim_phase_step_tag.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_phase_step_tag",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_phase_step_tag/sql-scripts/dml.amx_dim_phase_step_tag.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_product_family_group_selected_option",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_product_family_group_selected_option/sql-scripts/ddl.amx_dim_product_family_group_selected_option.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_product_family_group_selected_option",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_product_family_group_selected_option/sql-scripts/dml.amx_dim_product_family_group_selected_option.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_product_family_group_selected_option_map",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_product_family_group_selected_option_map/sql-scripts/ddl.amx_dim_product_family_group_selected_option_map.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_production_record",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_production_record/sql-scripts/ddl.amx_dim_production_record.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_production_record",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_production_record/sql-scripts/dml.amx_dim_production_record.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_production_record_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_production_record_status/sql-scripts/ddl.amx_dim_production_record_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_production_record_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_production_record_status/sql-scripts/dml.amx_dim_production_record_status.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_role_group_location",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_role_group_location/sql-scripts/ddl.amx_dim_role_group_location.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_role_group_location",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_role_group_location/sql-scripts/dml.amx_dim_role_group_location.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_dim_unit_of_measure",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_unit_of_measure/sql-scripts/ddl.amx_dim_unit_of_measure.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_dim_unit_procedure",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/amx/dim_unit_procedure/sql-scripts/ddl.amx_dim_unit_procedure.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "aqem_dim_element",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/aqem/dim_element/sql-scripts/dml.aqem_dim_element.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "aqem_dim_event_action_item",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/aqem/dim_event_action_item/sql-scripts/ddl.aqem_dim_event_action_item.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "aqem_dim_event_action_item",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/aqem/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_business_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_business_unit/sql-scripts/ddl.qx_dim_business_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_collaboration_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_collaboration_status/sql-scripts/ddl.qx_dim_collaboration_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_document_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_document_custom_field/sql-scripts/ddl.qx_dim_document_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam/sql-scripts/ddl.qx_dim_exam.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam/sql-scripts/dml.qx_dim_exam.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_exam_answer",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_answer/sql-scripts/ddl.qx_dim_exam_answer.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam_answer",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_answer/sql-scripts/dml.qx_dim_exam_answer.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_exam_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_custom_field/sql-scripts/ddl.qx_dim_exam_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam_definition",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_definition/sql-scripts/ddl.qx_dim_exam_definition.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam_definition",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_definition/sql-scripts/dml.qx_dim_exam_definition.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_exam_question",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_question/sql-scripts/ddl.qx_dim_exam_question.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_exam_question",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_exam_question/sql-scripts/dml.qx_dim_exam_question.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_infocard_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_infocard_custom_field/sql-scripts/ddl.qx_dim_infocard_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_packet/sql-scripts/ddl.qx_dim_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "IF",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_packet_custom_field/sql-scripts/ddl.qx_dim_packet_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_roles",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_roles/sql-scripts/ddl.qx_dim_roles.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_tenant",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_tenant/sql-scripts/ddl.qx_dim_tenant.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainee",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee/sql-scripts/ddl.qx_dim_trainee.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainee",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee/sql-scripts/dml.qx_dim_trainee.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_trainee_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_custom_field/sql-scripts/ddl.qx_dim_trainee_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainee_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_detail/sql-scripts/ddl.qx_dim_trainee_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainee_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_detail/sql-scripts/ddl.qx_dim_trainee_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainee_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_detail/sql-scripts/dml.qx_dim_trainee_detail.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_trainee_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_detail/sql-scripts/dml.qx_dim_trainee_detail.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_trainee_user_security",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainee_user_security/sql-scripts/ddl.qx_dim_trainee_user_security.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainer",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainer/sql-scripts/ddl.qx_dim_trainer.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_trainer",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainer/sql-scripts/dml.qx_dim_trainer.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_trainer_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_trainer_custom_field/sql-scripts/ddl.qx_dim_trainer_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_assignment/sql-scripts/ddl.qx_dim_training_assignment.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_competency",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_competency/sql-scripts/ddl.qx_dim_training_competency.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course/sql-scripts/ddl.qx_dim_training_course.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course/sql-scripts/ddl.qx_dim_training_course.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course/sql-scripts/dml.qx_dim_training_course.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course/sql-scripts/dml.qx_dim_training_course.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_course_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course_custom_field/sql-scripts/ddl.qx_dim_training_course_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course_unit/sql-scripts/ddl.qx_dim_training_course_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course_unit/sql-scripts/ddl.qx_dim_training_course_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_course_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course_unit/sql-scripts/dml.qx_dim_training_course_unit.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_course_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_course_unit/sql-scripts/dml.qx_dim_training_course_unit.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_curriculum",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_curriculum/sql-scripts/ddl.qx_dim_training_curriculum.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_curriculum",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_curriculum/sql-scripts/dml.qx_dim_training_curriculum.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_data/sql-scripts/ddl.qx_dim_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_jobcode",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_jobcode/sql-scripts/ddl.qx_dim_training_jobcode.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_training_jobcode",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_jobcode/sql-scripts/dml.qx_dim_training_jobcode.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_dim_training_jobcode_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_training_jobcode_custom_field/sql-scripts/ddl.qx_dim_training_jobcode_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_user",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_user/sql-scripts/ddl.qx_dim_user.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_user_vault_rights",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_user_vault_rights/sql-scripts/ddl.qx_dim_user_vault_rights.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_dim_vault",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/dimensions/qx/dim_vault/sql-scripts/ddl.qx_dim_vault.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_capture_correction",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_capture_correction/sql-scripts/dml.amx_fct_capture_correction.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_capture_correction",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_capture_correction/sql-scripts/dml.amx_fct_capture_correction.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/ddl.amx_fct_data_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/ddl.amx_fct_data_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/ddl.amx_fct_data_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/ddl.amx_fct_data_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/ddl.amx_fct_data_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_data_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_data_capture/sql-scripts/dml.amx_fct_data_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_final_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_final_capture/sql-scripts/ddl.amx_fct_final_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_final_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_final_capture/sql-scripts/dml.amx_fct_final_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/ddl.amx_fct_production_record_creation.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/ddl.amx_fct_production_record_creation.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/ddl.amx_fct_production_record_creation.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/dml.amx_fct_production_record_creation.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/dml.amx_fct_production_record_creation.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_production_record_creation",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_creation/sql-scripts/dml.amx_fct_production_record_creation.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_production_record_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_status/sql-scripts/ddl.amx_fct_production_record_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_production_record_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_production_record_status/sql-scripts/dml.amx_fct_production_record_status.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/ddl.amx_fct_structure_progress.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/ddl.amx_fct_structure_progress.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/dml.amx_fct_structure_progress.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/dml.amx_fct_structure_progress.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/dml.amx_fct_structure_progress.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "amx_fct_structure_progress",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/amx/fct_structure_progress/sql-scripts/dml.amx_fct_structure_progress.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_fct_attachment_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_attachment_detail/sql-scripts/ddl.qx_fct_attachment_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_business_unit_vault",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_business_unit_vault/sql-scripts/ddl.qx_fct_business_unit_vault.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_exam_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_exam_course/sql-scripts/ddl.qx_fct_exam_course.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_exam_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_exam_data/sql-scripts/ddl.qx_fct_exam_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_exam_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_exam_data/sql-scripts/dml.qx_fct_exam_data.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_fct_infocard_business_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_infocard_business_unit/sql-scripts/ddl.qx_fct_infocard_business_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_infocard_controlled_copy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_infocard_controlled_copy/sql-scripts/ddl.qx_fct_infocard_controlled_copy.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_infocard_links",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_infocard_links/sql-scripts/ddl.qx_fct_infocard_links.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_infocard_standard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_infocard_standard/sql-scripts/ddl.qx_fct_infocard_standard.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_infocard_vault",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_infocard_vault/sql-scripts/ddl.qx_fct_infocard_vault.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_linked_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_linked_infocard/sql-scripts/ddl.qx_fct_linked_infocard.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_assignment/sql-scripts/ddl.qx_fct_training_assignment.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_assignment/sql-scripts/ddl.qx_fct_training_assignment.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_assignment/sql-scripts/dml.qx_fct_training_assignment.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_fct_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_data/sql-scripts/ddl.qx_fct_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_data/sql-scripts/ddl.qx_fct_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_data/sql-scripts/ddl.qx_fct_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_data/sql-scripts/dml.qx_fct_training_data.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "qx_fct_training_document",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_document/sql-scripts/ddl.qx_fct_training_document.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_training_jobcode_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_training_jobcode_unit/sql-scripts/ddl.qx_fct_training_jobcode_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_user_role",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_user_role/sql-scripts/ddl.qx_fct_user_role.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_fct_web_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/facts/qx/fct_web_link/sql-scripts/ddl.qx_fct_web_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_action_item",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item/sql-scripts/ddl.int_aqem_action_item.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_action_item",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item/sql-scripts/dml.int_aqem_action_item.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_action_item_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item_tasks/sql-scripts/ddl.int_aqem_action_item_tasks.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_action_item_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item_tasks/sql-scripts/ddl.int_aqem_action_item_tasks.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_action_item_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item_tasks/sql-scripts/dml.int_aqem_action_item_tasks.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_action_item_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/action_item_tasks/sql-scripts/dml.int_aqem_action_item_tasks.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_latest_action_step_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_action_step_tasks/sql-scripts/ddl.int_aqem_latest_action_step_tasks.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_latest_action_step_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_action_step_tasks/sql-scripts/dml.int_aqem_latest_action_step_tasks.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_latest_approval_step_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_approval_step_tasks/sql-scripts/ddl.int_aqem_latest_approval_step_tasks.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_latest_approval_step_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_approval_step_tasks/sql-scripts/dml.int_aqem_latest_approval_step_tasks.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_latest_element_revision",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_element_revision/sql-scripts/ddl.int_aqem_latest_element_revision.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_latest_element_revision",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/latest_element_revision/sql-scripts/dml.int_aqem_latest_element_revision.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_recordexecution_element_data_unnest",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/record_execution_element_data_unnest/sql-scripts/ddl.int_aqem_recordexecution_element_data_unnest.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_recordexecution_element_data_unnest",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/record_execution_element_data_unnest/sql-scripts/dml.int_aqem_recordexecution_element_data_unnest.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_recordconfiguration_form_element_dummy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/recordconfiguration_form_element_dummy/sql-scripts/ddl.int_aqem_recordconfiguration_form_element_dummy.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_recordconfiguration_form_element_dummy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/recordconfiguration_form_element_dummy/sql-scripts/dml.int_aqem_recordconfiguration_form_element_dummy.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_recordconfiguration_node_filtered",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/recordconfiguration_node_filtered/sql-scripts/ddl.int_aqem_recordconfiguration_node_filtered.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_recordconfiguration_node_filtered",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/recordconfiguration_node_filtered/sql-scripts/dml.int_aqem_recordconfiguration_node_filtered.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_tag_tag_dummy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/tag_tag_dummy/sql-scripts/ddl.int_aqem_tag_tag_dummy.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_aqem_tag_tag_dummy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/tag_tag_dummy/sql-scripts/dml.int_aqem_tag_tag_dummy.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_aqem_user",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/aqem/user/sql-scripts/dml.int_aqem_user.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_01_runtime_step_status_actions",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/01_runtime_step_status_actions/sql-scripts/ddl.int_qx_01_runtime_step_status_actions.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_aborted_packets",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/aborted_packets/sql-scripts/ddl.int_qx_aborted_packets.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_answer_format",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/answer_format/sql-scripts/ddl.int_qx_answer_format.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_antecedent_rejection",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/antecedent_rejection/sql-scripts/ddl.int_qx_antecedent_rejection.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_completed_links_union_packet_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/completed_links_union_packet_detail/sql-scripts/ddl.int_qx_completed_links_union_packet_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_courses_wo_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/courses_wo_assignments/sql-scripts/ddl.int_qx_courses_wo_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_courses_wo_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/courses_wo_assignments/sql-scripts/ddl.int_qx_courses_wo_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_exam_performance_characteristics",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/exam_performance_characteristics/sql-scripts/ddl.int_qx_exam_performance_characteristics.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_exam_questions_answers_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/exam_questions_answers_data/sql-scripts/ddl.int_qx_exam_questions_answers_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_get_courses_with_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/get_courses_with_infocard/sql-scripts/ddl.int_qx_get_courses_with_infocard.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_get_courses_with_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/get_courses_with_infocard/sql-scripts/dml.int_qx_get_courses_with_infocard.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_get_courses_with_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/get_courses_with_infocard/sql-scripts/dml.int_qx_get_courses_with_infocard.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_get_courses_with_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/get_courses_with_infocard/sql-scripts/dml.int_qx_get_courses_with_infocard.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_get_link_count",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/get_link_count/sql-scripts/ddl.int_qx_get_link_count.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_infocard_custom_field",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/infocard_custom_field/sql-scripts/ddl.int_qx_infocard_custom_field.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_infocard_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/infocard_data/sql-scripts/ddl.int_qx_infocard_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_infocard_helper_get_full_result",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/infocard_helper_get_full_result/sql-scripts/ddl.int_qx_infocard_helper_get_full_result.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_infocard_helper_get_full_result_for_stage_user_dimension",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/infocard_helper_get_full_result_for_stage_user_dimension/sql-scripts/ddl.int_infocard_helper_get_full_result_for_stage_user_dimension.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_infocard_helper_get_full_result_for_training",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/infocard_helper_get_full_result_for_training/sql-scripts/ddl.int_qx_infocard_helper_get_full_result_for_training.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_jobcode_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/jobcode_assignments/sql-scripts/ddl.int_qx_jobcode_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_jobcode_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/jobcode_assignments/sql-scripts/dml.int_qx_jobcode_assignments.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_jobcodes_wo_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/jobcodes_wo_assignments/sql-scripts/ddl.int_qx_jobcodes_wo_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_packet_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/packet_detail/sql-scripts/ddl.int_qx_packet_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_packet_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/packet_detail/sql-scripts/dml.int_qx_packet_detail.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_packet_dimension",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/packet_dimension/sql-scripts/ddl.int_qx_packet_dimension.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_process_and_archive_tables",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/process_and_archive_tables/sql-scripts/ddl.int_qx_process_and_archive_tables.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_role_jobcode_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/role_jobcode_assignments/sql-scripts/ddl.int_qx_role_jobcode_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_role_jobcode_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/role_jobcode_assignments/sql-scripts/ddl.int_qx_role_jobcode_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_role_jobcode_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/role_jobcode_assignments/sql-scripts/dml.int_qx_role_jobcode_assignments.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_step_details",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/step_details/sql-scripts/ddl.int_qx_step_details.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_steps",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/steps/sql-scripts/ddl.int_qx_steps.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_tdc_abort_reject_tasks_unique_parent_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/tdc_abort_reject_tasks_unique_parent_packet/sql-scripts/ddl.int_qx_tdc_abort_reject_tasks_unique_parent_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_tdc_inpr_route_step_detail_unique_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/tdc_inpr_route_step_detail_unique_packet/sql-scripts/ddl.int_qx_tdc_inpr_route_step_detail_unique_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_trainee_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/trainee_assignments/sql-scripts/ddl.int_qx_trainee_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_trainee_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/trainee_assignments/sql-scripts/ddl.int_qx_trainee_assignments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_trainee_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/trainee_assignments/sql-scripts/dml.int_qx_trainee_assignments.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_trainee_assignments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/trainee_assignments/sql-scripts/dml.int_qx_trainee_assignments.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_trainee_steps",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/trainee_steps/sql-scripts/ddl.int_qx_trainee_steps.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_training_data_unformatted",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/training_data_unformatted/sql-scripts/ddl.int_qx_training_data_unformatted.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_training_data_unformatted",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/training_data_unformatted/sql-scripts/dml.int_qx_training_data_unformatted.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "int_qx_training_data_unique_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/training_data_unique_packet/sql-scripts/ddl.int_qx_training_data_unique_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_training_doc_release_transform",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/training_doc_release_transform/sql-scripts/ddl.int_qx_training_doc_release_transform.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_user_name",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/user_name/sql-scripts/ddl.int_qx_user_name.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_verifier_signoffs",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/verifier_signoffs/sql-scripts/ddl.int_qx_verifier_signoffs.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "int_qx_workflow_config",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/intermediates/qx/workflow_config/sql-scripts/ddl.int_qx_workflow_config.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "public_qx_mx_permissions_tenants",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/seeds/permissions/public_qx_mx_permissions_tenants/sql-scripts/dml.public_qx_mx_permissions_tenants.sql",
+      "same_sql_content": true,
+      "running": false
+    },
+    {
+      "table_name": "public_qx_mx_permissions_mfg_cfg_data_capture_steps",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/adapt/permissions/data_capture_steps/sql-scripts/ddl.mfg_cfg_data_capture_steps.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "public_qx_mx_permissions_dbo_portal_role_right",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/adapt/permissions/portal_role_right/sql-scripts/ddl.dbo_portal_role_right.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "public_qx_mx_permissions_mfg_cfg_structures",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/adapt/permissions/structures/sql-scripts/ddl.structures.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_amx_node_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/amx/node_capture/sql-scripts/ddl.src_amx_node_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_amx_node_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/amx/node_capture/sql-scripts/dml.src_amx_node_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "src_amx_record_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/amx/record_capture/sql-scripts/ddl.src_amx_record_capture.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_amx_record_capture",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/amx/record_capture/sql-scripts/dml.src_amx_record_capture.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "src_amx_record_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/amx/record_status/sql-scripts/ddl.src_amx_record_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_audit_trail_columns_changed_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/audit_trail_columns_changed_packet/sql-scripts/ddl.src_qx_audit_trail_columns_changed_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_audit_trail_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/audit_trail_packet/sql-scripts/ddl.src_qx_audit_trail_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_collaboration_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/collaboration_status/sql-scripts/ddl.src_qx_collaboration_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_controlled_copy_location",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/controlled_copy_location/sql-scripts/ddl.src_qx_controlled_copy_location.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_controlled_copy_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/controlled_copy_status/sql-scripts/ddl.src_qx_controlled_copy_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_departments",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/departments/sql-scripts/ddl.src_qx_departments.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_answers",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_answers/sql-scripts/ddl.src_qx_exam_answers.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_data/sql-scripts/ddl.src_qx_exam_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_data/sql-scripts/ddl.src_qx_exam_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_data/sql-scripts/dml.src_qx_exam_data.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_exam_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_def/sql-scripts/ddl.src_qx_exam_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_link/sql-scripts/ddl.src_qx_exam_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_performance",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_performance/sql-scripts/ddl.src_qx_exam_performance.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_exam_questions",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/exam_questions/sql-scripts/ddl.src_qx_exam_questions.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_mc_version",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/mc_version/sql-scripts/ddl.src_mc_version.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_portal_role",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/portal_role/sql-scripts/ddl.src_qx_portal_role.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_portal_role_member",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/portal_role_member/sql-scripts/ddl.src_qx_portal_role_member.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_portal_role_right",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/portal_role_right/sql-scripts/ddl.src_qx_portal_role_right.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_preexam_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/preexam_link/sql-scripts/ddl.src_qx_preexam_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_route_role",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/route_role/sql-scripts/ddl.src_qx_route_role.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_abort_reject_tasks",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_abort_reject_tasks/sql-scripts/ddl.src_qx_tdc_abort_reject_tasks.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_arc_inpr_route_step_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_arc_inpr_route_step_def/sql-scripts/ddl.src_qx_tdc_arc_inpr_route_step_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_arc_inpr_route_step_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_arc_inpr_route_step_def/sql-scripts/dml.src_qx_tdc_arc_inpr_route_step_def.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_tdc_doc_accesscattype",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_accesscattype/sql-scripts/ddl.src_qx_tdc_doc_accesscattype.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_controlled_copies",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_controlled_copies/sql-scripts/ddl.src_qx_tdc_doc_controlled_copies.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_customfield_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_customfield_data/sql-scripts/ddl.src_qx_tdc_doc_customfield_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_customfield_desc",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_customfield_desc/sql-scripts/ddl.src_qx_tdc_doc_customfield_desc.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_customfield_names",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_customfield_names/sql-scripts/ddl.src_qx_tdc_doc_customfield_names.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_document_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_document_type/sql-scripts/ddl.src_qx_tdc_doc_document_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_infocard",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_infocard/sql-scripts/ddl.src_qx_tdc_doc_infocard.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_infocard_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_infocard_type/sql-scripts/ddl.src_qx_tdc_doc_infocard_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_linked",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_linked/sql-scripts/ddl.src_qx_tdc_doc_linked.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_reference",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_reference/sql-scripts/ddl.src_qx_tdc_doc_reference.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_reference_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_reference_type/sql-scripts/ddl.src_qx_tdc_doc_reference_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_doc_release",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_doc_release/sql-scripts/ddl.src_qx_tdc_doc_release.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_approve_packet_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_approve_packet_def/sql-scripts/ddl.src_qx_tdc_inpr_approve_packet_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_approve_packet_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_approve_packet_def/sql-scripts/dml.src_qx_tdc_inpr_approve_packet_def.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_approve_packet_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_approve_packet_detail/sql-scripts/ddl.src_qx_tdc_inpr_approve_packet_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_packet/sql-scripts/ddl.src_qx_tdc_inpr_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_packet/sql-scripts/dml.src_qx_tdc_inpr_packet.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_route_step_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_route_step_detail/sql-scripts/ddl.src_qx_tdc_inpr_route_step_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_route_step_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_route_step_detail/sql-scripts/ddl.src_qx_tdc_inpr_route_step_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inpr_route_step_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inpr_route_step_detail/sql-scripts/dml.src_qx_tdc_inpr_route_step_detail.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_tdc_inprocess_route_step_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inprocess_route_step_def/sql-scripts/ddl.src_qx_tdc_inprocess_route_step_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_inprocess_route_step_statu",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_inprocess_route_step_statu/sql-scripts/ddl.src_qx_tdc_inprocess_route_step_statu.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "IF",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_route_action/sql-scripts/ddl.src_qx_tdc_route_action.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_route_status",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_route_status/sql-scripts/ddl.src_qx_tdc_route_status.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_route_step_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_route_step_def/sql-scripts/ddl.src_qx_tdc_route_step_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_routing_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_routing_def/sql-scripts/ddl.src_qx_tdc_routing_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_tdc_sys_user",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/tdc_sys_user/sql-scripts/ddl.src_qx_tdc_sys_user.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_trainee_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/trainee_link/sql-scripts/ddl.src_qx_trainee_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_trainer_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/trainer_link/sql-scripts/ddl.src_qx_trainer_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_category",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_category/sql-scripts/ddl.src_qx_training_category.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_competency",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_competency/sql-scripts/ddl.src_qx_training_competency.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_completed_links",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_completed_links/sql-scripts/ddl.src_qx_training_completed_links.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_course/sql-scripts/ddl.src_qx_training_course.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_course/sql-scripts/dml.src_qx_training_course.sql",
+      "same_sql_content": false,
+      "running": true
+    },
+    {
+      "table_name": "src_qx_training_curriculum",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_curriculum/sql-scripts/ddl.src_qx_training_curriculum.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_data/sql-scripts/ddl.src_qx_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_degree",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_degree/sql-scripts/ddl.src_qx_training_degree.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_jobcode",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_jobcode/sql-scripts/ddl.src_qx_training_jobcode.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_location",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_location/sql-scripts/ddl.src_qx_training_location.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_role_link",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_role_link/sql-scripts/ddl.src_qx_training_role_link.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_trainee",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_trainee/sql-scripts/ddl.src_qx_training_trainee.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_trainer",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_trainer/sql-scripts/ddl.src_qx_training_trainer.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_unit/sql-scripts/ddl.src_qx_training_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_unit_course",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_unit_course/sql-scripts/ddl.src_qx_training_unit_course.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_training_unit_curriculum",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/training_unit_curriculum/sql-scripts/ddl.src_qx_training_unit_curriculum.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_userstore_association",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/userstore_association/sql-scripts/ddl.src_qx_userstore_association.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_business_unit",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_business_unit/sql-scripts/ddl.src_qx_web_business_unit.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_business_unit_entity",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_business_unit_entity/sql-scripts/ddl.src_qx_web_business_unit_entity.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_business_unit_entity_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_business_unit_entity_type/sql-scripts/ddl.src_qx_web_business_unit_entity_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_complex_packet",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_complex_packet/sql-scripts/ddl.src_qx_web_complex_packet.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_infocard_type_template",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_infocard_type_template/sql-scripts/ddl.src_qx_web_infocard_type_template.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_lifecycle_def",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_lifecycle_def/sql-scripts/ddl.src_qx_web_lifecycle_def.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_lifecycle_detail",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_lifecycle_detail/sql-scripts/ddl.src_qx_web_lifecycle_detail.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_number_series",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_number_series/sql-scripts/ddl.src_qx_web_number_series.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_packet_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_packet_type/sql-scripts/ddl.src_qx_web_packet_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_pub_doc",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_pub_doc/sql-scripts/ddl.src_qx_web_pub_doc.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_pub_subfile",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_pub_subfile/sql-scripts/ddl.src_qx_web_pub_subfile.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_review_period_type",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_review_period_type/sql-scripts/ddl.src_qx_web_review_period_type.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_review_policy",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_review_policy/sql-scripts/ddl.src_qx_web_review_policy.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_subtype_customfields",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_subtype_customfields/sql-scripts/ddl.src_qx_web_subtype_customfields.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "src_qx_web_url_links",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/sources/qx/web_url_links/sql-scripts/ddl.src_qx_web_url_links.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "stage_tenant_dimension",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_tenant_dimension/sql-scripts/ddl.stage_tenant_dimension.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "stage_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_training_assignment/sql-scripts/ddl.stage_training_assignment.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "stage_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_training_assignment/sql-scripts/ddl.stage_training_assignment.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "stage_training_assignment",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_training_assignment/sql-scripts/dml.stage_training_assignment.sql",
+      "same_sql_content": true,
+      "running": true
+    },
+    {
+      "table_name": "stage_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_training_data/sql-scripts/ddl.stage_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "stage_user_dimension",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/stage/stage_user_dimension/sql-scripts/ddl.stage_user_dimension.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_mv_training_data",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/views/qx/mv_training_data/sql-scripts/ddl.qx_mv_training_data.sql",
+      "same_sql_content": false,
+      "running": false
+    },
+    {
+      "table_name": "qx_mv_training_document_attributes",
+      "file_modified_url": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines/views/qx/mv_training_document_attributes/sql-scripts/ddl.qx_mv_training_document_attributes.sql",
+      "same_sql_content": false,
+      "running": false
+    }
+  ]
+}

@@ -47,7 +47,7 @@ class SQLparser:
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
             ctes = self._extract_cte_names(sql_content_filtered)
-            matches=set()
+            matches_set=set[str]()
             for table in tables:
                 logger.debug(table)
                 if 'REPLACE' in table[1].upper():
@@ -56,9 +56,9 @@ class SQLparser:
                 if not keep_topic_name and retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
                 if not retrieved_table in ctes:
-                    matches.add(retrieved_table)
-            return matches
-        return matches
+                    matches_set.add(retrieved_table)
+            return matches_set
+        return set(matches)
 
     def extract_table_name_from_insert_into_statement(self, sql_content) -> str:
         logger.debug(f"sql_content: {sql_content}")
@@ -76,7 +76,8 @@ class SQLparser:
     
     def extract_table_name_from_create_statement(self, sql_content) -> str:
         sql_content=self._normalize_sql(sql_content)
-        regex=r'\b(\s*CREATE TABLE IF NOT EXISTS|CREATE TABLE)\s+(\s*(`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?\.)?`?[a-zA-Z0-9_][a-zA-Z0-9_]*`?)'
+        # This regex supports backticks starting the table name and allows no space after EXISTS keyword
+        regex = r'\b(CREATE TABLE IF NOT EXISTS|CREATE TABLE|CREATE OR REPLACE TABLE)\s*`?\s*(\w+(?:\.\w+)?|`[a-zA-Z0-9_]+`(?:\.`[a-zA-Z0-9_]+`)?)'
         tbname = re.findall(regex, sql_content, re.IGNORECASE)
         if len(tbname) > 0:
             #logger.debug(tbname[0][1])
@@ -175,7 +176,7 @@ class SQLparser:
         # Extract the column definitions
         match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[`"]?[\w.-]+[`"]?(?:\.[`"]?[\w.-]+[`"]?)*)\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
         if not match:
-            return []
+            return {}
 
         columns_section = match.group(1)
         # Extract primary key columns from CONSTRAINT PRIMARY KEY or PRIMARY KEY clause
@@ -217,7 +218,7 @@ class SQLparser:
         return columns
 
 
-    def extract_primary_key_from_sql_content(self, sql_content: str) -> str:
+    def extract_primary_key_from_sql_content(self, sql_content: str) -> List[str]:
         """
         Extract the primary key from the sql_content
         """
@@ -225,9 +226,11 @@ class SQLparser:
 
         if match_multiple:
             column_names_str_multiple = match_multiple.group(1)
-            result = [name.strip() for name in column_names_str_multiple.split(',')]
+            result = []
+            for name in column_names_str_multiple.split(','):
+                result.append(name.strip())
         else:
-            result="No primary key found in the statement."
+            result=["No primary key found in the statement."]
         return result
         
 

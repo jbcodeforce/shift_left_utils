@@ -2,7 +2,7 @@ include ../../../common.mk
 
 # --- c360_dim_groups
 TABLE_NAME=c360_dim_groups
-SCRIPT_PRE_KEBAB=j9r
+SCRIPT_PRE_KEBAB=dev-usw2-c360
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
 DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-ddl-$(SCRIPT_POST_KEBAB)

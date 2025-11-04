@@ -290,7 +290,7 @@ class ConfluentCloudClient:
             
         return total_messages
 
-    def list_topics(self):
+    def list_topics(self) -> dict | None:
         """List the topics in the environment 
         example of url https://lkc-23456-doqmp5.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-23456/topics \
  
