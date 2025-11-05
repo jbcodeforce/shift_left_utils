@@ -354,7 +354,8 @@ class TestSQLParser(unittest.TestCase):
             id STRING NOT NULL,
             tenant_id STRING NOT NULL,
             name STRING,
-            type STRING,
+            `type` STRING,
+            `standard` STRING,
             created_by STRING,
             created_date BIGINT,
             last_modified_by STRING,
@@ -368,6 +369,7 @@ class TestSQLParser(unittest.TestCase):
         assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
         assert columns['name'] == {'name': 'name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['type'] == {'name': 'type', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['standard'] == {'name': 'standard', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         print(columns)
 
     def test_extract_table_name_from_create_statement_quoted(self):

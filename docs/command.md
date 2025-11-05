@@ -218,7 +218,6 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 
 **Options**:
 
-* `--output-file TEXT`: Output file path to save the list  [default: modified_flink_files.txt]
 * `--project-path TEXT`: Project path where git repository is located  [default: .]
 * `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
 * `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)
@@ -500,7 +499,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1080a5d60&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1050be930&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -655,7 +654,6 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
-* `init-integration-test`: Initialize the integration test for a...
 * `analyze-pool-usage`: Analyze compute pool usage and assess...
 
 ### `pipeline build-metadata`
@@ -826,7 +824,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -848,7 +846,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -876,24 +874,6 @@ $ pipeline prepare [OPTIONS] SQL_FILE_NAME
 **Options**:
 
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
-* `--help`: Show this message and exit.
-
-### `pipeline init-integration-test`
-
-Initialize the integration test for a given table.
-
-**Usage**:
-
-```console
-$ pipeline init-integration-test [OPTIONS] TABLE_NAME
-```
-
-**Arguments**:
-
-* `TABLE_NAME`: The table name to initialize the integration test for.  [required]
-
-**Options**:
-
 * `--help`: Show this message and exit.
 
 ### `pipeline analyze-pool-usage`

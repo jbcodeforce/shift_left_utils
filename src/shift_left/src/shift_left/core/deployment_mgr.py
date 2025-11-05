@@ -22,6 +22,7 @@ from shift_left.core import compute_pool_mgr
 from shift_left.core import statement_mgr
 from shift_left.core.models.flink_statement_model import (
     Statement,
+    StatementError,
     FlinkStatementNode,
     FlinkStatementExecutionPlan,
     StatementInfo
@@ -48,7 +49,7 @@ MAX_CFU_INCREMENT: Final[int] = 20
 def build_deploy_pipeline_from_table(
     table_name: str,
     inventory_path: str,
-    compute_pool_id: str = None,
+    compute_pool_id: str,
     dml_only: bool = False,
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
@@ -1050,7 +1051,7 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
             try:
                 result = future.result(timeout=60)  # will wait up to timeout seconds.
                 logger.info(f"{result}")
-                if result is not None:  # Only append if we got a valid result
+                if isinstance(result, Statement):  # Only append if we got a valid result
                     statements.append(result)
                     if result.status.phase not in ["COMPLETED", "RUNNING"]:
                         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {result.name} failed, move to next node")
@@ -1058,7 +1059,7 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                         nodes_to_execute = _modify_impacted_nodes(result, nodes_to_execute)
                         pass
                 else:
-                    logger.warning(f"Result from future is None")
+                    logger.warning(f"Result from future is StatementError")
             except Exception as e:
                 logger.error(f"Failed to get result from future: {str(e)}")
                 if not accept_exceptions:
@@ -1079,7 +1080,7 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Still {len(nodes_to_execute)} statements to execute")
     node = nodes_to_execute.pop(0)
     statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
-    if statement:
+    if isinstance(statement, Statement):
         statements.append(statement)
     else:
         logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
@@ -1137,8 +1138,8 @@ def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkSta
 
 def _deploy_one_node(node: FlinkStatementNode,
                      accept_exceptions: bool = False, 
-                     compute_pool_id: str = None
-)-> Statement:
+                     compute_pool_id: str = ""
+)-> Statement | StatementError:
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
     maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')        
@@ -1159,13 +1160,13 @@ def _deploy_one_node(node: FlinkStatementNode,
             logger.error(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
     
 
-def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
+def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | StatementError:
     """
     Deploy the DDL and then the DML for the given table to process.
     """
 
     logger.info(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement")
-    statement_mgr.delete_statement_if_exists(node_to_process.dml_statement_name)
+    statement_mgr.delete_statement_if_exists(node_to_process.dml_statement_name) # need this to be able to drop table
     statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
@@ -1173,16 +1174,20 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement:
     statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
                                                                             node_to_process.ddl_ref, 
                                                                             node_to_process.ddl_statement_name)
-    while statement.status.phase not in ["COMPLETED"]:
-        time.sleep(2)
-        statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
-        logger.info(f"DDL deployment status is: {statement.status.phase}")
-        if statement.status.phase in ["FAILED"]:
-            raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
+    if isinstance(statement, Statement):
+        while statement.status.phase not in ["COMPLETED"]:
+            time.sleep(2)
+            statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
+            logger.info(f"DDL deployment status is: {statement.status.phase}")
+            if statement.status.phase in ["FAILED"]:
+                raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
+    else:
+        logger.error(f"DDL deployment failed for {node_to_process.table_name}")
+        raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
     return _deploy_dml(node_to_process, True)
 
 
-def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False)-> Statement:
+def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False)-> Statement | StatementError:
     logger.info(f"Run {to_process.dml_statement_name} for {to_process.table_name} table to {to_process.compute_pool_id}")
     if not dml_already_deleted:
         statement_mgr.delete_statement_if_exists(to_process.dml_statement_name)
@@ -1191,12 +1196,13 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
                                                                                 to_process.dml_ref, 
                                                                                 to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
-    while statement.status.phase in ["PENDING"]:
-        time.sleep(5)
-        statement = statement_mgr.get_statement(to_process.dml_statement_name)
-        logger.debug(f"DML deployment status is: {statement.status.phase}")
-    if statement.status.phase == "FAILED":
-        raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
+    if isinstance(statement, Statement):
+        while statement.status.phase in ["PENDING"]:
+            time.sleep(5)
+            statement = statement_mgr.get_statement(to_process.dml_statement_name)
+            logger.debug(f"DML deployment status is: {statement.status.phase}")
+        if statement.status.phase == "FAILED":
+            raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
     logger.info(f"DML deployment completed for {to_process.table_name}")
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} DML deployment completed for {to_process.table_name}")
     return statement

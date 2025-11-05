@@ -158,7 +158,7 @@ class SQLparser:
             ...     status             STRING
             ... )
             ... '''
-            >>> parse_sql_columns(sql)
+            >>> build_column_metadata_from_sql_content(sql)
             [
                 {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True},
                 {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': False},

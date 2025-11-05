@@ -2,6 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 A set of operations to manage a flink statement
 """
+from re import S
 from typing import List, Optional
 import os
 import time
@@ -29,6 +30,7 @@ from shift_left.core.models.flink_statement_model import (
     StatementInfo, 
     StatementListCache,
     StatementError,
+    ErrorData,
     FlinkStatementNode
 )
 from shift_left.core.utils.file_search import (
@@ -41,7 +43,7 @@ STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
                                                       flink_statement_file_path: str = None,
                                                       statement_name: str = None
-) -> Statement:
+) -> Statement | StatementError:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool. If the statement fails, propagate the exception to higher level.
@@ -69,7 +71,7 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             return statement
     except Exception as e:
         logger.error(e)
-        return None
+        return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail=str(e))])
 
 
 def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
@@ -96,7 +98,7 @@ def get_statement(statement_name: str) -> Statement | StatementError:
 def post_flink_statement(compute_pool_id: str,  
                              statement_name: str, 
                              sql_content: str,
-                             stopped: bool = False) -> Statement | None:
+                             stopped: bool = False) -> Statement | StatementError:
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -132,7 +134,7 @@ def post_flink_statement(compute_pool_id: str,
                     return client.wait_response(url, statement_name, start_time)
                 return  Statement(**response)
             else:
-                return None
+                return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail=str(response))])
         except Exception as e:
             logger.error(f"Error executing rest call: {e}")
             raise e

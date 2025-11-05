@@ -33,7 +33,7 @@ class InfoNode(BaseModel):
 
 class FlinkTableReference(InfoNode):
     """Reference to a Flink table including its metadata and location information."""
-    table_folder_name: Optional[str] = Field(default="", description="table_folder_name")
+    table_folder_name: str = Field(default="", description="table_folder_name")
     
     def __hash__(self) -> int:
         return hash(self.table_name)
