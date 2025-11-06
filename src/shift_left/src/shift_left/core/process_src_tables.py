@@ -42,11 +42,15 @@ def migrate_one_file(table_name: str,
                     src_folder_path: str,
                     process_parents: bool = False,
                     source_type: str = "spark",
+                    product_name: str = None,
                     validate: bool = False):
     """ Process one source sql file to extract code from and migrate to Flink SQL.
     This is the enry point of migration, and routes to the different type of migration.
     """
-    print(f"Migrate source {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
+    if product_name:
+        staging_target_folder = staging_target_folder + "/" + product_name
+    print(f"\nMigrate {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
+    print("-" * 40)
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:
@@ -57,11 +61,11 @@ def migrate_one_file(table_name: str,
                                         src_folder_path=src_folder_path, 
                                         walk_parent=process_parents, 
                                         validate=validate)
-            logger.info(f"Processed {table_name} from {sql_src_file} to {staging_target_folder}")
+            logger.info(f"Processed {table_name} to {staging_target_folder}")
         else:
             raise Exception("Error: the sql_src_file parameter needs to be a sql file")
     elif source_type == "ksql":
-        _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate)
+        _process_ksql_sql_file(table_name, sql_src_file, staging_target_folder, validate, product_name)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
 
@@ -167,6 +171,7 @@ def _save_dml_ddl(content_path: str,
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
+    logger.info(f"Save DML and DDL statements to {content_path} for {internal_table_name} with {len(ddls)} DDLs and {len(dmls)} DMLs")
     # Handle None or empty cases
     if ddls is None:
         ddls = []
@@ -346,17 +351,17 @@ def _find_sub_string(table_name, topic_name) -> bool:
 def _process_ksql_sql_file(table_name: str, 
                            ksql_src_file: str, 
                            staging_target_folder: str,
-                           validate: bool = False
+                           validate: bool = False,
+                           product_name: str = None
                            ) -> Tuple[List[str], List[str]]:
     """
     Process a ksql sql file to Flink SQL.
     """
-    logger.info(f"Process ksql SQL file {ksql_src_file} to {staging_target_folder}")
     table_folder = table_name.lower()
-    table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, None)
+    table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, product_name)
     agent = KsqlToFlinkSqlAgent()
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
-        ddl_content, dml_content = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
-        _save_dml_ddl(table_folder, internal_table_name, dml_content, ddl_content)
-        return ddl_content, dml_content
+        ddl_contents, dml_contents = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
+        _save_dml_ddl(table_folder, internal_table_name, dml_contents, ddl_contents)
+        return ddl_contents, dml_contents

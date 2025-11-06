@@ -20,7 +20,7 @@ class TestKsqlMigrations(unittest.TestCase):
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         os.environ["CONFIG_FILE"] = str(cls.data_dir / "config-ccloud.yaml")
-        os.environ["STAGING"] = str(cls.data_dir / "ksql-project/staging/ut")
+        os.environ["STAGING"] = str(cls.data_dir / "ksql-project/staging/")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "ksql-project/sources")
         shutil.rmtree(os.environ["STAGING"], ignore_errors=True)
         os.makedirs(os.environ["STAGING"], exist_ok=True) 
@@ -51,10 +51,11 @@ class TestKsqlMigrations(unittest.TestCase):
         mock_input.return_value = "y"
         ddl, dml = _process_ksql_sql_file(table_name="BASIC_TABLE_STREAM", 
                                           ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-                                          staging_target_folder=os.environ["STAGING"]) 
+                                          staging_target_folder=os.environ["STAGING"],
+                                          product_name="ut") 
         assert ddl[0] is not None
-        assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql")
-        assert os.path.exists(os.environ["STAGING"] + "/basic_table_stream/sql-scripts/dml.basic_table_stream.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/basic_table_stream/sql-scripts/dml.basic_table_stream.sql")
 
     @patch('builtins.input')
     def test_2_kpi_config_table_with_latest_offset(self, mock_input):
@@ -62,11 +63,12 @@ class TestKsqlMigrations(unittest.TestCase):
         mock_input.return_value = "n"
         ddl, dml = _process_ksql_sql_file(table_name="KPI_CONFIG_TABLE", 
                 ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-                staging_target_folder=os.environ["STAGING"])
+                staging_target_folder=os.environ["STAGING"],
+                 product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
-        assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/ddl.kpi_config_table.sql")
-        assert os.path.exists(os.environ["STAGING"] + "/kpi_config_table/sql-scripts/dml.kpi_config_table.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/kpi_config_table/sql-scripts/ddl.kpi_config_table.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/kpi_config_table/sql-scripts/dml.kpi_config_table.sql")
 
     @patch('builtins.input')
     def test_3_ksql_filtering(self, mock_input):
@@ -78,11 +80,12 @@ class TestKsqlMigrations(unittest.TestCase):
         ksql_src_file = "ddl-filtering.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="filtering", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-                                        staging_target_folder=os.environ["STAGING"])
+                                        staging_target_folder=os.environ["STAGING"],
+                                        product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
-        assert os.path.exists(os.environ["STAGING"] + "/filtering/sql-scripts/ddl.filtering.sql")
-        assert os.path.exists(os.environ["STAGING"] + "/filtering/sql-scripts/dml.filtering.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/filtering/sql-scripts/ddl.filtering.sql")
+        assert os.path.exists(os.environ["STAGING"] + "/ut/filtering/sql-scripts/dml.filtering.sql")
 
     @patch('builtins.input')
     def test_11_w2_processing(self, mock_input):
@@ -94,7 +97,8 @@ class TestKsqlMigrations(unittest.TestCase):
         ksql_src_file = "w2_processing.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="w2_processing", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-                                        staging_target_folder=os.environ["STAGING"])
+                                        staging_target_folder=os.environ["STAGING"],
+                                        product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
 
@@ -103,31 +107,35 @@ class TestKsqlMigrations(unittest.TestCase):
         ksql_src_file = "ddl-map_substr.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="map_location", 
                                         ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-                                        staging_target_folder=os.environ["STAGING"])
+                                        staging_target_folder=os.environ["STAGING"],
+                                        product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
 
     def test_ksql_bigger_file(self):
         ksql_src_file = "ddl-bigger-file.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="equipment", 
-        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-        staging_target_folder=os.environ["STAGING"])
+                                    ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                                    staging_target_folder=os.environ["STAGING"],
+                                    product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
 
     def test_ksql_g(self):
         ksql_src_file = "ddl-g.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="table_struct", 
-        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-        staging_target_folder=os.environ["STAGING"])
+                        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                        staging_target_folder=os.environ["STAGING"],
+                        product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
 
     def test_ksql_geolocation(self):
         ksql_src_file = "ddl-geo.ksql"
         ddl, dml = _process_ksql_sql_file(table_name="geolocation", 
-        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
-        staging_target_folder=os.environ["STAGING"])
+                                        ksql_src_file=os.environ["SRC_FOLDER"] + "/" + ksql_src_file, 
+                                        staging_target_folder=os.environ["STAGING"],
+                                        product_name="ut")
         assert ddl[0] is not None
         assert dml[0] is not None
 

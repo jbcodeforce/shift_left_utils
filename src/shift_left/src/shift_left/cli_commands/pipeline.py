@@ -334,7 +334,13 @@ def deploy(
         pool_creation: bool = typer.Option(False, help="By default the deployment will not create a compute pool per table. This flag will create a pool.")
         ):
     """
-    Deploy a pipeline from a given table name , product name or a directory.
+    Deploy a pipeline from a given table name , product name or a directory taking into account the execution plan.
+    It can run the deployment in parallel or sequential.
+    Four approaches are possible:
+    1. Deploy from a given table name
+    2. Deploy from a product name
+    3. Deploy from a directory
+    4. Deploy from a table list file name
     """
 
     if max_thread > 1:
@@ -384,7 +390,7 @@ def build_execution_plan(
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products when considering descendants only.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
-    and existing Flink Statement running status.
+    and existing Flink Statement running status. It does not deploy. This is a command for analysis.
     """
     if compute_pool_id:
         pool_creation = False
