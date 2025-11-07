@@ -133,20 +133,20 @@ class FlinkStatementNode(BaseModel):
     """
     # -- static information
     table_name: str
-    product_name: Optional[str] = Field(default=None, description="Data Product name")
-    type: Optional[str] = Field(default=None, description="Type of the node")
-    path:  Optional[str] =  Field(default=None, description="Name of path to access table files like sql, and metadata")
+    product_name: str = Field(default="", description="Data Product name")
+    type: Optional[str] = Field(default="", description="Type of the node")
+    path:  Optional[str] =  Field(default="", description="Name of path to access table files like sql, and metadata")
     created_at: Optional[datetime] = Field(default=datetime.now())
-    dml_ref: Optional[str] =  Field(default=None, description="DML sql file path")
-    dml_statement_name: Optional[str] =  Field(default=None, description="DML Statement name")
+    dml_ref: Optional[str] =  Field(default="", description="DML sql file path")
+    dml_statement_name: Optional[str] =  Field(default="", description="DML Statement name")
     ddl_ref: Optional[str] =  Field(default=None, description="DDL sql file path")
     ddl_statement_name: Optional[str] =  Field(default=None, description="DDL Statement name")
     upgrade_mode: str = Field(default="Stateful", description="upgrade mode will depend if the node state is stateful or not.")
     # -- dynamic information
     dml_only: Optional[bool] = Field(default=False, description="Used during deployment to enforce DDL and DML deployment or DML only")
     update_children: Optional[bool] = Field(default=False, description="Update children when the table is not a sink table. Will take care of statefulness. Used during deployment")
-    compute_pool_id:  Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
-    compute_pool_name: Optional[str] =  Field(default=None, description="Name of compute pool to use for deployment")
+    compute_pool_id:  str =  Field(default="", description="Name of compute pool to use for deployment")
+    compute_pool_name: Optional[str] =  Field(default="", description="Name of compute pool to use for deployment")
     parents: Set =  Field(default=set(), description="List of parent to run before this node")
     children: Set = Field(default=set(), description="Child list to run after this node")
     existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")

@@ -1,0 +1,255 @@
+{
+   "table_name": "z",
+   "product_name": "p2",
+   "type": "intermediate",
+   "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+   "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+   "path": "pipelines/intermediates/p2/z",
+   "complexity": {
+      "number_of_regular_joins": 1,
+      "number_of_left_joins": 0,
+      "number_of_right_joins": 0,
+      "number_of_inner_joins": 0,
+      "number_of_outer_joins": 0,
+      "complexity_type": "Simple",
+      "state_form": "Stateful"
+   },
+   "parents": [
+      {
+         "table_name": "x",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
+         "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
+         "path": "pipelines/intermediates/p2/x",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateful"
+         },
+         "parents": [
+            {
+               "table_name": "src_x",
+               "product_name": "p2",
+               "type": "source",
+               "dml_ref": "pipelines/sources/p2/src_x/sql-scripts/dml.src_x.sql",
+               "ddl_ref": "pipelines/sources/p2/src_x/sql-scripts/ddl.src_x.sql",
+               "path": "pipelines/sources/p2/src_x",
+               "complexity": {
+                  "number_of_regular_joins": 0,
+                  "number_of_left_joins": 0,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": [
+                  {
+                     "table_name": "x",
+                     "product_name": "p2",
+                     "type": "intermediate",
+                     "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
+                     "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
+                     "path": "pipelines/intermediates/p2/x",
+                     "complexity": {
+                        "number_of_regular_joins": 0,
+                        "number_of_left_joins": 0,
+                        "number_of_right_joins": 0,
+                        "number_of_inner_joins": 0,
+                        "number_of_outer_joins": 0,
+                        "complexity_type": "Simple",
+                        "state_form": "Stateless"
+                     },
+                     "parents": [],
+                     "children": []
+                  }
+               ]
+            }
+         ],
+         "children": [
+            {
+               "table_name": "z",
+               "product_name": "p2",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+               "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+               "path": "pipelines/intermediates/p2/z",
+               "complexity": {
+                  "number_of_regular_joins": 1,
+                  "number_of_left_joins": 0,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": []
+            }
+         ]
+      },
+      {
+         "table_name": "y",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
+         "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
+         "path": "pipelines/intermediates/p2/y",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateless"
+         },
+         "parents": [
+            {
+               "table_name": "src_y",
+               "product_name": "p2",
+               "type": "source",
+               "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
+               "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
+               "path": "pipelines/sources/p2/src_y",
+               "complexity": {
+                  "number_of_regular_joins": 0,
+                  "number_of_left_joins": 0,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": [
+                  {
+                     "table_name": "y",
+                     "product_name": "p2",
+                     "type": "intermediate",
+                     "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
+                     "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
+                     "path": "pipelines/intermediates/p2/y",
+                     "complexity": {
+                        "number_of_regular_joins": 0,
+                        "number_of_left_joins": 0,
+                        "number_of_right_joins": 0,
+                        "number_of_inner_joins": 0,
+                        "number_of_outer_joins": 0,
+                        "complexity_type": "Simple",
+                        "state_form": "Stateless"
+                     },
+                     "parents": [],
+                     "children": []
+                  }
+               ]
+            }
+         ],
+         "children": [
+            {
+               "table_name": "z",
+               "product_name": "p2",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+               "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+               "path": "pipelines/intermediates/p2/z",
+               "complexity": {
+                  "number_of_regular_joins": 1,
+                  "number_of_left_joins": 0,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": []
+            },
+            {
+               "table_name": "d",
+               "product_name": "p2",
+               "type": "intermediate",
+               "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+               "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+               "path": "pipelines/intermediates/p2/d",
+               "complexity": {
+                  "number_of_regular_joins": 1,
+                  "number_of_left_joins": 0,
+                  "number_of_right_joins": 0,
+                  "number_of_inner_joins": 0,
+                  "number_of_outer_joins": 0,
+                  "complexity_type": "Simple",
+                  "state_form": "Stateful"
+               },
+               "parents": [],
+               "children": []
+            }
+         ]
+      }
+   ],
+   "children": [
+      {
+         "table_name": "p",
+         "product_name": "p2",
+         "type": "fact",
+         "dml_ref": "pipelines/facts/p2/p/sql-scripts/dml.p.sql",
+         "ddl_ref": "pipelines/facts/p2/p/sql-scripts/ddl.p.sql",
+         "path": "pipelines/facts/p2/p",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateless"
+         },
+         "parents": [],
+         "children": []
+      },
+      {
+         "table_name": "d",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+         "path": "pipelines/intermediates/p2/d",
+         "complexity": {
+            "number_of_regular_joins": 1,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateful"
+         },
+         "parents": [],
+         "children": []
+      },
+      {
+         "table_name": "c",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/c/sql-scripts/dml.c.sql",
+         "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
+         "path": "pipelines/intermediates/p2/c",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateless"
+         },
+         "parents": [],
+         "children": []
+      }
+   ]
+}

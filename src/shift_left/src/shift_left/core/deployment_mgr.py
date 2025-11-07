@@ -57,12 +57,13 @@ def build_deploy_pipeline_from_table(
     execute_plan: bool = False,
     sequential: bool = True,
     pool_creation: bool = True,
+    exclude_table_names: List[str] = [],
     max_thread: int = 1
-) -> Tuple[str, FlinkStatementExecutionPlan]:
+) -> Tuple[str, TableReport]:
     """
     Build an execution plan from the static relationship between Flink Statements.
     Deploy a pipeline starting from a given table.
-    
+
     Args:
         table_name: Name of the table to deploy
         inventory_path: Path to the pipeline inventory
@@ -70,10 +71,10 @@ def build_deploy_pipeline_from_table(
         dml_only: Whether to only deploy DML statements
         may_start_children: Whether to start child pipelines
         force_ancestors: Whether to force source table deployment
-        
+
     Returns:
         Tuple containing the deployment report and summary
-        
+
     Raises:
         ValueError: If the not able to process the execution plan
     """
@@ -81,7 +82,7 @@ def build_deploy_pipeline_from_table(
     start_time = time.perf_counter()
     #statement_mgr.reset_statement_list()
     try:
-        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+
         pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
         start_node = pipeline_def.to_node()
         start_node.created_at = datetime.now()
@@ -89,29 +90,32 @@ def build_deploy_pipeline_from_table(
         start_node.compute_pool_id = compute_pool_id
         start_node = _assign_compute_pool_id_to_node(node=start_node, compute_pool_id=compute_pool_id, pool_creation=pool_creation)
         start_node.update_children = may_start_descendants
+        start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
+        start_node.to_restart = True
         # Build the static graph from the Flink statement relationship
         node_map = _build_statement_node_map(start_node)
 
         ancestors = []
-        start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
-        start_node.to_restart = True
-        ancestors = _build_topological_sorted_parents([start_node], node_map)
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors= ancestors, 
-                                                                      node_map=node_map, 
-                                                                      force_ancestors=force_ancestors, 
-                                                                      may_start_descendants=may_start_descendants, 
+        ancestors = _build_topological_sorted_graph([start_node], node_map)
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors= ancestors,
+                                                                      node_map=node_map,
+                                                                      force_ancestors=force_ancestors,
+                                                                      may_start_descendants=may_start_descendants,
                                                                       cross_product_deployment=cross_product_deployment,
-                                                                      compute_pool_id=compute_pool_id, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=compute_pool_id,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=exclude_table_names,
                                                                       pool_creation=pool_creation)
         _persist_execution_plan(execution_plan)
+        compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary=report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         logger.info(f"Execute the plan before deployment: {summary}")
         if execute_plan:
             statements = _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
-        
+
             result.execution_time = int(time.perf_counter() - start_time)
             result.start_time = start_time
             logger.info(
@@ -119,10 +123,10 @@ def build_deploy_pipeline_from_table(
                 f"{result.model_dump_json(indent=3)}"
             )
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
-            simple_report=report_mgr.build_simple_report(execution_plan, None)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
             #logger.info(f"Execute the plan after deployment: {simple_report}")
-            summary+=f"\n{simple_report}"
-        return summary, execution_plan
+            summary+="\n"+f"#"*40 + f" Deployed {len(table_report.tables)} tables " + "#"*40 + "\n"
+        return summary, table_report
     except Exception as e:
         logger.error(f"Failed to deploy pipeline from table {table_name} error is: {str(e)}")
         raise
@@ -130,20 +134,20 @@ def build_deploy_pipeline_from_table(
 def build_deploy_pipelines_from_product(
     product_name: str,
     inventory_path: str,
-    compute_pool_id: str = None,
-    dml_only: bool = False, 
+    compute_pool_id: str = "",
+    dml_only: bool = False,
     may_start_descendants: bool = False,
     force_ancestors: bool = False,
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
     sequential: bool = True,
     pool_creation: bool = True,
+    exclude_table_names: List[str] = [],
     max_thread: int = 1
 ) -> Tuple[str, TableReport]:
-    """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions. 
+    """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions.
     As each statement deployment is creating an execution plan, previously started statements will not be restarted.
     """
-    inventory_path = inventory_path or os.getenv("PIPELINES")
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     start_time = time.perf_counter()
     if not compute_pool_id:
@@ -154,38 +158,43 @@ def build_deploy_pipelines_from_product(
     visited_nodes = set()  # Shared across all calls to avoid redundant processing
     count=0
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building Node map")
-    for table_name, table_ref_dict in table_inventory.items():
+    for table_ref_dict in table_inventory.values():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref.product_name == product_name:
-            node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
-            node.dml_only = dml_only
-            nodes_to_process.append(node)
-            # Build the static graph to keep accurate references from the Flink statement relationship
-            # Pass shared visited_nodes and node_map to avoid reprocessing already analyzed nodes
-            combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
-            count+=1
+            pipe_def = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+            if pipe_def:
+                node = pipe_def.to_node()
+                node.dml_only = dml_only
+                nodes_to_process.append(node)
+                # Build the static graph to keep accurate references from the Flink statement relationship
+                # Pass shared visited_nodes and node_map to avoid reprocessing already analyzed nodes
+                combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
+                count+=1
+            else:
+                logger.error(f"Data consistency issue for {table_ref.table_folder_name}: no pipeline definition found or wrong reference in {table_ref.table_name}. The execution plan may not deploy successfully")
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Finished Node map")
     if count > 0:
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building topological sorted parents for {count} tables")            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
-        ancestors = _filtering_descendant_nodes(ancestors, product_name, may_start_descendants)
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building topological sorted parents for {count} tables")
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
+        ancestors = _filtering_out_descendant_nodes(ancestors, product_name, may_start_descendants)
         start_node = ancestors[-1]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=force_ancestors, 
-                                                                      may_start_descendants=may_start_descendants, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=force_ancestors,
+                                                                      may_start_descendants=may_start_descendants,
                                                                       cross_product_deployment=cross_product_deployment,
-                                                                      compute_pool_id=compute_pool_id, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=compute_pool_id,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=exclude_table_names,
                                                                       pool_creation=pool_creation)
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Start building topological sorted parents for {count} tables")            
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Start building topological sorted parents for {count} tables")
         if start_node.is_running() and not force_ancestors:
             start_node.to_restart = False
             start_node.to_run = False
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan summary: {summary}")
             start_time = time.perf_counter()
@@ -194,15 +203,15 @@ def build_deploy_pipelines_from_product(
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\n{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds"
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build table report now")
-            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
         summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
         return "Nothing run.", TableReport()
 
 def build_and_deploy_all_from_directory(
-    directory: str, 
-    inventory_path: str, 
+    directory: str,
+    inventory_path: str,
     compute_pool_id: str,
     dml_only: bool = False,
     may_start_descendants: bool = False,
@@ -211,10 +220,11 @@ def build_and_deploy_all_from_directory(
     execute_plan: bool = False,
     sequential: bool = True,
     pool_creation: bool = True,
+    exclude_table_names: List[str] = [],
     max_thread: int = 1
 ) -> Tuple[str, TableReport]:
     """
-    Deploy all the pipelines within a directory tree. The approach is 
+    Deploy all the pipelines within a directory tree. The approach is
     to define a combined execution plan for all tables in the directory as it is important
     to start Flink statements only one time and in the correct order.
     """
@@ -234,22 +244,23 @@ def build_and_deploy_all_from_directory(
             combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
     count = len(nodes_to_process)
     logger.info(f"Found {count} tables to process")
-    if count > 0:            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+    if count > 0:
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
         start_node = ancestors[-1]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=force_ancestors, 
-                                                                      may_start_descendants=may_start_descendants, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=force_ancestors,
+                                                                      may_start_descendants=may_start_descendants,
                                                                       cross_product_deployment=cross_product_deployment,
-                                                                      compute_pool_id=compute_pool_id,  
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=compute_pool_id,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=exclude_table_names,
                                                                       pool_creation=pool_creation
                                                                       )
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
             accept_exceptions= [True if "sources" in directory else False]
@@ -257,7 +268,7 @@ def build_and_deploy_all_from_directory(
             execution_time = int(time.perf_counter() - start_time)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
-            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -265,65 +276,64 @@ def build_and_deploy_all_from_directory(
 
 
 def build_and_deploy_all_from_table_list(
-    table_list_file_name: str,
+    include_table_names: List[str],
     inventory_path: str,
     compute_pool_id: str,
     dml_only: bool = False,
     may_start_descendants: bool = False,
-    force_ancestors: bool = False,  
+    force_ancestors: bool = False,
     cross_product_deployment: bool = False,
     execute_plan: bool = False,
     sequential: bool = True,
     pool_creation: bool = True,
+    exclude_table_names: List[str] = [],
     max_thread: int = 1
 ) -> Tuple[str, TableReport]:
     """
-    Deploy all the pipelines in the table list file.    
+    Deploy all the pipelines in the table list file.
     """
-    inventory_path = inventory_path or os.getenv("PIPELINES")
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     start_time = time.perf_counter()
     nodes_to_process = []
     combined_node_map = {}
-    with open(table_list_file_name, "r") as f:
-        table_names = f.read().splitlines()
-        count=0
-        combined_node_map = {}
-        visited_nodes = set()
-        print(f"Processing {len(table_names)} tables")
-        for table_name in table_names:
-            for _inventory_table_name, table_ref_dict in table_inventory.items():
-                table_ref = FlinkTableReference(**table_ref_dict)
-                if _inventory_table_name == table_name:
-                    node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
-                    nodes_to_process.append(node)
-                    node.to_restart = True
-                    # Build the static graph from the Flink statement relationship
-                    combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
-                    count+=1
-                    break
-    if count > 0:            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+    count=0
+    combined_node_map = {}
+    visited_nodes = set()
+    print(f"Processing {len(include_table_names)} tables")
+    for table_name in include_table_names:
+            table_ref_dict = table_inventory[table_name]
+            table_ref = FlinkTableReference(**table_ref_dict)
+            pipe_def = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+            if pipe_def:
+                node = pipe_def.to_node()
+                nodes_to_process.append(node)
+                node.to_restart = True
+                # Build the static graph from the Flink statement relationship
+                combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
+                count+=1
+    if count > 0:
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
         start_node = ancestors[-1]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=force_ancestors, 
-                                                                      may_start_descendants=may_start_descendants, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=force_ancestors,
+                                                                      may_start_descendants=may_start_descendants,
                                                                       cross_product_deployment=cross_product_deployment,
-                                                                      compute_pool_id=compute_pool_id, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=compute_pool_id,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=exclude_table_names,
                                                                       pool_creation=pool_creation)
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
-        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes)
+        table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
             _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
-            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, get_metrics=True)
+            table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
             summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
         return summary, table_report
     else:
@@ -332,25 +342,25 @@ def build_and_deploy_all_from_table_list(
 def report_running_flink_statements_for_a_table(
     table_name: str,
     inventory_path: str,
-    from_date: str = None
+    from_date: str
 ) -> str:
     """
     Report running flink statements for a table execution plan
     """
     config = get_config()
-    _, execution_plan = build_deploy_pipeline_from_table(table_name, 
-                                                        inventory_path=inventory_path, 
+    _, report = build_deploy_pipeline_from_table(table_name,
+                                                        inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
                                                         may_start_descendants=False,
                                                         force_ancestors=False,
                                                         pool_creation=False)
-    return report_mgr.build_simple_report(execution_plan, from_date)
+    return report_mgr.build_simple_report(report)
 
 def report_running_flink_statements_for_all_from_directory(
-    directory: str, 
+    directory: str,
     inventory_path: str,
-    from_date: str = None
+    from_date: str
 ) -> str:
     """
     Review execution plans for all the pipelines in the directory.
@@ -370,32 +380,33 @@ def report_running_flink_statements_for_all_from_directory(
             file_path=root + "/" + PIPELINE_JSON_FILE_NAME
             pipeline_def = read_pipeline_definition_from_file(file_path)
             node=pipeline_def.to_node()
-            node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)    
+            node.existing_statement_info = statement_mgr.get_statement_status_with_cache(node.dml_statement_name)
             node.compute_pool_id = node.existing_statement_info.compute_pool_id
             nodes_to_process.append(node)
             combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
-    if count > 0:            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+    if count > 0:
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
         start_node = ancestors[0]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=False, 
-                                                                      may_start_descendants=False, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=False,
+                                                                      may_start_descendants=False,
                                                                       cross_product_deployment=False,
-                                                                      compute_pool_id=None, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=None,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=[],
                                                                       pool_creation=False)
-       
+
         table_report = report_mgr.build_TableReport(report_name, execution_plan.nodes, from_date=from_date, get_metrics=True)
         return report_mgr.persist_table_reports(table_report, report_name)
     return "Nothing run. Do you have a pipeline_definition.json files?"
 
-  
+
 
 def report_running_flink_statements_for_a_product(
-    product_name: str, 
+    product_name: str,
     inventory_path: str,
     from_date: str
 ) -> str:
@@ -419,37 +430,38 @@ def report_running_flink_statements_for_a_product(
             nodes_to_process.append(node)
             combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
-    if count > 0:            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+    if count > 0:
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
         start_node = ancestors[0]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=False, 
-                                                                      may_start_descendants=False, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=False,
+                                                                      may_start_descendants=False,
                                                                       cross_product_deployment=False,
-                                                                      compute_pool_id=None, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id="",
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=[],
                                                                       pool_creation=False)
-       
+
         table_report = report_mgr.build_TableReport(report_name, execution_plan.nodes, from_date=from_date, get_metrics=True)
         return report_mgr.persist_table_reports(table_report, report_name)
     return "Nothing run. Do you have a pipeline_definition.json files?"
 
 
 def full_pipeline_undeploy_from_table(
-    table_name: str, 
+    table_name: str,
     inventory_path: str
 ) -> str:
     """
-    Stop DML statement and drop tables: look at the parents of the current table 
+    Stop DML statement and drop tables: look at the parents of the current table
     and remove the parent that has one running child. Delete all the children of the current table.
     """
     logger.info("\n"+"#"*20 + f"\n# Full pipeline delete from table {table_name}\n" + "#"*20)
     start_time = time.perf_counter()
     table_pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
     config = get_config()
-    summary, execution_plan = build_deploy_pipeline_from_table(table_name=table_pipeline_def.table_name,  
+    summary, report = build_deploy_pipeline_from_table(table_name=table_pipeline_def.table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
@@ -459,23 +471,25 @@ def full_pipeline_undeploy_from_table(
     config = get_config()
     trace = f"Full pipeline delete from table {table_name}\n"
     print(f"{trace}")
-    for node in reversed(execution_plan.nodes):
-        if node.to_restart: # remove only the tables that was marked as to restart to avoid stopping ancestors
-            statement_mgr.delete_statement_if_exists(node.dml_statement_name)
-            rep= statement_mgr.drop_table(node.table_name, node.compute_pool_id)
-            trace+=f"Dropped table {node.table_name} with result: {rep}\n"
-            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropped table {node.table_name}")
+    for table_info in reversed(report.tables):
+        if table_info.to_restart: # remove only the tables that was marked as to restart to avoid stopping ancestors
+            statement_mgr.delete_statement_if_exists(table_info.statement_name)
+            rep= statement_mgr.drop_table(table_info.table_name, table_info.compute_pool_id)
+            trace+=f"Dropped table {table_info.table_name} with result: {rep}\n"
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropped table {table_info.table_name}")
     execution_time = int(time.perf_counter() - start_time)
     logger.info(f"Done in {execution_time} seconds to undeploy pipeline from table {table_name}")
     return trace
 
-def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, compute_pool_id: str = None, cross_product: bool = False) -> str:
+def full_pipeline_undeploy_from_product(product_name: str,
+										inventory_path: str,
+										compute_pool_id: str,
+										cross_product: bool = False) -> str:
     """
     To undeploy we need to build an integrated execution plan for all the tables in the product.
     Undeploy in the reverse order of the execution plan, but keep table that have other product(s) as children
     """
     compute_pool_id = compute_pool_id or get_config()['flink']['compute_pool_id']
-    inventory_path = inventory_path or os.getenv("PIPELINES")
     start_time = time.perf_counter()
     nodes_to_process = []
     combined_node_map = {}
@@ -483,7 +497,7 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
     count=0
     trace = ""
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-    for table_name, table_ref_dict in table_inventory.items():
+    for table_ref_dict in table_inventory.values():
         table_ref = FlinkTableReference(**table_ref_dict)
         if table_ref and table_ref.product_name == product_name:
             node = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME).to_node()
@@ -491,19 +505,20 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
             # Build the static graph from the Flink statement relationship
             combined_node_map = _build_statement_node_map(node, visited_nodes, combined_node_map)
             count+=1
-    if count > 0:            
-        ancestors = _build_topological_sorted_parents(nodes_to_process, combined_node_map)
+    if count > 0:
+        ancestors = _build_topological_sorted_graph(nodes_to_process, combined_node_map)
         start_node = ancestors[0]
-        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors, 
-                                                                      node_map=combined_node_map, 
-                                                                      force_ancestors=False, 
-                                                                      may_start_descendants=True, 
+        execution_plan = _build_execution_plan_using_sorted_ancestors(ancestors=ancestors,
+                                                                      node_map=combined_node_map,
+                                                                      force_ancestors=False,
+                                                                      may_start_descendants=True,
                                                                       cross_product_deployment=False,
-                                                                      compute_pool_id=compute_pool_id, 
-                                                                      table_name=start_node.table_name, 
+                                                                      compute_pool_id=compute_pool_id,
+                                                                      table_name=start_node.table_name,
                                                                       expected_product_name=start_node.product_name,
+                                                                      exclude_table_names=[],
                                                                       pool_creation=False)
-       
+
         execution_plan.nodes.reverse()
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Integrated execution plan for {product_name} with {len(execution_plan.nodes)} nodes")
         for node in execution_plan.nodes:
@@ -511,26 +526,26 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
             if node.existing_statement_info == None or node.existing_statement_info.status_phase == "UNKNOWN":
                 state = "NOT EXISTS"
             print(f"Table: {report_mgr.pad_or_truncate(node.table_name, 40)} product: {report_mgr.pad_or_truncate(node.product_name, 40)} {state} {node.compute_pool_id}")
-            
+
         trace = f"Full pipeline delete from product {product_name}\n"
-        
+
         # Filter nodes that need to be processed
-        nodes_to_drop = [node for node in execution_plan.nodes if (node.product_name == product_name 
+        nodes_to_drop = [node for node in execution_plan.nodes if (node.product_name == product_name
                                                                 and (node.is_running() or node.existing_statement_info.status_phase != "UNKNOWN"))]  # 08-14 path to remove ant node
         # nodes_to_drop = [node for node in execution_plan.nodes if node.product_name == product_name]
         count = len(nodes_to_drop)
         if count == 0:
             return "No table found for product " + product_name + " in inventory " + inventory_path
-        
+
         # Get number of CPU cores for max workers
         max_workers = multiprocessing.cpu_count()
-        
+
         # Process nodes in parallel using a thread pool
         results = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks and get future objects
             future_to_node = {executor.submit(_drop_node_worker, node): node for node in nodes_to_drop}
-            
+
             # Process completed tasks as they finish
             for future in as_completed(future_to_node):
                 node = future_to_node[future]
@@ -539,17 +554,17 @@ def full_pipeline_undeploy_from_product(product_name: str, inventory_path: str, 
                     results.append(result)
                 except Exception as e:
                     results.append(f"Failed to process {node.table_name}: {str(e)}\n")
-        
+
         trace += "".join(results)
-        
-                
+
+
     execution_time = int(time.perf_counter() - start_time)
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Undeploy pipeline product {product_name} Done in {execution_time} seconds")
     return trace
 
 
-def prepare_tables_from_sql_file(sql_file_name: str, 
-                                 compute_pool_id: str = None):
+def prepare_tables_from_sql_file(sql_file_name: str,
+                                 compute_pool_id: str):
     """
     Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
     """
@@ -562,13 +577,13 @@ def prepare_tables_from_sql_file(sql_file_name: str,
         for line in f:
             if line.lstrip().startswith('--'):
                 continue
-            _, sql_out= transformer.update_sql_content(line, 
-                                                       "", 
+            _, sql_out= transformer.update_sql_content(line,
+                                                       "",
                                                        "")
             print(sql_out)
             statement_name = f"prepare-table-{stmnt_suffix}-{idx}"
-            statement = statement_mgr.post_flink_statement(compute_pool_id, 
-                                                           statement_name, 
+            statement = statement_mgr.post_flink_statement(compute_pool_id,
+                                                           statement_name,
                                                            sql_out)
             while statement.status.phase not in ["COMPLETED", "FAILED"]:
                 time.sleep(2)
@@ -584,26 +599,27 @@ def _drop_node_worker(node: FlinkStatementNode) -> str:
     """Worker function to drop a single node's table and statements."""
     try:
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Dropping table {node.table_name}")
-        statement_mgr.delete_statement_if_exists(node.dml_statement_name) 
-        statement_mgr.delete_statement_if_exists(node.ddl_statement_name)   
+        statement_mgr.delete_statement_if_exists(node.dml_statement_name)
+        statement_mgr.delete_statement_if_exists(node.ddl_statement_name)
         rep = statement_mgr.drop_table(node.table_name, node.compute_pool_id)
         return f"Dropped table {node.table_name} with result: {rep}\n"
     except Exception as e:
         return f"Failed to drop table {node.table_name}: {str(e)}\n"
 
-def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementNode], 
-                                                 node_map: Dict[str, FlinkStatementNode], 
-                                                 force_ancestors: bool, 
-                                                 may_start_descendants: bool, 
+def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementNode],
+                                                 node_map: Dict[str, FlinkStatementNode],
+                                                 force_ancestors: bool,
+                                                 may_start_descendants: bool,
                                                  cross_product_deployment: bool,
                                                  compute_pool_id: str,
                                                  table_name: str,
                                                  expected_product_name: str,
+                                                 exclude_table_names: List[str],
                                                  pool_creation: bool = True):
     """
     Build the execution plan using the sorted ancestors, and then taking into account children of each node and their stateful mode.
     The execution plan is a DAG of nodes that need to be executed in the correct order.
-    State is always needed if the output of processing a row is not only determined by that row itself, but also depends on the rows, 
+    State is always needed if the output of processing a row is not only determined by that row itself, but also depends on the rows,
     which have previously been processed. A join needs to materialize both sides of the join, as if a row in left hand side is updated
     the statements needs to emit an updated match for all matching rows in the right hand side.
     """
@@ -616,11 +632,11 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         # Process all parents and grandparents reachable by DFS from start_node. Ancestors may not be
         # in the same product family as the start_node. The ancestor list is sorted so first node needs to run first
         execution_plan = _process_ancestors(ancestors, execution_plan, force_ancestors, compute_pool_id, may_start_descendants, pool_creation)
-    
-        # At this level, execution_plan.nodes has the list of ancestors from the  starting node. 
-        # For each node, we need to assess if children and ancestors needs to be started. 
+        execution_plan.nodes = _filter_nodes_to_exclude(execution_plan.nodes, exclude_table_names)
+        # At this level, execution_plan.nodes has the list of ancestors from the  starting node.
+        # For each node, we need to assess if children and ancestors needs to be started.
         # Only restart ancestors, if user forced to do so: The current node once it deletes its output table(s) will reprocess
-        # records from the earliest and regenerates its states and aggregations.    
+        # records from the earliest and regenerates its states and aggregations.
         # The children needs to be restarted if the current node is stateful to avoid duplicates records
         if may_start_descendants:
             accepted_common_products = get_config()['app']['accepted_common_products']
@@ -632,16 +648,16 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                     for child in node.children:
                         child_node = _get_static_info_update_node_map(child, node_map) # need all the information of the child.
                         if child_node:
-                            if ((node.upgrade_mode == "Stateful" ) 
+                            if ((node.upgrade_mode == "Stateful" )
                             or (node.upgrade_mode != "Stateful" and child_node.upgrade_mode == "Stateful")):
-                                if (child_node not in execution_plan.nodes 
-                                    and (child_node.product_name == expected_product_name 
-                                        or child_node.product_name in accepted_common_products 
+                                if (child_node not in execution_plan.nodes
+                                    and (child_node.product_name == expected_product_name
+                                        or child_node.product_name in accepted_common_products
                                         or cross_product_deployment)):
                                     child_node.to_restart = not child_node.to_run  # should we restart non same product ? assume yes because may_start_descendants is True
                                     child_node=_assign_compute_pool_id_to_node(node=child_node, compute_pool_id=compute_pool_id, pool_creation=pool_creation)
                                     child_node.parents.remove(node)  # do not reprocess current node as parent of current child
-                                    new_ancestors = _build_topological_sorted_parents([child_node], node_map)
+                                    new_ancestors = _build_topological_sorted_graph([child_node], node_map)
                                     execution_plan = _process_ancestors(new_ancestors, execution_plan, force_ancestors, compute_pool_id, may_start_descendants, pool_creation)
                                     sorted_children = _build_topological_sorted_children(child_node, node_map)
                                     for _child in sorted_children:
@@ -649,9 +665,10 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
                                             _child.to_restart = not _child.to_run
                                             _child = _assign_compute_pool_id_to_node(node=_child, compute_pool_id=compute_pool_id, pool_creation=pool_creation)
                                     execution_plan.nodes = _merge_graphs(execution_plan.nodes, list(reversed(sorted_children)))
+                                    execution_plan.nodes = _filter_nodes_to_exclude(execution_plan.nodes, exclude_table_names)
                         else:
                             logger.warning(f"Child {child.table_name} not found in node_map")
-                            
+
         logger.info(f"Done with execution plan construction: [{len(execution_plan.nodes)} nodes]")
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done with execution plan construction [{len(execution_plan.nodes)} nodes]")
         logger.debug(execution_plan)
@@ -660,7 +677,7 @@ def _build_execution_plan_using_sorted_ancestors(ancestors: List[FlinkStatementN
         logger.error(f"Failed to build execution plan. Error is : {str(e)}")
         raise
 
-def _get_static_info_update_node_map(simple_node: FlinkStatementNode, 
+def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
                                      node_map: Dict[str, FlinkStatementNode]
 ) -> FlinkStatementNode | None:
     """
@@ -675,8 +692,8 @@ def _get_static_info_update_node_map(simple_node: FlinkStatementNode,
         return None
 
 
-def _process_ancestors(ancestors: List[FlinkStatementNode], 
-                       execution_plan: FlinkStatementExecutionPlan, 
+def _process_ancestors(ancestors: List[FlinkStatementNode],
+                       execution_plan: FlinkStatementExecutionPlan,
                        force_ancestors: bool,
                        compute_pool_id: str,
                        may_start_descendants: bool = False,
@@ -686,6 +703,7 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
     Process the ancestors of the current node. Ancestor needs to be started
     if it is not running so the current node will run successfully.
     A stateful node enforces restarting its children.
+    If force_ancestors is True, all ancestors will be started.
     """
     for node in ancestors:
         if force_ancestors and not node.to_restart:
@@ -694,7 +712,7 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
             node = _get_and_update_statement_info_compute_pool_id_for_node(node)
             if not node.is_running() and not node.to_restart:
                 node.to_run = True
-        if node.to_run and node.upgrade_mode == "Stateful": 
+        if (node.to_run or node.to_restart) and node.upgrade_mode == "Stateful":
             node.update_children = may_start_descendants
         if node.to_run and not node.compute_pool_id:
             node = _assign_compute_pool_id_to_node(node, compute_pool_id, pool_creation=pool_creation)
@@ -705,14 +723,14 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
 def _persist_execution_plan(execution_plan: FlinkStatementExecutionPlan, filename: str = None):
     """
     Persist the execution plan to a JSON file, handling circular references.
-    
+
     Args:
         execution_plan: The execution plan to persist
     """
     if not filename:
         filename = f"{shift_left_dir}/{execution_plan.start_table_name}_execution_plan.json"
     logger.info(f"Persist execution plan to {filename}")
-    
+
     # Add nodes with their parent and child references
     for node in execution_plan.nodes:
         parent_names = []
@@ -729,18 +747,18 @@ def _persist_execution_plan(execution_plan: FlinkStatementExecutionPlan, filenam
                 child_names.append(c)
         node.parents = set(parent_names)
         node.children = set(child_names)
-    
+
     # Write to file with proper JSON formatting
     with open(filename, "w") as f:
         f.write(execution_plan.model_dump_json(indent=2))  # default=str handles datetime serialization
 
 
 
-        
-def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dict[str, FlinkStatementNode], 
+
+def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dict[str, FlinkStatementNode],
                                                          Dict[str, List[FlinkStatementNode]]]:
     """Builds a subgraph containing all ancestors of the start node.
-    Returns a dictionary of unique ancestor and a dict of <table_name, list of ancestors> tuple 
+    Returns a dictionary of unique ancestor and a dict of <table_name, list of ancestors> tuple
     for each parent of a node.
     """
     ancestors = {}
@@ -764,8 +782,8 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
     # a node with 3 ancestors will have 3 records in the ancestor dependencies list.
     ancestor_dependencies = []
 
-    def _add_parent_dependencies(node: FlinkStatementNode, 
-                                 node_map: dict, 
+    def _add_parent_dependencies(node: FlinkStatementNode,
+                                 node_map: dict,
                                  new_ancestors: dict,
                                  ancestor_dependencies: list) -> None:
         """Iteratively add <table-name, parent> tuples to ancestor_dependencies.
@@ -796,7 +814,7 @@ def _get_ancestor_subgraph(start_node: FlinkStatementNode, node_map)-> Tuple[Dic
     return ancestors, ancestor_dependencies
 
 
-def _build_topological_sorted_parents(current_nodes: List[FlinkStatementNode], 
+def _build_topological_sorted_graph(current_nodes: List[FlinkStatementNode],
                                       node_map: Dict[str, FlinkStatementNode])-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG of the current node parents
     the node_map is a hashmap of table name and direct static relationships of the table with its parents and children
@@ -812,7 +830,7 @@ def _build_topological_sorted_parents(current_nodes: List[FlinkStatementNode],
     return _topological_sort(ancestor_nodes, ancestor_dependencies)
 
 def _build_topological_sorted_children(
-        current_node: FlinkStatementNode, 
+        current_node: FlinkStatementNode,
         node_map: Dict[str, FlinkStatementNode]
 )-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG of the current node"""
@@ -820,7 +838,7 @@ def _build_topological_sorted_children(
     return _topological_sort(nodes, dependencies)
 
 def _topological_sort(
-    nodes: Dict[str, FlinkStatementNode], 
+    nodes: Dict[str, FlinkStatementNode],
     dependencies: Dict[str, List[FlinkStatementNode]]
 )-> List[FlinkStatementNode]:
     """Performs topological sort on a DAG using Kahn Algorithm"""
@@ -850,7 +868,7 @@ def _topological_sort(
         raise ValueError("Graph has a cycle, cannot perform topological sort.")
 
 
-def _get_descendants_subgraph(start_node: FlinkStatementNode, 
+def _get_descendants_subgraph(start_node: FlinkStatementNode,
                               node_map: Dict[str, FlinkStatementNode]
 )-> Tuple[Dict[str, FlinkStatementNode], Dict[str, List[FlinkStatementNode]]]:
     """Builds a subgraph containing all descendants of the start node."""
@@ -890,10 +908,10 @@ def _get_descendants_subgraph(start_node: FlinkStatementNode,
 def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatementNode) -> FlinkStatementNode:
     """
     Update node with current statem
-    
+
     Args:
         node: Node to update
-        
+
     Returns:
         Updated node with existing_statement_info field getting the retrieved statement info
         and compute_pool_id and compute_pool_name fields getting the values from the statement info
@@ -906,7 +924,7 @@ def _get_and_update_statement_info_compute_pool_id_for_node(node: FlinkStatement
             node.created_at = node.existing_statement_info.created_at
         else:
             logger.warning(f"Statement {node.existing_statement_info}")
-    return node 
+    return node
 
 def _merge_graphs(in_out_graph:  List[FlinkStatementNode], in_graph:  List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
@@ -922,10 +940,10 @@ def _merge_graphs(in_out_graph:  List[FlinkStatementNode], in_graph:  List[Flink
 def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: str, pool_creation: bool = True) -> FlinkStatementNode:
     """
     Assign a compute pool id to a node. Node may already have an assigned compute pool id from a running statement or because it
-    was set as argument of the command line. 
-    If the node is an ancestor or a child of a running node, it may be possible there is no running 
-    statement for that node so no compute pool id is set. 
-    In this case we need to find a compute pool to use by looking at the table name and the naming convention 
+    was set as argument of the command line.
+    If the node is an ancestor or a child of a running node, it may be possible there is no running
+    statement for that node so no compute pool id is set.
+    In this case we need to find a compute pool to use by looking at the table name and the naming convention
     applied to the compute pool.
     """
     logger.info(f"Assign compute pool id to node {node.table_name}, backup pool is {compute_pool_id}")
@@ -956,7 +974,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     if len(pools) == 1:
         # matching pool found, Do not need to assess for capacity as the pool is reused.
         node.compute_pool_id = pools[0].id
-        node.compute_pool_name = pools[0].name  
+        node.compute_pool_name = pools[0].name
         return node
     # more than one? let use the configured compute pool id if it is valid
     configured_compute_pool_id = get_config()['flink']['compute_pool_id']
@@ -969,23 +987,23 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
 
 
 
-def _execute_plan(execution_plan: FlinkStatementExecutionPlan, 
-                  compute_pool_id: str, 
+def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
+                  compute_pool_id: str,
                   accept_exceptions: bool = False,
                   sequential: bool = True,
                   max_thread: int = 1) -> List[Statement]:
     """Execute statements in the execution plan.
-    It enables parallel deployment of Flink statements that 
-    have no dependencies (autonomous nodes), significantly 
+    It enables parallel deployment of Flink statements that
+    have no dependencies (autonomous nodes), significantly
     speeding up the deployment process compared to sequential
     execution
     Args:
         plan: Execution plan containing nodes to execute
         compute_pool_id: ID of the compute pool to use
-        
+
     Returns:
         List of deployed statements
-        
+
     Raises:
         RuntimeError: If statement execution fails
     """
@@ -1009,7 +1027,7 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                 while len(autonomous_nodes) > 0:
                     _max_workers = max_thread
                     if len(autonomous_nodes) < max_thread:
-                        _max_workers = len(autonomous_nodes)                   
+                        _max_workers = len(autonomous_nodes)
                     to_process = [] # need to use a separate list as we can have more elements in autonomous_nodes than max_workers
                     for _ in range(_max_workers):
                         to_process.append(autonomous_nodes.pop(0))
@@ -1018,9 +1036,9 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                 # no parallel execution possible, so execute sequentially
                 _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
         else:
-            _execute_statements_in_sequence(nodes_to_execute, 
-                                            accept_exceptions, 
-                                            compute_pool_id, 
+            _execute_statements_in_sequence(nodes_to_execute,
+                                            accept_exceptions,
+                                            compute_pool_id,
                                             started_nodes,
                                             statements)
         nodes_to_execute = _get_nodes_to_execute(execution_plan.nodes)
@@ -1036,9 +1054,9 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
             nodes_to_execute.append(node)
     return nodes_to_execute
 
-def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],   
+def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                                     max_workers: int,
-                                    accept_exceptions: bool = False, 
+                                    accept_exceptions: bool = False,
                                     compute_pool_id: str = None,
                                     started_nodes: List[FlinkStatementNode] = None,
                                     statements: List[Statement] = None) -> List[Statement]:
@@ -1069,8 +1087,8 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
             node.to_restart = False
             started_nodes.append(node)
 
-def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode], 
-                                    accept_exceptions: bool = False, 
+def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
+                                    accept_exceptions: bool = False,
                                     compute_pool_id: str = None,
                                     started_nodes: List[FlinkStatementNode] = None,
                                     statements: List[Statement] = None) -> List[Statement]:
@@ -1089,7 +1107,7 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     started_nodes.append(node)
 
 def _build_autonomous_nodes(
-        nodes_to_execute: List[FlinkStatementNode], 
+        nodes_to_execute: List[FlinkStatementNode],
         started_nodes: List[FlinkStatementNode]
     ) -> List[FlinkStatementNode]:
         """
@@ -1097,10 +1115,10 @@ def _build_autonomous_nodes(
         in parallel of other statements in the list, because it has no parents or all
         its parents are running.
         """
-        
+
         if not nodes_to_execute:
             return []
-        
+
         # Build dependencies (child->parent) for each child,parent relation in the graph
         dependencies = []
         for node in nodes_to_execute:
@@ -1109,24 +1127,24 @@ def _build_autonomous_nodes(
                 parent_node = next((n for n in nodes_to_execute if n.table_name == parent_table_name), None)
                 if parent_node and (parent_node.to_run or parent_node.to_restart) and parent_node not in started_nodes:
                     dependencies.append((node.table_name, parent_node))
-        
+
         # Use same in-degree calculation logic as existing _topological_sort
         in_degree = {node.table_name: 0 for node in nodes_to_execute}
         for child_name, parent_node in dependencies:
             in_degree[child_name] += 1
-        
+
         # Find autonomous nodes (in-degree 0) that need execution
         started_node_names = {node.table_name for node in started_nodes}
         autonomous_nodes = []
-        
+
         for node in nodes_to_execute:
             if (in_degree[node.table_name] == 0 and
                 (node.to_run or node.to_restart) and
                 node.table_name not in started_node_names):
                 autonomous_nodes.append(node)
-        
+
         return autonomous_nodes
-        
+
 
 def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkStatementNode]) -> None:
     """
@@ -1137,12 +1155,12 @@ def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkSta
     pass
 
 def _deploy_one_node(node: FlinkStatementNode,
-                     accept_exceptions: bool = False, 
+                     accept_exceptions: bool = False,
                      compute_pool_id: str = ""
 )-> Statement | StatementError:
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
-    maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')        
+    maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     logger.info(f"Deploy table: {node.table_name}'")
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploy table {node.table_name}")
     try:
@@ -1150,7 +1168,7 @@ def _deploy_one_node(node: FlinkStatementNode,
             statement = _deploy_ddl_dml(node)
         else:
             statement = _deploy_dml(node, False)
-        node.existing_statement_info = statement_mgr.map_to_statement_info(statement) 
+        node.existing_statement_info = statement_mgr.map_to_statement_info(statement)
         return statement
     except Exception as e:
         if not accept_exceptions:
@@ -1158,7 +1176,7 @@ def _deploy_one_node(node: FlinkStatementNode,
             raise RuntimeError(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement execution failed: {str(e)}")
         else:
             logger.error(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
-    
+
 
 def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | StatementError:
     """
@@ -1171,8 +1189,8 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | Statement
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
     logger.info(f"Dropped table {node_to_process.table_name} status is : {rep}")
     # create the table with ddl.
-    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process, 
-                                                                            node_to_process.ddl_ref, 
+    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(node_to_process,
+                                                                            node_to_process.ddl_ref,
                                                                             node_to_process.ddl_statement_name)
     if isinstance(statement, Statement):
         while statement.status.phase not in ["COMPLETED"]:
@@ -1191,9 +1209,9 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
     logger.info(f"Run {to_process.dml_statement_name} for {to_process.table_name} table to {to_process.compute_pool_id}")
     if not dml_already_deleted:
         statement_mgr.delete_statement_if_exists(to_process.dml_statement_name)
-    
-    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process, 
-                                                                                to_process.dml_ref, 
+
+    statement = statement_mgr.build_and_deploy_flink_statement_from_sql_content(to_process,
+                                                                                to_process.dml_ref,
                                                                                 to_process.dml_statement_name)
     compute_pool_mgr.save_compute_pool_info_in_metadata(to_process.dml_statement_name, to_process.compute_pool_id)
     if isinstance(statement, Statement):
@@ -1228,39 +1246,36 @@ def _delete_not_shared_parent(current_node: FlinkStatementNode, trace:str, confi
         statement_mgr.drop_table(current_node.table_name, config['flink']['compute_pool_id'])
         trace+= f"{current_node.table_name} deleted\n"
     return trace
-        
 
-def _build_statement_node_map(current_node: FlinkStatementNode, 
-                               visited_nodes: Set[FlinkStatementNode] = None,
-                               node_map: dict[str,FlinkStatementNode] = None) -> dict[str,FlinkStatementNode]:
+
+def _build_statement_node_map(current_node: FlinkStatementNode,
+                               visited_nodes: Set[FlinkStatementNode] = set(),
+                               node_map: dict[str,FlinkStatementNode] = {}) -> dict[str,FlinkStatementNode]:
     """
-    Define the complete static graph of the related parents and children for the current node. 
+    Define the complete static graph of the related parents and children for the current node.
     The returned node_map is a dict with each table name as key and the node with accurate list of parents and children.
     The function uses a DFS to reach all parents, and then a BFS to construct the list of reachable children with their own parents
     It should exclude all children because the decision to filter per product should be done during
     the execution plan construction taking into account if a parent needs to be restarted and if it is stateful.
-    
+
     Args:
         current_node: The starting node to build the graph from
         visited_nodes: Set of already processed nodes to avoid reprocessing (optional)
         node_map: Existing node map to extend (optional)
     """
     logger.info(f"start build tables static graph for {current_node.table_name} product: {current_node.product_name}")
-    
+
     # Initialize parameters if not provided (backward compatibility)
-    if visited_nodes is None:
-        visited_nodes = set()
-    if node_map is None:
-        node_map = {}   # <k: str, v: FlinkStatementNode> use a map to search with table name as key.
-    
+    # <k: str, v: FlinkStatementNode> use a map to search with table name as key.
+
     # Early return if this node was already processed
     if current_node in visited_nodes and current_node.table_name in node_map:
         logger.info(f"Node {current_node.table_name} already processed, skipping")
         return node_map
-        
+
     queue = deque()  # Queue for BFS processing to search children of nodes in the queue
-    def _search_parent_from_current_update_node_map(node_map: dict[str, FlinkStatementNode], 
-                                    current: FlinkStatementNode, 
+    def _search_parent_from_current_update_node_map(node_map: dict[str, FlinkStatementNode],
+                                    current: FlinkStatementNode,
                                     visited_nodes: Set[FlinkStatementNode]):
         """
         Goal: build an exhaustive static graph of the related ancestors for the current node.
@@ -1280,10 +1295,10 @@ def _build_statement_node_map(current_node: FlinkStatementNode,
                         queue.append(node_p)  # Add new nodes to the queue for processing
                     else:
                         logger.error(f"Data consistency issue for {p.path}: no pipeline definition found or wrong reference in {current.table_name}. The execution plan may not deploy successfully")
-       
 
-    def _search_children_from_current(node_map: dict[str, FlinkStatementNode], 
-                                      current: FlinkStatementNode, 
+
+    def _search_children_from_current(node_map: dict[str, FlinkStatementNode],
+                                      current: FlinkStatementNode,
                                       visited_nodes: Set[FlinkStatementNode]):
         """
         Goal: build an exhaustive static graph of the related descendants for the current node.
@@ -1303,7 +1318,7 @@ def _build_statement_node_map(current_node: FlinkStatementNode,
                         # process the child's parents to be sure they are considered before the child
                         _search_parent_from_current_update_node_map(node_map, node_c, visited_nodes)
                         queue.append(node_c)
-        
+
     _search_parent_from_current_update_node_map(node_map, current_node, visited_nodes)
     queue.append(current_node)  # need to process children of current node
 
@@ -1318,26 +1333,26 @@ def _build_statement_node_map(current_node: FlinkStatementNode,
 
 # --- to work on for stateless ---------------
 
-def _filtering_descendant_nodes(ancestors: List[FlinkStatementNode], 
-                        product_name: str, 
+def _filtering_out_descendant_nodes(ancestors: List[FlinkStatementNode],
+                        product_name: str,
                         may_start_descendants: bool) -> List[FlinkStatementNode]:
     """
     when may start descendant is true
     we need to keep nodes that are in the same product or in the accepted_common_products
     Filter ancestors based on product name and descendant policies.
     Remove ancestors that don't belong to the expected product and have no children in the expected product.
-    
+
     Args:
         ancestors: List of ancestor nodes to filter
         product_name: Expected product name
         may_start_descendants: Whether descendants may be started
-        
+
     Returns:
         Filtered list of ancestors
     """
     ancestors_to_remove = []
     for ancestor in ancestors:
-        if may_start_descendants:   
+        if may_start_descendants:
             if ancestor.product_name == product_name or ancestor.product_name in get_config()['app']['accepted_common_products']:
                 continue
             else:
@@ -1354,3 +1369,13 @@ def _filtering_descendant_nodes(ancestors: List[FlinkStatementNode],
         ancestors.remove(ancestor)
     return ancestors
 
+
+def _filter_nodes_to_exclude(nodes: List[FlinkStatementNode], exclude_table_names: List[str]) -> List[FlinkStatementNode]:
+    """
+    Filter nodes to exclude based on the table names.
+    """
+    for node in nodes:
+        if node.table_name in exclude_table_names:
+           node.to_run = False
+           node.to_restart = False
+    return nodes

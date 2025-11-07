@@ -13,8 +13,8 @@ import time
 
 class StatementBasicInfo(BaseModel):
     name: str
-    environment_id: str 
-    created_at: datetime = Field(default=None)
+    environment_id: str
+    created_at: Optional[datetime] = Field(default=None)
     uid: str
     compute_pool_id: str
     status: str
@@ -24,7 +24,7 @@ class StatementBasicInfo(BaseModel):
 
 class DeploymentReport(BaseModel):
     """Report of a pipeline deployment operation.
-    
+
     Attributes:
         table_name: Name of the table being deployed
         compute_pool_id: ID of the compute pool used
@@ -45,7 +45,7 @@ class TableInfo(BaseModel):
     upgrade_mode: str = ""
     statement_name: str = ""
     status: str = ""
-    created_at: datetime = Field(default=None)
+    created_at: Optional[datetime] = Field(default=None)
     compute_pool_id: str = ""
     compute_pool_name: str = ""
     to_restart: bool = False
@@ -60,18 +60,18 @@ class TableReport(BaseModel):
     environment_id: str = ""
     catalog_name: str = ""
     database_name: str = ""
-    created_at: datetime = Field(default=None)
+    created_at: Optional[datetime] = Field(default=None)
     tables: List[TableInfo] = []
 
 def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
     """
     Pad or truncate text to a specific length.
-    
+
     Args:
         text: Text to pad/truncate
         length: Target length
         padding_char: Character to use for padding
-        
+
     Returns:
         Padded or truncated text
     """
@@ -81,11 +81,11 @@ def pad_or_truncate(text: str, length: int, padding_char: str = ' ') -> str:
         else:
             return text.ljust(length, padding_char)
     else:
-        return str(text).ljust(length, padding_char)    
-    
-def build_TableReport(report_name: str, 
-                      nodes: List[FlinkStatementNode], 
-                      from_date: str = None,
+        return str(text).ljust(length, padding_char)
+
+def build_TableReport(report_name: str,
+                      nodes: List[FlinkStatementNode],
+                      from_date: str,
                       get_metrics: bool = False) -> TableReport:
     table_report = TableReport()
     table_report.report_name = report_name
@@ -96,7 +96,7 @@ def build_TableReport(report_name: str,
     if from_date:
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes for {from_date}")
     else:
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes from now")
     if get_metrics:
         compute_pool_ids = [node.compute_pool_id for node in nodes]
         pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date=from_date)
@@ -120,7 +120,7 @@ def build_TableReport(report_name: str,
             table_report.tables.append(table_info)
     return table_report
 
-def build_TableInfo(node: FlinkStatementNode, from_date: str = None, get_metrics: bool = False) -> TableInfo:
+def build_TableInfo(node: FlinkStatementNode, get_metrics: bool = False) -> TableInfo:
     table_info = TableInfo()
     table_info.table_name = node.table_name
     table_info.type = node.type
@@ -143,12 +143,12 @@ def build_TableInfo(node: FlinkStatementNode, from_date: str = None, get_metrics
     else:
         table_info.compute_pool_name = "UNKNOWN"
     if table_info.status == "RUNNING" and get_metrics:
-        table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name, from_date)
+        table_info.retention_size = metrics_mgr.get_retention_size(table_info.table_name)
         #table_info.message_count = metrics_mgr.get_total_amount_of_messages(table_info.table_name, compute_pool_id=table_info.compute_pool_id)
-        
+
     return table_info
 
-def build_simple_report(execution_plan: FlinkStatementExecutionPlan, from_date: str = None) -> str:
+def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15} {'Created At':<16} {'Pending_msgs':<12} {'Num_msg_in':<11} {'Num_msg_out':<11}\n"
     report+=f"-"*165 + "\n"
     compute_pool_ids = [node.compute_pool_id for node in execution_plan.nodes]
@@ -168,23 +168,23 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan, from_date: 
 def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPlan, compute_pool_list: ComputePoolList) -> str:
     """
     Build a summary of the execution plan showing which statements need to be executed.
-    
+
     Args:
         execution_plan: The execution plan containing nodes to be processed
-        
+
     Returns:
         A formatted string summarizing the execution plan
     """
 
-    
+
     summary_parts = [
         f"\nTo deploy {execution_plan.start_table_name} to {execution_plan.environment_id}, the following statements need to be executed in the order\n"
     ]
-    
+
     # Separate nodes into parents and children
     parents = [node for node in execution_plan.nodes if (node.to_run or node.is_running())]
     children = [node for node in execution_plan.nodes if node.to_restart]
-    
+
     # Build parent section
     if parents:
         summary_parts.extend([
@@ -200,7 +200,7 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
             summary_parts.append(
                 f"{pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
             )
-    
+
     # Build children section
     if children:
         summary_parts.extend([
@@ -216,9 +216,9 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
                 f"{pad_or_truncate(node.dml_statement_name,60)}\t{status_phase[:7]}\t\t{node.compute_pool_id}\t{action}\t{node.upgrade_mode}\t{node.table_name}"
             )
         summary_parts.append(f"--- {len(children)} children to restart")
-    
+
     summary= "\n".join(summary_parts)
-    summary+="\n---Matching compute pools: " 
+    summary+="\n---Matching compute pools: "
     summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 140
     for node in execution_plan.nodes:
         pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
@@ -230,9 +230,9 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
 
 
 def build_deployment_report(
-    table_name: str, 
-    dml_ref: str, 
-    may_start_children: bool, 
+    table_name: str,
+    dml_ref: str,
+    may_start_children: bool,
     statements: List[Statement]) -> DeploymentReport:
     report = DeploymentReport(table_name=table_name, type=dml_ref, update_children=may_start_children)
     for statement in statements:
@@ -246,13 +246,13 @@ def persist_table_reports(table_report: TableReport, base_file_name):
     non_running_count=0
     csv_content= "environment_id,catalog_name,database_name,table_name,type,upgrade_mode,statement_name,status,compute_pool_id,compute_pool_name,created_at,retention_size,message_count,pending_records,num_records_in,num_records_out\n"
     for table in table_report.tables:
-        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at.strftime('%Y-%m-%d %H:%M:%S')},{table.retention_size},{table.message_count},{table.pending_records},{table.num_records_in},{table.num_records_out}\n"   
+        csv_content+=f"{table_report.environment_id},{table_report.catalog_name},{table_report.database_name},{table.table_name},{table.type},{table.upgrade_mode},{table.statement_name},{table.status},{table.compute_pool_id},{table.compute_pool_name},{table.created_at.strftime('%Y-%m-%d %H:%M:%S')},{table.retention_size},{table.message_count},{table.pending_records},{table.num_records_in},{table.num_records_out}\n"
         if table.status == 'RUNNING':
             running_count+=1
         else:
             non_running_count+=1
         print(f"Table info: {report_mgr.pad_or_truncate(table.table_name, 40)} {report_mgr.pad_or_truncate(table.status, 10)} created: {report_mgr.pad_or_truncate(table.created_at.strftime('%Y-%m-%dT%H:%M:%S'), 20)} pool: {report_mgr.pad_or_truncate(table.compute_pool_id, 10)} pending records: {table.pending_records} sum records in: {table.num_records_in} sum records out: {table.num_records_out}")
-        
+
         table_count+=1
     print(f"Writing report to {shift_left_dir}/{base_file_name}_report.csv and {shift_left_dir}/{base_file_name}_report.json")
     with open(f"{shift_left_dir}/{base_file_name}_report.csv", "w") as f:
@@ -265,16 +265,16 @@ def persist_table_reports(table_report: TableReport, base_file_name):
     result+=csv_content
     result+="#"*120 + f"\n\tRunning tables: {running_count}" + "\n"
     result+=f"\tNon running tables: {non_running_count}" + "\n"
-    return result 
+    return result
 
 def _build_statement_basic_info(statement: Statement) -> StatementBasicInfo:
     if statement.status and statement.status.detail:
         status_detail = statement.status.detail
     else:
         status_detail = ""
-    
+
     status_phase = statement.status.phase if statement.status else "UNKNOWN"
-    
+
     return StatementBasicInfo(
         name=statement.name,
         environment_id=statement.environment_id,

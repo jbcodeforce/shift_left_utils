@@ -1,6 +1,7 @@
 {
   "include": [
-    "src/shift_left/src"
+    "src/shift_left/src",
+    "src/shift_left/tests"
   ],
   "extraPaths": [
     "src/shift_left/src"
@@ -12,6 +13,9 @@
   "reportMissingImports": "warning",
   "reportMissingTypeStubs": false
 }
+
+
+
 
 
 
