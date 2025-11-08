@@ -274,19 +274,19 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
         mock_build_simple_report.return_value = "mock_build_simple_report"
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d",
+        summary, report = dm.build_deploy_pipeline_from_table(table_name="d",
                                     inventory_path=self.inventory_path,
                                     compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                                     dml_only=False,
                                     execute_plan=True,
                                     may_start_descendants=False,
                                     force_ancestors=False)
-        assert execution_plan.start_table_name == "d"
-        assert len(execution_plan.nodes) == 6
-        assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
-        assert execution_plan.nodes[2].table_name in ["x", "y"]
+
+        assert len(report.tables) == 6
+        assert report.tables[0].table_name in ["src_x", "src_y"]
+        assert report.tables[2].table_name in ["x", "y"]
         print(f"summary: {summary}")
-        print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+        print(f"report: {report.model_dump_json(indent=3)}")
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
@@ -361,8 +361,7 @@ class TestDeploymentManager(BaseUT):
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
             table_name="z",
-            inventory_path=self.inventory_path,
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
+            inventory_path=self.inventory_path
         )
         print(result)
         # Verify

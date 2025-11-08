@@ -17,7 +17,7 @@ from shift_left.core.utils.app_config import get_config
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 import shift_left.core.deployment_mgr as dm
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
+    Statement,
     StatementInfo
 )
 from shift_left.core.deployment_mgr import (
@@ -31,7 +31,7 @@ TEST_COMPUTE_POOL_ID_3 = "test-pool-123"
 
 class TestPoolAssignment(unittest.TestCase):
     """Test suite for the deployment manager functionality."""
-    
+
     data_dir = None
 
     def setUp(self) -> None:
@@ -41,7 +41,7 @@ class TestPoolAssignment(unittest.TestCase):
 
     # Following set of methods are used to create reusable mock objects and functions
     def _create_mock_statement_info(
-        self, 
+        self,
         name: str = "statement_name",
         status_phase: str = "UNKNOWN",
         compute_pool_id: str = TEST_COMPUTE_POOL_ID_1
@@ -95,7 +95,7 @@ class TestPoolAssignment(unittest.TestCase):
             compute_pool_id=compute_pool_id
         )
 
-   
+
     def _mock_get_and_update_node(self, node: FlinkStatementNode) -> Statement:
         """Mock function for getting and updating node statement info."""
         node.existing_statement_info = self._create_mock_statement_info(
@@ -103,10 +103,10 @@ class TestPoolAssignment(unittest.TestCase):
         )
         return node
 
-    def _create_mock_compute_pool_info(self, 
-                                       compute_pool_id: str, 
+    def _create_mock_compute_pool_info(self,
+                                       compute_pool_id: str,
                                        compute_pool_name: str = None,
-                                       current_cfu: int = 0, 
+                                       current_cfu: int = 0,
                                        max_cfu: int = 10) -> dict:
         """Create a mock ComputePoolInfo object to report on compute pool capacity."""
         if compute_pool_id == "high-cfu":
@@ -120,7 +120,7 @@ class TestPoolAssignment(unittest.TestCase):
                         "id": "env-00000",
                         "related": "https://api.confluent.cloud/org/v2/environments/env-00000",
                         "resource_name": "https://api.confluent.cloud/organization=9bb441c4-edef-46ac-8a41-c49e44a3fd9a/environment=env-00000"
-                    },  
+                    },
                     "network": {
                         "id": "n-00000",
                         "environment": "string",
@@ -154,7 +154,7 @@ class TestPoolAssignment(unittest.TestCase):
                 "current_cfu": current_cfu
             }
         }
-    
+
     def _mock_create_pool(self, name: str, cp_id: str):
             return {
             "api_version": "fcpm/v2",
@@ -187,8 +187,8 @@ class TestPoolAssignment(unittest.TestCase):
     #  ----------- TESTS -----------
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_assign_compute_pool_id_to_node_using_parameter(self, 
-                                                            mock_get_compute_pool_list, 
+    def test_assign_compute_pool_id_to_node_using_parameter(self,
+                                                            mock_get_compute_pool_list,
                                                             MockConfluentCloudClient):
         """ should assign compute_pool_id from the parameter"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -204,8 +204,8 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_assign_compute_pool_id_to_node_using_node_compute_pool_id(self, 
-                                                                       mock_get_compute_pool_list, 
+    def test_assign_compute_pool_id_to_node_using_node_compute_pool_id(self,
+                                                                       mock_get_compute_pool_list,
                                                                        MockConfluentCloudClient):
         """ should keep compute_pool_id already set in the node"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -213,7 +213,7 @@ class TestPoolAssignment(unittest.TestCase):
         mock_response={}
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info(TEST_COMPUTE_POOL_ID_1,"dev-table-1", 2, 20)
-       
+
         node = self._create_mock_statement_node("table-4")
         node.compute_pool_id = TEST_COMPUTE_POOL_ID_1
         node = dm._assign_compute_pool_id_to_node(node, None)
@@ -223,8 +223,8 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def _test_get_compute_pool_id_from_config(self, 
-                                            mock_get_compute_pool_list, 
+    def _test_get_compute_pool_id_from_config(self,
+                                            mock_get_compute_pool_list,
                                             MockConfluentCloudClient):
         """ should use the compute pool id from config.yaml
         06/10/25 REMOVED the logic to use the compute pool id from config.yaml
@@ -234,7 +234,7 @@ class TestPoolAssignment(unittest.TestCase):
         mock_response={}
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info(TEST_COMPUTE_POOL_ID_1, "dev-table-1", 3, 20)
-       
+
         node = self._create_mock_statement_node("table-X")
         node.compute_pool_id = None
         self.config['flink']['compute_pool_id'] = TEST_COMPUTE_POOL_ID_2
@@ -244,8 +244,8 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_get_compute_pool_id_from_matching_name(self, 
-                                            mock_get_compute_pool_list, 
+    def test_get_compute_pool_id_from_matching_name(self,
+                                            mock_get_compute_pool_list,
                                             MockConfluentCloudClient):
         """ should use the compute pool id from config.yaml"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -253,7 +253,7 @@ class TestPoolAssignment(unittest.TestCase):
         mock_response={}
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info(TEST_COMPUTE_POOL_ID_1, "dev-table-1", 3, 20)
-       
+
         node = self._create_mock_statement_node("table-3")
         node.compute_pool_id = None
         node = dm._assign_compute_pool_id_to_node(node, None)
@@ -262,8 +262,8 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_too_high_cfu(self, 
-                         mock_get_compute_pool_list, 
+    def test_too_high_cfu(self,
+                         mock_get_compute_pool_list,
                          MockConfluentCloudClient):
         """When the cfu is too high create a new compute pool if not already exists"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -280,8 +280,8 @@ class TestPoolAssignment(unittest.TestCase):
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.ConfluentCloudClient')
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
-    def test_pool_creation(self, 
-                         mock_get_compute_pool_list, 
+    def test_pool_creation(self,
+                         mock_get_compute_pool_list,
                          MockConfluentCloudClient):
         """When could not find a matching compute pool, create a new one"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
@@ -290,9 +290,9 @@ class TestPoolAssignment(unittest.TestCase):
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info("cp-id-1", "cp-name-1",  5, 50)
         mock_client_instance.create_compute_pool.return_value = self._mock_create_pool("cp-name-1", "cp-id-1")
-        node = self._create_mock_statement_node("table-7", compute_pool_id=None)
-        self.config['flink']['compute_pool_id'] = None
-        node = dm._assign_compute_pool_id_to_node(node, None)
+        node = self._create_mock_statement_node("table-7", compute_pool_id='')
+        self.config['flink']['compute_pool_id'] = ''
+        node = dm._assign_compute_pool_id_to_node(node, '')
         assert node.compute_pool_id == "cp-id-1"
         assert node.compute_pool_name == "cp-name-1"
 
@@ -322,13 +322,13 @@ class TestPoolAssignment(unittest.TestCase):
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info("cp-id-1", "cp-name-1",  5, 50)
         mock_client_instance.create_compute_pool.return_value = create_pool_error
         node = self._create_mock_statement_node("table-8")
-        node.compute_pool_id = None
+        node.compute_pool_id = ''
         try:
-            node = dm._assign_compute_pool_id_to_node(node, None)
+            node = dm._assign_compute_pool_id_to_node(node, '')
         except Exception as e:
-            assert node.compute_pool_id == None
-            assert node.compute_pool_name == None
-            
+            assert node.compute_pool_id == ''
+            assert node.compute_pool_name == ''
+
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ import re
 import hashlib
 import subprocess
 import shutil
-import importlib.resources 
+import importlib.resources
 from datetime import timezone
 from typing import Tuple, List
 from pydantic import BaseModel, Field
@@ -17,9 +17,9 @@ from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.pipeline_mgr import FlinkTablePipelineDefinition
 from shift_left.core.utils.file_search import (
-    PIPELINE_JSON_FILE_NAME, 
-    PIPELINE_FOLDER_NAME, 
-    get_table_ref_from_inventory, 
+    PIPELINE_JSON_FILE_NAME,
+    PIPELINE_FOLDER_NAME,
+    get_table_ref_from_inventory,
     read_pipeline_definition_from_file,
     from_pipeline_to_absolute,
     create_folder_if_not_exist,
@@ -48,36 +48,36 @@ class ModifiedFilesResult(BaseModel):
 
 def _extract_table_name_from_path(file_path: str) -> str:
     """Extract table name from file path.
-    
+
     Attempts to extract a meaningful table name from various file path patterns:
     - For SQL files: extracts filename without extension
     - For pipeline paths: attempts to extract table name from directory structure
-    
+
     Args:
         file_path: The file path to extract table name from
-        
+
     Returns:
         Extracted table name or filename without extension as fallback
     """
     path = Path(file_path)
-    
+
     # Remove file extension
     table_name = path.stem
-    
+
     # Handle common patterns in pipeline directory structures
     if 'pipelines' in path.parts:
         # If it's in a pipelines directory, the parent directory might be the table name
         if len(path.parts) > 1 and path.parent.name != 'pipelines':
             table_name = path.parent.name
-    
+
     # Clean up common prefixes/suffixes
     table_name = table_name.replace('ddl.', '').replace('dml.', '')
-    
+
     return table_name
 
 
-def build_project_structure(project_name: str, 
-                            project_path: str, 
+def build_project_structure(project_name: str,
+                            project_path: str,
                             project_type: str):
     logger.info(f"build_project_structure({project_name}, {project_path}, {project_type}")
     project_folder=os.path.join(project_path, project_name)
@@ -92,7 +92,7 @@ def build_project_structure(project_name: str,
     #os.chdir(project_folder)
     _initialize_git_repo(project_folder)
     _add_important_files(project_folder)
-        
+
 
 def get_topic_list(file_name: str):
     ccloud = ConfluentCloudClient(get_config())
@@ -115,22 +115,26 @@ def report_table_cross_products(project_path: str | None):
     inventory = get_or_build_inventory(project_path, project_path, False)
     risky_tables = []
     for table_name, table_ref in inventory.items():
-        table_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
-        if table_hierarchy:
-            for child in table_hierarchy.children:
-                if child.product_name != table_ref['product_name']:
-                    risky_tables.append(table_name)
-                    break
+        try:
+            table_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
+            if table_hierarchy:
+                for child in table_hierarchy.children:
+                    if child.product_name != table_ref['product_name']:
+                        risky_tables.append(table_name)
+                        break
+        except Exception as e:
+            logger.error(f"Error in reporting table cross products: {e}")
+            continue
     return risky_tables
 
 
 def list_tables_with_one_child(project_path: str):
     """
     Return the list of table names for tables that have exactly one child table.
-    
+
     Args:
         project_path: Path to the pipeline folder. If not provided, uses $PIPELINES environment variable.
-        
+
     Returns:
         List of table names that have exactly one child
     """
@@ -148,17 +152,17 @@ def list_tables_with_one_child(project_path: str):
 
 def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str = None) -> ModifiedFilesResult:
     """List modified files and return structured result.
-    
+
     Args:
         project_path: Path to the project directory
         branch_name: Git branch name to check
         since: Date filter for git log (YYYY-MM-DD format)
         file_filter: File extension filter (e.g., '.sql')
         output_file: Optional output file path (for backward compatibility)
-        
+
     Returns:
         ModifiedFilesResult: Structured result with description and file list
-        
+
     Raises:
         subprocess.CalledProcessError: If git commands fail
         Exception: For other errors
@@ -168,7 +172,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         original_cwd = os.getcwd()
         if project_path != ".":
             os.chdir(project_path)
-        
+
         # Get the current branch name
         current_branch_result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -197,10 +201,10 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
             text=True,
             check=True
         )
-        
+
         all_modified_files = git_diff_result.stdout.strip().split('\n')
         all_modified_files = [f for f in all_modified_files if f.strip()]  # Remove empty strings
-        
+
         # Filter for specific file types (default: SQL files)
         filtered_files = []
         for file_path in all_modified_files:
@@ -211,7 +215,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
                     logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
                     continue
                 filtered_files.append(absolute_file_path)
-        
+
         print(f"Found {len(all_modified_files)} total modified files")
 
         print(f"Found {len(filtered_files)} modified files matching filter '{file_filter}'")
@@ -245,33 +249,33 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
                 same_sql_content=same_sql,
                 running=running
             ))
-        
+
         # Create result object
         result = ModifiedFilesResult(
             description=description,
             file_list=file_list
         )
-        
+
         # Backward compatibility: write to file if output_file is provided
         if output_file:
             output_path = Path(output_file)
             if not output_path.is_absolute():
                 output_path = Path(original_cwd) / output_path
-            
+
             with open(output_path, 'w') as f:
                 f.write(result.model_dump_json(indent=2))
-            
+
             print(f"\nFile list saved to: {output_path}")
-        
+
         # Display results
         if filtered_files:
             logger.info(f"\nModified {file_filter} files:")
             for file_info in file_list:
                 logger.info(f"  {file_info.table_name}: {file_info.file_modified_url}")
         else:
-            logger.info(f"\nNo modified files found matching filter '{file_filter}'")        
+            logger.info(f"\nNo modified files found matching filter '{file_filter}'")
         return result
-        
+
     except subprocess.CalledProcessError as e:
         print(f"❌ Git command failed: {e}")
         print(f"Error output: {e.stderr}")
@@ -298,19 +302,19 @@ def isolate_data_product(product_name: str, source_folder: str, target_folder: s
     tables = [table for table in inventory if inventory[table]['product_name'] == product_name]
     tables_to_process = {}
     visited = set()
-    
+
     # Process each table and recursively find all its parents
     for table in tables:
         logger.info(f"Processing table {table} and finding all its dependencies")
         _find_all_parent_tables_recursive(table, inventory, visited, tables_to_process)
-    
+
     logger.info(f"Found {len(tables_to_process)} total tables to process (including all dependencies)")
-    
+
     # Copy all tables (original + all dependencies) to target folder
-    
+
     for table, table_folder_name in tables_to_process.items():
         logger.info(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
-        
+
         # Keep the hierarchy of folder in the table_folder_name
         print(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
         shutil.copytree(
@@ -321,7 +325,7 @@ def isolate_data_product(product_name: str, source_folder: str, target_folder: s
     with open(os.path.join(shift_left_dir, "tables_to_process.txt"), "w") as f:
         for table, table_folder_name in tables_to_process.items():
             f.write(f"{table},{table_folder_name}\n")
-    
+
 # ---------------------------------
 # --- Private APIs ---
 # ---------------------------------
@@ -347,7 +351,7 @@ def _define_kimball_structure(pipeline_folder: str):
     create_folder_if_not_exist(pipeline_folder + "/sources")
     create_folder_if_not_exist(pipeline_folder + "/views")
 
-def _add_important_files(project_folder: str):    
+def _add_important_files(project_folder: str):
     logger.info(f"add_important_files({project_folder}")
     for file in ["common.mk"]:
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
@@ -361,7 +365,7 @@ def _add_important_files(project_folder: str):
     env_content = env_content.replace("FLINK_PROJECT=", f"FLINK_PROJECT={project_folder}")
     with open(env_file, 'w') as f:
         f.write(env_content)
-    template_path = importlib.resources.files("shift_left.core.templates").joinpath(".gitignore_tmpl")  
+    template_path = importlib.resources.files("shift_left.core.templates").joinpath(".gitignore_tmpl")
     shutil.copyfile(template_path, os.path.join(project_folder, ".gitignore"))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath("config_tmpl.yaml")
     shutil.copyfile(template_path, os.path.join(shift_left_dir, "config.yaml"))
@@ -401,38 +405,38 @@ def _assess_sql_difference(table_name: str, file_sql_content: str, running_sql_c
     # Normalize both SQL content strings
     normalized_file_sql = _normalize_sql_content(file_sql_content)
     normalized_running_sql = _normalize_sql_content(running_sql_content)
-    
+
     logger.info(f"Normalized FILE SQL: \n {normalized_file_sql}")
     logger.info(f"Normalized RUNNING SQL: \n {normalized_running_sql}")
-    
+
     hash_normalized_file_sql = hashlib.md5(normalized_file_sql.encode('utf-8')).hexdigest()
     hash_normalized_running_sql = hashlib.md5(normalized_running_sql.encode('utf-8')).hexdigest()
-    
+
     logger.info(f"Hash normalized file SQL: {hash_normalized_file_sql}")
     logger.info(f"Hash normalized running SQL: {hash_normalized_running_sql}")
-    
+
     return hash_normalized_file_sql == hash_normalized_running_sql
 
 
 def _normalize_sql_content(sql_content: str) -> str:
     """
     Normalize SQL content by removing comments and normalizing whitespace.
-    
+
     Args:
         sql_content: Raw SQL content string
-        
+
     Returns:
         Normalized SQL content string
     """
     if not sql_content:
         return ""
-    
+
     # Remove SQL comments
     sql_without_comments = _remove_sql_comments(sql_content)
-    
+
     # Normalize whitespace
     normalized_sql = _normalize_whitespace(sql_without_comments)
-    
+
     return normalized_sql
 
 
@@ -440,49 +444,49 @@ def _remove_sql_comments(sql_content: str) -> str:
     """
     Remove SQL comments from the content.
     Handles both single-line comments (--) and multi-line comments (/* */).
-    
+
     Args:
         sql_content: SQL content with potential comments
-        
+
     Returns:
         SQL content with comments removed
     """
     # Remove multi-line comments /* ... */
     # Use re.DOTALL to make . match newlines
     sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
-    
+
     # Remove single-line comments -- ...
     # Match -- followed by anything until end of line
     sql_content = re.sub(r'--.*?$', '', sql_content, flags=re.MULTILINE)
-    
+
     return sql_content
 
 
 def _normalize_whitespace(sql_content: str) -> str:
     """
     Normalize whitespace in SQL content.
-    
+
     Args:
         sql_content: SQL content string
-        
+
     Returns:
         SQL content with normalized whitespace
     """
     # Replace multiple whitespace characters (spaces, tabs, newlines) with single space
     normalized = re.sub(r'\s+', ' ', sql_content)
-    
+
     # Strip leading and trailing whitespace
     normalized = normalized.strip()
-    
+
     # Convert to uppercase for case-insensitive comparison
     normalized = normalized.upper()
-    
+
     return normalized
-   
+
 def _find_all_parent_tables_recursive(table_name: str, inventory: dict, visited: set, tables_to_process: dict):
     """
     Recursively find all parent tables for a given table.
-    
+
     Args:
         table_name: The table to find parents for
         inventory: The complete inventory of tables
@@ -493,22 +497,22 @@ def _find_all_parent_tables_recursive(table_name: str, inventory: dict, visited:
         # Avoid circular dependencies
         logger.debug(f"Table {table_name} already visited, skipping to avoid circular dependency")
         return
-    
+
     visited.add(table_name)
-    
+
     # Get table reference from inventory
     if table_name not in inventory:
         logger.warning(f"Table {table_name} not found in inventory")
         return
-    
+
     tableRef = inventory[table_name]
     tables_to_process[table_name] = tableRef['table_folder_name']
-    
+
     # Read pipeline definition to find parents
     pipeline_definition = read_pipeline_definition_from_file(
         os.path.join(tableRef['table_folder_name'], PIPELINE_JSON_FILE_NAME)
     )
-    
+
     if pipeline_definition and pipeline_definition.parents:
         logger.debug(f"Found {len(pipeline_definition.parents)} parents for table {table_name}")
         for parent in pipeline_definition.parents:

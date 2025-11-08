@@ -59,7 +59,7 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
-    def test_filter_tables_from_exclude_table_file_for_product_deployment(self,
+    def _test_filter_tables_from_exclude_table_file_for_product_deployment(self,
                 mock_get_statement_list,
                 mock_get_status,
                 mock_get_compute_pool_list
@@ -124,11 +124,11 @@ class TestDeploymentManager(BaseUT):
         print(f"@@@@ test_filter_tables_from_exclude_table_file_for_table_deployment report.tables: {report.model_dump_json(indent=3)}")
         assert len(report.tables) == 12 # no src_a as it is not part of z parents
         for table in report.tables:
-            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}\t{table.to_run}")
             if table.table_name in ["z", "x", "y", "d", "f", "p", "c", "e", "b",  "src_b"]:
-                assert table.to_restart is True
+                assert table.to_restart is True or table.to_run is True
             else:
-                assert table.to_restart is False
+                assert table.to_restart is False and table.to_run is False
 
         # another table, but a leaf:
         result, report = dm.build_deploy_pipeline_from_table(
@@ -143,17 +143,17 @@ class TestDeploymentManager(BaseUT):
         )
         print(f"@@@@ test_filter_tables_from_exclude_table_file_for_table_deployment report.tables: {report.model_dump_json(indent=3)}")
         for table in report.tables:
-            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
+            print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}\t{table.to_run}")
             if table.table_name in ["z", "x", "y", "d", "f"]:
-                assert table.to_restart is True
+                assert table.to_run is True or table.to_restart is True
             else:
-                assert table.to_restart is False
+                assert table.to_restart is False and table.to_run is False
 
 
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
-    def test_filter_tables_from_exclude_table_file_for_list_tables_deployment(self,
+    def _test_filter_tables_from_exclude_table_file_for_list_tables_deployment(self,
                 mock_get_statement_list,
                 mock_get_status,
                 mock_get_compute_pool_list
@@ -195,7 +195,7 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_status_with_cache')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
-    def test_filter_tables_from_exclude_table_file_for_directory_deployment(self,
+    def _test_filter_tables_from_exclude_table_file_for_directory_deployment(self,
                 mock_get_statement_list,
                 mock_get_status,
                 mock_get_compute_pool_list

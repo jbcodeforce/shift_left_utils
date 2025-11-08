@@ -49,6 +49,7 @@ class TableInfo(BaseModel):
     compute_pool_id: str = ""
     compute_pool_name: str = ""
     to_restart: bool = False
+    to_run: bool = False
     retention_size: int = 0
     message_count: int = 0
     pending_records: float = 0
@@ -126,7 +127,8 @@ def build_TableInfo(node: FlinkStatementNode, get_metrics: bool = False) -> Tabl
     table_info.type = node.type
     table_info.upgrade_mode = node.upgrade_mode
     table_info.statement_name = node.dml_statement_name
-    table_info.to_restart = node.to_restart or node.to_run
+    table_info.to_restart = node.to_restart
+    table_info.to_run = node.to_run
     compute_pool_list = compute_pool_mgr.get_compute_pool_list()
     if node.existing_statement_info:
         table_info.status = node.existing_statement_info.status_phase
@@ -152,9 +154,9 @@ def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
     report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15} {'Created At':<16} {'Pending_msgs':<12} {'Num_msg_in':<11} {'Num_msg_out':<11}\n"
     report+=f"-"*165 + "\n"
     compute_pool_ids = [node.compute_pool_id for node in execution_plan.nodes]
-    pending_records = metrics_mgr.get_pending_records(compute_pool_ids)
-    num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids)
-    num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids)
+    pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date="")
+    num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids,from_date="")
+    num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids,from_date="")
     for node in execution_plan.nodes:
         if node.existing_statement_info:
             pending_records_value = pending_records.get(node.existing_statement_info.name, 0)

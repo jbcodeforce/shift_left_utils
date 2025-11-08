@@ -7,13 +7,13 @@ from typing import Dict, List, Optional, Any, Set
 
 class ComputePoolInfo(BaseModel):
     id: Optional[str] = Field(default=None)
-    name: Optional[str] = Field(default=None)
+    name: str = Field(default="")
     env_id: Optional[str] = Field(default=None)
-    max_cfu: Optional[int] = Field(default=None)
+    max_cfu: int = Field(default=10)
     region: Optional[str] = Field(default=None)
     status_phase: Optional[str] = Field(default=None)
     current_cfu: Optional[int] = Field(default=None)
-    
+
 class ComputePoolList(BaseModel):
     created_at: Optional[datetime] = Field(default=datetime.now())
     pools: Optional[list[ComputePoolInfo]] = Field(default=[])

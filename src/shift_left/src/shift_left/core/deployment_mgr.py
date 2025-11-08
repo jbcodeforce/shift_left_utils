@@ -93,7 +93,9 @@ def build_deploy_pipeline_from_table(
         start_node = _get_and_update_statement_info_compute_pool_id_for_node(start_node)
         start_node.to_restart = True
         # Build the static graph from the Flink statement relationship
-        node_map = _build_statement_node_map(start_node)
+        combined_node_map = {}
+        visited_nodes = set()
+        node_map = _build_statement_node_map(start_node, visited_nodes, combined_node_map)
 
         ancestors = []
         ancestors = _build_topological_sorted_graph([start_node], node_map)
@@ -1031,12 +1033,12 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                     to_process = [] # need to use a separate list as we can have more elements in autonomous_nodes than max_workers
                     for _ in range(_max_workers):
                         to_process.append(autonomous_nodes.pop(0))
-                    _execute_statements_in_parallel(to_process, _max_workers, accept_exceptions, compute_pool_id, started_nodes, statements)
+                    started_nodes, statements= _execute_statements_in_parallel(to_process, _max_workers, accept_exceptions, compute_pool_id, started_nodes, statements)
             else:
                 # no parallel execution possible, so execute sequentially
-                _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
+                started_nodes, statements= _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
         else:
-            _execute_statements_in_sequence(nodes_to_execute,
+            started_nodes, statements= _execute_statements_in_sequence(nodes_to_execute,
                                             accept_exceptions,
                                             compute_pool_id,
                                             started_nodes,
@@ -1057,9 +1059,9 @@ def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatemen
 def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                                     max_workers: int,
                                     accept_exceptions: bool = False,
-                                    compute_pool_id: str = None,
-                                    started_nodes: List[FlinkStatementNode] = None,
-                                    statements: List[Statement] = None) -> List[Statement]:
+                                    compute_pool_id: str = "",
+                                    started_nodes: List[FlinkStatementNode] = [],
+                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement]]:
     """
     Execute statements in parallel.
     """
@@ -1086,12 +1088,13 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
             node.to_run = False
             node.to_restart = False
             started_nodes.append(node)
+    return started_nodes, statements
 
 def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
                                     accept_exceptions: bool = False,
-                                    compute_pool_id: str = None,
-                                    started_nodes: List[FlinkStatementNode] = None,
-                                    statements: List[Statement] = None) -> List[Statement]:
+                                    compute_pool_id: str = "",
+                                    started_nodes: List[FlinkStatementNode] = [],
+                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement]]:
     """
     Execute statements in sequence.
     """
@@ -1105,45 +1108,46 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     node.to_run = False
     node.to_restart = False
     started_nodes.append(node)
+    return started_nodes, statements
 
 def _build_autonomous_nodes(
         nodes_to_execute: List[FlinkStatementNode],
         started_nodes: List[FlinkStatementNode]
     ) -> List[FlinkStatementNode]:
-        """
-        Build a list of autonomous statements: a statement is autonomous when it can be executed
-        in parallel of other statements in the list, because it has no parents or all
-        its parents are running.
-        """
+    """
+    Build a list of autonomous statements: a statement is autonomous when it can be executed
+    in parallel of other statements in the list, because it has no parents or all
+    its parents are running.
+    """
 
-        if not nodes_to_execute:
-            return []
+    if not nodes_to_execute:
+        return []
 
-        # Build dependencies (child->parent) for each child,parent relation in the graph
-        dependencies = []
-        for node in nodes_to_execute:
-            for parent in node.parents:
-                parent_table_name = parent if isinstance(parent, str) else parent.table_name
-                parent_node = next((n for n in nodes_to_execute if n.table_name == parent_table_name), None)
-                if parent_node and (parent_node.to_run or parent_node.to_restart) and parent_node not in started_nodes:
-                    dependencies.append((node.table_name, parent_node))
+    # Build dependencies (child->parent) for each child,parent relation in the graph
+    dependencies = []
+    for node in nodes_to_execute:
+        for parent in node.parents:
+            parent_table_name = parent if isinstance(parent, str) else parent.table_name
+            parent_node = next((n for n in nodes_to_execute if n.table_name == parent_table_name), None)
+            if parent_node and (parent_node.to_run or parent_node.to_restart) and parent_node not in started_nodes:
+                dependencies.append((node.table_name, parent_node))
 
-        # Use same in-degree calculation logic as existing _topological_sort
-        in_degree = {node.table_name: 0 for node in nodes_to_execute}
-        for child_name, parent_node in dependencies:
-            in_degree[child_name] += 1
+    # Use same in-degree calculation logic as existing _topological_sort
+    in_degree = {node.table_name: 0 for node in nodes_to_execute}
+    for child_name, parent_node in dependencies:
+        in_degree[child_name] += 1
 
-        # Find autonomous nodes (in-degree 0) that need execution
-        started_node_names = {node.table_name for node in started_nodes}
-        autonomous_nodes = []
+    # Find autonomous nodes (in-degree 0) that need execution
+    started_node_names = {node.table_name for node in started_nodes}
+    autonomous_nodes = []
 
-        for node in nodes_to_execute:
-            if (in_degree[node.table_name] == 0 and
-                (node.to_run or node.to_restart) and
-                node.table_name not in started_node_names):
-                autonomous_nodes.append(node)
+    for node in nodes_to_execute:
+        if (in_degree[node.table_name] == 0 and
+            (node.to_run or node.to_restart) and
+            node.table_name not in started_node_names):
+            autonomous_nodes.append(node)
 
-        return autonomous_nodes
+    return autonomous_nodes
 
 
 def _modify_impacted_nodes(statement: Statement, nodes_to_execute: List[FlinkStatementNode]) -> None:
