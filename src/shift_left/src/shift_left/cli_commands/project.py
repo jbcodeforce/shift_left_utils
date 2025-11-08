@@ -16,7 +16,7 @@ import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.project_manager as project_manager
 import shift_left.core.integration_test_mgr as integration_test_mgr
 from shift_left.core.project_manager import (
-        DATA_PRODUCT_PROJECT_TYPE, 
+        DATA_PRODUCT_PROJECT_TYPE,
         KIMBALL_PROJECT_TYPE)
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 from typing_extensions import Annotated
@@ -28,13 +28,13 @@ Manage project foundations
 app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
 @app.command()
-def init(project_name: Annotated[str, typer.Argument(help= "Name of project to create")] = "default_data_project", 
-            project_path: Annotated[str, typer.Argument(help= "")] = "./tmp", 
+def init(project_name: Annotated[str, typer.Argument(help= "Name of project to create")] = "default_data_project",
+            project_path: Annotated[str, typer.Argument(help= "")] = "./tmp",
             project_type: Annotated[str, typer.Option()] = KIMBALL_PROJECT_TYPE):
     """
-    Create a project structure with a specified name, target path, and optional project type. 
-    The project type can be one of `kimball` or `data_product`. 
-    Kimball will use a structure like 
+    Create a project structure with a specified name, target path, and optional project type.
+    The project type can be one of `kimball` or `data_product`.
+    Kimball will use a structure like
     pipelines/sources
     pipelines/facts
     pipelines/dimensions
@@ -186,7 +186,7 @@ def list_tables_with_one_child():
             print(f"Tables with one child saved in {os.getenv('PIPELINES')}/tables_with_one_child.txt")
         else:
             print(f"No tables with one child found")
-       
+
 
 @app.command()
 def list_modified_files(
@@ -203,7 +203,7 @@ def list_modified_files(
     print("#" * 30 + f" List modified files in current branch vs {branch_name}")
     output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files.txt"
     result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, output_file)
-    
+
     # Display structured result summary
     print(f"\nSummary:")
     print(f"   Total modified files: {len(result.file_list)}")
@@ -222,7 +222,7 @@ def list_modified_files(
         for table_name in table_names:
             f.write(table_name + "\n")
     print(f"Tables affected saved in {short_output_file}")
-    
+
     return result
 
 @app.command()
@@ -236,7 +236,7 @@ def init_integration_tests(
     Integration tests validate end-to-end data flow from source tables to the specified sink table.
     """
     print("#" * 30 + f" Initialize Integration Tests for {sink_table_name}")
-    
+
     try:
         test_path = integration_test_mgr.init_integration_tests(sink_table_name, project_path)
         print(f"✅ Integration test structure created successfully")
@@ -245,7 +245,7 @@ def init_integration_tests(
         print(f"   1. Review and update synthetic data files in the test directory")
         print(f"   2. Customize validation queries based on your business logic")
         print(f"   3. Run tests with: shift_left project run-integration-tests {sink_table_name}")
-        
+
     except Exception as e:
         print(f"❌ Error initializing integration tests: {e}")
         raise typer.Exit(1)
@@ -266,18 +266,18 @@ def run_integration_tests(
     Optionally measures latency from data injection to sink table arrival.
     """
     print("#" * 30 + f" Run Integration Tests for {sink_table_name}")
-    
+
     if not compute_pool_id:
         compute_pool_id = get_config().get('flink', {}).get('compute_pool_id')
-    
+
     if scenario_name:
         print(f"Running specific scenario: {scenario_name}")
     else:
         print(f"Running all test scenarios")
-        
+
     print(f"Latency measurement: {'enabled' if measure_latency else 'disabled'}")
     print(f"Compute pool: {compute_pool_id}")
-    
+
     try:
         results = integration_test_mgr.run_integration_tests(
             sink_table_name=sink_table_name,
@@ -286,7 +286,7 @@ def run_integration_tests(
             compute_pool_id=compute_pool_id,
             measure_latency=measure_latency
         )
-        
+
         # Display results summary
         print(f"\n{'=' * 60}")
         print(f"Integration Test Results Summary")
@@ -295,32 +295,32 @@ def run_integration_tests(
         print(f"Overall Status: {_get_status_emoji(results.overall_status)} {results.overall_status}")
         print(f"Total Duration: {results.total_duration_ms:.2f}ms")
         print(f"Test Scenarios: {len(results.test_results)}")
-        
+
         # Display individual scenario results
         for test_result in results.test_results:
             status_emoji = _get_status_emoji(test_result.status)
             print(f"\n  {status_emoji} {test_result.scenario_name}")
             print(f"     Status: {test_result.status}")
             print(f"     Duration: {test_result.duration_ms:.2f}ms")
-            
+
             if test_result.latency_results:
                 avg_latency = sum(lr.latency_ms for lr in test_result.latency_results) / len(test_result.latency_results)
                 print(f"     Avg Latency: {avg_latency:.2f}ms")
-            
+
             if test_result.error_message:
                 print(f"     Error: {test_result.error_message}")
-        
+
         # Save detailed results if output file specified
         if output_file:
             with open(output_file, 'w') as f:
                 f.write(results.model_dump_json(indent=2))
             print(f"\nDetailed results saved to: {output_file}")
-        
+
         print(f"\n{'=' * 60}")
-        
+
         if results.overall_status != "PASS":
             raise typer.Exit(1)
-            
+
     except Exception as e:
         print(f"❌ Error running integration tests: {e}")
         raise typer.Exit(1)
@@ -337,28 +337,28 @@ def delete_integration_tests(
     This cleanup command removes all test-related resources created during integration test execution.
     """
     print("#" * 30 + f" Delete Integration Test Artifacts for {sink_table_name}")
-    
+
     if not no_confirm:
         print("⚠️  This will delete all integration test artifacts including:")
         print("   - Flink statements with '_it' postfix")
         print("   - Associated Kafka topics")
         print("   - Test data and temporary resources")
-        
+
         confirm = typer.confirm("Are you sure you want to proceed?")
         if not confirm:
             print("❌ Deletion cancelled")
             raise typer.Exit(0)
-    
+
     try:
         integration_test_mgr.delete_integration_test_artifacts(
             sink_table_name=sink_table_name,
             project_path=project_path,
             compute_pool_id=compute_pool_id
         )
-        
+
         print(f"✅ Integration test artifacts deleted successfully")
         print(f"All test resources for '{sink_table_name}' have been cleaned up")
-        
+
     except Exception as e:
         print(f"❌ Error deleting integration test artifacts: {e}")
         raise typer.Exit(1)
@@ -367,7 +367,7 @@ def _get_status_emoji(status: str) -> str:
     """Get emoji representation for test status"""
     emoji_map = {
         "PASS": "✅",
-        "FAIL": "❌", 
+        "FAIL": "❌",
         "ERROR": "🚫"
     }
     return emoji_map.get(status, "❓")
@@ -384,3 +384,14 @@ def isolate_data_product(
     print("#" * 30 + f" Isolate data product {product_name} from {source_folder} to {target_folder}")
     project_manager.isolate_data_product(product_name, source_folder, target_folder)
     print(f"Data product isolated in {target_folder}")
+
+@app.command()
+def get_statement_list(
+     compute_pool_id: Annotated[str, typer.Argument(help="Compute pool id to get the statement list for")],
+):
+    """
+    Get the list of statements
+    """
+    print("#" * 30 + f" Get statement list")
+    statement_list = statement_mgr.get_statement_list(compute_pool_id)
+    print(statement_list)
