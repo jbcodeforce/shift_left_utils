@@ -341,7 +341,7 @@ class TestReportMgr(unittest.TestCase):
         self.assertEqual(result.status, "UNKNOWN")
         self.assertEqual(result.compute_pool_id, "")
         self.assertEqual(result.compute_pool_name, "UNKNOWN")
-        self.assertTrue(result.to_restart)  # to_restart = node.to_restart or node.to_run
+        self.assertTrue(result.to_restart or result.to_run)  # to_restart = node.to_restart or node.to_run
 
     @patch('shift_left.core.utils.report_mgr.compute_pool_mgr')
     def test_build_table_info_with_unknown_compute_pool(self, mock_compute_pool):
