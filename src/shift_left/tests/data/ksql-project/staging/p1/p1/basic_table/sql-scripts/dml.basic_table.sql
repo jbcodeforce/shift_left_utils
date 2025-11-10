@@ -1,4 +1,4 @@
-INSERT INTO int_p3_data_mesh
+INSERT INTO basic_table
 SELECT 
 -- part to select stuff
 FROM src_table

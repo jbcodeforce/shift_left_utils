@@ -1,4 +1,4 @@
-insert into src_p2_a_ut
+insert into src_a_ut
 (`default_key`, `a_value`, `x_key`)
 values
 ('default_key_1', 'a_value_1', 'x_key_1'),

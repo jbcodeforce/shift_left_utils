@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS int_p3_data_mesh (
+CREATE TABLE IF NOT EXISTS basic_table (
 
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

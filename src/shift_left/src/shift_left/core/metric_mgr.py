@@ -17,7 +17,7 @@ def get_available_metrics(compute_pool_id: str) -> list:
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
-   
+
     url=f"https://api.telemetry.confluent.cloud/v2/metrics/{dataset}/descriptors/metrics"
     response = None
     try:
@@ -28,7 +28,7 @@ def get_available_metrics(compute_pool_id: str) -> list:
         raise Exception(f"Error executing rest call: {e}")
 
 
-def get_retention_size(table_name: str, from_date: str = None) -> int:
+def get_retention_size(table_name: str) -> int:
     """
     Get the retention size of a table using the REST API metrics endpoint.
     """
@@ -42,7 +42,7 @@ def get_retention_size(table_name: str, from_date: str = None) -> int:
     now= datetime.now()
     interval = f"{now_minus_1_hour.strftime('%Y-%m-%dT%H:%M:%S%z')}/{now.strftime('%Y-%m-%dT%H:%M:%S%z')}"
     q_retention = {"aggregations":[{"metric":"io.confluent.kafka.server/retained_bytes"}],
-                       "filter": { "op": "AND", 
+                       "filter": { "op": "AND",
                                   "filters": [{"field":"resource.kafka.id","op":"EQ","value": cluster_id},
                                               {"field":"metric.topic","op":"EQ","value": table_name}]
                        },
@@ -78,7 +78,7 @@ def get_total_amount_of_messages(table_name: str, compute_pool_id: str= None, fr
     if statement and statement.status.phase == "RUNNING":
         statement_result = statement_mgr.get_statement_results(statement_name)
         if statement_result and isinstance(statement_result, StatementResult):
-            result = _process_results(statement_result, result) 
+            result = _process_results(statement_result, result)
             while statement_result.metadata.next:
                 statement_result = statement_mgr.get_next_statement_results(statement_result.metadata.next)
                 result = _process_results(statement_result, result)
@@ -98,7 +98,7 @@ def _process_results(statement_result: StatementResult, result: int) -> int:
         result = previous_result
     return result
 
-def get_pending_records(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+def get_pending_records(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
     """
     Get the pending records for a statement using the REST API metrics endpoint.
     Metric data points are typically available for query in the API within 5 minutes of their origination at the source.
@@ -106,18 +106,18 @@ def get_pending_records(compute_pool_ids: list[str], from_date: str = None) -> d
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/pending_records", from_date)
 
 
-def get_num_records_out(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+def get_num_records_out(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_out", from_date)
-    
-def get_num_records_in(compute_pool_ids: list[str], from_date: str = None) -> dict[str,int]:
+
+def get_num_records_in(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_in", from_date)
 
-def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: str = None) -> dict[str,int]:
+def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: str) -> dict[str,int]:
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
     qtype="query"
-    
+
     if from_date:
         # Parse input date and localize to configured timezone
         from_date_local = pytz.timezone(config['app']['timezone']).localize(datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S"))

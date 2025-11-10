@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS src_p2_a (
+CREATE TABLE IF NOT EXISTS src_a_ut (
   default_key STRING,
-  a_value STRING, 
+  a_value STRING,
   x_key STRING,
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS src_p2_a_ut (
+CREATE TABLE IF NOT EXISTS src_a (
   default_key STRING,
   a_value STRING, 
   x_key STRING,

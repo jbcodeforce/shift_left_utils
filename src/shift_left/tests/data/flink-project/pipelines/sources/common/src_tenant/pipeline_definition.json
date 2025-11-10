@@ -1,0 +1,58 @@
+{
+   "table_name": "src_common_tenant",
+   "product_name": "common",
+   "type": "source",
+   "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
+   "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
+   "path": "pipelines/sources/common/src_tenant",
+   "complexity": {
+      "number_of_regular_joins": 0,
+      "number_of_left_joins": 0,
+      "number_of_right_joins": 0,
+      "number_of_inner_joins": 0,
+      "number_of_outer_joins": 0,
+      "complexity_type": "Simple",
+      "state_form": "Stateful"
+   },
+   "parents": [],
+   "children": [
+      {
+         "table_name": "c360_dim_groups",
+         "product_name": "c360",
+         "type": "dimension",
+         "dml_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/dml.c360_dim_groups.sql",
+         "ddl_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/ddl.c360_dim_groups.sql",
+         "path": "pipelines/dimensions/c360/dim_groups",
+         "complexity": {
+            "number_of_regular_joins": 1,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateful"
+         },
+         "parents": [],
+         "children": []
+      },
+      {
+         "table_name": "int_common_tenant",
+         "product_name": "common",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/common/int_tenant/sql-scripts/dml.int_common_tenant.sql",
+         "ddl_ref": "pipelines/intermediates/common/int_tenant/sql-scripts/ddl.int_common_tenant.sql",
+         "path": "pipelines/intermediates/common/int_tenant",
+         "complexity": {
+            "number_of_regular_joins": 0,
+            "number_of_left_joins": 0,
+            "number_of_right_joins": 0,
+            "number_of_inner_joins": 0,
+            "number_of_outer_joins": 0,
+            "complexity_type": "Simple",
+            "state_form": "Stateless"
+         },
+         "parents": [],
+         "children": []
+      }
+   ]
+}

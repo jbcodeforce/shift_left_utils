@@ -3,8 +3,8 @@ Copyright 2024-2025 Confluent, Inc.
 
 The processing of dbt sql statements for defining sources adopt a different approach than sink tables.
 
-Processes per application, and generates the sql in the existing pipelines. 
-So this script needs to be created after the pipeline folder structure is created from the sink, as 
+Processes per application, and generates the sql in the existing pipelines.
+So this script needs to be created after the pipeline folder structure is created from the sink, as
 there is one pipeline per sink table.
 
 """
@@ -16,9 +16,9 @@ from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_trans
 from shift_left.core.utils.ksql_code_agent import KsqlToFlinkSqlAgent
 
 from shift_left.core.utils.file_search import (
-    create_folder_if_not_exist, 
+    create_folder_if_not_exist,
     SCRIPTS_DIR,
-    get_or_build_source_file_inventory, 
+    get_or_build_source_file_inventory,
     extract_product_name
 )
 from shift_left.core.utils.app_config import get_config, logger
@@ -37,8 +37,8 @@ TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 # ---- PUBLIC APIs ----
 
 def migrate_one_file(table_name: str,
-                    sql_src_file: str, 
-                    staging_target_folder: str, 
+                    sql_src_file: str,
+                    staging_target_folder: str,
                     src_folder_path: str,
                     process_parents: bool = False,
                     source_type: str = "spark",
@@ -55,11 +55,11 @@ def migrate_one_file(table_name: str,
     create_folder_if_not_exist(staging_target_folder)
     if source_type in ['dbt', 'spark']:
         if sql_src_file.endswith(".sql"):
-            _process_spark_sql_file(table_name=table_name, 
-                                        sql_src_file_name=sql_src_file, 
-                                        target_path=staging_target_folder, 
-                                        src_folder_path=src_folder_path, 
-                                        walk_parent=process_parents, 
+            _process_spark_sql_file(table_name=table_name,
+                                        sql_src_file_name=sql_src_file,
+                                        target_path=staging_target_folder,
+                                        src_folder_path=src_folder_path,
+                                        walk_parent=process_parents,
                                         validate=validate)
             logger.info(f"Processed {table_name} to {staging_target_folder}")
         else:
@@ -101,8 +101,8 @@ def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
         pk_to_use= config["app"]["default_PK"]
     else:
         pk_to_use="__pd"
-   
-    file_name=f"{target_folder}/ddl.{table_name}.sql" 
+
+    file_name=f"{target_folder}/ddl.{table_name}.sql"
     logger.info(f"Create DDL Skeleton for {table_name}")
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
@@ -133,7 +133,7 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     :return: create a file in the target folder
     """
 
-    file_name=f"{target_folder}/dml.{table_name}.sql" 
+    file_name=f"{target_folder}/dml.{table_name}.sql"
     env = Environment(loader=PackageLoader("shift_left.core","templates"))
     sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
     topic_name=_search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
@@ -147,10 +147,10 @@ def _create_dml_statement(table_name:str, target_folder: str, fields: str, confi
     with open(file_name, 'w') as f:
         f.write(rendered_sql)
 
-    
+
 def _process_ddl_file(file_path: str, sql_file: str):
     """
-    Process a ddl file, replacing the ``` final AS (``` and SELECT * FROM final 
+    Process a ddl file, replacing the ``` final AS (``` and SELECT * FROM final
     """
     print(f"Process {sql_file} in {file_path}")
     file_name=Path(sql_file)
@@ -164,26 +164,20 @@ def _save_one_file(fname: str, content: str):
     with open(fname,"w") as f:
         f.write(content)
 
-def _save_dml_ddl(content_path: str, 
-                  internal_table_name: str, 
-                  dmls: List[str], 
+def _save_dml_ddl(content_path: str,
+                  internal_table_name: str,
+                  dmls: List[str],
                   ddls: List[str]):
     """
     creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
     """
     logger.info(f"Save DML and DDL statements to {content_path} for {internal_table_name} with {len(ddls)} DDLs and {len(dmls)} DMLs")
-    # Handle None or empty cases
-    if ddls is None:
-        ddls = []
-    if dmls is None:
-        dmls = []
-    
     # Ensure we have lists, not strings (to avoid character iteration)
     if isinstance(ddls, str):
         ddls = [ddls] if ddls.strip() else []
     if isinstance(dmls, str):
         dmls = [dmls] if dmls.strip() else []
-    
+
     idx=0
     for ddl in ddls:
         if ddl and ddl.strip():  # Only process non-empty DDLs
@@ -227,8 +221,8 @@ def _search_table_in_processed_tables(table_name: str) -> bool:
 
 # TODO this is dead code as of now, to remove later as we may need it.
 def _process_source_sql_file(table_name: str,
-                            src_file_name: str, 
-                             target_path: str, 
+                            src_file_name: str,
+                             target_path: str,
                              product_name: str,
                              validate: bool = False):
     """
@@ -245,21 +239,21 @@ def _process_source_sql_file(table_name: str,
     table_folder, internal_table_name = build_folder_structure_for_table(table_name,  target_path + "/sources", product_name)
     config = get_config()
     fields = _create_src_ddl_statement(internal_table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
-    _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)   
-    
+    _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)
 
-def _process_spark_sql_file(table_name: str, 
-                                sql_src_file_name: str, 
-                                target_path: str, 
+
+def _process_spark_sql_file(table_name: str,
+                                sql_src_file_name: str,
+                                target_path: str,
                                 src_folder_path: str,
                                 walk_parent: bool = False,
                                 validate: bool = False):
     """
-    Transform intermediate or fact or dimension sql file to Flink SQL. 
+    Transform intermediate or fact or dimension sql file to Flink SQL.
     The folder created are <table_name>/sql_scripts and <table_name>/tests + a makefile to facilitate Confluent cloud deployment.
 
     :param src_file_name: the file name of the dbt, spark SQL source file
-    :param target_path 
+    :param target_path
     :param source_target_path: the path for the newly created Flink sql file
     :param walk_parent: Assess if it needs to process the dependencies
     :param validate: Assess if it needs to validate the sql using Confluent Cloud for Flink
@@ -348,8 +342,8 @@ def _find_sub_string(table_name, topic_name) -> bool:
             break
     return all_present
 
-def _process_ksql_sql_file(table_name: str, 
-                           ksql_src_file: str, 
+def _process_ksql_sql_file(table_name: str,
+                           ksql_src_file: str,
                            staging_target_folder: str,
                            validate: bool = False,
                            product_name: str = None

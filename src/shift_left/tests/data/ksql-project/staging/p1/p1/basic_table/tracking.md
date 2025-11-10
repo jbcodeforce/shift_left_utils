@@ -1,4 +1,4 @@
-## Fact Table: int_p3_data_mesh
+## Fact Table: basic_table
 
 Status date:
 

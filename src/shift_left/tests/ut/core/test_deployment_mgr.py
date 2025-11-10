@@ -19,7 +19,7 @@ from shift_left.core.utils.file_search import read_pipeline_definition_from_file
 import shift_left.core.deployment_mgr as dm
 
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
+    Statement,
     StatementInfo,
     Status,
     Spec,
@@ -34,7 +34,7 @@ from ut.core.BaseUT import BaseUT
 
 class TestDeploymentManager(BaseUT):
     """Test suite for the deployment manager functionality."""
-    
+
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -58,12 +58,12 @@ class TestDeploymentManager(BaseUT):
         return node
 
     #  ----------- TESTS -----------
-   
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
-    def test_build_topological_sorted_parents(self, mock_statement_list) -> None:
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
+    def test_build_topological_sorted_graph(self, mock_statement_list) -> None:
         """Test building topologically sorted parents.
-        
+
         f has 6 parents: d, then z, x, y then src_y, src_x.
         The topological sort should return src_y, src_x, y, x, z, d, f.
         """
@@ -71,14 +71,14 @@ class TestDeploymentManager(BaseUT):
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
             "test-statement-2": StatementInfo(name= "test-statement-2", status_phase= "COMPLETED")
         }
-        print("test_build_topological_sorted_parents ")
+        print("test_build_topological_sorted_graph ")
         pipeline_def = read_pipeline_definition_from_file(
             self.inventory_path + "/facts/p2/f/" + PIPELINE_JSON_FILE_NAME
         )
         current_node = pipeline_def.to_node()
         node_map = dm._build_statement_node_map(current_node)
-        nodes_to_run = dm._build_topological_sorted_parents([current_node], node_map)
-        
+        nodes_to_run = dm._build_topological_sorted_graph([current_node], node_map)
+
         assert len(nodes_to_run) == 7
         for node in nodes_to_run:
             print(node.table_name, node.to_run, node.to_restart)
@@ -104,19 +104,19 @@ class TestDeploymentManager(BaseUT):
         node_map["c"] = FlinkStatementNode(table_name="c", parents=[node_map["z"], node_map["b"]])
         node_map["p"] = FlinkStatementNode(table_name="p", parents=[node_map["z"]])
         node_map["a"] = FlinkStatementNode(table_name="a", parents=[node_map["src_x"], node_map["src_a"]])
-   
+
         node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
         node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
 
-        ancestors = dm._build_topological_sorted_parents([node_map["z"]], node_map)
+        ancestors = dm._build_topological_sorted_graph([node_map["z"]], node_map)
         assert ancestors[0].table_name == "src_x" or ancestors[0].table_name == "src_y"
         assert ancestors[1].table_name == "src_x" or ancestors[1].table_name == "src_y"
         assert ancestors[2].table_name == "x" or ancestors[2].table_name == "y"
         assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
         assert ancestors[4].table_name == "z"
 
-    
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     def test_build_children_sorted_graph_from_z(self, mock_statement_list):
         mock_statement_list.return_value = {
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
@@ -144,8 +144,8 @@ class TestDeploymentManager(BaseUT):
         for node in descendants:
             print(node.table_name, node.to_run, node.to_restart)
             assert node.table_name in ["p","d", "f", "c", "e", "z"]
-        
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     def test_build_children_sorted_graph_from_src_x(self, mock_statement_list):
         mock_statement_list.return_value = {
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
@@ -161,7 +161,7 @@ class TestDeploymentManager(BaseUT):
             print(node.table_name, node.to_run, node.to_restart)
             assert node.table_name in ["p","e", "d", "f", "c", "a", "z", "x", "src_x"]
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')       
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     def test_topological_sort(self, mock_statement_list):
         mock_statement_list.return_value = {
             "test-statement-1": StatementInfo(name= "test-statement-1", status_phase= "RUNNING"),
@@ -185,7 +185,7 @@ class TestDeploymentManager(BaseUT):
         node_map["y"].children = [node_map["z"]]
         node_map["b"].children = [node_map["c"]]
 
-        ancestors = dm._build_topological_sorted_parents([node_map["src_x"]], node_map)
+        ancestors = dm._build_topological_sorted_graph([node_map["src_x"]], node_map)
         assert len(ancestors) == 1
         assert ancestors[0].table_name == "src_x"
         print("\nancestors of src_x:")
@@ -197,11 +197,11 @@ class TestDeploymentManager(BaseUT):
         for node in descendants:
             print(node.table_name)
         combined = ancestors + descendants
-        new_ancestors = dm._build_topological_sorted_parents(combined, node_map)
+        new_ancestors = dm._build_topological_sorted_graph(combined, node_map)
         print("\nnew sorted ancestors:")
         for node in new_ancestors:
             print(node.table_name)
-        ancestors = dm._build_topological_sorted_parents([node_map["z"]], node_map)
+        ancestors = dm._build_topological_sorted_graph([node_map["z"]], node_map)
         print("\nancestors of z:")
         for node in ancestors:
             print(node.table_name)
@@ -210,13 +210,13 @@ class TestDeploymentManager(BaseUT):
         for node in descendants:
             print(node.table_name)
         combined_2 = ancestors + descendants
-        new_ancestors_2 = dm._build_topological_sorted_parents(combined_2, node_map)
+        new_ancestors_2 = dm._build_topological_sorted_graph(combined_2, node_map)
         print("\nnew sorted ancestors:")
         for node in new_ancestors_2:
             print(node.table_name)
 
 
-   
+
 
     @patch('shift_left.core.deployment_mgr.report_mgr.build_simple_report')
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
@@ -225,16 +225,16 @@ class TestDeploymentManager(BaseUT):
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
-    def test_deploy_table_pipeline(self, 
-                                    mock_delete, 
+    def test_deploy_table_pipeline(self,
+                                    mock_delete,
                                     mock_drop,
                                     mock_post,
                                     mock_get_status,
                                     mock_get_compute_pool_list,
                                     mock_get_statement_list,
                                     mock_build_simple_report):
-    
-        
+
+
         """
         start src_x, src_y, x, y, z, d
         """
@@ -242,31 +242,31 @@ class TestDeploymentManager(BaseUT):
             print(f"@@@@ drop_table {table_name} {compute_pool_id}")
             time.sleep(1)
             return "deleted"
-        
+
         def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
             print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
             time.sleep(1)
-            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x","dev-usw2-p2-dml-d"]:  
+            if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x","dev-usw2-p2-dml-d"]:
                 print(f"mock_ get statement info: {statement_name} -> RUNNING")
                 return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
-            elif "ddl" in statement_name:  
+            elif "ddl" in statement_name:
                 return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
             else:
                 print(f"mock_ get statement info: {statement_name} -> UNKNOWN")
                 return self._create_mock_statement(name=statement_name, status_phase="UNKNOWN")
-            
+
         def _get_status(statement_name: str) -> StatementInfo:
             print(f"@@@@ get status {statement_name}")
-            if statement_name in ["dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x"]:  
+            if statement_name in ["dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x"]:
                 return self._create_mock_get_statement_info(name=statement_name, status_phase="RUNNING")
             return self._create_mock_get_statement_info(name=statement_name, status_phase="UNKNOWN")
-        
+
         def _delete_statement(statement_name: str):
             print(f"@@@@ delete statement {statement_name}")
             time.sleep(1)
             return "deleted"
-        
-        mock_get_status.side_effect = _get_status 
+
+        mock_get_status.side_effect = _get_status
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_delete.side_effect = _delete_statement
         mock_drop.side_effect = _drop_table
@@ -274,39 +274,42 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
         mock_build_simple_report.return_value = "mock_build_simple_report"
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name="d", 
-                                    inventory_path=self.inventory_path, 
-                                    compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, 
-                                    dml_only=False, 
+        summary, report = dm.build_deploy_pipeline_from_table(table_name="d",
+                                    inventory_path=self.inventory_path,
+                                    compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
+                                    dml_only=False,
                                     execute_plan=True,
                                     may_start_descendants=False,
                                     force_ancestors=False)
-        assert execution_plan.start_table_name == "d"
-        assert len(execution_plan.nodes) == 6
-        assert execution_plan.nodes[0].table_name in ["src_x", "src_y"]
-        assert execution_plan.nodes[2].table_name in ["x", "y"]
+
+        assert len(report.tables) == 6
+        assert report.tables[0].table_name in ["src_x", "src_y"]
+        assert report.tables[2].table_name in ["x", "y"]
         print(f"summary: {summary}")
-        print(f"execution_plan: {execution_plan.model_dump_json(indent=3)}")
+        print(f"report: {report.model_dump_json(indent=3)}")
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
-    def test_deploy_product_using_parallel(self, 
-                                           mock_delete, 
+    def test_deploy_product_using_parallel(self,
+                                           mock_delete,
                                            mock_drop,
                                            mock_post):
+        """
+        Deploying a product p1 in parallel should deploy all the tables in parallel.
+        """
         def _drop_table(table_name: str, compute_pool_id: str) -> str:
             print(f"@@@@ drop_table {table_name} {compute_pool_id}")
             time.sleep(1)
             return "deleted"
-        
+
         def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
             print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
             time.sleep(1)
             if "ddl" in statement_name:
                 return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
             return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
-        
+
         def _delete_statement(statement_name: str):
             print(f"@@@@ delete statement {statement_name}")
             time.sleep(1)
@@ -316,12 +319,13 @@ class TestDeploymentManager(BaseUT):
         mock_drop.side_effect = _drop_table
         mock_post.side_effect = _post_flink_statement
 
-        dm.build_deploy_pipelines_from_product(product_name="qx", 
-                                                           inventory_path=self.inventory_path, 
-                                                           execute_plan=True,
-                                                           force_ancestors=True,
-                                                           sequential=False)
-        
+        dm.build_deploy_pipelines_from_product(product_name="p1",
+                                                inventory_path=self.inventory_path,
+                                                execute_plan=True,
+                                                force_ancestors=True,
+                                                may_start_descendants=True,
+                                                sequential=False)
+
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
@@ -342,10 +346,10 @@ class TestDeploymentManager(BaseUT):
         def mock_statement(statement_name: str) -> StatementInfo:
             print(f"mock_statement {statement_name}")
             return self._create_mock_get_statement_info(status_phase="RUNNING")
- 
+
         def mock_drop_table(table_name: str, compute_pool_id: str) -> str:
             print(f"drop_table {table_name} {compute_pool_id}")
-            self.count += 1 
+            self.count += 1
             return "deleted"
 
         mock_get_status.side_effect = mock_statement
@@ -353,7 +357,7 @@ class TestDeploymentManager(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_delete.return_value = "deleted"
         mock_drop.side_effect = mock_drop_table
-        
+
         # Execute
         result = dm.full_pipeline_undeploy_from_table(
             table_name="z",
@@ -370,12 +374,12 @@ class TestDeploymentManager(BaseUT):
         """
         Test the prepare table
         """
- 
+
         def mock_post_statement(compute_pool_id, statement_name, sql_content):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
             status = Status(
-                phase= "COMPLETED", 
+                phase= "COMPLETED",
                 detail= ""
             )
             spec = Spec(
@@ -399,13 +403,13 @@ class TestDeploymentManager(BaseUT):
         mock_delete.return_value = "deleted"
         mock_post.side_effect = mock_post_statement
         path_to_sql_file = os.getenv("PIPELINES") + "/alter_table_avro_debezium.sql"
-        dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file, 
+        dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file,
                                         compute_pool_id="lfcp-121")
 
 
     @patch('shift_left.core.deployment_mgr._drop_node_worker')
     @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
-    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_graph')
     @patch('shift_left.core.deployment_mgr._build_statement_node_map')
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
@@ -424,10 +428,10 @@ class TestDeploymentManager(BaseUT):
          Two tables belong to the target product and are running, both should be dropped
         """
         print("test_full_pipeline_undeploy_from_product_success")
-        
+
         # Setup mocks
         mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
-        
+
         # Mock inventory with tables from target product and other products
         mock_inventory = {
             'table1': {
@@ -437,20 +441,20 @@ class TestDeploymentManager(BaseUT):
                 'type': 'source'
             },
             'table2': {
-                'table_name': 'table2', 
+                'table_name': 'table2',
                 'product_name': 'test_product',
                 'table_folder_name': 'table2_folder',
                 'type': 'fact'
             },
             'table3': {
                 'table_name': 'table3',
-                'product_name': 'other_product', 
+                'product_name': 'other_product',
                 'table_folder_name': 'table3_folder',
                 'type': 'source'
             }
         }
         mock_get_inventory.return_value = mock_inventory
-        
+
         # Mock pipeline definitions that return nodes
         mock_pipeline_def = MagicMock()
         mock_node1 = self._create_mock_statement_node(
@@ -462,9 +466,9 @@ class TestDeploymentManager(BaseUT):
             name='table1-dml',
             status_phase='RUNNING'
         )
-        
+
         mock_node2 = self._create_mock_statement_node(
-            table_name='table2', 
+            table_name='table2',
             product_name='test_product',
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
@@ -472,47 +476,47 @@ class TestDeploymentManager(BaseUT):
             name='table2-dml',
             status_phase='RUNNING'
         )
-        
+
         mock_pipeline_def.to_node.side_effect = [mock_node1, mock_node2]
         mock_read_pipeline.return_value = mock_pipeline_def
-        
+
         # Mock node map building
         mock_node_map = {
             'table1': mock_node1,
             'table2': mock_node2
         }
         mock_build_node_map.return_value = mock_node_map
-        
+
         # Mock topological sorting
         mock_build_sorted_parents.return_value = [mock_node1, mock_node2]
-        
+
         # Mock execution plan
         mock_execution_plan = MagicMock()
         mock_execution_plan.nodes = [mock_node2, mock_node1]  # Reverse order for undeploy
         mock_build_execution_plan.return_value = mock_execution_plan
-        
+
         # Mock drop worker to return success messages
         mock_drop_worker.return_value = "Dropped table successfully\n"
-        
+
         # Execute the function
         result = dm.full_pipeline_undeploy_from_product(
             product_name='test_product',
             inventory_path='/test/inventory/path',
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
-        
+
         # Verify the result
         self.assertIsInstance(result, str)
         self.assertIn("Full pipeline delete from product test_product", result)
         self.assertIn("Dropped table successfully", result)
-        
+
         # Verify mock calls
         mock_get_inventory.assert_called_once_with('/test/inventory/path', '/test/inventory/path', False)
         self.assertEqual(mock_read_pipeline.call_count, 2)  # Called for table1 and table2
         mock_build_node_map.assert_called()
         mock_build_sorted_parents.assert_called_once()
         mock_build_execution_plan.assert_called_once()
-        
+
         # Verify drop worker was called for both nodes
         self.assertEqual(mock_drop_worker.call_count, 2)
 
@@ -525,10 +529,10 @@ class TestDeploymentManager(BaseUT):
     ):
         """Test when no tables are found for the specified product."""
         print("test_full_pipeline_undeploy_from_product_no_tables_found")
-        
+
         # Setup mocks
         mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
-        
+
         # Mock inventory with no tables for target product
         mock_inventory = {
             'table1': {
@@ -538,13 +542,14 @@ class TestDeploymentManager(BaseUT):
             }
         }
         mock_get_inventory.return_value = mock_inventory
-        
+
         # Execute the function
         result = dm.full_pipeline_undeploy_from_product(
             product_name='test_product',
-            inventory_path='/test/inventory/path'
+            inventory_path='/test/inventory/path',
+			compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
-        
+
         # Verify the result - when no tables found for product, returns empty trace
         self.assertEqual(result, "")
         mock_get_inventory.assert_called_once_with('/test/inventory/path', '/test/inventory/path', False)
@@ -558,23 +563,24 @@ class TestDeploymentManager(BaseUT):
     ):
         """Test when inventory is empty."""
         print("test_full_pipeline_undeploy_from_product_empty_inventory")
-        
+
         # Setup mocks
         mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
         mock_get_inventory.return_value = {}
-        
+
         # Execute the function
         result = dm.full_pipeline_undeploy_from_product(
             product_name='test_product',
-            inventory_path='/test/inventory/path'
+            inventory_path='/test/inventory/path',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
-        
+
         # Verify the result - empty inventory returns empty trace
         self.assertEqual(result, "")
 
     @patch('shift_left.core.deployment_mgr._drop_node_worker')
     @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
-    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_graph')
     @patch('shift_left.core.deployment_mgr._build_statement_node_map')
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
@@ -594,10 +600,10 @@ class TestDeploymentManager(BaseUT):
         """
 
         print("test_full_pipeline_undeploy_from_product_no_nodes_to_drop")
-        
+
         # Setup mocks
         mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
-        
+
         # Mock inventory with tables for target product
         mock_inventory = {
             'table1': {
@@ -608,7 +614,7 @@ class TestDeploymentManager(BaseUT):
             }
         }
         mock_get_inventory.return_value = mock_inventory
-        
+
         # Mock pipeline definition that returns a node
         mock_pipeline_def = MagicMock()
         mock_node1 = self._create_mock_statement_node(
@@ -620,31 +626,32 @@ class TestDeploymentManager(BaseUT):
             name='table1-dml',
             status_phase='UNKNOWN'
         )
-        
+
         mock_pipeline_def.to_node.return_value = mock_node1
         mock_read_pipeline.return_value = mock_pipeline_def
-        
+
         # Mock node map building
         mock_node_map = {'table1': mock_node1}
         mock_build_node_map.return_value = mock_node_map
-        
+
         # Mock topological sorting
         mock_build_sorted_parents.return_value = [mock_node1]
-        
+
         # Mock execution plan
         mock_execution_plan = MagicMock()
         mock_execution_plan.nodes = [mock_node1]
         mock_build_execution_plan.return_value = mock_execution_plan
-        
+
         # Execute the function
         result = dm.full_pipeline_undeploy_from_product(
             product_name='test_product',
-            inventory_path='/test/inventory/path'
+            inventory_path='/test/inventory/path',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
-        
+
         # Verify the result - should return the "No table found" message when no nodes to drop
         self.assertEqual(result, "No table found for product test_product in inventory /test/inventory/path")
-        
+
         # Verify mocks called but drop worker should not be called
         mock_get_inventory.assert_called_once()
         mock_read_pipeline.assert_called_once()
@@ -652,7 +659,7 @@ class TestDeploymentManager(BaseUT):
 
     @patch('shift_left.core.deployment_mgr._drop_node_worker')
     @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
-    @patch('shift_left.core.deployment_mgr._build_topological_sorted_parents')
+    @patch('shift_left.core.deployment_mgr._build_topological_sorted_graph')
     @patch('shift_left.core.deployment_mgr._build_statement_node_map')
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     @patch('shift_left.core.deployment_mgr.get_or_build_inventory')
@@ -669,10 +676,10 @@ class TestDeploymentManager(BaseUT):
     ):
         """Test pipeline undeployment with some failures."""
         print("test_full_pipeline_undeploy_from_product_with_errors")
-        
+
         # Setup mocks similar to success test
         mock_get_config.return_value = {'flink': {'compute_pool_id': self.TEST_COMPUTE_POOL_ID_1}}
-        
+
         mock_inventory = {
             'table1': {
                 'table_name': 'table1',
@@ -682,7 +689,7 @@ class TestDeploymentManager(BaseUT):
             }
         }
         mock_get_inventory.return_value = mock_inventory
-        
+
         mock_pipeline_def = MagicMock()
         mock_node1 = self._create_mock_statement_node(
             table_name='table1',
@@ -692,67 +699,34 @@ class TestDeploymentManager(BaseUT):
             name='table1-dml',
             status_phase='RUNNING'
         )
-        
+
         mock_pipeline_def.to_node.return_value = mock_node1
         mock_read_pipeline.return_value = mock_pipeline_def
-        
+
         mock_node_map = {'table1': mock_node1}
         mock_build_node_map.return_value = mock_node_map
         mock_build_sorted_parents.return_value = [mock_node1]
-        
+
         mock_execution_plan = MagicMock()
         mock_execution_plan.nodes = [mock_node1]
         mock_build_execution_plan.return_value = mock_execution_plan
-        
+
         # Mock drop worker to raise an exception
         mock_drop_worker.side_effect = Exception("Connection failed")
-        
+
         # Execute the function
         result = dm.full_pipeline_undeploy_from_product(
             product_name='test_product',
-            inventory_path='/test/inventory/path'
+            inventory_path='/test/inventory/path',
+            compute_pool_id=self.TEST_COMPUTE_POOL_ID_1
         )
-        
+
         # Verify the result contains error message
         self.assertIsInstance(result, str)
         self.assertIn("Full pipeline delete from product test_product", result)
         self.assertIn("Failed to process table1: Connection failed", result)
 
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
-    def test_deploy_product_using_parallel(self, 
-                                           mock_delete, 
-                                           mock_drop,
-                                           mock_post):
-        def _drop_table(table_name: str, compute_pool_id: str) -> str:
-            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
-            time.sleep(1)
-            return "deleted"
-        
-        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
-            print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
-            time.sleep(1)
-            if "ddl" in statement_name:
-                return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
-            return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
-        
-        def _delete_statement(statement_name: str):
-            print(f"@@@@ delete statement {statement_name}")
-            time.sleep(1)
-            return "deleted"
 
-        mock_delete.side_effect = _delete_statement
-        mock_drop.side_effect = _drop_table
-        mock_post.side_effect = _post_flink_statement
-
-        dm.build_deploy_pipelines_from_product(product_name="qx", 
-                                                           inventory_path=self.inventory_path, 
-                                                           execute_plan=True,
-                                                           force_ancestors=True,
-                                                           sequential=False)
-
-       
 if __name__ == '__main__':
     unittest.main()
