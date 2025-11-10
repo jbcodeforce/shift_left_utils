@@ -5,7 +5,7 @@ import unittest
 import os
 import pathlib
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
-    
+
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.file_search import (
@@ -18,23 +18,22 @@ from shift_left.core.pipeline_mgr import (
 
 
 class TestPipelineManager(unittest.TestCase):
-    
-    
+
+
     @classmethod
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
-        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def test_PipelineReport(self):
         report: PipelineReport = PipelineReport(table_name="fct_order",
                                                 path = "facts/p1/fct_order")
         assert report
         assert report.table_name == "fct_order"
-  
+
     def test_build_a_src_pipeline_def(self):
         print("test_build_a_src_pipelinedef")
         path= os.getenv("PIPELINES")
@@ -48,7 +47,7 @@ class TestPipelineManager(unittest.TestCase):
         assert len(result.children) == 0
         assert "source" == result.type
         print(result.model_dump_json(indent=3))
-        
+
     def test_1_build_pipeline_def_for_fact_table(self):
         """ Need to run this one first"""
         print("test_1_build_pipeline_def_for_fact_table")
@@ -86,7 +85,7 @@ class TestPipelineManager(unittest.TestCase):
         print(pipeline_def.model_dump_json(indent=3))
         assert len(pipeline_def.parents) == 2
         assert len(pipeline_def.children) == 0
-       
+
     def test_build_pipeline_report_from_table(self):
         print("test_walk_the_hierarchy_for_report_from_table")
         path= os.getenv("PIPELINES")
@@ -106,7 +105,7 @@ class TestPipelineManager(unittest.TestCase):
         result = pm.get_static_pipeline_report_from_table("int_p1_table_1", os.getenv("PIPELINES"))
         assert result
         print(result.model_dump_json(indent=3))
-    
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -840,12 +840,14 @@ The execution plan is a topological sorted Flink statement hierarchy enriched wi
     ```
 
 * The options that are relevant to control the execution plan:
-    ```sh
-    --compute-pool-id 
-    --may-start-descendants
-    --force-ancestors
-    --cross-product-deployment
-    ```
+
+| Option | Why |
+| --- | --- |
+| --compute-pool-id | will run the statements into one compute pool | 
+| --may-start-descendants |Deploying a table will children, will restart all descedants |
+| --force-ancestors | Rare to use. Only when redeploying all product or directory |
+| --cross-product-deployment | Enfore touching cross product table. not recommended |
+| --
 
 * This command will take into account the following parameters in the config.yaml:
     ```yaml

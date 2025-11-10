@@ -36,13 +36,13 @@ from shift_left.core.models.flink_statement_model import (
 from shift_left.core.utils.file_search import (
     FlinkTableReference
 )
-from shift_left.core.utils.table_worker import NoChangeDoneToSqlContent
+from shift_left.core.utils.table_worker import NoChangeDoneToSqlContent, TableWorker
 
 STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
-                                                      flink_statement_file_path: str = None,
-                                                      statement_name: str = None
+                                                      flink_statement_file_path: str = "",
+                                                      statement_name: str = ""
 ) -> Statement | StatementError:
     """
     Read the SQL content for the flink_statement file name, and deploy to
@@ -59,7 +59,11 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             sql_content = f.read()
             column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
             transformer = get_or_build_sql_content_transformer()
-            _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
+            _, sql_out= transformer.update_sql_content(
+                                                sql_content=sql_content,
+                                                column_to_search=column_to_search,
+                                                product_name=flinkStatement_to_process.product_name,
+                                                version=flinkStatement_to_process.version)
 
             statement= post_flink_statement(compute_pool_id,
                                             statement_name,
@@ -362,7 +366,7 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     return f"{table_name} dropped"
 
 _runner_class = None
-def get_or_build_sql_content_transformer():
+def get_or_build_sql_content_transformer() -> TableWorker:
     global _runner_class
     if not _runner_class:
         if get_config().get('app').get('sql_content_modifier'):

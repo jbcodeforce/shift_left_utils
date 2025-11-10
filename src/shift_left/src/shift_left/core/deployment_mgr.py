@@ -21,6 +21,7 @@ from shift_left.core import pipeline_mgr
 from shift_left.core import compute_pool_mgr
 from shift_left.core import statement_mgr
 from shift_left.core.models.flink_statement_model import (
+    ErrorData,
     Statement,
     StatementError,
     FlinkStatementNode,
@@ -289,7 +290,8 @@ def build_and_deploy_all_from_table_list(
     sequential: bool = True,
     pool_creation: bool = True,
     exclude_table_names: List[str] = [],
-    max_thread: int = 1
+    max_thread: int = 1,
+    version: str = ""
 ) -> Tuple[str, TableReport]:
     """
     Deploy all the pipelines in the table list file.
@@ -299,7 +301,6 @@ def build_and_deploy_all_from_table_list(
     nodes_to_process = []
     combined_node_map = {}
     count=0
-    combined_node_map = {}
     visited_nodes = set()
     print(f"Processing {len(include_table_names)} tables")
     for table_name in include_table_names:
@@ -308,6 +309,7 @@ def build_and_deploy_all_from_table_list(
             pipe_def = read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
             if pipe_def:
                 node = pipe_def.to_node()
+                node.version = version
                 nodes_to_process.append(node)
                 node.to_restart = True
                 # Build the static graph from the Flink statement relationship
@@ -331,7 +333,11 @@ def build_and_deploy_all_from_table_list(
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
-            _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
+            _execute_plan(execution_plan=execution_plan,
+                         compute_pool_id=compute_pool_id,
+                         accept_exceptions=False,
+                         sequential=sequential,
+                         max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
@@ -1162,9 +1168,11 @@ def _deploy_one_node(node: FlinkStatementNode,
                      accept_exceptions: bool = False,
                      compute_pool_id: str = ""
 )-> Statement | StatementError:
+    """
+    Deploy one Statement as described in the FlinkStatementNode. Keep the node concept as it is part of the execution plan graph.
+    """
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
-    maintenant= datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     logger.info(f"Deploy table: {node.table_name}'")
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploy table {node.table_name}")
     try:
@@ -1172,6 +1180,8 @@ def _deploy_one_node(node: FlinkStatementNode,
             statement = _deploy_ddl_dml(node)
         else:
             statement = _deploy_dml(node, False)
+        if isinstance(statement, StatementError):
+            return statement
         node.existing_statement_info = statement_mgr.map_to_statement_info(statement)
         return statement
     except Exception as e:
@@ -1180,6 +1190,7 @@ def _deploy_one_node(node: FlinkStatementNode,
             raise RuntimeError(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement execution failed: {str(e)}")
         else:
             logger.error(f"Statement execution for: {node.table_name} failed: {str(e)}, move to next node")
+            return StatementError(errors =[ ErrorData(id=node.table_name, status="FAILED", detail=f"Statement execution for: {node.table_name} failed: {str(e)}")])
 
 
 def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | StatementError:

@@ -333,7 +333,8 @@ def deploy(
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from. If not provided, it will deploy the pipeline from the table name."),
         parallel: bool = typer.Option(False, help="By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel."),
         max_thread: int = typer.Option(1, help="The maximum number of threads to use when deploying the pipeline in parallel."),
-        pool_creation: bool = typer.Option(False, help="By default the deployment will not create a compute pool per table. This flag will create a pool.")
+        pool_creation: bool = typer.Option(False, help="By default the deployment will not create a compute pool per table. This flag will create a pool."),
+        version: str = typer.Option(None, help="The default version to use, at the table level for modified flink statements. But when set the tool will increasing existing version in SQL. Example of string is '_v2'. Only used if table_list_file_name is provided.")
         ):
     """
     Deploy a pipeline from a given table name , product name or a directory taking into account the execution plan.
@@ -375,7 +376,8 @@ def deploy(
         parallel=parallel,
         max_thread=max_thread,
         execute_plan=True,
-        pool_creation=pool_creation)
+        pool_creation=pool_creation,
+        version=version)
 
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline DEPLOYED")
 
@@ -514,7 +516,8 @@ def _build_deploy_pipeline(
         parallel: bool = False,
         max_thread: int = 4,
         execute_plan: bool=False,
-        pool_creation: bool = False):
+        pool_creation: bool = False,
+        version: str = ""):
     summary="Nothing done"
     try:
         report=None
@@ -592,7 +595,8 @@ def _build_deploy_pipeline(
                                                                     execute_plan=execute_plan,
                                                                     exclude_table_names=exclude_table_names,
                                                                     max_thread=max_thread,
-                                                                    pool_creation=pool_creation
+                                                                    pool_creation=pool_creation,
+                                                                    version=version
                                                                 )
         else:
             print(f"[red]Error: either table-name, product-name, dir or table-list-file-name must be provided[/red]")

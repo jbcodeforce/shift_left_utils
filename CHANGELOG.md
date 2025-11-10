@@ -1,6 +1,12 @@
 # CHANGELOG
 
 <!-- version list -->
+### v0.1.45
+* Add list of statement per compute pool id, as part of project commands and in the deployment manager service
+* Add support to exclude-table-list from a deployment or build execution plan. The table will not be restarted or re run
+* Enhance the project list-modified-files
+* Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
+
 ### v0.1.44
 * Support post_fix to run and validate unit tests so they can be run in parallel with CI/CD workflow. New arguments to the unit test function
 * Add new command for creating a healthcheck report of a given product pipeline.
@@ -10,7 +16,7 @@
 * Add a run-all flag for running validation script:  `table validate-unit-tests <table_name> --run-all ` so all the validation SQLs will be executed.
 
 ### v0.1.42 - 2025-10-15
-- **NEW: MCP (Model Context Protocol) Integration for Cursor AI**
+- **MCP (Model Context Protocol) Integration for Cursor AI. (alpha version)**
   - Added `shift_left.mcp` module for seamless Cursor AI integration
   - All CLI commands now available as MCP tools
   - Natural language interface for shift_left commands in Cursor

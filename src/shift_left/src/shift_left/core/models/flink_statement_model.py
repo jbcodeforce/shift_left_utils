@@ -115,7 +115,7 @@ class StatementListCache(BaseModel):
 class FlinkStatementComplexity(BaseModel):
     """
     Keep metrics of the DML statement, derive a complexity of a Flink Statement.
-    
+
     """
     number_of_regular_joins: int = Field(default=0, description="Number of regular joins in the statement")
     number_of_left_joins: int = Field(default=0, description="Number of left joins in the statement")
@@ -124,8 +124,8 @@ class FlinkStatementComplexity(BaseModel):
     number_of_outer_joins: int = Field(default=0, description="Number of outer joins in the statement")
     complexity_type: str = Field(default="Simple", description="Type of complexity")
     state_form: Optional[str] =  Field(default="Stateless", description="Type of Flink SQL statement. Could be Stateful or Stateless")
-    
-    
+
+
 class FlinkStatementNode(BaseModel):
     """
     To build an execution plan we need one node for each popential Flink Statement to run.
@@ -152,7 +152,8 @@ class FlinkStatementNode(BaseModel):
     existing_statement_info:  Optional[StatementInfo] =  Field(default=None, description="Flink statement status")
     to_run: bool = Field(default=False, description="statement must be executed")
     to_restart: bool = Field(default=False, description="statement will be restarted, this is to differentiate child treatment from parent")
-    
+    version: str = Field(default="", description="Version of the table, used to identify modified statements")
+
     def add_child(self, child):
         self.children.add(child)
         child.parents.add(self)
@@ -166,12 +167,12 @@ class FlinkStatementNode(BaseModel):
             return (self.existing_statement_info.status_phase in ["RUNNING", "PENDING", "COMPLETED"])
         else:
             return False
-    
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FlinkStatementNode):
             return NotImplemented
         return self.table_name == other.table_name
-    
+
     def __hash__(self) -> int:
         return hash(self.table_name)
 
