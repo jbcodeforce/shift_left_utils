@@ -1,5 +1,14 @@
 # CHANGELOG
 
+* Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
+
+### v0.1.45
+* Add list of statement per compute pool id, as part of project commands and in the deployment manager service
+* Add support to exclude-table-list from a deployment or build execution plan. The table will not be restarted or re run
+* Enhance the project list-modified-files
+
+
+
 <!-- version list -->
 ### v0.1.44
 * Support post_fix to run and validate unit tests so they can be run in parallel with CI/CD workflow. New arguments to the unit test function
