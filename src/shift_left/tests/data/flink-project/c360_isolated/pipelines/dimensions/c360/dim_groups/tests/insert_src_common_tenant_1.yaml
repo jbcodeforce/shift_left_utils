@@ -1,0 +1,6 @@
+src_common_tenant:
+  - tenant_id: ['enum_test_data']
+  - tenant_name: ['enum_test_data']
+  - tenant_description: ['enum_test_data']
+  - tenant_status: ['enum_test_data']
+  - tenant_created_at: ['enum_test_data']

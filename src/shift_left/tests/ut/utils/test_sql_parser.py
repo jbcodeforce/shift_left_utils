@@ -30,8 +30,8 @@ class TestSQLParser(unittest.TestCase):
     def test_upgrade_mode_get_tables_from_join(self):
         parser = SQLparser()
         query= """
-        SELECT a.*, b.name 
-        FROM schema1.table1 a 
+        SELECT a.*, b.name
+        FROM schema1.table1 a
         JOIN table2 b ON a.id = b.id
         """
         rep=parser.extract_table_references(query)
@@ -43,7 +43,7 @@ class TestSQLParser(unittest.TestCase):
     def test_upgrade_mode_get_tables_from_inner_join(self):
         parser = SQLparser()
         query= """
-        SELECT * 
+        SELECT *
         FROM table1 t1
         LEFT JOIN schema2.table2 AS t2 ON t1.id = t2.id
         INNER JOIN table3 t3 ON t2.id = t3.id
@@ -58,7 +58,7 @@ class TestSQLParser(unittest.TestCase):
     def test_upgrade_mode_get_tables_from_right_join(self):
         parser = SQLparser()
         query=  """
-        SELECT * 
+        SELECT *
         FROM table1
         RIGHT OUTER JOIN table2 ON table1.id = table2.id
         FULL JOIN table3 ON table2.id = table3.id
@@ -70,7 +70,7 @@ class TestSQLParser(unittest.TestCase):
         assert "table3" in rep
         assert "Stateful" in parser.extract_upgrade_mode(query, "")
 
-        
+
     def test_upgrade_mode_get_tables_without_ctes(self):
         parser = SQLparser()
         query= """
@@ -82,7 +82,7 @@ class TestSQLParser(unittest.TestCase):
             SELECT d,b,e
            FROM table2
         )
-        SELECT * 
+        SELECT *
         FROM cte1
         RIGHT OUTER JOIN cte2 ON table1.id = table2.id
         FULL JOIN table3 ON table2.id = table3.id
@@ -95,7 +95,7 @@ class TestSQLParser(unittest.TestCase):
         assert not "cte1" in rep
         print(rep)
         assert "Stateful" in parser.extract_upgrade_mode(query, "")
-    
+
 
     def test_upgrade_mode_get_tables_without_ctes(self):
         parser = SQLparser()
@@ -132,7 +132,7 @@ class TestSQLParser(unittest.TestCase):
 
     def test_upgrade_mode_stateless_from_dml_ref(self):
         parser = SQLparser()
-        fname = os.getenv("PIPELINES") + "/sources/p2/src_a/sql-scripts/dml.src_p2_a.sql"
+        fname = os.getenv("PIPELINES") + "/sources/p2/src_a/sql-scripts/dml.src_a.sql"
         with open(fname, "r") as f:
             sql_content = f.read()
             upgrade_mode = parser.extract_upgrade_mode(sql_content, "")
@@ -142,7 +142,7 @@ class TestSQLParser(unittest.TestCase):
         parser = SQLparser()
         query="""
         SELECT order_id, product_name
-        FROM Orders 
+        FROM Orders
             CROSS JOIN UNNEST(product_names) AS t(product_name)
         """
         assert "Stateless" in parser.extract_upgrade_mode(query, "" )
@@ -154,7 +154,7 @@ class TestSQLParser(unittest.TestCase):
             sql_content = f.read()
             columns = parser.build_column_metadata_from_sql_content(sql_content)
             assert columns
-            assert columns['id'] == {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True}  
+            assert columns['id'] == {'name': 'id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
             assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
             assert columns['status'] == {'name': 'status', 'type': 'STRING', 'nullable': True, 'primary_key': False}
             assert columns['name'] == {'name': 'name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
@@ -175,13 +175,13 @@ class TestSQLParser(unittest.TestCase):
             element_name            STRING,
             event_element_id        STRING,
              tenant_id               STRING,
-            PRIMARY KEY(sid) NOT ENFORCED 
+            PRIMARY KEY(sid) NOT ENFORCED
         ) DISTRIBUTED BY HASH(sid) INTO 3 BUCKETS WITH (
         """
         primary_key = parser.extract_primary_key_from_sql_content(sql_content)
         assert primary_key == ['sid']
 
-    def test_extract_table_name_from_insert_into_statement(self):   
+    def test_extract_table_name_from_insert_into_statement(self):
         parser = SQLparser()
         query="""INSERT INTO element_data
         WITH
@@ -237,7 +237,7 @@ class TestSQLParser(unittest.TestCase):
                     ed.parent_id,
                     ed.table_row_id,
                     ed.element_name as `name`,
-                    CASE 
+                    CASE
                         WHEN ed.element_type = 'DROPDOWN'
                             THEN ed.element_data
                         ELSE null
@@ -321,7 +321,7 @@ class TestSQLParser(unittest.TestCase):
         print(rep)
 
 
-    def test_extract_cte_table(self):   
+    def test_extract_cte_table(self):
         parser = SQLparser()
         query="""INSERT INTO element_data
         WITH
@@ -354,13 +354,14 @@ class TestSQLParser(unittest.TestCase):
             id STRING NOT NULL,
             tenant_id STRING NOT NULL,
             name STRING,
-            type STRING,
+            `type` STRING,
+            `standard` STRING,
             created_by STRING,
             created_date BIGINT,
             last_modified_by STRING,
             last_modified_date BIGINT,
             PRIMARY KEY(id, tenant_id) NOT ENFORCED
-        ) 
+        )
         """
         columns = parser.build_column_metadata_from_sql_content(query)
         assert columns
@@ -368,6 +369,7 @@ class TestSQLParser(unittest.TestCase):
         assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': False, 'primary_key': True}
         assert columns['name'] == {'name': 'name', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['type'] == {'name': 'type', 'type': 'STRING', 'nullable': True, 'primary_key': False}
+        assert columns['standard'] == {'name': 'standard', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         print(columns)
 
     def test_extract_table_name_from_create_statement_quoted(self):
@@ -432,7 +434,7 @@ class TestSQLParser(unittest.TestCase):
         assert columns['description'] == {'name': 'description', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['parent_id'] == {'name': 'parent_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['hierarchy'] == {'name': 'hierarchy', 'type': 'STRING', 'nullable': True, 'primary_key': False}
-    
+
     def test_build_columns_from_sql_content_quoted_column_names_2(self):
         parser = SQLparser()
         query="""CREATE TABLE `j9r-env`.`j9r-kafka`.`raw_users` (
@@ -473,7 +475,7 @@ WITH (
         assert columns['tenant_id'] == {'name': 'tenant_id', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['created_date'] == {'name': 'created_date', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['is_active'] == {'name': 'is_active', 'type': 'BOOLEAN', 'nullable': True, 'primary_key': False}
-    
+
     def test_should_not_consider_unnest_as_table_name(self):
         parser = SQLparser()
         query="""
@@ -482,9 +484,9 @@ WITH (
                 ed.id,
                 ed.`name` as element_name,
                 pe.element_type,
-                CASE 
-                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = 'null' THEN null 
-                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = '' THEN null 
+                CASE
+                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = 'null' THEN null
+                    WHEN TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', '')) = '' THEN null
                     ELSE TRIM(REGEXP_REPLACE(edata, '^["\[]|["\]"]$', ''))
                 END AS element_data,
                 ed.user_id,
@@ -497,7 +499,7 @@ WITH (
             INNER JOIN `src_plan_element` as pe
                 ON pe.event_element_id = ed.execution_plan_element_id
                 AND pe.tenant_id = ed.tenant_id
-            LEFT JOIN `src_form_element` as fec   
+            LEFT JOIN `src_form_element` as fec
                 ON fec.id = pe.config_element_id
                 AND fec.tenant_id = pe.tenant_id
             CROSS JOIN UNNEST(split(REGEXP_REPLACE(ed.data, '^\["|\"]$', '') , '", "')) as edata
@@ -516,12 +518,12 @@ WITH (
         """Test complexity extraction with no joins - should be Simple"""
         parser = SQLparser()
         query = """
-        SELECT col1, col2, col3 
-        FROM table1 
+        SELECT col1, col2, col3
+        FROM table1
         WHERE col1 = 'value'
         """
         result = parser.extract_statement_complexity(query, "Stateless")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -534,12 +536,12 @@ WITH (
         """Test complexity extraction with LEFT JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         LEFT JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -552,12 +554,12 @@ WITH (
         """Test complexity extraction with LEFT OUTER JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         LEFT OUTER JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -569,12 +571,12 @@ WITH (
         """Test complexity extraction with RIGHT JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         RIGHT JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 1)
@@ -586,12 +588,12 @@ WITH (
         """Test complexity extraction with RIGHT OUTER JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         RIGHT OUTER JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 1)
@@ -603,12 +605,12 @@ WITH (
         """Test complexity extraction with INNER JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         INNER JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -620,12 +622,12 @@ WITH (
         """Test complexity extraction with FULL OUTER JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         FULL OUTER JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -637,12 +639,12 @@ WITH (
         """Test complexity extraction with regular JOIN"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         JOIN table2 t2 ON t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 1)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -661,7 +663,7 @@ WITH (
         INNER JOIN table4 t4 ON t2.id = t4.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 2)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -683,10 +685,10 @@ WITH (
         FROM cte_1 t1
         LEFT JOIN table2 t2 ON t1.id = t2.id
         RIGHT JOIN table3 t3 ON t2.id = t3.id
-        INNER JOIN table4 t4 ON t3.id = t4.id 
+        INNER JOIN table4 t4 ON t3.id = t4.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 2)
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.number_of_right_joins, 1)
@@ -698,12 +700,12 @@ WITH (
         """Test that CROSS JOINs are not counted in complexity (stateless operation)"""
         parser = SQLparser()
         query = """
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         CROSS JOIN table2 t2
         """
         result = parser.extract_statement_complexity(query, "Stateless")
-        
+
         # CROSS JOINs should not contribute to complexity count
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
@@ -722,7 +724,7 @@ WITH (
         CROSS JOIN table3 t3
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         # Only the LEFT JOIN should be counted, not the CROSS JOIN
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 1)
@@ -736,13 +738,13 @@ WITH (
         parser = SQLparser()
         query = """
         -- This is a comment
-        SELECT t1.col1, t2.col2 
+        SELECT t1.col1, t2.col2
         FROM table1 t1
         /* Multi-line comment with LEFT JOIN inside */
         LEFT JOIN table2 t2 ON t1.id = t2.id -- another comment
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -754,7 +756,7 @@ WITH (
         """Test complexity extraction with empty SQL content"""
         parser = SQLparser()
         result = parser.extract_statement_complexity("", "Stateless")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 0)
         self.assertEqual(result.number_of_right_joins, 0)
@@ -767,12 +769,12 @@ WITH (
         """Test complexity extraction is case insensitive"""
         parser = SQLparser()
         query = """
-        select t1.col1, t2.col2 
+        select t1.col1, t2.col2
         from table1 t1
         left join table2 t2 on t1.id = t2.id
         """
         result = parser.extract_statement_complexity(query, "Stateful")
-        
+
         self.assertEqual(result.number_of_regular_joins, 0)
         self.assertEqual(result.number_of_left_joins, 1)
         self.assertEqual(result.complexity_type, "Simple")
@@ -780,11 +782,11 @@ WITH (
     def test_parse_sql_values_simple_values(self):
         """Test parsing simple comma-separated values without quotes"""
         parser = SQLparser()
-        
+
         # Simple values without quotes
         result = parser._parse_sql_values("value1, value2, value3")
         self.assertEqual(result, ["value1", "value2", "value3"])
-        
+
         # Values with extra spaces
         result = parser._parse_sql_values("  value1  ,  value2  ,  value3  ")
         self.assertEqual(result, ["value1", "value2", "value3"])
@@ -792,11 +794,11 @@ WITH (
     def test_parse_sql_values_single_quotes(self):
         """Test parsing values with single quotes"""
         parser = SQLparser()
-        
+
         # Simple quoted values
         result = parser._parse_sql_values("'value1', 'value2', 'value3'")
         self.assertEqual(result, ["value1", "value2", "value3"])
-        
+
         # Mixed quoted and unquoted
         result = parser._parse_sql_values("'quoted', unquoted, 'another quoted'")
         self.assertEqual(result, ["quoted", "unquoted", "another quoted"])
@@ -804,11 +806,11 @@ WITH (
     def test_parse_sql_values_double_quotes(self):
         """Test parsing values with double quotes"""
         parser = SQLparser()
-        
+
         # Double quoted values
         result = parser._parse_sql_values('"value1", "value2", "value3"')
         self.assertEqual(result, ["value1", "value2", "value3"])
-        
+
         # Mixed quote types
         result = parser._parse_sql_values("'single', \"double\", unquoted")
         self.assertEqual(result, ["single", "double", "unquoted"])
@@ -816,11 +818,11 @@ WITH (
     def test_parse_sql_values_escaped_quotes(self):
         """Test parsing values with escaped quotes"""
         parser = SQLparser()
-        
+
         # Escaped single quotes
         result = parser._parse_sql_values("'O''Reilly', 'Don''t', 'It''s working'")
         self.assertEqual(result, ["O'Reilly", "Don't", "It's working"])
-        
+
         # Escaped double quotes
         result = parser._parse_sql_values('"He said ""Hello""", "She replied ""Hi"""')
         self.assertEqual(result, ['He said "Hello"', 'She replied "Hi"'])
@@ -828,11 +830,11 @@ WITH (
     def test_parse_sql_values_values_with_commas_in_quotes(self):
         """Test parsing quoted values that contain commas"""
         parser = SQLparser()
-        
+
         # Commas inside quoted values should not split
         result = parser._parse_sql_values("'value1, with comma', 'value2', 'another, value'")
         self.assertEqual(result, ["value1, with comma", "value2", "another, value"])
-        
+
         # Mixed with double quotes
         result = parser._parse_sql_values('"value1, comma", \'value2\', "another, one"')
         self.assertEqual(result, ["value1, comma", "value2", "another, one"])
@@ -840,27 +842,27 @@ WITH (
     def test_parse_sql_values_empty_and_edge_cases(self):
         """Test parsing edge cases and empty values"""
         parser = SQLparser()
-        
+
         # Empty string
         result = parser._parse_sql_values("")
         self.assertEqual(result, [])
-        
+
         # Single value
         result = parser._parse_sql_values("single")
         self.assertEqual(result, ["single"])
-        
+
         # Single quoted value
         result = parser._parse_sql_values("'single quoted'")
         self.assertEqual(result, ["single quoted"])
-        
+
         # Empty quoted values - note: function currently returns only one empty string for "'', \"\""
         result = parser._parse_sql_values("'', ''")
         self.assertEqual(result, [""])  # Current behavior: only returns one empty string
-        
+
         # Single empty double quote
         result = parser._parse_sql_values("\"\"")
         self.assertEqual(result, [])  # Current behavior: returns empty list
-        
+
         # Values with only spaces and commas
         result = parser._parse_sql_values("   ,   ")
         self.assertEqual(result, [""])  # Current behavior: returns one empty string
@@ -868,11 +870,11 @@ WITH (
     def test_parse_sql_values_special_characters(self):
         """Test parsing values with special characters"""
         parser = SQLparser()
-        
+
         # Values with special characters
         result = parser._parse_sql_values("'value@domain.com', 'user#123', 'path/to/file'")
         self.assertEqual(result, ["value@domain.com", "user#123", "path/to/file"])
-        
+
         # Numbers and mixed content
         result = parser._parse_sql_values("123, 'text123', '456text'")
         self.assertEqual(result, ["123", "text123", "456text"])
@@ -880,15 +882,15 @@ WITH (
     def test_parse_sql_values_complex_scenarios(self):
         """Test parsing complex real-world scenarios"""
         parser = SQLparser()
-        
+
         # SQL-like values that might appear in INSERT statements
         result = parser._parse_sql_values("'John Doe', 25, 'john@email.com', 'Manager'")
         self.assertEqual(result, ["John Doe", "25", "john@email.com", "Manager"])
-        
+
         # Values with quotes and escaped quotes mixed
         result = parser._parse_sql_values("'It''s a test', \"Another \"\"test\"\"\", normal_value")
         self.assertEqual(result, ["It's a test", 'Another "test"', "normal_value"])
-        
+
         # Empty values in the middle
         result = parser._parse_sql_values("'first', , 'third'")
         self.assertEqual(result, ["first", "", "third"])
@@ -896,7 +898,7 @@ WITH (
     def test_parse_insert_sql_to_dict_basic(self):
         """Test basic INSERT SQL parsing functionality"""
         parser = SQLparser()
-        
+
         # Simple INSERT with single row
         sql = "INSERT INTO users (id, name, email) VALUES ('1', 'John Doe', 'john@example.com')"
         result = parser.parse_insert_sql_to_dict(sql)
@@ -910,8 +912,8 @@ WITH (
     def test_parse_insert_sql_to_dict_multiple_rows(self):
         """Test INSERT SQL with multiple value rows"""
         parser = SQLparser()
-        
-        sql = """INSERT INTO users (id, name, email) VALUES 
+
+        sql = """INSERT INTO users (id, name, email) VALUES
                  ('1', 'John Doe', 'john@example.com'),
                  ('2', 'Jane Smith', 'jane@example.com'),
                  ('3', 'Bob Johnson', 'bob@example.com')"""
@@ -926,7 +928,7 @@ WITH (
     def test_parse_insert_sql_to_dict_quoted_columns(self):
         """Test INSERT SQL with quoted column names"""
         parser = SQLparser()
-        
+
         # Test with backticks
         sql = "INSERT INTO `users` (`id`, `name`, `email`) VALUES ('1', 'John Doe', 'john@example.com')"
         result = parser.parse_insert_sql_to_dict(sql)
@@ -936,7 +938,7 @@ WITH (
             'email': ['john@example.com']
         }
         self.assertEqual(result, expected)
-        
+
         # Test with double quotes
         sql = 'INSERT INTO users ("id", "name", "email") VALUES (\'1\', \'John Doe\', \'john@example.com\')'
         result = parser.parse_insert_sql_to_dict(sql)
@@ -950,8 +952,8 @@ WITH (
     def test_parse_insert_sql_to_dict_mixed_quotes(self):
         """Test INSERT SQL with mixed quote types in values"""
         parser = SQLparser()
-        
-        sql = """INSERT INTO users (id, name, comment) VALUES 
+
+        sql = """INSERT INTO users (id, name, comment) VALUES
                  ('1', "John O'Reilly", 'He said "Hello"'),
                  ("2", 'Jane Smith', "She replied 'Hi'")"""
         result = parser.parse_insert_sql_to_dict(sql)
@@ -965,7 +967,7 @@ WITH (
     def test_parse_insert_sql_to_dict_with_comments(self):
         """Test INSERT SQL with SQL comments"""
         parser = SQLparser()
-        
+
         sql = """-- Insert user data
                  INSERT INTO users (id, name, email) -- columns
                  VALUES ('1', 'John Doe', 'john@example.com'), -- first user
@@ -982,8 +984,8 @@ WITH (
     def test_parse_insert_sql_to_dict_special_characters(self):
         """Test INSERT SQL with special characters in values"""
         parser = SQLparser()
-        
-        sql = """INSERT INTO users (id, name, email, tags) VALUES 
+
+        sql = """INSERT INTO users (id, name, email, tags) VALUES
                  ('1', 'John@Doe', 'user+test@domain.co.uk', 'admin,vip'),
                  ('2', 'Jane#Smith', 'jane_smith@test-domain.com', 'user,basic')"""
         result = parser.parse_insert_sql_to_dict(sql)
@@ -998,8 +1000,8 @@ WITH (
     def test_parse_insert_sql_to_dict_with_spaces(self):
         """Test INSERT SQL with extra spaces and formatting"""
         parser = SQLparser()
-        
-        sql = """  INSERT   INTO   users   (  id  ,  name  ,  email  )  
+
+        sql = """  INSERT   INTO   users   (  id  ,  name  ,  email  )
                  VALUES   (  '1'  ,  'John Doe'  ,  'john@example.com'  )  """
         result = parser.parse_insert_sql_to_dict(sql)
         expected = {
@@ -1012,7 +1014,7 @@ WITH (
     def test_parse_insert_sql_to_dict_case_insensitive(self):
         """Test INSERT SQL with different case variations"""
         parser = SQLparser()
-        
+
         sql = "insert into USERS (ID, Name, Email) values ('1', 'John Doe', 'john@example.com')"
         result = parser.parse_insert_sql_to_dict(sql)
         expected = {
@@ -1025,22 +1027,22 @@ WITH (
     def test_parse_insert_sql_to_dict_error_cases(self):
         """Test INSERT SQL parsing error cases"""
         parser = SQLparser()
-        
+
         # Missing column definition
         with self.assertRaises(ValueError) as context:
             parser.parse_insert_sql_to_dict("INSERT INTO users VALUES ('1', 'John')")
         self.assertIn("Could not extract column names", str(context.exception))
-        
+
         # Missing VALUES section
         with self.assertRaises(ValueError) as context:
             parser.parse_insert_sql_to_dict("INSERT INTO users (id, name)")
         self.assertIn("Could not extract VALUES section", str(context.exception))
-        
+
         # Mismatched number of columns and values
         with self.assertRaises(ValueError) as context:
             parser.parse_insert_sql_to_dict("INSERT INTO users (id, name) VALUES ('1', 'John', 'Extra')")
         self.assertIn("Number of values", str(context.exception))
-        
+
         # Malformed VALUES section
         with self.assertRaises(ValueError) as context:
             parser.parse_insert_sql_to_dict("INSERT INTO users (id, name) VALUES invalid_syntax")
@@ -1049,9 +1051,9 @@ WITH (
     def test_parse_insert_sql_to_dict_escaped_quotes(self):
         """Test INSERT SQL with escaped quotes in values"""
         parser = SQLparser()
-        
+
         # Build SQL string with proper escaping
-        sql = ("INSERT INTO users (id, name, comment) VALUES " + 
+        sql = ("INSERT INTO users (id, name, comment) VALUES " +
                "('1', 'O''Reilly', 'He said ''Hello World'''), " +
                "('2', \"Jane \"\"The Great\"\" Smith\", \"She replied \"\"Hi there\"\"\")")
         result = parser.parse_insert_sql_to_dict(sql)
@@ -1065,8 +1067,8 @@ WITH (
     def test_parse_insert_sql_to_dict_numeric_and_special_values(self):
         """Test INSERT SQL with numeric values and special SQL values"""
         parser = SQLparser()
-        
-        sql = """INSERT INTO products (id, name, price, active, created_date) VALUES 
+
+        sql = """INSERT INTO products (id, name, price, active, created_date) VALUES
                  ('1', 'Product A', 29.99, true, '2023-01-01'),
                  ('2', 'Product B', 15.50, false, '2023-01-02')"""
         result = parser.parse_insert_sql_to_dict(sql)
@@ -1082,7 +1084,7 @@ WITH (
     def test_parse_insert_sql_to_dict_ending_semicolon(self):
         """Test INSERT SQL with ending semicolon"""
         parser = SQLparser()
-        
+
         sql = "INSERT INTO users (id, name) VALUES ('1', 'John Doe'), ('2', 'Jane Smith');"
         result = parser.parse_insert_sql_to_dict(sql)
         expected = {
@@ -1091,7 +1093,7 @@ WITH (
         }
         self.assertEqual(result, expected)
 
-        
+
     def test_get_source_topics(self):
         """Test getting source topics."""
         src_table='src_c360_groups'
@@ -1107,7 +1109,7 @@ WITH (
   updated_at
 )
 WITH deduplicated_groups AS (
-  SELECT 
+  SELECT
     group_id,
     tenant_id,
     group_name,
@@ -1115,20 +1117,20 @@ WITH deduplicated_groups AS (
     created_date,
     is_active,
     CURRENT_TIMESTAMP AS updated_at,
-    
+
     -- Deduplication: Keep latest record per group_id
     -- This handles cases where the same group appears multiple times
     ROW_NUMBER() OVER (
-      PARTITION BY tenant_id, group_id 
+      PARTITION BY tenant_id, group_id
       ORDER BY `$rowtime` DESC
     ) AS row_num
-    
+
   FROM raw_groups
-  WHERE 
+  WHERE
     group_id IS NOT NULL  -- Ensure we have valid group_id  and tenant_id
-    AND tenant_id IS NOT NULL  
+    AND tenant_id IS NOT NULL
 )
-SELECT 
+SELECT
   group_id,
   tenant_id,
   group_name,
@@ -1137,7 +1139,7 @@ SELECT
   is_active,
   updated_at
 FROM deduplicated_groups
-WHERE row_num = 1 
+WHERE row_num = 1
 """
         source_topics = parser.extract_table_references(dml_content)
         assert source_topics is not None
@@ -1148,14 +1150,14 @@ WHERE row_num = 1
     def test_extract_cte_names_simple_uppercase(self):
         """Test CTE name extraction with uppercase WITH and AS"""
         parser = SQLparser()
-        
+
         sql = """
         WITH user_data AS (
             SELECT user_id, name FROM users WHERE active = 1
         )
         SELECT * FROM user_data ORDER BY name
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data"]
         self.assertEqual(result, expected)
@@ -1163,14 +1165,14 @@ WHERE row_num = 1
     def test_extract_cte_names_simple_lowercase(self):
         """Test CTE name extraction with lowercase with and as"""
         parser = SQLparser()
-        
+
         sql = """
         with user_data as (
             select user_id, name from users where active = 1
         )
         select * from user_data order by name
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data"]
         self.assertEqual(result, expected)
@@ -1178,7 +1180,7 @@ WHERE row_num = 1
     def test_extract_cte_names_mixed_case(self):
         """Test CTE name extraction with mixed case WITH and AS"""
         parser = SQLparser()
-        
+
         sql = """
         With user_data As (
             SELECT user_id, name FROM users WHERE active = 1
@@ -1188,7 +1190,7 @@ WHERE row_num = 1
         )
         Select * From user_data u Left Join order_data o On u.user_id = o.user_id
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data"]
         self.assertEqual(result, expected)
@@ -1196,7 +1198,7 @@ WHERE row_num = 1
     def test_extract_cte_names_multiple_ctes(self):
         """Test CTE name extraction with multiple CTEs"""
         parser = SQLparser()
-        
+
         sql = """
         WITH user_data AS (
             SELECT user_id, name FROM users WHERE active = 1
@@ -1209,7 +1211,7 @@ WHERE row_num = 1
         )
         SELECT * FROM combined_data WHERE order_count > 5
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data", "combined_data"]
         self.assertEqual(result, expected)
@@ -1217,17 +1219,17 @@ WHERE row_num = 1
     def test_extract_cte_names_nested_subqueries(self):
         """Test CTE name extraction with nested subqueries in CTE"""
         parser = SQLparser()
-        
+
         sql = """
         WITH complex_cte AS (
-            SELECT user_id, 
+            SELECT user_id,
                    (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.user_id) as order_count
             FROM users u
             WHERE EXISTS (SELECT 1 FROM orders o2 WHERE o2.user_id = u.user_id)
         )
         SELECT * FROM complex_cte WHERE order_count > 5
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["complex_cte"]
         self.assertEqual(result, expected)
@@ -1235,25 +1237,25 @@ WHERE row_num = 1
     def test_extract_cte_names_no_cte_present(self):
         """Test CTE name extraction when no CTEs are present"""
         parser = SQLparser()
-        
+
         sql = "SELECT * FROM users WHERE active = 1"
         result = parser._extract_cte_names(sql)
-        
+
         # Should return empty list when no CTEs found
         self.assertEqual(result, [])
 
     def test_extract_cte_names_empty_sql(self):
         """Test CTE name extraction with empty or None SQL"""
         parser = SQLparser()
-        
+
         # Empty string
         result = parser._extract_cte_names("")
         self.assertEqual(result, [])
-        
+
         # None
         result = parser._extract_cte_names(None)
         self.assertEqual(result, [])
-        
+
         # Whitespace only
         result = parser._extract_cte_names("   ")
         self.assertEqual(result, [])
@@ -1261,15 +1263,15 @@ WHERE row_num = 1
     def test_extract_cte_names_insert_statement(self):
         """Test CTE name extraction with INSERT statement"""
         parser = SQLparser()
-        
+
         sql = """
         WITH active_users AS (
             SELECT user_id, name FROM users WHERE active = 1
         )
-        INSERT INTO user_summary 
+        INSERT INTO user_summary
         SELECT user_id, name, 'active' as status FROM active_users
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["active_users"]
         self.assertEqual(result, expected)
@@ -1277,7 +1279,7 @@ WHERE row_num = 1
     def test_extract_cte_names_with_comments(self):
         """Test CTE name extraction with SQL comments"""
         parser = SQLparser()
-        
+
         sql = """
         -- User data CTE
         WITH user_data AS (
@@ -1290,7 +1292,7 @@ WHERE row_num = 1
         )
         SELECT * FROM user_data u JOIN order_summary o ON u.user_id = o.user_id
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_summary"]
         self.assertEqual(result, expected)
@@ -1298,25 +1300,25 @@ WHERE row_num = 1
     def test_extract_cte_names_duplicate_handling(self):
         """Test that duplicate CTE names are handled correctly"""
         parser = SQLparser()
-        
+
         # This shouldn't happen in valid SQL, but test the deduplication logic
         sql = """
         WITH user_data AS (SELECT * FROM users),
              order_data AS (SELECT * FROM orders)
         SELECT * FROM user_data u JOIN order_data o ON u.id = o.user_id
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["user_data", "order_data"]
         self.assertEqual(result, expected)
-        
+
         # Ensure no duplicates in result
         self.assertEqual(len(result), len(set(result)))
 
     def test_extract_cte_names_complex_real_world_example(self):
         """Test CTE name extraction with complex real-world SQL"""
         parser = SQLparser()
-        
+
         sql = """
         WITH section_detail as (
             SELECT s.event_section_id, sc.name, s.tenant_id
@@ -1338,11 +1340,11 @@ WHERE row_num = 1
                 ON ae.element_data = att.id AND ae.tenant_id = att.tenant_id
             where ae.element_type = 'ATTACHMENT'
         )
-        SELECT * FROM section_detail s 
+        SELECT * FROM section_detail s
         JOIN tenant t ON s.tenant_id = t.tenant_id
         LEFT JOIN attachment a ON s.tenant_id = a.tenant_id
         """
-        
+
         result = parser._extract_cte_names(sql)
         expected = ["section_detail", "tenant", "attachment"]
         self.assertEqual(result, expected)

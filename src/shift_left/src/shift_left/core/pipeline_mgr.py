@@ -1,7 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 
-Flink Statement pipeline manager defines functions to build inventory, create pipeline definition for table, 
+Flink Statement pipeline manager defines functions to build inventory, create pipeline definition for table,
 and navigate statement pipeline trees.
 
 This module provides functionality to:
@@ -23,7 +23,7 @@ from shift_left.core.utils.file_search import (
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME,
     from_absolute_to_pipeline,
-    FlinkTableReference, 
+    FlinkTableReference,
     FlinkTablePipelineDefinition,
     FlinkStatementComplexity,
     get_ddl_file_name,
@@ -32,7 +32,8 @@ from shift_left.core.utils.file_search import (
     get_or_build_inventory,
     get_table_type_from_file_path,
     create_folder_if_not_exist,
-    read_pipeline_definition_from_file
+    read_pipeline_definition_from_file,
+    get_ddl_dml_names_from_pipe_def
 )
 
 
@@ -44,7 +45,7 @@ files_to_process: deque = deque()  # Files to process when parsing SQL dependenc
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
 
 
- 
+
 class PipelineReport(BaseModel):
     """
     Class to represent a full pipeline tree without recursion
@@ -56,34 +57,114 @@ class PipelineReport(BaseModel):
     parents: Optional[Set[Any]] = Field(default=set(),   description="parents of this flink dml")
     children: Optional[Set[Any]] = Field(default=set(),  description="users of the table created by this flink dml")
 
+class PipelineStatusTree:
+    """
+    Class to provide the status of each statement in a pipeline given the child table.
+    """
+    def __init__(self, statement_info: Dict[str, Dict[str, Any]], inventory_path: str):
+        self.statement_info = statement_info
+        self.inventory_path = inventory_path
+        self.summary = {}
+
+    def pipeline_status(self, child_table, node_data, tree_node):
+
+        logger.info(f"child_table: {child_table}")
+        if node_data.parents:
+            for parent in node_data.parents:
+                logger.info(f"Parent: {parent.table_name}")
+                c_pipeline_def = get_pipeline_definition_for_table(child_table, self.inventory_path)
+                c_ddl_n, c_dml_n = get_ddl_dml_names_from_pipe_def(c_pipeline_def)
+                p_ddl_n, p_dml_n = get_ddl_dml_names_from_pipe_def(parent)
+                product_name = c_pipeline_def.product_name
+                if c_dml_n in self.statement_info:
+                    status_phase = self.statement_info[c_dml_n]['status_phase']
+                    compute_pool_id = self.statement_info[c_dml_n]['compute_pool_id']
+                    #compute_pool_name = self.statement_info[c_dml_n]['compute_pool_name']
+                else:
+                    status_phase = 'UNKNOWN'
+                    compute_pool_id = None
+
+                # Initialize the status counters for the product
+                logger.info(f"Product: {product_name}")
+                if product_name not in self.summary:
+                    self.summary[product_name] = {}
+                    self.summary[product_name]["OUT_OF_ORDER"] = {}
+                    self.summary[product_name]["POOLS"] = []
+
+                logger.info(f"compute_pool_id: {compute_pool_id} status_phase: {status_phase}")
+                if compute_pool_id and compute_pool_id not in self.summary[product_name]["POOLS"]:
+                    self.summary[product_name]["POOLS"].append(compute_pool_id)
+                if status_phase not in self.summary[product_name]:
+                    self.summary[product_name][status_phase] = {}
+                #if child_table not in self.summary[product_name][status_phase]:
+                #    self.summary[product_name][status_phase][child_table] = 1
+                if c_dml_n not in self.summary[product_name][status_phase]:
+                    self.summary[product_name][status_phase][c_dml_n] = 1
+                if  c_dml_n in self.statement_info and p_dml_n in self.statement_info:   #-- Not RUNNING statements
+                    if self.statement_info[c_dml_n]['created_at'] < self.statement_info[p_dml_n]['created_at']:
+                        if not parent.table_name in self.summary[product_name]["OUT_OF_ORDER"]:
+                            self.summary[product_name]["OUT_OF_ORDER"][parent.table_name] = f"{p_dml_n},{self.statement_info[p_dml_n]['created_at']},{c_dml_n},{self.statement_info[c_dml_n]['created_at']}"
+
+                parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
+                parent_node.add(f"[dim]Type: {parent.type}[/dim]")
+                parent_node.add(f"[dim]Product: {parent.product_name}[/dim]")
+                child=parent
+                # Recursive call
+                logger.info(f"recursive call : {child.table_name}")
+                self.pipeline_status(child.table_name, parent, parent_node)
+        else:
+            # this is the case of a source table with no parents
+            logger.info(f"Source: {node_data.table_name}")
+            s_pipeline_def = get_pipeline_definition_for_table(node_data.table_name, self.inventory_path)
+            s_ddl_n, s_dml_n = get_ddl_dml_names_from_pipe_def(s_pipeline_def)
+            product_name = s_pipeline_def.product_name
+            if s_dml_n in self.statement_info:
+                status_phase = self.statement_info[s_dml_n]['status_phase']
+                compute_pool_id = self.statement_info[s_dml_n]['compute_pool_id']
+            else:
+                status_phase = 'UNKNOWN'
+                compute_pool_id = None
+
+            if product_name not in self.summary:
+                self.summary[product_name] = {}
+                self.summary[product_name]["OUT_OF_ORDER"] = {}
+                self.summary[product_name]["POOLS"] = []
+
+            if compute_pool_id and compute_pool_id not in self.summary[product_name]["POOLS"]:
+                self.summary[product_name]["POOLS"].append(compute_pool_id)
+            if status_phase not in self.summary[product_name]:
+                self.summary[product_name][status_phase] = {}
+            #if not node_data.table_name in self.summary[product_name][status_phase]:
+            #    self.summary[product_name][status_phase][node_data.table_name] = 1
+            if s_dml_n not in self.summary[product_name][status_phase]:
+                self.summary[product_name][status_phase][s_dml_n] = 1
+        return self.summary
 
 def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> FlinkTablePipelineDefinition:
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    if not table_ref:
-        raise Exception(f"Table {table_name} not found. Stop processing")
     return read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
 
 
 def build_pipeline_definition_from_ddl_dml_content(
-    dml_file_name: str, 
+    dml_file_name: str,
     ddl_file_name: str,
     pipeline_path: str
 ) -> FlinkTablePipelineDefinition:
     """Build pipeline definition hierarchy starting from given dml file. This is the exposed API
     so entry point of the processing.
-    
+
     Args:
         ddl_file_name: Path to DDL file for root table
         dml_file_name: Path to DML file for root table
         pipeline_path: Root pipeline folder path
-        
+
     Returns: FlinkTablePipelineDefinition
         FlinkTablePipelineDefinition for the table and its dependencies
     """
     #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
-    
+
     table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
     logger.debug(f"Build pipeline for table: {table_name} from {dml_file_name} with parents: {parent_references}")
     current_node = _build_pipeline_definition(table_name=table_name,
@@ -91,8 +172,8 @@ def build_pipeline_definition_from_ddl_dml_content(
                                               complexity=complexity,
                                               table_folder=None,
                                               dml_file_name=from_absolute_to_pipeline(dml_file_name),
-                                              ddl_file_name=from_absolute_to_pipeline(ddl_file_name), 
-                                              parents=parent_references, 
+                                              ddl_file_name=from_absolute_to_pipeline(ddl_file_name),
+                                              parents=parent_references,
                                               children=set())
     node_to_process= deque()
     node_to_process.append(current_node)
@@ -111,11 +192,11 @@ def build_all_pipeline_definitions(pipeline_path: str):
     logger.info(f"Total number of pipeline definitions created: {count}")
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Total number of pipeline definitions created: {count}")
 
-    
+
 def get_static_pipeline_report_from_table(
-        table_name: str, 
+        table_name: str,
         inventory_path: str,
-        parent_only: bool = True, 
+        parent_only: bool = True,
         children_only: bool = False
 ) -> PipelineReport:
     """
@@ -132,9 +213,9 @@ def get_static_pipeline_report_from_table(
     try:
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
         current_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-        root_ref= PipelineReport(table_name= table_ref.table_name, 
-                                  path= table_ref.table_folder_name, 
-                                  ddl_ref= table_ref.ddl_ref, 
+        root_ref= PipelineReport(table_name= table_ref.table_name,
+                                  path= table_ref.table_folder_name,
+                                  ddl_ref= table_ref.ddl_ref,
                                   dml_ref= table_ref.dml_ref,
                                   parents= set(),
                                   children= set())
@@ -169,7 +250,7 @@ def delete_all_metada_files(root_folder: str):
 
 
 
-# ---- Private APIs ---- 
+# ---- Private APIs ----
 
 def _process_table_for_integration_test(table_def: FlinkTablePipelineDefinition, where_to_save_test_files: str):
     if len(table_def.parents) == 0:
@@ -179,7 +260,7 @@ def _process_table_for_integration_test(table_def: FlinkTablePipelineDefinition,
     else:
         # generate a validation statement
         print(f"Validation statement for {table_def.table_name}")
-        # recursively call the function for the parent 
+        # recursively call the function for the parent
         for parent in table_def.parents:
             _process_table_for_integration_test(parent, where_to_save_test_files)
 
@@ -191,12 +272,12 @@ def _build_pipeline_definitions_from_sql_content(
 ) -> Tuple[str, Set[FlinkTablePipelineDefinition], FlinkStatementComplexity]:
     """Extract parent table references and semantic from SQL content plus some
     complexity metrics.
-    
+
     Args:
         dml_file_name: Path to SQL file for dml content
         ddl_file_name: Path to SQL file for ddl content
         table_inventory: Dictionary of all available files
-        
+
     Returns:
         Tuple of (current_table_name, set of parent FlinkTablePipelineDefinition, complexity of current table)
     """
@@ -214,13 +295,13 @@ def _build_pipeline_definitions_from_sql_content(
                 dml_sql_content = f.read()
             current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
             referenced_table_names = parser.extract_table_references(dml_sql_content)
-            
+
         if  not current_table_name and ddl_file_name:
             if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
                 ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
             with open(ddl_file_name) as f:
                 ddl_sql_content = f.read()
-            current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)          
+            current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
         dependencies = set()
         state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
         complexity = parser.extract_statement_complexity(dml_sql_content,state_form)
@@ -248,9 +329,9 @@ def _build_pipeline_definitions_from_sql_content(
                         _ddl_sql_content = g.read()
                     dependent_state_form = parser.extract_upgrade_mode(_dml_sql_content, _ddl_sql_content)
                     dep_complexity = parser.extract_statement_complexity(_dml_sql_content, dependent_state_form)
-                logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}") 
+                logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}")
                 bpd = _build_pipeline_definition(
-                    table_name, 
+                    table_name,
                     table_ref.type,
                     dep_complexity,
                     table_ref.table_folder_name,
@@ -263,12 +344,12 @@ def _build_pipeline_definitions_from_sql_content(
         else:
             logger.warning(f"No referenced table found in {dml_file_name}")
         return current_table_name, dependencies, complexity
-            
+
     except Exception as e:
         logger.error(f"Error while processing {dml_file_name} or {ddl_file_name} with message: {e} but process continues...")
         return ERROR_TABLE_NAME, set(), None
 
-    
+
 def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, count: int) -> int:
     for sql_scripts_path in parent_folder_path.rglob("sql-scripts"): # rglob recursively finds all sql-scripts directories.
         if sql_scripts_path.is_dir():
@@ -283,7 +364,7 @@ def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, 
             count += 1
             build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)
     return count
-    
+
 
 def _build_pipeline_definition(
             table_name: str,
@@ -296,13 +377,13 @@ def _build_pipeline_definition(
             children: Optional[Set[FlinkTablePipelineDefinition]]
             ) -> FlinkTablePipelineDefinition:
     """Create hierarchy node with table information.
-    
+
     Args:
         dml_file_name: Path to DML file
         table_name: Name of the table
         parent_names: Set of parent table references
         children: Set of child table references
-        
+
     Returns:
         FlinkTablePipelineDefinition node
     """
@@ -331,7 +412,7 @@ def _build_pipeline_definition(
 
     return f
 
-    
+
 def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inventory):
     """
     Process the next node from the queue if not already processed.
@@ -349,7 +430,7 @@ def _update_hierarchy_of_next_node(nodes_to_process, processed_nodes,  table_inv
             tmp_node.children = set()
             tmp_node.parents = set()
             for parent in current_node.parents:
-                if not  current_node in parent.children: # current is a child of its parents        
+                if not  current_node in parent.children: # current is a child of its parents
                     parent.children.add(tmp_node)
                     _create_or_merge_pipeline_definition(parent)
                 nodes_to_process=_add_node_to_process_if_not_present(parent, nodes_to_process)
@@ -386,7 +467,7 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
 
 
 def _add_node_to_process_if_not_present(current_hierarchy, nodes_to_process):
-    try: 
+    try:
         nodes_to_process.index(current_hierarchy)
     except ValueError:
         nodes_to_process.append(current_hierarchy)
@@ -406,15 +487,15 @@ def _get_statement_hierarchy_from_table_ref(access_info: FlinkTablePipelineDefin
 def _visit_parents(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipelineDefinition:
     """Visit parents of current node.
     The goal is for the current node which does not have a parents or children populated with FlinkTablePipelineDefinition objects to populate those
-    sets. 
+    sets.
     Args:
         current_node: Current node
-    
+
     Returns:
         FlinkTablePipelineDefinition containing parents information as FlinkTablePipelineDefinition
     """
     parents = set()
-    
+
     for parent in current_node.parents:
         parent_info = _get_statement_hierarchy_from_table_ref(parent)
         rep = _visit_parents(parent_info)
@@ -425,10 +506,10 @@ def _visit_parents(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipe
 
 def _visit_children(current_node: FlinkTablePipelineDefinition) -> FlinkTablePipelineDefinition:
     """Visit children of current node.
-    
+
     Args:
         current_node: Current node
-    
+
     Returns:
         FlinkTablePipelineDefinition containing parents and childrens information
     """

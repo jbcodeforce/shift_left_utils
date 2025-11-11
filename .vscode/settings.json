@@ -1,0 +1,50 @@
+{
+  // Python-specific settings
+  "python.analysis.extraPaths": [
+    "src/shift_left/src"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+
+  // Editor settings to prevent tab/space issues
+  "editor.insertSpaces": false,
+  "editor.tabSize": 4,
+  "editor.detectIndentation": false,
+
+  // Python-specific indentation
+  "[python]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "editor.indentSize": 4,
+    "editor.detectIndentation": false,
+    "editor.formatOnSave": false
+  },
+
+  // Trim trailing whitespace
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // Show whitespace characters to catch tabs
+  "editor.renderWhitespace": "boundary",
+
+  // File associations
+  "files.associations": {
+    "*.sql": "sql"
+  },
+
+  // Additional language settings
+  "[sql]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
+  "[json]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[yaml]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  }
+}

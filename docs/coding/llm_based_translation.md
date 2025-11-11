@@ -2,7 +2,7 @@
 
 ???- info "Version"
     Created Dec - 2024 
-    Updated Sept 24 - 2025
+    Updated Nov 05 - 2025
 
 
 The current implementation supported by this tool enables migration of:
@@ -113,12 +113,43 @@ Normally, the DML is not executable until all dependent input tables are created
   
 ### ksqlDB to Flink SQL
 
-ksqlDB has some SQL constructs, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses keywords to define such integration. The migration and prompts need to support migration examples outside of the classical SELECT and CREATE TABLE statements.
+ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses keywords to define such integration. LLM may have limited access to ksql code during the training. 
 
-* Example command to migrate a ksqlDB script
-  ```sh
-  shift_left table migrate w2_processing $SRC_FOLDER/w2processing.ksql $STAGING --source-type ksql 
+The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
+
+* The base of ksqldb files to test the migration are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
+* Set the environment variables to run shift_left using the [setup instructions](../setup.md)
   ```
+  PROJECT_ROOT=shift_left_utils/tree/main/src/shift_left/tests/
+  export CONFIG_FILE=$PROJECT_ROOT/config.yaml
+  export SRC_FOLDER=$PROJECT_ROOT/data/ksql-project/sources
+  export STAGING=$PROJECT_ROOT/data/ksql-project/staging
+  export SL_LLM_BASE_URL=http://localhost:11434/v1
+  export SL_LLM_MODEL=qwen3:30b
+  export SL_LLM_API_KEY=ollama_test_key
+  ```
+* Start ollama: 
+  ```sh
+  olama serve
+  ```
+
+* Be sure to have one of the following model (`ollama list`): By default qwen3:30b is used.
+  ```
+  gpt-oss:20b   13 GB        
+  qwen3:30b     18 GB
+  ```
+
+
+* Example command to migrate one of ksqlDB script:
+  ```sh
+  shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql 
+  ```
+
+* Status of working migration
+
+| Source | Status |
+| --- | --- |
+| | |
 
 ## Current Agentic Approach
 

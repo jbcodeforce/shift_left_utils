@@ -1,0 +1,2 @@
+INSERT INTO src_c360_groups_ut (group_id, tenant_id, group_name, group_type, created_date, is_active, updated_at) 
+VALUES ('group123', 'tenant001', 'Group Name', 'Type1', '2023-10-01', true, TIMESTAMP '2023-10-01 12:00:00');

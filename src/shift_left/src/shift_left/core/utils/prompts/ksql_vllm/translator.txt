@@ -42,6 +42,7 @@ Your task is to convert ksqlDB streaming SQL into equivalent Apache Flink SQL wi
 * `'value_format' = 'AVRO'` → `'value.format' = 'avro-registry'`
 * `'key_format' = 'KAFKA'` → `'key.format' = 'json-registry'`
 * Add schema context: `'key.avro-registry.schema-context' = '.flink-dev'`
+* Add schema context: `'value.avro-registry.schema-context' = '.flink-dev'`
 * Add startup mode: `'scan.startup.mode' = 'earliest-offset'`
 * Include all fields: `'value.fields-include' = 'all'`
 

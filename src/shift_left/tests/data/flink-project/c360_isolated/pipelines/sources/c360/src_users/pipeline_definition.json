@@ -2,8 +2,8 @@
    "table_name": "src_c360_users",
    "product_name": "c360",
    "type": "source",
-   "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_users_users.sql",
-   "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_users_users.sql",
+   "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
+   "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360users.sql",
    "path": "pipelines/sources/c360/src_users",
    "complexity": {
       "number_of_regular_joins": 0,

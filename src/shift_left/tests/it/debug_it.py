@@ -36,12 +36,10 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'])
         #result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'])
         #result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'])
-        #result = runner.invoke(app,['pipeline', 'build-all-metadata'])
+        result = runner.invoke(app,['pipeline', 'build-all-metadata'])
         #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'])
-        result = runner.invoke(app, ['table', 'init-unit-tests',  '--nb-test-cases', '1', 'aqem_dim_event_element'])
-        #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--product-name', 'aqem'])
+        #result = runner.invoke(app, ['table', 'init-unit-tests',  '--nb-test-cases', '1', 'aqem_dim_event_element'])
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--directory', os.getenv('PIPELINES') + '/sources])
-        #result = runner.invoke(app, ['project', 'list-compute-pools'])
         print(result.stdout)
 
       

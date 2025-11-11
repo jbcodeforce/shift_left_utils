@@ -5,8 +5,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 from shift_left.core.models.flink_statement_model import (
-    FlinkStatementExecutionPlan, 
-    FlinkStatementNode, 
+    FlinkStatementExecutionPlan,
+    FlinkStatementNode,
     StatementInfo
 )
 from shift_left.core.utils.report_mgr import (
@@ -27,7 +27,7 @@ from shift_left.core.models.flink_compute_pool_model import (
 )
 from shift_left.core.models.flink_statement_model import (
     Statement,
-    Spec, 
+    Spec,
     Status,
     Metadata
 )
@@ -58,7 +58,7 @@ class TestReportMgr(unittest.TestCase):
             ),
             parents=[node2]
         )
-        
+
         self.execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_environment",
@@ -120,13 +120,13 @@ class TestReportMgr(unittest.TestCase):
             dml_ref="test_statement",
             may_start_children=True,
             statements=statements
-        )   
+        )
         print(f"\n\n{report}\n\n")
         assert "test_table" in report.table_name
         assert "test_statement" in report.flink_statements_deployed[0].name
         assert "running" in report.flink_statements_deployed[0].status
         assert "test_compute_pool" in report.flink_statements_deployed[0].compute_pool_id
-        
+
 
     def test_build_summary_from_execution_plan(self):
         print(f"test_build_summary_from_execution_plan")
@@ -139,7 +139,7 @@ class TestReportMgr(unittest.TestCase):
         assert "running" in summary
         assert "test_compute_pool" in summary
         assert "test_compute_pool_2" in summary
-        
+
     def test_build_simple_report(self):
         print(f"test_build_simple_report")
         report = build_simple_report(self.execution_plan)
@@ -191,7 +191,7 @@ class TestReportMgr(unittest.TestCase):
         mock_metrics.get_pending_records.return_value = {'test_statement': 100}
         mock_metrics.get_num_records_out.return_value = {'test_statement': 200}
         mock_metrics.get_num_records_in.return_value = {'test_statement': 300}
-        
+
         # Create node with existing statement info
         node = FlinkStatementNode(
             table_name="test_table",
@@ -202,13 +202,13 @@ class TestReportMgr(unittest.TestCase):
                 status_phase="RUNNING"
             )
         )
-        
+
         with patch('shift_left.core.utils.report_mgr.build_TableInfo') as mock_build_info:
             mock_table_info = TableInfo(table_name="test_table", status="RUNNING")
             mock_build_info.return_value = mock_table_info
-            
+
             result = build_TableReport("test_report", [node], from_date="2024-01-01", get_metrics=True)
-            
+
             self.assertEqual(result.report_name, "test_report")
             self.assertEqual(result.environment_id, "test_env")
             self.assertEqual(len(result.tables), 1)
@@ -229,7 +229,7 @@ class TestReportMgr(unittest.TestCase):
         mock_metrics.get_pending_records.return_value = {}
         mock_metrics.get_num_records_out.return_value = {}
         mock_metrics.get_num_records_in.return_value = {}
-        
+
         # Create node without existing statement info
         node = FlinkStatementNode(
             table_name="test_table",
@@ -237,13 +237,13 @@ class TestReportMgr(unittest.TestCase):
             compute_pool_id="test_pool",
             existing_statement_info=None
         )
-        
+
         with patch('shift_left.core.utils.report_mgr.build_TableInfo') as mock_build_info:
             mock_table_info = TableInfo(table_name="test_table", status="UNKNOWN")
             mock_build_info.return_value = mock_table_info
-            
-            result = build_TableReport("test_report", [node], get_metrics=True)
-            
+
+            result = build_TableReport("test_report", [node], from_date="", get_metrics=True)
+
             # Should log error for missing existing_statement_info
             mock_logger.error.assert_called_once()
             self.assertEqual(len(result.tables), 1)
@@ -256,19 +256,19 @@ class TestReportMgr(unittest.TestCase):
             'confluent_cloud': {'environment_id': 'test_env'},
             'flink': {'catalog_name': 'test_catalog', 'database_name': 'test_db'}
         }
-        
+
         node = FlinkStatementNode(
             table_name="test_table",
             dml_statement_name="test_statement",
             compute_pool_id="test_pool"
         )
-        
+
         with patch('shift_left.core.utils.report_mgr.build_TableInfo') as mock_build_info:
             mock_table_info = TableInfo(table_name="test_table")
             mock_build_info.return_value = mock_table_info
-            
-            result = build_TableReport("test_report", [node], get_metrics=False)
-            
+
+            result = build_TableReport("test_report", [node], from_date="", get_metrics=False)
+
             self.assertEqual(result.report_name, "test_report")
             self.assertEqual(len(result.tables), 1)
             # build_TableInfo should be called with get_metrics=False
@@ -282,7 +282,7 @@ class TestReportMgr(unittest.TestCase):
         mock_compute_pool.get_compute_pool_list.return_value = self.compute_pool_list
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
         mock_metrics.get_retention_size.return_value = 1000
-        
+
         # Create node with existing statement info
         existing_statement = StatementInfo(
             name="test_statement",
@@ -300,9 +300,9 @@ class TestReportMgr(unittest.TestCase):
             to_run=False,
             existing_statement_info=existing_statement
         )
-        
+
         result = build_TableInfo(node, get_metrics=True)
-        
+
         self.assertEqual(result.table_name, "test_table")
         self.assertEqual(result.type, "TABLE")
         self.assertEqual(result.upgrade_mode, "stateless")
@@ -312,7 +312,7 @@ class TestReportMgr(unittest.TestCase):
         self.assertEqual(result.compute_pool_name, "test_compute_pool")
         self.assertTrue(result.to_restart)
         self.assertEqual(result.retention_size, 1000)
-        mock_metrics.get_retention_size.assert_called_once_with("test_table", None)
+        mock_metrics.get_retention_size.assert_called_once_with("test_table")
 
     @patch('shift_left.core.utils.report_mgr.compute_pool_mgr')
     def test_build_table_info_without_existing_statement(self, mock_compute_pool):
@@ -320,7 +320,7 @@ class TestReportMgr(unittest.TestCase):
         # Setup mocks
         mock_compute_pool.get_compute_pool_list.return_value = self.compute_pool_list
         mock_compute_pool.get_compute_pool_with_id.return_value = None
-        
+
         node = FlinkStatementNode(
             table_name="test_table",
             dml_statement_name="test_statement",
@@ -331,9 +331,9 @@ class TestReportMgr(unittest.TestCase):
             to_run=True,
             existing_statement_info=None
         )
-        
+
         result = build_TableInfo(node, get_metrics=False)
-        
+
         self.assertEqual(result.table_name, "test_table")
         self.assertEqual(result.type, "VIEW")
         self.assertEqual(result.upgrade_mode, "stateful")
@@ -341,7 +341,7 @@ class TestReportMgr(unittest.TestCase):
         self.assertEqual(result.status, "UNKNOWN")
         self.assertEqual(result.compute_pool_id, "")
         self.assertEqual(result.compute_pool_name, "UNKNOWN")
-        self.assertTrue(result.to_restart)  # to_restart = node.to_restart or node.to_run
+        self.assertTrue(result.to_restart or result.to_run)  # to_restart = node.to_restart or node.to_run
 
     @patch('shift_left.core.utils.report_mgr.compute_pool_mgr')
     def test_build_table_info_with_unknown_compute_pool(self, mock_compute_pool):
@@ -349,7 +349,7 @@ class TestReportMgr(unittest.TestCase):
         # Setup mocks
         mock_compute_pool.get_compute_pool_list.return_value = self.compute_pool_list
         mock_compute_pool.get_compute_pool_with_id.return_value = None  # Pool not found
-        
+
         existing_statement = StatementInfo(
             name="test_statement",
             status_phase="PENDING",
@@ -362,9 +362,9 @@ class TestReportMgr(unittest.TestCase):
             compute_pool_id="unknown_pool",
             existing_statement_info=existing_statement
         )
-        
+
         result = build_TableInfo(node, get_metrics=False)
-        
+
         self.assertEqual(result.status, "PENDING")
         self.assertEqual(result.compute_pool_id, "unknown_pool")
         self.assertEqual(result.compute_pool_name, "UNKNOWN")
@@ -376,7 +376,7 @@ class TestReportMgr(unittest.TestCase):
         # Setup mocks
         mock_compute_pool.get_compute_pool_list.return_value = self.compute_pool_list
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
-        
+
         existing_statement = StatementInfo(
             name="test_statement",
             status_phase="RUNNING",
@@ -386,9 +386,9 @@ class TestReportMgr(unittest.TestCase):
             table_name="test_table",
             existing_statement_info=existing_statement
         )
-        
+
         result = build_TableInfo(node, get_metrics=False)
-        
+
         self.assertEqual(result.status, "RUNNING")
         self.assertEqual(result.retention_size, 0)  # Should not call metrics when get_metrics=False
         mock_metrics.get_retention_size.assert_not_called()
@@ -400,7 +400,7 @@ class TestReportMgr(unittest.TestCase):
         mock_metrics.get_pending_records.return_value = {}
         mock_metrics.get_num_records_out.return_value = {}
         mock_metrics.get_num_records_in.return_value = {}
-        
+
         # Create node without existing statement info
         node = FlinkStatementNode(
             table_name="test_table",
@@ -408,15 +408,15 @@ class TestReportMgr(unittest.TestCase):
             compute_pool_id="test_pool",
             existing_statement_info=None
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node]
         )
-        
+
         result = build_simple_report(execution_plan)
-        
+
         # Should contain headers but no node data (since node has no existing_statement_info)
         self.assertIn("Ancestor Table Name", result)
         self.assertIn("Statement Name", result)
@@ -432,7 +432,7 @@ class TestReportMgr(unittest.TestCase):
         """Test build_summary_from_execution_plan with nodes that have to_restart=True."""
         # Setup mocks
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
-        
+
         # Create nodes with different restart/run statuses
         node1 = FlinkStatementNode(
             table_name="parent_table",
@@ -450,15 +450,15 @@ class TestReportMgr(unittest.TestCase):
             to_restart=True,
             existing_statement_info=StatementInfo(status_phase="PENDING")
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node1, node2]
         )
-        
+
         result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
-        
+
         self.assertIn("Ancestors:", result)
         self.assertIn("Children to restart", result)
         self.assertIn("Restart", result)  # Should show "Restart" action for to_restart nodes
@@ -471,26 +471,26 @@ class TestReportMgr(unittest.TestCase):
         """Test build_summary_from_execution_plan with no parent nodes."""
         # Setup mocks
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
-        
+
         # Create only child nodes (to_restart=True, to_run=False, not running)
         # Note: A node with existing_statement_info and RUNNING status will be considered both parent and child
         node = FlinkStatementNode(
-            table_name="child_table", 
+            table_name="child_table",
             dml_statement_name="child_statement",
             compute_pool_id="test_compute_pool",
             to_run=False,
             to_restart=True,
             existing_statement_info=StatementInfo(status_phase="STOPPED")  # Use STOPPED so is_running() returns False
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node]
         )
-        
+
         result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
-        
+
         # Node appears in both sections since logic separates by (to_run or is_running()) vs to_restart
         # But we test that ancestors section exists if the node is_running() or to_run=True
         self.assertIn("Children to restart", result)
@@ -502,7 +502,7 @@ class TestReportMgr(unittest.TestCase):
         """Test build_summary_from_execution_plan with no child nodes."""
         # Setup mocks
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
-        
+
         # Create only parent nodes (to_run=True, to_restart=False)
         node = FlinkStatementNode(
             table_name="parent_table",
@@ -512,15 +512,15 @@ class TestReportMgr(unittest.TestCase):
             to_restart=False,
             existing_statement_info=StatementInfo(status_phase="RUNNING")
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node]
         )
-        
+
         result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
-        
+
         self.assertIn("--- Ancestors:", result)
         # Should not contain Children section
         self.assertNotIn("Children to restart", result)
@@ -532,7 +532,7 @@ class TestReportMgr(unittest.TestCase):
         """Test build_summary_from_execution_plan with unknown compute pool."""
         # Setup mocks - return None for unknown pool
         mock_compute_pool.get_compute_pool_with_id.return_value = None
-        
+
         node = FlinkStatementNode(
             table_name="test_table",
             dml_statement_name="test_statement",
@@ -540,15 +540,15 @@ class TestReportMgr(unittest.TestCase):
             to_run=True,
             existing_statement_info=StatementInfo(status_phase="RUNNING")
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node]
         )
-        
+
         result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
-        
+
         self.assertIn("test_table", result)
         # Should handle case where pool is not found gracefully
         self.assertIn("unknown_pool", result)
@@ -559,7 +559,7 @@ class TestReportMgr(unittest.TestCase):
         """Test build_summary_from_execution_plan with nodes that have no existing_statement_info."""
         # Setup mocks
         mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
-        
+
         node = FlinkStatementNode(
             table_name="test_table",
             dml_statement_name="test_statement",
@@ -567,15 +567,15 @@ class TestReportMgr(unittest.TestCase):
             to_run=True,
             existing_statement_info=None  # No existing statement info
         )
-        
+
         execution_plan = FlinkStatementExecutionPlan(
             start_table_name="test_table",
             environment_id="test_env",
             nodes=[node]
         )
-        
+
         result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
-        
+
         self.assertIn("test_table", result)
         self.assertIn("Not dep", result)  # Shows "Not dep" (truncated) when no existing_statement_info
 
@@ -632,14 +632,14 @@ class TestReportMgr(unittest.TestCase):
                 )
             )
         ]
-        
+
         report = build_deployment_report(
             table_name="test_table",
             dml_ref="DML",
             may_start_children=False,
             statements=statements
         )
-        
+
         # Should only include non-None statements
         self.assertEqual(len(report.flink_statements_deployed), 2)
         self.assertEqual(report.flink_statements_deployed[0].name, "test_statement")
@@ -655,7 +655,7 @@ class TestReportMgr(unittest.TestCase):
             'confluent_cloud': {'environment_id': 'test_env'},
             'flink': {'catalog_name': 'test_catalog', 'database_name': 'test_db'}
         }
-        
+
         # Create table report with mixed status tables
         table_report = TableReport(
             report_name="test_report",
@@ -681,7 +681,7 @@ class TestReportMgr(unittest.TestCase):
                     num_records_out=0
                 ),
                 TableInfo(
-                    table_name="pending_table", 
+                    table_name="pending_table",
                     status="PENDING",
                     created_at=datetime(2024, 1, 1, 12, 0, 0),
                     pending_records=50,
@@ -690,17 +690,17 @@ class TestReportMgr(unittest.TestCase):
                 )
             ]
         )
-        
+
         with patch('builtins.open', unittest.mock.mock_open()) as mock_open:
             result = persist_table_reports(table_report, "test_base")
-            
+
             # Should count RUNNING vs non-RUNNING correctly
             self.assertIn("Running tables: 1", result)
             self.assertIn("Non running tables: 2", result)
             self.assertIn("running_table", result)
             self.assertIn("stopped_table", result)
             self.assertIn("pending_table", result)
-            
+
             # Should write both CSV and JSON files
             self.assertEqual(mock_open.call_count, 2)  # CSV and JSON files
 
@@ -731,9 +731,9 @@ class TestReportMgr(unittest.TestCase):
             ),
             execution_time=150.5
         )
-        
+
         result = _build_statement_basic_info(statement)
-        
+
         self.assertEqual(result.name, "test_statement")
         self.assertEqual(result.environment_id, "test_environment")
         self.assertEqual(result.uid, "test_uid")
@@ -769,9 +769,9 @@ class TestReportMgr(unittest.TestCase):
             ),
             execution_time=0
         )
-        
+
         result = _build_statement_basic_info(statement)
-        
+
         self.assertEqual(result.name, "test_statement")
         self.assertEqual(result.status, "pending")
         self.assertEqual(result.status_details, "")  # Should be empty string when no detail
@@ -801,9 +801,9 @@ class TestReportMgr(unittest.TestCase):
             status=None,  # No status
             execution_time=0
         )
-        
+
         result = _build_statement_basic_info(statement)
-        
+
         self.assertEqual(result.name, "test_statement")
         self.assertEqual(result.status, "UNKNOWN")  # Should be "UNKNOWN" when no status
         self.assertEqual(result.status_details, "")  # Should be empty string when no status

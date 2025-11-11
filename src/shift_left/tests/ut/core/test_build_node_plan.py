@@ -28,7 +28,7 @@ class TestBuildNodePlan(unittest.TestCase):
         if pipelines_path is None:
             raise ValueError("PIPELINES environment variable is not set")
         pm.build_all_pipeline_definitions(pipelines_path)
-        
+
     def _create_node(self, table_name: str, type: str) -> FlinkStatementNode:
         """Create a node."""
         return FlinkStatementNode(
@@ -42,7 +42,7 @@ class TestBuildNodePlan(unittest.TestCase):
             ddl_statement_name=f"ddl_{table_name}",
             ddl_ref=f"ddl_{table_name}.sql",
             upgrade_mode="Stateful")
-    
+
 
     def setUp(self):
         """Set up test fixtures."""
@@ -54,7 +54,7 @@ class TestBuildNodePlan(unittest.TestCase):
         self.source_node = self._create_node(table_name="source_table", type="source")
         self.intermediate_node = self._create_node(table_name="intermediate_table", type="intermediate")
         self.sink_node = self._create_node(table_name="sink_table", type="fact")
-        
+
         # Set up relationships: source -> intermediate -> sink
         self.intermediate_node.add_parent(self.source_node)
         self.sink_node.add_parent(self.intermediate_node)
@@ -77,12 +77,12 @@ class TestBuildNodePlan(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     def test_build_statement_node_map_simple_chain(self, mock_read_pipeline):
         """Test building node map for a simple chain of nodes: source -> intermediate -> sink."""
-        
+
         # Create mock pipeline definitions
         source_pipeline = self.create_mock_pipeline_definition(self.source_node)
         intermediate_pipeline = self.create_mock_pipeline_definition(self.intermediate_node)
         sink_pipeline = self.create_mock_pipeline_definition(self.sink_node)
-        
+
         # Mock the read_pipeline_definition_from_file function
         def mock_read_pipeline_side_effect(path):
             if "source_table" in path:
@@ -92,23 +92,25 @@ class TestBuildNodePlan(unittest.TestCase):
             elif "sink_table" in path:
                 return sink_pipeline
             return None
-        
+
         mock_read_pipeline.side_effect = mock_read_pipeline_side_effect
-        
+
         # Test the function
-        result_node_map = _build_statement_node_map(self.sink_node)
-        
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(self.sink_node, visited_nodes, combined_node_map)
+
         # Verify the result
         self.assertEqual(len(result_node_map), 3)
         self.assertIn("source_table", result_node_map)
         self.assertIn("intermediate_table", result_node_map)
         self.assertIn("sink_table", result_node_map)
-        
+
         # Verify nodes are the correct type
         self.assertIsInstance(result_node_map["source_table"], FlinkStatementNode)
         self.assertIsInstance(result_node_map["intermediate_table"], FlinkStatementNode)
         self.assertIsInstance(result_node_map["sink_table"], FlinkStatementNode)
-        
+
         # Verify table names
         self.assertEqual(result_node_map["source_table"].table_name, "source_table")
         self.assertEqual(result_node_map["intermediate_table"].table_name, "intermediate_table")
@@ -117,18 +119,20 @@ class TestBuildNodePlan(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     def test_build_statement_node_map_with_missing_pipeline_def(self, mock_read_pipeline):
         """Test building node map when pipeline definition is missing."""
-        
+
         # Mock the function to return None for missing pipeline definition
         def mock_read_pipeline_side_effect(path):
             if "source_table" in path:
                 return None  # Simulate missing pipeline definition
             return self.create_mock_pipeline_definition(self.sink_node)
-        
+
         mock_read_pipeline.side_effect = mock_read_pipeline_side_effect
-        
+
         # Test the function
-        result_node_map = _build_statement_node_map(self.sink_node)
-        
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(self.sink_node, visited_nodes, combined_node_map)
+
         # Verify that the function handles missing pipeline definitions gracefully
         assert len(result_node_map) == 1
         self.assertIn("sink_table", result_node_map)
@@ -137,16 +141,18 @@ class TestBuildNodePlan(unittest.TestCase):
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     def test_build_statement_node_map_single_node(self, mock_read_pipeline):
         """Test building node map for a single node with no parents or children."""
-        
+
         # Create a standalone node
         standalone_node = self._create_node(table_name="standalone_table", type="source")
-        
+
         # Mock the read_pipeline_definition_from_file function
         mock_read_pipeline.return_value = self.create_mock_pipeline_definition(standalone_node)
-        
+
         # Test the function
-        result_node_map = _build_statement_node_map(standalone_node)
-        
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(standalone_node, visited_nodes, combined_node_map)
+
         # Verify the result
         self.assertEqual(len(result_node_map), 1)
         self.assertIn("standalone_table", result_node_map)
@@ -160,7 +166,7 @@ class TestBuildNodePlan(unittest.TestCase):
         src_b -> child_table_2
         src_c -> child_table_2
         """
-        
+
         src_a = self._create_node(table_name="src_a", type="source")
         src_b = self._create_node(table_name="src_b", type="source")
         src_c = self._create_node(table_name="src_c", type="source")
@@ -170,7 +176,7 @@ class TestBuildNodePlan(unittest.TestCase):
         child_table_2 = self._create_node(table_name="child_table_2", type="fact")
         child_table_2.add_parent(src_c)
         child_table_2.add_parent(src_b)
-        
+
         src_a_pipeline = self.create_mock_pipeline_definition(src_a)
         src_b_pipeline = self.create_mock_pipeline_definition(src_b)
         src_c_pipeline = self.create_mock_pipeline_definition(src_c)
@@ -188,11 +194,13 @@ class TestBuildNodePlan(unittest.TestCase):
             if table_name in _mock_pipeline_map:
                 return _mock_pipeline_map[table_name]
             return None
-        
+
         mock_read_pipeline.side_effect = mock_read_pipeline_side_effect
-        
+
         # Test the function
-        result_node_map = _build_statement_node_map(src_a)
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(src_a, visited_nodes, combined_node_map)
         assert len(result_node_map) == 5
         assert result_node_map["src_a"].parents == set()
         assert result_node_map["src_b"].parents == set()
@@ -201,7 +209,9 @@ class TestBuildNodePlan(unittest.TestCase):
         assert result_node_map["child_table_1"].children == set()
         assert result_node_map["child_table_1"].parents == set([src_a, src_b])
         # same from child_table
-        result_node_map = _build_statement_node_map(child_table_1)
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(child_table_1, visited_nodes, combined_node_map)
         assert len(result_node_map) == 5
         assert result_node_map["src_a"].parents == set()
         assert result_node_map["src_b"].parents == set()
@@ -210,10 +220,12 @@ class TestBuildNodePlan(unittest.TestCase):
         assert result_node_map["child_table_1"].children == set()
         assert result_node_map["child_table_1"].parents == set([src_a, src_b])
         # same from child_table_2
-        result_node_map = _build_statement_node_map(child_table_2)
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(child_table_2, visited_nodes, combined_node_map)
         assert len(result_node_map) == 5
-    
-    
+
+
     @patch('shift_left.core.deployment_mgr.read_pipeline_definition_from_file')
     def test_build_statement_node_map_complex_graph(self, mock_read_pipeline):
         """Test building node map for a complex graph with multiple parents one intermediate and children.
@@ -224,7 +236,7 @@ class TestBuildNodePlan(unittest.TestCase):
         src_c -> join_table_2
         src_c -> child_c
         """
-        
+
         # Create additional nodes for complex graph
         src_a = self._create_node(table_name="src_a", type="source")
         src_b = self._create_node(table_name="src_b", type="source")
@@ -244,7 +256,7 @@ class TestBuildNodePlan(unittest.TestCase):
         child_c = self._create_node(table_name="child_c", type="fact")
         child_c.product_name = "common"
         child_c.add_parent(src_c)
-        
+
         # Create mock pipeline definitions
         src_a_pipeline = self.create_mock_pipeline_definition(src_a)
         src_b_pipeline = self.create_mock_pipeline_definition(src_b)
@@ -272,37 +284,40 @@ class TestBuildNodePlan(unittest.TestCase):
             if table_name in _mock_pipeline_map:
                 return _mock_pipeline_map[table_name]
             return None
-        
+
         mock_read_pipeline.side_effect = mock_read_pipeline_side_effect
-        
+
         # Test the function
-        result_node_map = _build_statement_node_map(child_b)
-        
+        combined_node_map = {}
+        visited_nodes = set()
+        result_node_map = _build_statement_node_map(child_b, visited_nodes, combined_node_map)
+
         # Verify the result
         self.assertEqual(len(result_node_map), 9)
 
     def test_build_node_map(self) -> None:
         """Test building node map from pipeline definition.
-        
-        Loading a pipeline definition for an intermediate table should get all reachable 
+
+        Loading a pipeline definition for an intermediate table should get all reachable
         related tables. Direct descendants and ancestors should be included.
         """
         print("test_build node_map")
-        pipeline_def = read_pipeline_definition_from_file(
-            self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME
-        )
+        combined_node_map = {}
+        visited_nodes = set()
+        pipeline_def = read_pipeline_definition_from_file(self.inventory_path + "/intermediates/p2/z/" + PIPELINE_JSON_FILE_NAME)
         if pipeline_def is None:
             raise ValueError("Failed to read pipeline definition")
-        node_map = _build_statement_node_map(pipeline_def.to_node())
-        
+        sink_node = pipeline_def.to_node()
+        node_map = _build_statement_node_map(sink_node, visited_nodes, combined_node_map)
+
         assert len(node_map) == 14
         for node in node_map.values():
             print(node.table_name, node.upgrade_mode, node.dml_statement_name)
-            
+
         assert node_map["src_y"].upgrade_mode == "Stateless"
         assert node_map["src_x"].upgrade_mode == "Stateless"
         assert node_map["src_b"].upgrade_mode == "Stateless"
-        assert node_map["src_p2_a"].upgrade_mode == "Stateless"
+        assert node_map["src_a"].upgrade_mode == "Stateless"
         assert node_map["x"].upgrade_mode == "Stateless"
         assert node_map["y"].upgrade_mode == "Stateless"
         assert node_map["z"].upgrade_mode == "Stateful"
@@ -314,7 +329,7 @@ class TestBuildNodePlan(unittest.TestCase):
         assert node_map["e"].upgrade_mode == "Stateless"
         assert node_map["f"].upgrade_mode == "Stateless"
 
-        
+
 if __name__ == '__main__':
     unittest.main()
 

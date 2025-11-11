@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- users_fct_user_per_group
-TABLE_NAME=fct_user_per_group
+# --- c360_fct_user_per_group
+TABLE_NAME=c360_fct_user_per_group
 SCRIPT_PRE_KEBAB=dev-usw2-c360
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_users_fct_user_per_group: create_flink_ddl  create_flink_dml
+create_c360_fct_user_per_group: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source

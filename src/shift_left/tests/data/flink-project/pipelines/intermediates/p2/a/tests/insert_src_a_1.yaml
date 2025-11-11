@@ -1,0 +1,4 @@
+src_a:
+  - default_key: ['enum_test_data']
+  - a_value: ['enum_test_data']
+  - x_key: ['enum_test_data']

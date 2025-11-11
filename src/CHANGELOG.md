@@ -1,3 +1,20 @@
+## [0.1.45] - 2025-11-10
+
+### Changes:
+- b9f05bf healthcheck bug fixes
+- c36d3c0 Merge pull request #70 from jbcodeforce/healthcheck2
+- d20d005 work on b/g deployment
+- fe7e91c improve robustness of list modified file from git, and fix some new issues in the UT
+- 7e9617b modification to settings
+- f598220 Merge branch 'fix62' into develop
+- ef04806 update to sql parser
+- 2d901fe update ksql
+- 779a4dd work on excluding tables, and fixing some deployment management
+- e89f6d2 finish exclude-file implementation, but also fix some internal function with Return None or optional field in the model. Fixed impacted unit tests
+- 8072f50 add compute poolid to get_statement_list + new command in project so user can get the list of statements per compute pool
+- 32f6f3c Merge pull request #74 from jbcodeforce/fix62
+- 1edc048 fix report unit test
+
 ## [0.1.44] - 2025-10-22
 
 ### Changes:

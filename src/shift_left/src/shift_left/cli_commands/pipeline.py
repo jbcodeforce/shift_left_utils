@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 import time
 from datetime import datetime, timezone
+from typing import List
 import json
 import networkx as nx
 from pydantic_yaml import to_yaml_str
@@ -14,7 +15,7 @@ from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
 from shift_left.core.utils.app_config import get_config
-from shift_left.core.utils.file_search import get_or_build_inventory, get_ddl_dml_names_from_pipe_def
+from shift_left.core.utils.file_search import get_or_build_inventory
 from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
@@ -42,7 +43,7 @@ app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_local
 
 
 @app.command()
-def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The path to the DML file. e.g. $PIPELINES/table-name/sql-scripts/dml.table-name.sql")], 
+def build_metadata(dml_file_name:  Annotated[str, typer.Argument(help = "The path to the DML file. e.g. $PIPELINES/table-name/sql-scripts/dml.table-name.sql")],
              pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")]):
     """
     Build a pipeline definition metadata by reading the Flink dml SQL content for the given dml file.
@@ -76,8 +77,8 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
     """
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build all pipeline definitions for all tables in {pipeline_path}")
     pipeline_mgr.build_all_pipeline_definitions(pipeline_path)
-    print("{time.strftime('%Y%m%d_%H:%M:%S')} Done")
-    
+    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done")
+
 
 @app.command()
 def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.")],
@@ -117,10 +118,10 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     if output_file_name:
         with open(output_file_name,"w") as f:
             f.write(result)
-        
+
     # Create a rich tree for visualization
     tree = Tree(f"[bold blue]{table_name}[/bold blue]")
-    
+
     def add_nodes_to_tree(node_data, tree_node, summary: str):
         # Process parents recursively
         if parent_only and node_data.parents:
@@ -136,7 +137,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 parent_node.add(f"[dim]Type: {parent.type}[/dim]")
                 # Recursively process parents of parents
                 summary=add_nodes_to_tree(parent, parent_node, summary)
-        
+
         # Process children recursively
         if children_too and node_data.children:
             for child in node_data.children:
@@ -152,15 +153,15 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
                 # Recursively process children of children
                 summary=add_nodes_to_tree(child, child_node, summary)
         return summary
-    
+
     # Add the root node details
     tree.add(f"[dim]DML: {pipeline_def.dml_ref}[/dim]")
     tree.add(f"[dim]DDL: {pipeline_def.ddl_ref}[/dim]")
-    
+
     # Add parent nodes
     summary = ""
     summary = add_nodes_to_tree(pipeline_def, tree, summary)
-    
+
     # Print the tree
     console.print(f"\n[bold]Pipeline with {'children' if children_too else 'parents'} hierarchy:[/bold]")
     console.print(tree)
@@ -178,7 +179,7 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
     print(f"Generating pipeline healthcheck for product {product_name}")
     try:
         # get all the views, facts, dimension tables for a given product and build the pipeline hierarchy
-        # This approach covers all the intermediates & sources and tables cross products.
+        # This approach covers all the intermediates & sources and cross product tables. .
         inventory = get_or_build_inventory(inventory_path, inventory_path, False)
         sink_tables = {
             k: v
@@ -188,7 +189,7 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
         logger.info(f"Inventory for product {product_name}: {json.dumps(sink_tables, indent=2)}")
 
         # get all statements created time & status
-        #statement_list={}
+        statement_list={}
         statement_list = statement_mgr.get_statement_list().copy()
         statement_info = {}
         for statement_name in statement_list:
@@ -204,78 +205,13 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
         # get all compute pools CFU information
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
 
-        class PipelineHealthChecker:
-            def __init__(self, statement_info):
-                self.statement_info = statement_info
-                self.summary = {}
 
-            def healthcheck_tree(self, child_table, node_data, tree_node):
-
-                if node_data.parents:
-                    for parent in node_data.parents:
-                        c_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(child_table, inventory_path)
-                        c_ddl_n, c_dml_n = get_ddl_dml_names_from_pipe_def(c_pipeline_def)
-                        p_ddl_n, p_dml_n = get_ddl_dml_names_from_pipe_def(parent)
-                        product_name = c_pipeline_def.product_name
-                        if c_dml_n in statement_info:
-                            status_phase = statement_info[c_dml_n]['status_phase']
-                            compute_pool_id = statement_info[c_dml_n]['compute_pool_id']
-                            #compute_pool_name = statement_info[c_dml_n]['compute_pool_name']
-                        else:
-                            status_phase = 'UNKNOWN'
-                            compute_pool_id = 'UNKNOWN'
-
-                        # Initialize the status counters for the product
-                        if product_name not in self.summary:
-                            self.summary[product_name] = {}
-                            self.summary[product_name]["OUT_OF_ORDER"] = {}
-                            self.summary[product_name]["POOLS"] = []
-
-                        if compute_pool_id not in self.summary[product_name]["POOLS"]:
-                            self.summary[product_name]["POOLS"].append(compute_pool_id)
-                        if status_phase not in self.summary[product_name]:
-                            self.summary[product_name][status_phase] = {}
-                        if child_table not in self.summary[product_name][status_phase]:
-                            self.summary[product_name][status_phase][child_table] = 1
-                        if statement_info[c_dml_n]['created_at'] < statement_info[p_dml_n]['created_at']:
-                            if not parent.table_name in self.summary[product_name]["OUT_OF_ORDER"]:
-                                self.summary[product_name]["OUT_OF_ORDER"][parent.table_name] = f"child [ {c_dml_n} ] created at [ {statement_info[c_dml_n]['created_at']} ] < parent [ {p_dml_n} ] created at [ {statement_info[p_dml_n]['created_at']} ]"
-                        parent_node = tree_node.add(f"[green]{parent.table_name}[/green]")
-                        parent_node.add(f"[dim]Type: {parent.type}[/dim]")
-                        parent_node.add(f"[dim]Product: {parent.product_name}[/dim]")
-                        child=parent
-                        # Recursive call
-                        self.healthcheck_tree(child.table_name, parent, parent_node)
-                else:
-                    # this is the case of a table with no parents, so it is a source table
-                    s_pipeline_def = pipeline_mgr.get_pipeline_definition_for_table(node_data.table_name, inventory_path)
-                    s_ddl_n, s_dml_n = get_ddl_dml_names_from_pipe_def(s_pipeline_def)
-                    product_name = s_pipeline_def.product_name
-                    if s_dml_n in statement_info:
-                        status_phase = statement_info[s_dml_n]['status_phase']
-                        compute_pool_id = statement_info[s_dml_n]['compute_pool_id']
-                    else:
-                        status_phase = 'UNKNOWN'
-                        compute_pool_id = 'UNKNOWN'
-
-                    if product_name not in self.summary:
-                        self.summary[product_name] = {}
-                        self.summary[product_name]["OUT_OF_ORDER"] = {}
-                        self.summary[product_name]["POOLS"] = []
-
-                    if compute_pool_id not in self.summary[product_name]["POOLS"]:
-                        self.summary[product_name]["POOLS"].append(compute_pool_id)
-                    if status_phase not in self.summary[product_name]:
-                        self.summary[product_name][status_phase] = {}
-                    if not node_data.table_name in self.summary[product_name][status_phase]:
-                        self.summary[product_name][status_phase][node_data.table_name] = 1
-                return self.summary
-
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Generating Health Report for {product_name.upper()} ...")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Generating Health Report for {product_name.upper()} ( ETA <1min ) ...")
         health_report = {}
-        checker = PipelineHealthChecker(statement_info)
+        pipeline_status = pipeline_mgr.PipelineStatusTree(statement_info, inventory_path)
 
         for table_name, _ in sink_tables.items():
+            logger.info(f"Table: {table_name}")
             #This tree gives all parents including the parents that are reapeated for multiple children.
             pipeline_report=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path)
             #This tree gives all parents of a table without the repeated ones
@@ -286,48 +222,58 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
             else:
                 # Create a rich tree for visualization for debugging purposes
                 tree = Tree(f"[bold blue]{table_name}[/bold blue]")
-                health_report = checker.healthcheck_tree( table_name, pipeline_report, tree)
+                # Accumulates the pipeline status for each table called.
+                health_report = pipeline_status.pipeline_status( table_name, pipeline_report, tree)
 
         logger.info(f"Tree: {tree}")
         logger.info(f"Health Report: {json.dumps(health_report, indent=2)}")
 
         header = f"{product_name.upper()} Health Report"
-        console.print(f"\n[bold]{header.center(80, '-')}[/bold]")
+        header_width = 75
+        console.print(f"\n[bold]{header.center(header_width, '-')}[/bold]")
         #---- Statement Health Report ----
-        console.print(f"[bold]{'Statements'.center(80, '-')}[/bold]")
-        console.print(f"[bold]Product | RUNNING | PENDING | DEGRADED | STOPPED | FAILED | OUT-OF-ORDER[/bold]")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        running = pending = degraded = stopped = failed = out_of_order = 0
-        t_running = t_pending = t_degraded = t_stopped = t_failed = t_out_of_order = 0
+        console.print(f"[bold]{'Statements'.center(header_width, '-')}[/bold]")
+        console.print(f"[bold]Product    | RUNNING PENDING DEGRADED STOPPED FAILED | UNKNOWN OUT-OF-ORDER[/bold]")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        t_running = t_pending = t_degraded = t_stopped = t_failed = t_unknown = t_out_of_order = 0
         for product_name in health_report:
+            running = pending = degraded = stopped = failed = unknown = out_of_order = 0
             if "RUNNING" in health_report[product_name]:
-                running = len(health_report[product_name]["RUNNING"])
-                t_running += running
+                t_running += (running := len(health_report[product_name]["RUNNING"]))
             if "PENDING" in health_report[product_name]:
-                pending = len(health_report[product_name]["PENDING"])
-                t_pending += pending
+                t_pending += (pending := len(health_report[product_name]["PENDING"]))
             if "DEGRADED" in health_report[product_name]:
-                degraded = len(health_report[product_name]["DEGRADED"])
-                t_degraded += degraded
+                t_degraded += (degraded := len(health_report[product_name]["DEGRADED"]))
             if "STOPPED" in health_report[product_name]:
-                stopped = len(health_report[product_name]["STOPPED"])
-                t_stopped += stopped
+                t_stopped += (stopped := len(health_report[product_name]["STOPPED"]))
             if "FAILED" in health_report[product_name]:
-                failed = len(health_report[product_name]["FAILED"])
-                t_failed += failed
+                t_failed += (failed := len(health_report[product_name]["FAILED"]))
+            if "UNKNOWN" in health_report[product_name]:
+                t_unknown += (unknown := len(health_report[product_name]["UNKNOWN"]))
             if "OUT_OF_ORDER" in health_report[product_name]:
-                out_of_order = len(health_report[product_name]["OUT_OF_ORDER"])
-                t_out_of_order += out_of_order
-            total = running + degraded + stopped + failed
-            console.print(f"{product_name:<7} | {running:>7}   {pending:>7}   {degraded:>8}   {stopped:>7}   {failed:>6} | {out_of_order:>12}")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        console.print(f"{'Total':<7} | {t_running:>7}   {t_pending:>7}   {t_degraded:>8}   {t_stopped:>7}   {t_failed:>6} | {t_out_of_order:>12}\n")
+                t_out_of_order += (out_of_order := len(health_report[product_name]["OUT_OF_ORDER"]))
+            total = running + pending + degraded + stopped + failed + unknown
+            console.print(f"{product_name:<10} | {running:>7} {pending:>7} {degraded:>8} {stopped:>7} {failed:>6} | {unknown:>7} {out_of_order:>12}")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        console.print(f"{'Total':<10} | {t_running:>7} {t_pending:>7} {t_degraded:>8} {t_stopped:>7} {t_failed:>6} | {t_unknown:>7} {t_out_of_order:>12}")
+
         #---- statements out-of-order report ----
         if t_out_of_order > 0:
-            console.print(f"[bold]{'Statements Out-Of-Order'.center(80, '-')}[/bold]")
-            for table_name in health_report[product_name]["OUT_OF_ORDER"]:
-                console.print(f"[red]{table_name}: {health_report[product_name]["OUT_OF_ORDER"][table_name]}[/red]")
-            console.print(f"[bold]{'-'*80}[/bold]")
+            console.print(f"\n[bold]{'Statements Out-Of-Order'.center(header_width, '-')}[/bold]")
+            for product_name in health_report:
+                if "OUT_OF_ORDER" in health_report[product_name]:
+                    for p_c_dml_info in health_report[product_name]["OUT_OF_ORDER"].values():
+                        p_dml_n, p_created_at, c_dml_n, c_created_at = p_c_dml_info.split(',')
+                        console.print(f"[bold]{p_dml_n:<65} created at {p_created_at:>20}[/bold]")
+                        console.print(f"[bold]└─{c_dml_n:<63} created at {c_created_at:>20}[/bold]")
+        #---- statements not-running report ----
+        if t_unknown > 0:
+            console.print(f"\n[bold]{'Statements Not RUNNING'.center(header_width, '-')}[/bold]")
+            for product_name in health_report:
+                if "UNKNOWN" in health_report[product_name]:
+                    for dml_name in health_report[product_name]["UNKNOWN"].keys():
+                        console.print(f"[bold]{dml_name}[/bold]")
+
         #---- Compute Poool Health Report ----
         # Get all compute pools CFU information in dictionary format
         pool_info={}
@@ -338,9 +284,9 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
             pool_info[pool.id]["current_cfu"] = pool.current_cfu
             pool_info[pool.id]["max_cfu"] = pool.max_cfu
 
-        console.print(f"[bold]{'Compute Pools'.center(80, '-')}[/bold]")
-        console.print(f"[bold]Product | #Pools | #CFUs | #Pools>1CFU | Max CFU ( pool )[/bold]")
-        console.print(f"[bold]{'-'*80}[/bold]")
+        console.print(f"\n[bold]{'Compute Pools'.center(header_width, '-')}[/bold]")
+        console.print(f"[bold]Product    | #Pools | #CFUs | #Pools>1CFU | Max Pool ( CFU )[/bold]")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
         t_cfus = t_pools = t_plus1pools = t_max_cfu = 0
         t_max_cfu_pool = None
         for product_name in health_report:
@@ -363,9 +309,9 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
                 if max_cfu > t_max_cfu:
                     t_max_cfu = max_cfu
                     t_max_cfu_pool = max_cfu_pool
-                console.print(f"{product_name:<7} | {num_pools:>6}   {num_cfus:>5}   {plus1pools:>11}   {f'{max_cfu} ({max_cfu_pool})':>15}")
-        console.print(f"[bold]{'-'*80}[/bold]")
-        console.print(f"{'Total':<7} | {t_pools:>6}   {t_cfus:>5}   {t_plus1pools:>11}   {f'{t_max_cfu} ({t_max_cfu_pool})':>15}\n")
+                console.print(f"{product_name:<10} | {num_pools:>6}   {num_cfus:>5}   {plus1pools:>11}   {f'{max_cfu_pool} ({max_cfu})':<15}")
+        console.print(f"[bold]{'-'*header_width}[/bold]")
+        console.print(f"{'Total':<10} | {t_pools:>6}   {t_cfus:>5}   {t_plus1pools:>11}   {f'{t_max_cfu_pool} ({t_max_cfu})':<15}\n")
 
     except Exception as e:
         sanitized_error = safe_error_display(e)
@@ -378,6 +324,7 @@ def deploy(
         table_name:  str =  typer.Option(default= None, help="The table name containing pipeline_definition.json."),
         product_name: str =  typer.Option(None, help="The product name to deploy."),
         table_list_file_name: str = typer.Option(None, help="The file containing the list of tables to deploy."),
+        exclude_table_file_name: str = typer.Option(None, help="The file containing the list of tables to exclude from the deployment."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID. If not provided, it will create a pool."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)"),
@@ -389,14 +336,20 @@ def deploy(
         pool_creation: bool = typer.Option(False, help="By default the deployment will not create a compute pool per table. This flag will create a pool.")
         ):
     """
-    Deploy a pipeline from a given table name , product name or a directory.
+    Deploy a pipeline from a given table name , product name or a directory taking into account the execution plan.
+    It can run the deployment in parallel or sequential.
+    Four approaches are possible:
+    1. Deploy from a given table name
+    2. Deploy from a product name
+    3. Deploy from a directory
+    4. Deploy from a table list file name
     """
 
     if max_thread > 1:
         parallel = True
     else:
         parallel = False
-    
+
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deploying pipeline in Env [ {get_config()['kafka']['cluster_type']} ] Id [ {get_config()['confluent_cloud']['environment_id']} ]", flush=True)
     builtins.print(f"------------------------------------------ Command Parameters ---------------------------------------------")
     builtins.print(f"| may_start_descendants | force_ancestors | cross_product_deployment | pool_creation | Parallel | Threads |")
@@ -407,22 +360,23 @@ def deploy(
         builtins.print(f"| {str(bool(may_start_descendants)):>21} | {str(bool(force_ancestors)):>15} | {str(bool(cross_product_deployment)):>24} | {str(bool(pool_creation)):>13} | {str(bool(parallel)):>8} | {str(max_thread):>7} |")
     builtins.print(f"----------------------------------------------------------------------------------------------------------")
 
-    _build_deploy_pipeline( 
-        table_name=table_name, 
-        product_name=product_name, 
-        dir=dir, 
+    _build_deploy_pipeline(
+        table_name=table_name,
+        product_name=product_name,
+        dir=dir,
         table_list_file_name=table_list_file_name,
-        inventory_path=inventory_path, 
-        compute_pool_id=compute_pool_id, 
-        dml_only=dml_only, 
-        may_start_descendants=may_start_descendants, 
+        exclude_table_file_name=exclude_table_file_name,
+        inventory_path=inventory_path,
+        compute_pool_id=compute_pool_id,
+        dml_only=dml_only,
+        may_start_descendants=may_start_descendants,
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
         parallel=parallel,
         max_thread=max_thread,
         execute_plan=True,
         pool_creation=pool_creation)
-    
+
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline DEPLOYED")
 
 @app.command()
@@ -432,6 +386,7 @@ def build_execution_plan(
         product_name: str =  typer.Option(None, help="The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product."),
         dir: str = typer.Option(None, help="The directory to deploy the pipeline from."),
         table_list_file_name: str = typer.Option(None, help="The file containing the list of tables to deploy."),
+        exclude_table_file_name: str = typer.Option(None, help="The file containing the list of tables to exclude from the deployment."),
         compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
         dml_only: bool = typer.Option(False, help="By default the deployment will do DDL and DML, with this flag it will deploy only DML"),
         may_start_descendants: bool = typer.Option(False, help="The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless."),
@@ -439,21 +394,22 @@ def build_execution_plan(
         cross_product_deployment: bool = typer.Option(False, help="By default the deployment will deploy only tables from the same product. This flag allows to deploy tables from different products when considering descendants only.")):
     """
     From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
-    and existing Flink Statement running status.
+    and existing Flink Statement running status. It does not deploy. This is a command for analysis.
     """
     if compute_pool_id:
         pool_creation = False
     else:
         pool_creation = True
-    _build_deploy_pipeline( 
-        table_name=table_name, 
-        product_name=product_name, 
-        dir=dir, 
+    _build_deploy_pipeline(
+        table_name=table_name,
+        product_name=product_name,
+        dir=dir,
         table_list_file_name=table_list_file_name,
-        inventory_path=inventory_path, 
-        compute_pool_id=compute_pool_id, 
-        dml_only=dml_only, 
-        may_start_descendants=may_start_descendants, 
+        exclude_table_file_name=exclude_table_file_name,
+        inventory_path=inventory_path,
+        compute_pool_id=compute_pool_id,
+        dml_only=dml_only,
+        may_start_descendants=may_start_descendants,
         force_ancestors=force_ancestors,
         cross_product_deployment=cross_product_deployment,
         execute_plan=False,
@@ -475,17 +431,17 @@ def report_running_statements(
     try:
         if table_name:
             results = "\n" + "#"*40 + f" Table: {table_name} " + "#"*40 + "\n"
-            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name, 
-                                                                                 inventory_path, 
+            results+= deployment_mgr.report_running_flink_statements_for_a_table(table_name,
+                                                                                 inventory_path,
                                                                                  from_date)
         elif dir:
-            results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir, 
+            results= deployment_mgr.report_running_flink_statements_for_all_from_directory(dir,
                                                                                            inventory_path,
                                                                                            from_date)
         elif product_name:
             product_name = product_name.lower()
-            results= deployment_mgr.report_running_flink_statements_for_a_product(product_name, 
-                                                                                  inventory_path, 
+            results= deployment_mgr.report_running_flink_statements_for_a_product(product_name,
+                                                                                  inventory_path,
                                                                                   from_date)
         else:
             print(f"[red]Error: either table-name, product-name or dir must be provided[/red]")
@@ -503,7 +459,8 @@ def undeploy(
         product_name: str =  typer.Option(default= None, help="The product name to undeploy from"),
         no_ack: bool = typer.Option(False, help="By default the undeploy will ask for confirmation. This flag will undeploy without confirmation."),
         cross_product: bool = typer.Option(False, help="By default the undeployment will process tables from the same product (valid with product-name). This flag allows to undeploy tables from different products."),
-        inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
+        compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
+		inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Path to the inventory folder, if not provided will use the $PIPELINES environment variable.")]= os.getenv("PIPELINES")):
     """
     From a given sink table, this command goes all the way to the full pipeline and delete tables and Flink statements not shared with other statements.
     """
@@ -520,7 +477,7 @@ def undeploy(
     elif product_name:
         product_name = product_name.lower()
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Full undeployment of all tables for product: {product_name} except shareable tables")
-        result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path, cross_product)
+        result = deployment_mgr.full_pipeline_undeploy_from_product(product_name, inventory_path, compute_pool_id, cross_product)
     else:
         print(f"[red]Error: either table-name or product-name must be provided[/red]")
         raise typer.Exit(1)
@@ -532,7 +489,7 @@ def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare t
             compute_pool_id: str= typer.Option(None, help="Flink compute pool ID to use as default."),
        ):
     """
-    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. 
+    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table.
     For deployment by adding the necessary comments and metadata.
     """
     print(f"Prepare tables using sql file {sql_file_name}")
@@ -541,29 +498,38 @@ def  prepare(sql_file_name: str = typer.Argument(help="The sql file to prepare t
 
 
 # ----- Private APIs -----
-    
+
 def _build_deploy_pipeline(
-        table_name: str, 
-        product_name: str, 
-        dir: str, 
+        table_name: str,
+        product_name: str,
+        dir: str,
         table_list_file_name: str,
-        inventory_path: str, 
-        compute_pool_id: str, 
-        dml_only: bool = False, 
-        may_start_descendants: bool = False, 
+        exclude_table_file_name: str,
+        inventory_path: str,
+        compute_pool_id: str,
+        dml_only: bool = False,
+        may_start_descendants: bool = False,
         force_ancestors: bool = False,
         cross_product_deployment: bool = False,
         parallel: bool = False,
-        max_thread: int = None,
+        max_thread: int = 4,
         execute_plan: bool=False,
         pool_creation: bool = False):
     summary="Nothing done"
     try:
         report=None
+        if exclude_table_file_name:
+            exclude_table_names = _load_table_names_from_file(exclude_table_file_name)
+        else:
+            exclude_table_names = []
+        if table_list_file_name:
+            table_names = _load_table_names_from_file(table_list_file_name)
+        else:
+            table_names = []
         if table_name:
             table_name = table_name.lower()
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for table {table_name}")
-            summary,execution_plan=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
+            summary,report=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
@@ -573,11 +539,12 @@ def _build_deploy_pipeline(
                                                         sequential=not parallel,
                                                         max_thread=max_thread,
                                                         execute_plan=execute_plan,
+                                                        exclude_table_names=exclude_table_names,
                                                         pool_creation=pool_creation)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution plan built and persisted for table {table_name}")
             print(f"Potential Impacted tables:\n" + "-"*30 )
-            for node in execution_plan.nodes:
-                if node.to_run or node.to_restart:
+            for node in report.tables:
+                if node.to_restart:
                     print(f"{node.table_name}")
             print(f"\n" + "-"*30 + "\n")
 
@@ -594,12 +561,13 @@ def _build_deploy_pipeline(
                                                         sequential=not parallel,
                                                         execute_plan=execute_plan,
                                                         max_thread=max_thread,
+                                                        exclude_table_names=exclude_table_names,
                                                         pool_creation=pool_creation)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution plan built and persisted for product {product_name}")
 
         elif dir:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')}Build an execution plan for directory {dir}")
-            summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir, 
+            summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir,
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
                                                                     dml_only=dml_only,
@@ -609,10 +577,11 @@ def _build_deploy_pipeline(
                                                                     sequential=not parallel,
                                                                     execute_plan=execute_plan,
                                                                     max_thread=max_thread,
+                                                                    exclude_table_names=exclude_table_names,
                                                                     pool_creation=pool_creation)
         elif table_list_file_name:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for tables in {table_list_file_name}")
-            summary, report=deployment_mgr.build_and_deploy_all_from_table_list(table_list_file_name=table_list_file_name,
+            summary, report=deployment_mgr.build_and_deploy_all_from_table_list(include_table_names=table_names,
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
                                                                     dml_only=dml_only,
@@ -621,6 +590,7 @@ def _build_deploy_pipeline(
                                                                     cross_product_deployment=cross_product_deployment,
                                                                     sequential=not parallel,
                                                                     execute_plan=execute_plan,
+                                                                    exclude_table_names=exclude_table_names,
                                                                     max_thread=max_thread,
                                                                     pool_creation=pool_creation
                                                                 )
@@ -651,23 +621,23 @@ def analyze_pool_usage(
 ):
     """
     Analyze compute pool usage and assess statement consolidation opportunities.
-    
+
     This command will:
     - Analyze current usage across compute pools (optionally filtered by product or directory)
     - Identify running statements in each pool
     - Assess opportunities for statement consolidation
     - Generate optimization recommendations using simple heuristics
-    
+
     Examples:
         # Analyze all pools
         shift-left pipeline analyze-pool-usage
-        
+
         # Analyze for specific product
         shift-left pipeline analyze-pool-usage --product-name saleops
-        
+
         # Analyze for specific directory
         shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
-        
+
         # Combine product and directory filters
         shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
     """
@@ -680,26 +650,26 @@ def analyze_pool_usage(
             scope_desc = f"product '{product_name}'"
         elif directory:
             scope_desc = f"directory '{directory}'"
-            
+
         print(f"[blue]Analyzing compute pool usage and statement consolidation opportunities for {scope_desc}...[/blue]")
-        
+
         analyzer = ComputePoolUsageAnalyzer()
         report = analyzer.analyze_pool_usage(inventory_path, product_name, directory)
-        
+
         # Print summary to console
         summary = analyzer.print_analysis_summary(report)
         print(summary)
-        
+
         # Save detailed report to file
         from shift_left.core.utils.app_config import shift_left_dir
         import json
-        
+
         report_file = f"{shift_left_dir}/pool_usage_analysis_{report.created_at.strftime('%Y%m%d_%H%M%S')}.json"
         with open(report_file, 'w') as f:
             f.write(report.model_dump_json(indent=2))
-        
+
         print(f"[green]Detailed analysis report saved to: {report_file}[/green]")
-        
+
         # Highlight key findings
         if report.recommendations:
             print(f"\n[yellow]🔍 Found {len(report.recommendations)} consolidation opportunities![/yellow]")
@@ -707,11 +677,11 @@ def analyze_pool_usage(
             print(f"[yellow]💰 Potential CFU savings: {total_potential_savings}[/yellow]")
         else:
             print(f"\n[green]✅ Your compute pools appear to be efficiently utilized![/green]")
-            
+
     except Exception as e:
         safe_error_display(f"Error analyzing compute pool usage", e)
-    
-   
+
+
 
 
 
@@ -756,3 +726,11 @@ def _process_hierarchy_to_node(pipeline_def):
     if len(pipeline_def.parents) > 0:
         _process_parents(nodes_directed, edges_directed, pipeline_def)
     _display_directed_graph(nodes_directed, edges_directed)
+
+def _load_table_names_from_file(file_name: str) -> list[str]:
+    if not os.path.exists(file_name):
+        print(f"[red]Error: file {file_name} does not exist[/red]")
+        raise typer.Exit(1)
+    with open(file_name, 'r') as f:
+        table_names = f.read().splitlines()
+        return table_names

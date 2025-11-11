@@ -8,10 +8,8 @@ import pathlib
 import shutil
 import unittest
 from unittest.mock import patch, mock_open, MagicMock, call
-import shift_left.core.statement_mgr as sm
 from shift_left.core.utils.file_search import (
-    get_or_build_inventory,
-    from_pipeline_to_absolute,
+    get_or_build_inventory
 )
 # Set up environment variables before importing the module under test
 #os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
@@ -33,7 +31,6 @@ from shift_left.core.integration_test_mgr import (
 )
 from shift_left.core.utils.file_search import FlinkTableReference
 from shift_left.core.utils.app_config import reset_all_caches
-import shift_left.core.pipeline_mgr as pm
 from shift_left.core.utils.sql_parser import SQLparser
 class TestIntegrationTestManager(unittest.TestCase):
     """
@@ -118,18 +115,23 @@ WITH (
                 assert validation_query.table_name == self.test_sink_table
                 assert validation_query.file_name == "./validate_fct_user_per_group_scenario_1.sql"
             self._assert_files_exist(expected_path, ["ddl.raw_groups.sql", "ddl.raw_users.sql", "ddl.raw_tenants.sql", "insert_raw_groups_scenario_1.sql", "insert_raw_users_scenario_1.sql", "insert_raw_tenants_scenario_1.sql", "validate_fct_user_per_group_scenario_1.sql"])
-            
-        
-    def test_init_integration_tests_success_with_env_var(self):
+
+
+    @patch('shift_left.core.integration_test_mgr.get_or_build_inventory')
+    @patch('shift_left.core.integration_test_mgr.statement_mgr.show_flink_table_structure')
+    @patch('shift_left.core.integration_test_mgr._find_source_tables_for_sink')
+    @patch('builtins.open', new_callable=mock_open) 
+    def test_init_integration_tests_success_with_env_var(self, mock_file,mock_find_sources, mock_show_structure, mock_get_inventory):
         """Test successful initialization using PIPELINES environment variable."""
-        with patch('shift_left.core.integration_test_mgr._find_source_tables_for_sink') as mock_find_sources:
-            mock_find_sources.return_value = ["src_test_source"]      
-            expected_path = os.path.join(self.test_pipeline_path, "..", INTEGRATION_TEST_FOLDER, self.test_product_name, self.test_sink_table)
-               
-            # Execute (no project_path provided, should use env var)
-            itg_test_def = init_integration_tests(self.test_sink_table)
-            assert itg_test_def is not None
-            self.assertEqual(itg_test_def.sink_test_path, expected_path)
+        mock_get_inventory.return_value = {"src_test_source": {"table_name": "src_test_source", "product_name": "c360", "table_type": "source"}, "fct_user_per_group": {"table_name": "fct_user_per_group", "product_name": "c360", "table_type": "fact"}}
+        mock_find_sources.return_value = ["src_test_source"]      
+        mock_show_structure.return_value = self.base_ddl_content.replace('raw_users', "src_test_source")
+        expected_path = os.path.join(self.test_pipeline_path, "..", INTEGRATION_TEST_FOLDER, self.test_product_name, self.test_sink_table)
+           
+        # Execute (no project_path provided, should use env var)    
+        itg_test_def = init_integration_tests(self.test_sink_table)
+        assert itg_test_def is not None
+        self.assertEqual(itg_test_def.sink_test_path, expected_path)
 
     def test_init_integration_tests_no_project_path_or_env(self):
         """Test error when no project path provided and no PIPELINES env var."""

@@ -60,12 +60,13 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `run-integration-tests`: Run integration tests for a given sink table.
 * `delete-integration-tests`: Delete all integration test artifacts...
 * `isolate-data-product`: Isolate the data product from the project
+* `get-statement-list`: Get the list of statements
 
 ### `project init`
 
-Create a project structure with a specified name, target path, and optional project type. 
-The project type can be one of `kimball` or `data_product`. 
-Kimball will use a structure like 
+Create a project structure with a specified name, target path, and optional project type.
+The project type can be one of `kimball` or `data_product`.
+Kimball will use a structure like
 pipelines/sources
 pipelines/facts
 pipelines/dimensions
@@ -218,7 +219,6 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 
 **Options**:
 
-* `--output-file TEXT`: Output file path to save the list  [default: modified_flink_files.txt]
 * `--project-path TEXT`: Project path where git repository is located  [default: .]
 * `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
 * `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)
@@ -308,6 +308,24 @@ $ project isolate-data-product [OPTIONS] PRODUCT_NAME SOURCE_FOLDER TARGET_FOLDE
 * `PRODUCT_NAME`: Product name to isolate  [required]
 * `SOURCE_FOLDER`: Source folder to isolate the data product  [required]
 * `TARGET_FOLDER`: Target folder to isolate the data product  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project get-statement-list`
+
+Get the list of statements
+
+**Usage**:
+
+```console
+$ project get-statement-list [OPTIONS] COMPUTE_POOL_ID
+```
+
+**Arguments**:
+
+* `COMPUTE_POOL_ID`: Compute pool id to get the statement list for  [required]
 
 **Options**:
 
@@ -422,6 +440,7 @@ $ table migrate [OPTIONS] TABLE_NAME SQL_SRC_FILE_NAME TARGET_PATH
 
 * `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc.  [default: spark]
 * `--validate`: Validate the migrated sql using Confluent Cloud for Flink.
+* `--product-name TEXT`: Product name to use for the table. If not provided, it will use the table_path last folder as product name
 * `--recursive`: Indicates whether to process recursively up to the sources. (default is False)
 * `--help`: Show this message and exit.
 
@@ -500,7 +519,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1080a5d60&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1211c6b10&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -655,7 +674,6 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `report-running-statements`: Assess for a given table, what are the...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
-* `init-integration-test`: Initialize the integration test for a...
 * `analyze-pool-usage`: Analyze compute pool usage and assess...
 
 ### `pipeline build-metadata`
@@ -758,7 +776,13 @@ $ pipeline healthcheck [OPTIONS] PRODUCT_NAME INVENTORY_PATH
 
 ### `pipeline deploy`
 
-Deploy a pipeline from a given table name , product name or a directory.
+Deploy a pipeline from a given table name , product name or a directory taking into account the execution plan.
+It can run the deployment in parallel or sequential.
+Four approaches are possible:
+1. Deploy from a given table name
+2. Deploy from a product name
+3. Deploy from a directory
+4. Deploy from a table list file name
 
 **Usage**:
 
@@ -775,6 +799,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--table-name TEXT`: The table name containing pipeline_definition.json.
 * `--product-name TEXT`: The product name to deploy.
 * `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
+* `--exclude-table-file-name TEXT`: The file containing the list of tables to exclude from the deployment.
 * `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will create a pool.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The children deletion will be done only if they are stateful. This Flag force to drop table and recreate all (ddl, dml)  [default: no-may-start-descendants]
@@ -789,7 +814,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 ### `pipeline build-execution-plan`
 
 From a given table, this command goes all the way to the full pipeline and assess the execution plan taking into account parent, children
-and existing Flink Statement running status.
+and existing Flink Statement running status. It does not deploy. This is a command for analysis.
 
 **Usage**:
 
@@ -807,6 +832,7 @@ $ pipeline build-execution-plan [OPTIONS] INVENTORY_PATH
 * `--product-name TEXT`: The product name to deploy from. Can deploy ancestors and descendants of the tables part of the product.
 * `--dir TEXT`: The directory to deploy the pipeline from.
 * `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
+* `--exclude-table-file-name TEXT`: The file containing the list of tables to exclude from the deployment.
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
 * `--dml-only / --no-dml-only`: By default the deployment will do DDL and DML, with this flag it will deploy only DML  [default: no-dml-only]
 * `--may-start-descendants / --no-may-start-descendants`: The descendants will not be started by default. They may be started differently according to the fact they are stateful or stateless.  [default: no-may-start-descendants]
@@ -826,7 +852,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -848,7 +874,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
 
 **Options**:
 
@@ -856,11 +882,12 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 * `--product-name TEXT`: The product name to undeploy from
 * `--no-ack / --no-no-ack`: By default the undeploy will ask for confirmation. This flag will undeploy without confirmation.  [default: no-no-ack]
 * `--cross-product / --no-cross-product`: By default the undeployment will process tables from the same product (valid with product-name). This flag allows to undeploy tables from different products.  [default: no-cross-product]
+* `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
 * `--help`: Show this message and exit.
 
 ### `pipeline prepare`
 
-Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. 
+Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table.
 For deployment by adding the necessary comments and metadata.
 
 **Usage**:
@@ -878,24 +905,6 @@ $ pipeline prepare [OPTIONS] SQL_FILE_NAME
 * `--compute-pool-id TEXT`: Flink compute pool ID to use as default.
 * `--help`: Show this message and exit.
 
-### `pipeline init-integration-test`
-
-Initialize the integration test for a given table.
-
-**Usage**:
-
-```console
-$ pipeline init-integration-test [OPTIONS] TABLE_NAME
-```
-
-**Arguments**:
-
-* `TABLE_NAME`: The table name to initialize the integration test for.  [required]
-
-**Options**:
-
-* `--help`: Show this message and exit.
-
 ### `pipeline analyze-pool-usage`
 
 Analyze compute pool usage and assess statement consolidation opportunities.
@@ -909,13 +918,13 @@ This command will:
 Examples:
     # Analyze all pools
     shift-left pipeline analyze-pool-usage
-    
+
     # Analyze for specific product
     shift-left pipeline analyze-pool-usage --product-name saleops
-    
+
     # Analyze for specific directory
     shift-left pipeline analyze-pool-usage --directory /path/to/facts/saleops
-    
+
     # Combine product and directory filters
     shift-left pipeline analyze-pool-usage --product-name saleops --directory /path/to/facts
 

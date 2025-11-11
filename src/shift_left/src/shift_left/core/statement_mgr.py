@@ -2,6 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 A set of operations to manage a flink statement
 """
+from re import S
 from typing import List, Optional
 import os
 import time
@@ -17,18 +18,19 @@ from shift_left.core.pipeline_mgr import (
     get_or_build_inventory,
     PIPELINE_JSON_FILE_NAME
 )
-from shift_left.core.utils.file_search import ( 
+from shift_left.core.utils.file_search import (
     read_pipeline_definition_from_file,
     get_table_ref_from_inventory,
     get_ddl_dml_names_from_pipe_def,
     from_pipeline_to_absolute
 )
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
-    StatementResult, 
-    StatementInfo, 
+    Statement,
+    StatementResult,
+    StatementInfo,
     StatementListCache,
     StatementError,
+    ErrorData,
     FlinkStatementNode
 )
 from shift_left.core.utils.file_search import (
@@ -41,7 +43,7 @@ STATEMENT_LIST_FILE=session_log_dir + "/statement_list.json"
 def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process: FlinkStatementNode,
                                                       flink_statement_file_path: str = None,
                                                       statement_name: str = None
-) -> Statement:
+) -> Statement | StatementError:
     """
     Read the SQL content for the flink_statement file name, and deploy to
     the assigned compute pool. If the statement fails, propagate the exception to higher level.
@@ -59,8 +61,8 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             transformer = get_or_build_sql_content_transformer()
             _, sql_out= transformer.update_sql_content(sql_content, column_to_search, flinkStatement_to_process.product_name)
 
-            statement= post_flink_statement(compute_pool_id, 
-                                            statement_name, 
+            statement= post_flink_statement(compute_pool_id,
+                                            statement_name,
                                             sql_out)
             logger.debug(f"Statement: {statement_name} -> {statement}")
             if statement and isinstance(statement, Statement) and statement.status:
@@ -69,7 +71,7 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             return statement
     except Exception as e:
         logger.error(e)
-        return None
+        return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail=str(e))])
 
 
 def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
@@ -82,7 +84,7 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
                                    compute_pool_id=None,
                                    compute_pool_name=None
                                 )
-    return statement_info  
+    return statement_info
 
 def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
@@ -93,10 +95,10 @@ def get_statement(statement_name: str) -> Statement | StatementError:
         return StatementError(**response)
     return Statement(**response)
 
-def post_flink_statement(compute_pool_id: str,  
-                             statement_name: str, 
+def post_flink_statement(compute_pool_id: str,
+                             statement_name: str,
                              sql_content: str,
-                             stopped: bool = False) -> Statement | None:
+                             stopped: bool = False) -> Statement | StatementError:
         """
         POST to the statements API to execute a SQL statement.
         """
@@ -132,11 +134,11 @@ def post_flink_statement(compute_pool_id: str,
                     return client.wait_response(url, statement_name, start_time)
                 return  Statement(**response)
             else:
-                return None
+                return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail=str(response))])
         except Exception as e:
             logger.error(f"Error executing rest call: {e}")
             raise e
-                
+
 
 def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"Enter with {statement_name}")
@@ -168,16 +170,16 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
 
 def get_statement_results(statement_name: str)-> StatementResult:
         client = ConfluentCloudClient(get_config())
-        url, auth_header = client.build_flink_url_and_auth_header() 
+        url, auth_header = client.build_flink_url_and_auth_header()
         try:
             next_page_token = None
             previous_step = None
             while True:
                 if next_page_token and previous_step != next_page_token:
-                    logger.info(f"Get next page token: {next_page_token} for {statement_name}")  
+                    logger.info(f"Get next page token: {next_page_token} for {statement_name}")
                     resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
                 else:
-                    logger.info(f"Get results from {url}/statements/{statement_name}/results")  
+                    logger.info(f"Get results from {url}/statements/{statement_name}/results")
                     resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
                 logger.info(f"response: {resp} same tokens: {previous_step == next_page_token}")
                 if (resp and "metadata" in resp and "next" in resp["metadata"] and resp["metadata"]["next"]):
@@ -198,9 +200,9 @@ def get_next_statement_results(next_token_page: str) -> StatementResult:
     resp=client.make_request(method="GET", url=next_token_page, auth_header=auth_header)
     return StatementResult(**resp)
 
-_cache_lock = threading.RLock()    
+_cache_lock = threading.RLock()
 _statement_list_cache = None  # cache the statement list loaded to limit the number of call to CC API
-def get_statement_list() -> dict[str, StatementInfo]:
+def get_statement_list(compute_pool_id: Optional[str] = None) -> dict[str, StatementInfo]:
     """
     Get the statement list from the CC API - the list is <statement_name, statement_info>
     """
@@ -250,11 +252,13 @@ def get_statement_list() -> dict[str, StatementInfo]:
                 stop_time = time.perf_counter()
                 logger.info(f"Statement list has {len(_statement_list_cache.statement_list)} statements, read in {int(stop_time - start_time)} seconds")
                 print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement list has {len(_statement_list_cache.statement_list)} statements")
-        elif (_statement_list_cache.created_at 
+        elif (_statement_list_cache.created_at
             and (datetime.now() - _statement_list_cache.created_at).total_seconds() > get_config()['app']['cache_ttl']):
             logger.info("Statement list cache is expired, reload it")
             _statement_list_cache = None
-            return get_statement_list()
+            return get_statement_list(compute_pool_id)
+        if compute_pool_id:
+            return {k: v for k, v in _statement_list_cache.statement_list.items() if v.compute_pool_id == compute_pool_id}
         return _statement_list_cache.statement_list
 
 
@@ -341,8 +345,8 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
     drop_statement_name = "drop-" + table_name.replace('_','-')
     try:
         delete_statement_if_exists(drop_statement_name)
-        result= post_flink_statement(compute_pool_id, 
-                                            drop_statement_name, 
+        result= post_flink_statement(compute_pool_id,
+                                            drop_statement_name,
                                             sql_content)
         if result and isinstance(result, Statement) and result.status.phase not in ("COMPLETED", "FAILED"):
             while result.status.phase not in ["COMPLETED", "FAILED"]:
@@ -362,7 +366,7 @@ def get_or_build_sql_content_transformer():
     global _runner_class
     if not _runner_class:
         if get_config().get('app').get('sql_content_modifier'):
-        
+
             class_to_use = get_config().get('app').get('sql_content_modifier')
             module_path, class_name = class_to_use.rsplit('.',1)
             mod = import_module(module_path)
@@ -381,7 +385,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
             catalog = info.get('spec',{}).get('properties',{}).get('sql.current-catalog','UNKNOWN')
             database = info.get('spec',{}).get('properties',{}).get('sql.current-database','UNKNOWN')
         else:
-            catalog = 'UNKNOWN' 
+            catalog = 'UNKNOWN'
             database = 'UNKNOWN'
         return StatementInfo(name=info['name'],
                                     status_phase= info.get('status').get('phase', 'UNKNOWN'),
@@ -412,7 +416,7 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
                              sql_database=database)
     else:
         raise Exception(f"Invalid statement info: {info}")
-    
+
 # ------------- private methods -------------
 def _save_statement_list(statement_list: dict[str, StatementInfo]):
     """
@@ -426,7 +430,7 @@ def _save_statement_list(statement_list: dict[str, StatementInfo]):
             f.write(statement_list.model_dump_json(indent=2, warnings=False))
             f.flush()  # Ensure data is written
             os.fsync(f.fileno())  # Force write to disk
-        
+
         # Atomic operation - either succeeds completely or fails
         shutil.move(temp_file, STATEMENT_LIST_FILE)
     except Exception as e:
@@ -451,8 +455,8 @@ def _update_results_from_node(node: FlinkTablePipelineDefinition, statement_list
     return results
 
 
-def _search_statement_status(node: FlinkTablePipelineDefinition, 
-                             statement_list, results, 
+def _search_statement_status(node: FlinkTablePipelineDefinition,
+                             statement_list, results,
                              table_inventory, config: dict):
     ddl_statement_name, statement_name = get_ddl_dml_names_from_pipe_def(node)
     if statement_name in get_statement_list():

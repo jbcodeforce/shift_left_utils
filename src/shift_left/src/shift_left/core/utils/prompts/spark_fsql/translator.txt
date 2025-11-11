@@ -14,6 +14,8 @@ Your task is to translate Spark SQL DML batch scripts into Apache Flink SQL for 
 * Replace `current_timestamp()` → `$ROWTIME` for event time
 * Transform `date_trunc()` → `DATE_FORMAT()` where applicable
 * Replace `split_part()` → `REGEXP_EXTRACT()` when possible
+* Replace `DATEDIFF()` with `TIMESTAMPDIFF()`
+* Replace `CURRENT_DATE()` with `CURRENT_DATE`
 
 ### Join Transformations:
 * Convert LEFT ANTI JOIN to LEFT JOIN with NULL filtering:

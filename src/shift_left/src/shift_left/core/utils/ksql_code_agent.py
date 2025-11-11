@@ -151,7 +151,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
                 continue
             
             # Keep all other lines including the original indentation
-            cleaned_lines.append(line)
+            cleaned_lines.append(stripped_line)
         
         return '\n'.join(cleaned_lines)
     
@@ -206,7 +206,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
             {"role": "system", "content": self.table_detection_system_prompt},
             {"role": "user", "content": table_detection_prompt_template.format(ksql_input=ksql)}
         ]
-        
+        logger.info(f"Table detection messages: {messages}")
         # Use structured output to ensure consistent response format
         response = self.llm_client.chat.completions.parse(
             model=self.model_name,
@@ -215,6 +215,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         )
         
         obj_response = response.choices[0].message
+        logger.info(f"Table detection result: {obj_response}")
         if obj_response.parsed:
             return obj_response.parsed
         else:
@@ -395,14 +396,14 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
             executing statements against the live Flink environment.
         """
         
-        print("0/ Cleaning KSQL input by removing DROP TABLE statements and comment lines...")
+        print("\n0/ Cleaning KSQL input by removing DROP TABLE statements and comments...\n")
         logger.info("Starting KSQL input cleaning")
         ksql = self._clean_ksql_input(ksql)
         print(f"Cleaned KSQL input: {ksql[:400]}...")
-        logger.info("KSQL input cleaning completed")
+        logger.info(f"KSQL input cleaning completed {ksql[:400]}...")
         
 
-        print(f"1/ Analyzing KSQL input for multiple CREATE TABLE statements using: {self.model_name} ")
+        print(f"\n1/ Analyzing KSQL input for multiple CREATE TABLE statements using: {self.model_name} \n")
         logger.info("Starting table detection analysis")
         table_detection = self._table_detection_agent(ksql)
         print(f"Table detection result: {table_detection.description}")

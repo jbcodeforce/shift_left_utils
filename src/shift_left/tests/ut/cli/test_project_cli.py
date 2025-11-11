@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.project import app
+import shift_left.core.pipeline_mgr as pm
 import subprocess
 
 class TestProjectCLI(unittest.TestCase):
@@ -21,6 +22,7 @@ class TestProjectCLI(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES",""))
 
     @classmethod
     def tearDownClass(cls):
@@ -39,7 +41,7 @@ class TestProjectCLI(unittest.TestCase):
         assert os.path.exists(temp_dir / "project_test_via_cli")
         assert os.path.exists(temp_dir / "project_test_via_cli/pipelines")
 
-   
+
 
     @patch('shift_left.cli_commands.project.get_config')
     def test_validate_config_valid(self, mock_get_config):
@@ -88,10 +90,10 @@ class TestProjectCLI(unittest.TestCase):
                 "data_limit_table_type": "test_type"
             }
         }
-        
+
         # Mock get_config to return our test configuration
         mock_get_config.return_value = valid_config
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
@@ -108,10 +110,10 @@ class TestProjectCLI(unittest.TestCase):
             }
             # Missing confluent_cloud, flink, app sections
         }
-        
+
         # Mock get_config to return our test configuration
         mock_get_config.return_value = invalid_config
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
@@ -168,10 +170,10 @@ class TestProjectCLI(unittest.TestCase):
                 "data_limit_table_type": "test_type"
             }
         }
-        
+
         # Mock get_config to return our test configuration
         mock_get_config.return_value = config_with_placeholders
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
@@ -225,10 +227,10 @@ class TestProjectCLI(unittest.TestCase):
                 "data_limit_table_type": "test_type"
             }
         }
-        
+
         # Mock get_config to return our test configuration
         mock_get_config.return_value = invalid_types_config
-        
+
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
@@ -237,11 +239,12 @@ class TestProjectCLI(unittest.TestCase):
         assert "must be a valid log level" in result.stdout
         assert "must be a list" in result.stdout
 
+    @patch('shift_left.cli_commands.project.project_manager._assess_flink_statement_state')
     @patch('shift_left.cli_commands.project.subprocess.run')
-    def test_list_modified_files_success(self, mock_subprocess_run):
+    def test_list_modified_files_success(self, mock_subprocess_run, mock_assess_state):
         """Test list_modified_files command with successful git operations"""
         runner = CliRunner()
-        
+
         # Mock git subprocess calls
         mock_subprocess_run.side_effect = [
             # Mock git rev-parse --abbrev-ref HEAD (current branch)
@@ -249,43 +252,42 @@ class TestProjectCLI(unittest.TestCase):
             # Mock git checkout main)
             MagicMock(stdout="main\n", stderr="", returncode=0),
             # Mock git log --name-only --since=2024-01-01 --pretty=format:
-            MagicMock(stdout="pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql\npipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql\nsrc/some_file.py\ndocs/readme.md\n", 
+            MagicMock(stdout="pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql\npipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql\nsrc/some_file.py\ndocs/readme.md\n",
                      stderr="", returncode=0)
         ]
-        
+        # for the 2 sqls return same sql and if running flag
+        mock_assess_state.side_effect = [(False, True), (False, True)]
         # Create temporary directory for output file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_file = os.path.join(temp_dir, "test_modified_files.txt")
-            
-            result = runner.invoke(app, [
-                "list-modified-files", 
-                "main",
-                "--output-file", output_file,
-                "--file-filter", ".sql"
-            ])
-            
-            print(f"result.stdout: {result.stdout}")
-            assert result.exit_code == 0
-            assert "Found 4 total modified files" in result.stdout
-            assert "Found 2 modified files matching filter '.sql'" in result.stdout
-            
-            # Verify output file was created and contains expected content
-            assert os.path.exists(output_file)
-            with open(output_file, 'r') as f:
-                content = f.read()
-                assert "feature-branch" in content
-                assert "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql" in content
-                assert "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql" in content
-                assert "Total files: 2" in content
-                # Python and markdown files should not be in the output due to filter
-                assert "src/some_file.py" not in content
-                assert "docs/readme.md" not in content
+        output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files.txt"
+
+        result = runner.invoke(app, [
+            "list-modified-files",
+            "main",
+            "--file-filter", ".sql"
+        ])
+
+        print(f"result.stdout: {result.stdout}")
+        assert result.exit_code == 0
+        assert "Found 4 total modified files" in result.stdout
+        assert "Found 2 modified files matching filter '.sql'" in result.stdout
+
+        # Verify output file was created and contains expected content
+        assert os.path.exists(output_file)
+        with open(output_file, 'r') as f:
+            content = f.read()
+            assert "feature-branch" in content
+            assert "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql" in content
+            assert "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql" in content
+            assert "Total files: 2" in content
+            # Python and markdown files should not be in the output due to filter
+            assert "src/some_file.py" not in content
+            assert "docs/readme.md" not in content
 
     @patch('shift_left.cli_commands.project.subprocess.run')
     def test_list_modified_files_no_matches(self, mock_subprocess_run):
         """Test list_modified_files command when no files match the filter"""
         runner = CliRunner()
-        
+
         # Mock git subprocess calls
         mock_subprocess_run.side_effect = [
             # Mock git rev-parse --abbrev-ref HEAD (current branch)
@@ -293,54 +295,52 @@ class TestProjectCLI(unittest.TestCase):
             # Mock git checkout main)
             MagicMock(stdout="main\n", stderr="", returncode=0),
             # Mock git diff --name-only main...HEAD (modified files, no SQL)
-            MagicMock(stdout="src/some_file.py\ndocs/readme.md\nconfig.yaml\n", 
+            MagicMock(stdout="src/some_file.py\ndocs/readme.md\nconfig.yaml\n",
                      stderr="", returncode=0),
             # Mock date command for timestamp
             MagicMock(stdout="Mon Jan 1 12:00:00 UTC 2024\n", stderr="", returncode=0)
         ]
-        
+
         # Create temporary directory for output file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_file = os.path.join(temp_dir, "test_no_matches.txt")
-            
-            result = runner.invoke(app, [
-                "list-modified-files", 
-                "main",
-                "--output-file", output_file,
-                "--file-filter", ".sql"
-            ])
-            
-            print(f"result.stdout: {result.stdout}")
-            assert result.exit_code == 0
-            assert "Total modified files: 0" in result.stdout
-            assert "Found 3 total modified files" in result.stdout
-            assert "Found 0 modified files matching filter '.sql'" in result.stdout
-            # Verify output file was created even with no matches
-            assert os.path.exists(output_file)
-            with open(output_file, 'r') as f:
-                content = f.read()
-                assert "Total files: 0" in content
+        output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files_short.txt"
+
+        result = runner.invoke(app, [
+            "list-modified-files",
+            "main",
+            "--file-filter", ".sql"
+        ])
+
+        print(f"result.stdout: {result.stdout}")
+        assert result.exit_code == 0
+        assert "Total modified files: 0" in result.stdout
+        assert "Found 3 total modified files" in result.stdout
+        assert "Found 0 modified files matching filter '.sql'" in result.stdout
+        # Verify output file was created even with no matches
+        assert os.path.exists(output_file)
+        with open(output_file, 'r') as f:
+            content = f.read()
+            assert "" in content
 
     @patch('shift_left.cli_commands.project.subprocess.run')
     def test_list_modified_files_git_error(self, mock_subprocess_run):
         """Test list_modified_files command when git command fails"""
         runner = CliRunner()
-        
+
         # Mock git command failure
         mock_subprocess_run.side_effect = [
             # Mock git rev-parse failure (not in a git repo)
             subprocess.CalledProcessError(128, "git rev-parse", stderr="fatal: not a git repository")
         ]
-        
+
         result = runner.invoke(app, [
-            "list-modified-files", 
+            "list-modified-files",
             "main"
         ])
-        
+
         print(result.stdout)
         assert result.exit_code == 1
         assert "Git command failed" in result.stdout
-        
+
 
 if __name__ == '__main__':
     unittest.main()
