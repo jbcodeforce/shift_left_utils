@@ -10,6 +10,8 @@ os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  
 import shift_left.core.deployment_mgr as dm
 import shift_left.core.table_mgr as tm
 import shift_left.core.pipeline_mgr as pm
+from ut.core.BaseUT import BaseUT
+
 
 class TestBgPipeline(BaseUT):
 

@@ -68,3 +68,7 @@ class TestBgTableWorker(unittest.TestCase):
         assert updated
         assert "dim_table_v3" in sql_out
         print(sql_out)
+
+
+if __name__ == "__main__":
+    unittest.main()

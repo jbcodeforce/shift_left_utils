@@ -270,20 +270,21 @@ class ReplaceEnvInSqlContent(TableWorker):
             logger.debug(f"Extracted version {existing_version} from table name {table_name}")
             # Remove the existing version suffix before adding the new version
             base_table_name = version_pattern.sub('', table_name)
-            return sql_content.replace(table_name, f"{base_table_name}_v{str(int(existing_version)+1)}")
+            sql_content = sql_content.replace(table_name, f"{base_table_name}_v{str(int(existing_version)+1)}")
         else:
-            return sql_content.replace(table_name, f"{table_name}{version}")
+            sql_content = sql_content.replace(table_name, f"{table_name}{version}")
+        return sql_content
 
     def _change_table_name_with_version_in_create_table(self, sql_content: str, version: str) -> str:
         table_name = self.parser.extract_table_name_from_create_statement(sql_content)
         if table_name:
-            self._process_table_name_with_version(sql_content, table_name, version)
+            sql_content = self._process_table_name_with_version(sql_content, table_name, version)
         return sql_content
 
     def _change_table_name_with_version_in_insert_into(self, sql_content: str, version: str) -> str:
         table_name = self.parser.extract_table_name_from_insert_into_statement(sql_content)
         if table_name:
-            return self._process_table_name_with_version(sql_content, table_name, version)
+            sql_content = self._process_table_name_with_version(sql_content, table_name, version)
         return sql_content
 
     def update_sql_content(self,
