@@ -60,12 +60,13 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `run-integration-tests`: Run integration tests for a given sink table.
 * `delete-integration-tests`: Delete all integration test artifacts...
 * `isolate-data-product`: Isolate the data product from the project
+* `get-statement-list`: Get the list of statements
 
 ### `project init`
 
-Create a project structure with a specified name, target path, and optional project type. 
-The project type can be one of `kimball` or `data_product`. 
-Kimball will use a structure like 
+Create a project structure with a specified name, target path, and optional project type.
+The project type can be one of `kimball` or `data_product`.
+Kimball will use a structure like
 pipelines/sources
 pipelines/facts
 pipelines/dimensions
@@ -312,6 +313,24 @@ $ project isolate-data-product [OPTIONS] PRODUCT_NAME SOURCE_FOLDER TARGET_FOLDE
 
 * `--help`: Show this message and exit.
 
+### `project get-statement-list`
+
+Get the list of statements
+
+**Usage**:
+
+```console
+$ project get-statement-list [OPTIONS] COMPUTE_POOL_ID
+```
+
+**Arguments**:
+
+* `COMPUTE_POOL_ID`: Compute pool id to get the statement list for  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ## `table`
 
 **Usage**:
@@ -500,7 +519,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x107ebe720&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1211c6b10&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`

@@ -12,7 +12,7 @@
       "number_of_inner_joins": 0,
       "number_of_outer_joins": 0,
       "complexity_type": "Simple",
-      "state_form": "Stateless"
+      "state_form": "Stateful"
    },
    "parents": [
       {

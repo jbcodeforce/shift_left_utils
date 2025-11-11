@@ -239,8 +239,9 @@ class TestProjectCLI(unittest.TestCase):
         assert "must be a valid log level" in result.stdout
         assert "must be a list" in result.stdout
 
+    @patch('shift_left.cli_commands.project.project_manager._assess_flink_statement_state')
     @patch('shift_left.cli_commands.project.subprocess.run')
-    def test_list_modified_files_success(self, mock_subprocess_run):
+    def test_list_modified_files_success(self, mock_subprocess_run, mock_assess_state):
         """Test list_modified_files command with successful git operations"""
         runner = CliRunner()
 
@@ -254,7 +255,8 @@ class TestProjectCLI(unittest.TestCase):
             MagicMock(stdout="pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql\npipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql\nsrc/some_file.py\ndocs/readme.md\n",
                      stderr="", returncode=0)
         ]
-
+        # for the 2 sqls return same sql and if running flag
+        mock_assess_state.side_effect = [(False, True), (False, True)]
         # Create temporary directory for output file
         output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files.txt"
 
