@@ -288,13 +288,15 @@ class TestDeploymentManager(BaseUT):
         print(f"summary: {summary}")
         print(f"report: {report.model_dump_json(indent=3)}")
 
+    @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
     def test_deploy_product_using_parallel(self,
                                            mock_delete,
                                            mock_drop,
-                                           mock_post):
+                                           mock_post,
+                                           mock_assign_compute_pool_id):
         """
         Deploying a product p1 in parallel should deploy all the tables in parallel.
         """
@@ -318,13 +320,14 @@ class TestDeploymentManager(BaseUT):
         mock_delete.side_effect = _delete_statement
         mock_drop.side_effect = _drop_table
         mock_post.side_effect = _post_flink_statement
-
+        mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         dm.build_deploy_pipelines_from_product(product_name="p1",
                                                 inventory_path=self.inventory_path,
                                                 execute_plan=True,
                                                 force_ancestors=True,
                                                 may_start_descendants=True,
-                                                sequential=False)
+                                                sequential=False,
+                                                pool_creation=False)
 
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
