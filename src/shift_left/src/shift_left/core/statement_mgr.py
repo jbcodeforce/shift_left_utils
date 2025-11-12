@@ -61,9 +61,8 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
             transformer = get_or_build_sql_content_transformer()
             _, sql_out= transformer.update_sql_content(
                                                 sql_content=sql_content,
-                                                column_to_search=column_to_search,
-                                                product_name=flinkStatement_to_process.product_name,
-                                                version=flinkStatement_to_process.version)
+                                                column_to_search=column_to_search or "",
+                                                product_name=flinkStatement_to_process.product_name)
 
             statement= post_flink_statement(compute_pool_id,
                                             statement_name,

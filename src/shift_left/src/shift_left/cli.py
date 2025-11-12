@@ -14,7 +14,7 @@ app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_local
 install_secure_exception_handler()
 
 
-    
+
 app.add_typer(project.app, name="project")
 app.add_typer(table.app, name="table")
 app.add_typer(pipeline.app, name="pipeline")

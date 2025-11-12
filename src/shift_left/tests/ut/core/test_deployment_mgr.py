@@ -9,8 +9,9 @@ from datetime import datetime
 import uuid
 from typing import Tuple
 import time
+TEST_PIPELINES_DIR = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
+os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 
 import shift_left.core.pipeline_mgr as pm
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
@@ -39,23 +40,16 @@ class TestDeploymentManager(BaseUT):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up test environment before running tests."""
-        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES",TEST_PIPELINES_DIR))
 
     def setUp(self) -> None:
         """Set up test case before each test."""
         self.config = get_config()
         self.compute_pool_id = self.TEST_COMPUTE_POOL_ID_1
         self.table_name = "test_table"
-        self.inventory_path = os.getenv("PIPELINES")
+        self.inventory_path = os.getenv("PIPELINES",TEST_PIPELINES_DIR)
         self.count = 0  # Initialize count as instance variable
 
-
-    def _mock_get_and_update_node(self, node: FlinkStatementNode) -> Statement:
-        """Mock function for getting and updating node statement info."""
-        node.existing_statement_info = self._create_mock_get_statement_info(
-            compute_pool_id=self.TEST_COMPUTE_POOL_ID_2
-        )
-        return node
 
     #  ----------- TESTS -----------
 
@@ -405,7 +399,7 @@ class TestDeploymentManager(BaseUT):
 
         mock_delete.return_value = "deleted"
         mock_post.side_effect = mock_post_statement
-        path_to_sql_file = os.getenv("PIPELINES") + "/alter_table_avro_debezium.sql"
+        path_to_sql_file = os.getenv("PIPELINES",TEST_PIPELINES_DIR) + "/alter_table_avro_debezium.sql"
         dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file,
                                         compute_pool_id="lfcp-121")
 

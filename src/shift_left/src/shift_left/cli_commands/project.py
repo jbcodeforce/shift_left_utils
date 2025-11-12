@@ -6,6 +6,7 @@ import subprocess
 import os
 import sys
 import time
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from rich import print
@@ -17,6 +18,7 @@ import shift_left.core.project_manager as project_manager
 import shift_left.core.integration_test_mgr as integration_test_mgr
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE,
+        ModifiedFileInfo,
         KIMBALL_PROJECT_TYPE)
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 from typing_extensions import Annotated
@@ -201,14 +203,14 @@ def list_modified_files(
     This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
     """
     print("#" * 30 + f" List modified files in current branch vs {branch_name}")
-    output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files.txt"
-    result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, output_file)
+    fname =  os.getenv("HOME",'~') + "/.shift_left/" + get_config().get('app', {}).get('modified_flink_files_file_name', 'modified_flink_files.txt')
+    long_fname = fname.replace('.txt', '.json')
+    result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, long_fname)
 
     # Display structured result summary
     print(f"\nSummary:")
     print(f"   Total modified files: {len(result.file_list)}")
     print(f"   Tables affected:")
-    short_output_file = os.getenv("HOME",'~') + "/.shift_left/modified_flink_files_short.txt"
     table_names = []
     if result.file_list:
         for file in result.file_list:
@@ -218,12 +220,31 @@ def list_modified_files(
                 table_names.append(file.table_name)
                 print(f"   {file.table_name} {file.file_modified_url} \t\t -> not running")
             table_names.append(file.table_name)
-    with open(short_output_file, "w") as f:
+    with open(fname, "w") as f:
         for table_name in table_names:
             f.write(table_name + "\n")
-    print(f"Tables affected saved in {short_output_file}")
+    print(f"Tables affected saved in {fname}")
 
     return result
+
+@app.command()
+def update_tables_version(
+    table_list_file_name: Annotated[str, typer.Argument(help="File name containing json object with table names and file modified url to update the table version for")],
+    default_version: Annotated[str, typer.Option(help="Default version to use if not provided in the file")] = "_v2"
+):
+    """
+    Update the table version for the given file
+    """
+    if not os.path.exists(table_list_file_name):
+        print(f"File {table_list_file_name} does not exist")
+        raise typer.Exit(1)
+    if not table_list_file_name.endswith('.json'):
+        print(f"File {table_list_file_name} is not a json file")
+        raise typer.Exit(1)
+    table_names = _load_table_names_from_file(table_list_file_name)
+    print("#" * 30 + f" Update table version for {len(table_names)} tables")
+    project_manager.update_tables_version(table_names, default_version)
+    print(f"Table version updated in {len(table_names)} tables")
 
 @app.command()
 def init_integration_tests(
@@ -363,14 +384,6 @@ def delete_integration_tests(
         print(f"❌ Error deleting integration test artifacts: {e}")
         raise typer.Exit(1)
 
-def _get_status_emoji(status: str) -> str:
-    """Get emoji representation for test status"""
-    emoji_map = {
-        "PASS": "✅",
-        "FAIL": "❌",
-        "ERROR": "🚫"
-    }
-    return emoji_map.get(status, "❓")
 
 @app.command()
 def isolate_data_product(
@@ -395,3 +408,29 @@ def get_statement_list(
     print("#" * 30 + f" Get statement list")
     statement_list = statement_mgr.get_statement_list(compute_pool_id)
     print(statement_list)
+
+# ------- Private APIS ----------
+def _get_status_emoji(status: str) -> str:
+    """Get emoji representation for test status"""
+    emoji_map = {
+        "PASS": "✅",
+        "FAIL": "❌",
+        "ERROR": "🚫"
+    }
+    return emoji_map.get(status, "❓")
+
+def _load_table_names_from_file(file_name: str) -> list[str]:
+    if not os.path.exists(file_name):
+        print(f"[red]Error: file {file_name} does not exist[/red]")
+        raise typer.Exit(1)
+    if file_name.endswith('.json'):
+        with open(file_name, 'r') as f:
+            content = json.load(f)
+            return content['file_list']
+    else:
+        file_list=[]
+        with open(file_name, 'r') as f:
+            table_names = f.read().splitlines()
+            for table_name in table_names:
+                file_list.append(ModifiedFileInfo(table_name=table_name, file_modified_url="", same_sql_content=False, running=False).model_dump_json())
+            return file_list

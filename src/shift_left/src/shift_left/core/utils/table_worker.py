@@ -17,8 +17,7 @@ class TableWorker():
                            column_to_search: str= "",
                            product_name: str= "",
                            string_to_change_from: str= "",
-                           string_to_change_to: str= "",
-                           version: str= "") -> Tuple[bool, str]:
+                           string_to_change_to: str= "") -> Tuple[bool, str]:
         """
         Transform SQL content based on the current deployment environment.
         Args:
@@ -37,10 +36,14 @@ class TableWorker():
 
 
 class ChangeChangeModeToUpsert(TableWorker):
-     """
-     Predefined class to change the DDL setting for a change log
-     """
-     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change the DDL setting for a change log
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
@@ -65,10 +68,14 @@ class ChangeChangeModeToUpsert(TableWorker):
 
 
 class ChangePK_FK_to_SID(TableWorker):
-     """
-     Predefined class to change _PK_FK suffix to _SID
-     """
-     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change _PK_FK suffix to _SID
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         if '_pk_fk' in sql_content:
@@ -81,10 +88,14 @@ class ChangePK_FK_to_SID(TableWorker):
 
 
 class Change_Concat_to_Concat_WS(TableWorker):
-     """
-     Predefined class to change the DDL setting for a change log
-     """
-     def update_sql_content(sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change the DDL setting for a change log
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str="",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(r"md5\(concat\(", re.IGNORECASE)
@@ -95,10 +106,14 @@ class Change_Concat_to_Concat_WS(TableWorker):
         return updated, sql_out
 
 class Change_CompressionType(TableWorker):
-     """
-     Predefined class to change the compression type
-     """
-     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change the compression type
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
 
@@ -123,10 +138,14 @@ class Change_CompressionType(TableWorker):
         return updated, sql_out
 
 class DefaultStringReplacementInFromClause(TableWorker):
-     """
-     Predefined class to change the DML setting for one string to another in the from clause
-     """
-     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change the DML setting for one string to another in the from clause
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         from_statement = re.compile(re.escape("from " + string_to_change_from), re.IGNORECASE)
@@ -137,10 +156,14 @@ class DefaultStringReplacementInFromClause(TableWorker):
         return updated, sql_out
 
 class Change_SchemaContext(TableWorker):
-     """
-     Predefined class to change the DDL setting for the schema-context
-     """
-     def update_sql_content(self, sql_content: str, string_to_change_from: str= None, string_to_change_to: str= None)  -> Tuple[bool, str]:
+    """
+    Predefined class to change the DDL setting for the schema-context
+    """
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
         sql_out: str = ""
         with_statement = re.compile(re.escape("with ("), re.IGNORECASE)
@@ -175,6 +198,45 @@ class NoChangeDoneToSqlContent(TableWorker):
                         string_to_change_to: str)  -> Tuple[bool, str]:
         return False, sql_content
 
+class ReplaceVersionInSqlContent(TableWorker):
+    def __init__(self):
+        self.parser = SQLparser()
+        self.config = get_config()
+        self.env = self.config.get('kafka',{'cluster_type': 'dev'}).get('cluster_type')
+
+    def _process_table_name_with_version(self, sql_content: str, table_name: str, version: str) -> str:
+        # Check if table name ends with _v[0-9]+ pattern and extract the numerical value
+        version_pattern = re.compile(r'_v(\d+)$')
+        match = version_pattern.search(table_name)
+        if match:
+            existing_version = match.group(1)  # Extract the numerical value
+            logger.debug(f"Extracted version {existing_version} from table name {table_name}")
+            # Remove the existing version suffix before adding the new version
+            base_table_name = version_pattern.sub('', table_name)
+            sql_content = sql_content.replace(table_name, f"{base_table_name}_v{str(int(existing_version)+1)}",1)
+        else:
+            sql_content = sql_content.replace(table_name, f"{table_name}{version}",1)
+        return sql_content
+
+    def _change_table_name_with_version_in_create_table(self,
+                                                    sql_content: str,
+                                                    string_to_change_from: str= "",
+                                                    string_to_change_to: str= "") -> str:
+        sql_content = sql_content.replace(string_to_change_from, string_to_change_to,1)
+        return sql_content
+
+    def _change_table_name_with_version_in_insert_into(self, sql_content: str, string_to_change_from, string_to_change_to) -> str:
+
+        return sql_content
+
+    def update_sql_content(self, sql_content: str,
+                            column_to_search: str= "",
+                            product_name: str= "",
+                            string_to_change_from: str= "",
+                            string_to_change_to: str= "")  -> Tuple[bool, str]:
+        updated = False
+        # TO DO
+        return updated, sql_content
 class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"
     topic_prefix="clone"
@@ -261,39 +323,12 @@ class ReplaceEnvInSqlContent(TableWorker):
         self.insert_into_src=r"\s*INSERT\s+INTO\s+src_"
         self.semaphore = threading.Semaphore(value=1)
 
-    def _process_table_name_with_version(self, sql_content: str, table_name: str, version: str) -> str:
-        # Check if table name ends with _v[0-9]+ pattern and extract the numerical value
-        version_pattern = re.compile(r'_v(\d+)$')
-        match = version_pattern.search(table_name)
-        if match:
-            existing_version = match.group(1)  # Extract the numerical value
-            logger.debug(f"Extracted version {existing_version} from table name {table_name}")
-            # Remove the existing version suffix before adding the new version
-            base_table_name = version_pattern.sub('', table_name)
-            sql_content = sql_content.replace(table_name, f"{base_table_name}_v{str(int(existing_version)+1)}")
-        else:
-            sql_content = sql_content.replace(table_name, f"{table_name}{version}")
-        return sql_content
-
-    def _change_table_name_with_version_in_create_table(self, sql_content: str, version: str) -> str:
-        table_name = self.parser.extract_table_name_from_create_statement(sql_content)
-        if table_name:
-            sql_content = self._process_table_name_with_version(sql_content, table_name, version)
-        return sql_content
-
-    def _change_table_name_with_version_in_insert_into(self, sql_content: str, version: str) -> str:
-        table_name = self.parser.extract_table_name_from_insert_into_statement(sql_content)
-        if table_name:
-            sql_content = self._process_table_name_with_version(sql_content, table_name, version)
-        return sql_content
-
     def update_sql_content(self,
                            sql_content: str,
                            column_to_search: str = "",
                            product_name: str = "",
                            string_to_change_from: str= "",
-                           string_to_change_to: str= "",
-                           version: str= "")  -> Tuple[bool, str]:
+                           string_to_change_to: str= "")  -> Tuple[bool, str]:
         """
         Transform SQL content based on the current deployment environment , and versioning.
         Args:
@@ -314,9 +349,6 @@ class ReplaceEnvInSqlContent(TableWorker):
                         sql_content = re.sub(v["search"], v["replace"], sql_content)
                         updated = True
                         logger.debug(f"{k} , {v} ")
-                if version:
-                    sql_content = self._change_table_name_with_version_in_create_table(sql_content, version)
-                    updated = True
             else: # dml statements
                 if 'clone.dev' in sql_content and self.env != 'dev':
                     # the sql content by default may use clone.dev. as the source topic prefix
@@ -338,8 +370,5 @@ class ReplaceEnvInSqlContent(TableWorker):
                             updated = (sql_out != sql_content)
                             sql_content=sql_out
                             logger.info(f"{k} , {v} ")
-                if version:
-                    sql_content = self._change_table_name_with_version_in_insert_into(sql_content, version)
-                    updated = True
             logger.debug(sql_content)
             return updated, sql_content

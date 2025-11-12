@@ -217,7 +217,6 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     # Validate app section
     if config.get("app"):
       app_required = [
-
                       "accepted_common_products",
                       "sql_content_modifier",
                       "dml_naming_convention_modifier",

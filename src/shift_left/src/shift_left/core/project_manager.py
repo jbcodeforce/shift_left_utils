@@ -10,7 +10,7 @@ import subprocess
 import shutil
 import importlib.resources
 from datetime import timezone
-from typing import Tuple, List
+from typing import Tuple, List, Any
 from pydantic import BaseModel, Field
 from shift_left.core.table_mgr import get_or_build_inventory
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
@@ -27,54 +27,33 @@ from shift_left.core.utils.file_search import (
 from shift_left.core.utils.sql_parser import SQLparser
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import Statement
+from shift_left.core.utils.table_worker import ReplaceVersionInSqlContent
 DATA_PRODUCT_PROJECT_TYPE="data_product"
 KIMBALL_PROJECT_TYPE="kimball"
 TMPL_FOLDER="templates"
 
 
 class ModifiedFileInfo(BaseModel):
-    """Information about a modified file"""
     table_name: str = Field(description="Extracted table name")
     file_modified_url: str = Field(description="File path/URL of the modified file")
     same_sql_content: bool = Field(description="Whether the SQL is the same as the running statement")
     running: bool = Field(description="Whether the statement is running")
+    new_table_name: str = Field(description="New table name after versioning")
+
+    def __hash__(self) -> int:
+        return hash(self.table_name)
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, ModifiedFileInfo):
+            return NotImplemented
+        return self.table_name == other.table_name and self.file_modified_url == other.file_modified_url
 
 
 class ModifiedFilesResult(BaseModel):
     """Result of list_modified_files operation"""
     description: str = Field(description="Summary information about the operation")
-    file_list: List[ModifiedFileInfo] = Field(description="List of modified files with extracted table names")
+    file_list: set[ModifiedFileInfo] = Field(description="Set of modified files with extracted table names")
 
-
-def _extract_table_name_from_path(file_path: str) -> str:
-    """Extract table name from file path.
-
-    Attempts to extract a meaningful table name from various file path patterns:
-    - For SQL files: extracts filename without extension
-    - For pipeline paths: attempts to extract table name from directory structure
-
-    Args:
-        file_path: The file path to extract table name from
-
-    Returns:
-        Extracted table name or filename without extension as fallback
-    """
-    path = Path(file_path)
-
-    # Remove file extension
-    table_name = path.stem
-
-    # Handle common patterns in pipeline directory structures
-    if 'pipelines' in path.parts:
-        # If it's in a pipelines directory, the parent directory might be the table name
-        if len(path.parts) > 1 and path.parent.name != 'pipelines':
-            table_name = path.parent.name
-
-    # Clean up common prefixes/suffixes
-    table_name = table_name.replace('ddl.', '').replace('dml.', '')
-
-    return table_name
-
+# ------- Public APIS ----------
 
 def build_project_structure(project_name: str,
                             project_path: str,
@@ -89,24 +68,26 @@ def build_project_structure(project_name: str,
         _define_dp_structure(os.path.join(project_folder, "pipelines"))
     else:
         _define_kimball_structure(os.path.join(project_folder, "pipelines"))
-    #os.chdir(project_folder)
     _initialize_git_repo(project_folder)
     _add_important_files(project_folder)
 
 
-def get_topic_list(file_name: str):
+def get_topic_list(file_name: str) -> list[dict]:
+    """
+    Get the list of topics from the Confluent Cloud and save it to a file.
+    """
     ccloud = ConfluentCloudClient(get_config())
     topics = ccloud.list_topics()
     if topics and topics.get('data'):
         with open(file_name, "w") as f:
-            for topic in topics.get('data'):
-                f.write(topic['cluster_id'] + "," + topic['topic_name'] + "," + str(topic['partitions_count']) + "\n")
+            for topic in topics["data"]:
+                f.write(f"{topic['cluster_id']},{topic['topic_name']},{topic['partitions_count']}\n")
         return topics["data"]
     else:
         return []
 
 
-def report_table_cross_products(project_path: str | None):
+def report_table_cross_products(project_path: str):
     """
     Return the lit of table names for tables that are referenced in other products.
     """
@@ -150,7 +131,7 @@ def list_tables_with_one_child(project_path: str):
             tables_with_one_child.append(table_name)
     return tables_with_one_child
 
-def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str = None) -> ModifiedFilesResult:
+def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str) -> ModifiedFilesResult:
     """List modified files and return structured result.
 
     Args:
@@ -206,7 +187,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         all_modified_files = [f for f in all_modified_files if f.strip()]  # Remove empty strings
 
         # Filter for specific file types (default: SQL files)
-        filtered_files = []
+        filtered_files = set()
         for file_path in all_modified_files:
             lowered_file_path = file_path.lower()
             if file_filter in lowered_file_path and "/tests/" not in lowered_file_path and PIPELINE_FOLDER_NAME in lowered_file_path:
@@ -214,7 +195,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
                 if not os.path.exists(absolute_file_path):
                     logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
                     continue
-                filtered_files.append(absolute_file_path)
+                filtered_files.add(absolute_file_path)
 
         print(f"Found {len(all_modified_files)} total modified files")
 
@@ -222,14 +203,14 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
 
         generated_on = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         description = (
-            f"Modified files in branch '{current_branch}'\n"
+            f"Modified files in branch:'{current_branch}'\n"
             f"Filter applied: {file_filter}\n"
             f"Generated on: {generated_on}\n"
             f"Total files: {len(filtered_files)}"
         )
         logger.info(description)
         # Create file list with extracted table names
-        file_list = []
+        file_list = set()
         parser = SQLparser()
         for absolute_file_path in sorted(filtered_files):
             with open(absolute_file_path, 'r') as file:
@@ -243,11 +224,12 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
                         logger.warning(f"No table name found in file {sql_content}, skipping")
                         continue
                     same_sql, running = _assess_flink_statement_state(table_name, absolute_file_path, sql_content)
-            file_list.append(ModifiedFileInfo(
+            file_list.add(ModifiedFileInfo(
                 table_name=table_name,
                 file_modified_url=absolute_file_path,
                 same_sql_content=same_sql,
-                running=running
+                running=running,
+                new_table_name=table_name
             ))
 
         # Create result object
@@ -286,6 +268,151 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
     finally:
         # Restore original working directory
         os.chdir(original_cwd)
+
+
+def update_tables_version(file_info_list: list[ModifiedFileInfo], default_version: str):
+    """
+    Update the table version within the DDL and DMLSQL content for the given list of table names
+    """
+    inventory = get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), False)
+    processed_files = set[ModifiedFileInfo]()
+    for file_info in file_info_list:
+        _update_version_in_current_ddl_dml(file_info, processed_files, default_version, inventory)
+
+
+def _change_version_in_ddl(fname: str,
+                           old_table_name: str,
+                           default_version: str):
+    parser = SQLparser()
+    fname = from_pipeline_to_absolute(fname)
+    new_table_name = _build_new_table_name(old_table_name, default_version)
+    with open(fname, 'r') as f:
+        sql_content = f.read()
+        parsed_table_name = parser.extract_table_name_from_create_statement(sql_content)
+        if parsed_table_name == old_table_name:
+            sql_content = sql_content.replace(parsed_table_name,new_table_name,1) # first occurence is in CREATE TABLE line
+        else:
+            print(f"❌ Error: table name {parsed_table_name} does not match {old_table_name} in {fname}")
+            logger.error(f"❌ Error: table name {parsed_table_name} does not match {old_table_name} in {fname}")
+            return
+        with open(fname, 'w') as f2:
+            f2.write(sql_content)
+        print("-"*10 +f"\n{sql_content}\n" + "-"*10)
+
+def _replace_table_name_in_sql_clauses(sql_content: str, old_table_name: str, new_table_name: str) -> str:
+    """
+    Replace table name in FROM, JOIN, and INSERT INTO clauses.
+    Also replaces implicit table aliases (tablename.column) when no explicit AS alias is provided.
+
+    Args:
+        sql_content: The SQL content to modify
+        old_table_name: The table name to replace
+        new_table_name: The new table name
+
+    Returns:
+        Modified SQL content with table name replaced in appropriate contexts
+    """
+    result = sql_content
+
+    # Step 1: Find all FROM/JOIN occurrences and check if they have explicit aliases
+    # Pattern to match table references: FROM/JOIN tablename [AS alias]
+    table_ref_pattern = rf'\b(FROM|(?:INNER\s+|LEFT\s+|RIGHT\s+|FULL\s+|CROSS\s+)?JOIN)\s+`?{re.escape(old_table_name)}`?\s+(?:AS\s+(\w+))?'
+
+    # Check if there's an explicit alias defined
+    has_explicit_alias = False
+    matches = re.finditer(table_ref_pattern, sql_content, re.IGNORECASE)
+    for match in matches:
+        if match.group(2):  # Group 2 is the alias name after AS
+            has_explicit_alias = True
+            break
+
+    # Step 2: Replace table name in FROM clause
+    result = re.sub(
+        rf'(\bFROM\s+)(`?{re.escape(old_table_name)}`?)(\b)',
+        rf'\g<1>{new_table_name}\g<3>',
+        result,
+        flags=re.IGNORECASE
+    )
+
+    # Step 3: Replace table name in JOIN clauses
+    result = re.sub(
+        rf'(\b(?:INNER\s+|LEFT\s+|RIGHT\s+|FULL\s+|CROSS\s+)?JOIN\s+)(`?{re.escape(old_table_name)}`?)(\b)',
+        rf'\g<1>{new_table_name}\g<3>',
+        result,
+        flags=re.IGNORECASE
+    )
+
+    # Step 4: Replace table name in INSERT INTO clause
+    result = re.sub(
+        rf'(\bINSERT\s+INTO\s+)(`?{re.escape(old_table_name)}`?)(\b)',
+        rf'\g<1>{new_table_name}\g<3>',
+        result,
+        flags=re.IGNORECASE
+    )
+
+    # Step 5: If no explicit alias, replace implicit table alias references (tablename.column)
+    if not has_explicit_alias:
+        # Replace tablename. with newtablename. in column references
+        # Use word boundary before table name and require a dot after it
+        result = re.sub(
+            rf'\b{re.escape(old_table_name)}\.',
+            f'{new_table_name}.',
+            result,
+            flags=re.IGNORECASE
+        )
+
+    return result
+
+
+def _change_version_in_dml(processed_files: set[ModifiedFileInfo], fname, table_name: str, version: str):
+    """
+    Change the version of the sql content
+    """
+
+    parser = SQLparser()
+    fname = from_pipeline_to_absolute(fname)
+    updated = False
+    processed_table_names = [file_info.table_name for file_info in processed_files]
+    with open(fname, 'r') as f:
+        sql_content = f.read()
+        referenced_table_names = parser.extract_table_references(sql_content)
+        for referenced_table_name in referenced_table_names:
+            if referenced_table_name in processed_table_names:
+                new_referenced_table_name = _build_new_table_name(referenced_table_name, version)
+                # Use smart replacement that only replaces in FROM/JOIN clauses
+                sql_content = _replace_table_name_in_sql_clauses(sql_content, referenced_table_name, new_referenced_table_name)
+                updated = True
+    if updated:
+        with open(fname, 'w') as f:
+            f.write(sql_content)
+    print("-"*10 +f"\n{sql_content}\n" + "-"*10)
+
+def _update_version_in_current_ddl_dml(currentfile_info: ModifiedFileInfo,
+                               processed_files: set[ModifiedFileInfo],
+                               default_version: str,
+                               inventory: dict):
+    table_ref = inventory[currentfile_info.table_name]
+    if not table_ref:
+        logger.error(f"Error: table {currentfile_info.table_name} not found in inventory")
+        return
+    pipeline_definition = read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
+    if not pipeline_definition:
+        logger.error(f"Error: pipeline definition not found for table {currentfile_info.table_name}")
+        return
+    if currentfile_info not in processed_files:
+        processed_files.add(currentfile_info)
+        _change_version_in_ddl(pipeline_definition.ddl_ref, currentfile_info.table_name, default_version)
+        _change_version_in_dml(processed_files, pipeline_definition.dml_ref, currentfile_info.table_name, default_version)
+        logger.info(f"Updated version in {pipeline_definition.ddl_ref} and {pipeline_definition.dml_ref}")
+        if pipeline_definition.children:
+            logger.info(f"Updating version in children of {pipeline_definition.table_name}")
+            for child in pipeline_definition.children:
+                child_file_info = ModifiedFileInfo(table_name=child.table_name,
+                                                   file_modified_url=child.dml_ref,
+                                                   same_sql_content=False,
+                                                   running=False,
+                                                   new_table_name=child.table_name)
+                _update_version_in_current_ddl_dml(child_file_info, processed_files, default_version, inventory)
 
 
 
@@ -329,6 +456,35 @@ def isolate_data_product(product_name: str, source_folder: str, target_folder: s
 # ---------------------------------
 # --- Private APIs ---
 # ---------------------------------
+
+def _extract_table_name_from_path(file_path: str) -> str:
+    """Extract table name from file path.
+
+    Attempts to extract a meaningful table name from various file path patterns:
+    - For SQL files: extracts filename without extension
+    - For pipeline paths: attempts to extract table name from directory structure
+
+    Args:
+        file_path: The file path to extract table name from
+
+    Returns:
+        Extracted table name or filename without extension as fallback
+    """
+    path = Path(file_path)
+
+    # Remove file extension
+    table_name = path.stem
+
+    # Handle common patterns in pipeline directory structures
+    if 'pipelines' in path.parts:
+        # If it's in a pipelines directory, the parent directory might be the table name
+        if len(path.parts) > 1 and path.parent.name != 'pipelines':
+            table_name = path.parent.name
+
+    # Clean up common prefixes/suffixes
+    table_name = table_name.replace('ddl.', '').replace('dml.', '')
+
+    return table_name
 
 def _initialize_git_repo(project_folder: str):
     print(f"initialize_git_repo({project_folder})")
@@ -519,3 +675,15 @@ def _find_all_parent_tables_recursive(table_name: str, inventory: dict, visited:
             logger.debug(f"Processing parent {parent.table_name} for table {table_name}")
             # Recursively process each parent
             _find_all_parent_tables_recursive(parent.table_name, inventory, visited, tables_to_process)
+
+
+def _build_new_table_name(old_table_name: str, version: str) -> str:
+    version_pattern = re.compile(r'_v(\d+)$')
+    match = version_pattern.search(old_table_name)
+    if match:
+        existing_version = match.group(1)  # Extract the numerical value
+        # Remove the existing version suffix before adding the new version
+        base_table_name = version_pattern.sub('', old_table_name)
+        return f"{base_table_name}_v{str(int(existing_version)+1)}"
+    else:
+        return f"{old_table_name}{version}"

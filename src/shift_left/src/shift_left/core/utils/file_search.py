@@ -28,8 +28,8 @@ class InfoNode(BaseModel):
     table_name: Final[str]
     product_name: Optional[str]  =  Field(default="common", description="product name of the table.")
     type: Optional[str] =  Field(default="source", description="type of the table.")
-    dml_ref: Optional[str]  =  Field(default=None   , description="Type of Flink SQL statement. Could be Stateful or Stateless")
-    ddl_ref: Optional[str] =  Field(default=None, description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    dml_ref: str  =  Field(default=""   , description="Type of Flink SQL statement. Could be Stateful or Stateless")
+    ddl_ref: str =  Field(default="", description="Type of Flink SQL statement. Could be Stateful or Stateless")
 
 class FlinkTableReference(InfoNode):
     """Reference to a Flink table including its metadata and location information."""
@@ -198,7 +198,7 @@ def get_table_type_from_file_path(file_name: str) -> str:
         return "dimension"
     elif "stage" in file_name:
         return "intermediate"
-    elif "mv" in file_name:
+    elif "mv" in file_name or "view" in file_name:
         return "view"
     elif "seed" in file_name:
         return "seed"
