@@ -32,7 +32,7 @@ The following figure illustrates the Flink statements processing data across sou
 
 <figure markdown="span">
 ![](./images/bg_2_1.drawio.png)
-<caption>**Figure 2**:Real-time processing with Apache Flink within a Data Stream Plarform</caption>
+<caption>**Figure 2**: Real-time processing with Apache Flink within a Data Stream Plarform</caption>
 </figure>
 
 On the left side, Raw data originates from Change Data Capture of a transactional database or from event-driven microservices utilizing the [transactional outbox pattern](https://jbcodeforce.github.io/eda-studies/patterns/#transactional-outbox). Given the volume of data injected into these raw topics and the need to retain historical data for extended periods, these topics should be rarely re-created.
@@ -72,7 +72,7 @@ An alternate approach is to work directly to the `main` branch:
 
 <figure markdown="span">
 ![](./images/bg_2_2_main_branch.drawio.png)
-<caption>**Figure 3-bis**:Branching from main, for Flink Statement updates</caption>
+<caption>**Figure 3-bis**: Branching from main, for Flink Statement updates</caption>
 </figure>
 
 ### Flink pipelines deployment
@@ -81,7 +81,7 @@ To illustrate the needs, we will start by this flink pipeline topology, running 
 
 <figure markdown="span">
 ![](./images/bg_2_3_0.drawio.png){ width=800 }
-<caption>**Figure 4**:Current Flink Statements in production</caption>
+<caption>**Figure 4**: Current Flink Statements in production</caption>
 </figure>
 
 The process needs to get the list of changed flink statements from a given tag or date on a given git branch. The shift left tool can get the list of statements modified from a date:
@@ -91,12 +91,23 @@ The process needs to get the list of changed flink statements from a given tag o
 shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 main
 ```
 
-The above command may list that the tables: `int 3`, `fact 3` were modified and `view 1` was added. 
+The above command may list that the tables: `int 3`, `fact 3` were modified and `view 1` was added. Looking at the impact of those changes, the tool needs to redeploy the following tables with a new version:
 
 <figure markdown="span">
 ![](./images/bg_2_3.drawio.png){ width=800 }
-<caption>**Figure 4**:Flink logic update and impacted statements</caption>
+<caption>**Figure 5**: Flink logic update and impacted statements</caption>
 </figure>
+
+The above figure illustrates those new tables:
+
+| Blue Table name | Green Table name | Statement name | <div style="width:600px">Triggered Change</div> | 
+| --------------- | ---------------- |----------------|----------------- |
+|    int_3        |     int_3_v2     |  dml.int_3     | User modified content, tool adds _v2 |
+|    fact_3       |     fact_3_v2    |  dml.fact_3    | User modified content, tool adds _v2 |
+|    fact_2       |     fact_2_v2    |  dml.fact_2    | tool adds _v2 for output as it modified input(s). fact_2 was not modified in the git, this is a side effect of the relationship|
+|                 |     view32   |  dml.view32   | User created this new content - no extension |
+
+Also as a side effect the sink connectors configuration need to be modified to go to _v2 topics and even add one new connector because of the new table.
 
 The command creates two files under the $HOME/.shift_left folder: 
 
@@ -105,13 +116,12 @@ The command creates two files under the $HOME/.shift_left folder:
 | modified_flink_files.txt | json | contains a filelist with element like: <code>{"table_name": "p1_dim_c2",</br>"file_modified_url": "...pipelines/dimensions/p1/dim_c2/sql-scripts/ddl.dim_c2.sql",</br>"same_sql_content": false,"running": false }</code> |
 | modified_flink_files_short.txt | txt | list of table name only |
 
-In this then possible to assess the execution plan with:
+With this, it will be possible to assess the execution plan with:
 
 ```sql
 shift_left pipeline build-execution-plan --table-list-file-name  ~/.shift_left/modified_flink_files_short.txt
 ```
 
-To support blue-green deployment at the statement level, the table names need to be changed. 
 
 The DDL Flink statements need to have a new table name with the next version postfix (e.g. int_3_v2). 
 
@@ -133,14 +143,14 @@ join src_b ...
 join src_c  ...
 ```
 
-Any children of the modified statement needs to take into account the new table name. For example the fact table needs to use the new versioned intermediate table:
+Any children of the modified statement needs to take into account the new table name of it input tables. For example the fact table needs to use the new versioned intermediate table:
 
 ```sql
 --- DML Fact table
 insert into fact_3_v2
 select 
 ...
-from int_3_v2 
+from int_3_v2  -- ATTENTION 
 join int_1
 ```
 
@@ -156,78 +166,74 @@ shift_left pipeline deploy --table-list-file-name statement_list.txt --may-start
 
 ## Different deployment scenarios
 
-To demonstrate blue/green deployment we will take the [flink_project_demos git repo](https://github.com/jbcodeforce/flink_project_demos) as a source of a real-time processing using a Kimball structure.
+To demonstrate blue/green deployment we will take the [flink_project_demos git repo](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing) as a source of a real-time processing using a Kimball structure.
 
 ???- info "Access to the the flink demos repository"
-    Clone the [https://github.com/jbcodeforce/flink_project_demos](https://github.com/jbcodeforce/flink_project_demos).
+    Clone the [https://github.com/jbcodeforce/flink_project_demos](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing).
     Set environment variables like:
     ```sh
-    export FLINK_PROJECT=$HOME/Code/flink_project_demos/flink_data_products/
+    export FLINK_PROJECT=$HOME/Code/flink_project_demos/customer_360/c360_flink_processing
     export PIPELINES=$FLINK_PROJECT/pipelines
     ```
 
+The current pipeline is presented in this figure:
 
-### Deploying a Fact or Dimension
+![](./images/bg_c360_flink_pipeline_graph.drawio.png)
 
-The Fact or Dimension table deployment, means deploying an isolated sub-tree of a full pipeline, but with very limited set of children: mainly views or other facts. The scenario will be the same for new table deployment or update existing deployment. 
+### Version migration rules
 
-In the figure below, the new or to update fact is `fact_1`, with two dimensions as parents and one view as children. 
+* For table with non existant `_v[0-9]+` as postfix, then use the default postfix of `_v2`
+* For table with existing `_v[0-9]+`, then extract the numerical value, and add one: `_v2` -> `_v3`, `_v9` -> `_v10`
+* Statement name does not need to have this name update. 
 
-<figure markdown="span">
-![](./images/bg_fact_pipeline.drawio.png)
-</figure>
+### Sink tables
 
-The white flink statements are running, they could be part of the same product or not (common tables). The running ancestors to the `fact_1`
+Some Facts and Views have no child, in this case the version management is to modify the DDL and DML to change the current table with a new version. No need to walk to descendants
 
-The commands to start the Flink ancestors that are not already running and the descendants look like:
+### Intermediate tables
 
-```sh
-# 1- always look at the execution plan
-shift_left pipeline build-execution-plan --table-name fact_1 --may-start-descendants
-# 2- deploy
-shift_left pipeline deploy --table-name fact_1 --may-start-descendants
-```
+For any table with descendants, need to modify DDL and DML of current, and for each direct descedant modify DML for new input version of current table, and then create new version for DDL and DML. Continue recursively until a table has no descendant.
 
-Recall that may-start-descendant will start statement within the same product. 
+The list of table modified will increase because of those changes.
 
-### Deploy a data product
+### Source schema evolution 
 
-As a data product, we mean, one to many Flink statements, integrated in a pipeline to serve a business/analytic data product. 
-
-There are already existing 
-
-## Source schema evolution 
-
-In this example, we consider source schema evolution occurs when the transactional data source changes. In this case, it is assumed the modifications are schema compatible with Full Transitive semantic. 
+For source schema evolution, it is assumed the modifications are schema compatible with Full Transitive semantic. 
 
 <figure markdown="span">
 ![](./images/bg_2_4.drawio.png)
-<caption>**Figure 5**: Transactional data change: schema evolution</caption>
+<caption>**Figure 6**: Transactional data change: schema evolution</caption>
 </figure>
 
-The CDC topic will contain records with both old and new schemas. The initial Flink statement, responsible for creating the source topic, is affected as it must now process new columns. This statement, which handles deduplication, filtering, primary key redefinition, and field encryption, is designed to process both the previous and new schema versions. Since this statement creates new records and reloads from the earliest offset, it will generate a version 2 of its output table, consequently impacting all its downstream dependencies.
+The CDC raw topic will contain records with both old and new schema definitions. The initial Flink statement, responsible for creating the source topic, is affected as it must now process new columns. This statement, which may handle deduplication, filtering, primary key redefinition, and field encryption, is designed to process both the previous and new schema versions. When Flink Statements are executed they load the last version of a schema and keep it in their state. Restarting the first level of Flink statements (to create src_), will get the last schema version, the new version. As it may reprocess records earliest offset, it will generate new records with default value or new values. This is a new version too.
 
-???- info "Shift left commands to support the b/g deployment"
-    * get config.yaml files for each target environment
-    * set CONFIG_FILE environment variable accordingly
-    * Verify impacted tables
-    * Define the list of sink tables to modify
+So it may make sense to take into account schema modification in the registry as part of the CI/CD process to be able to modify the list of modified file, as Flink statements to create those src_ may not be aware to the change done into the transactional table schema.
 
-
-## Testing the blue/green deployment
+## A blue/green deployment process
 
 ### Pre-deployment activities
 
-* Get the **list of Pull Requests** to integrate in the release. (` git ls-remote origin 'pull/*/head'`)
-* Get the **list of Flink modified tables** cross PRs to work on, using git commands
-* **Create release branch** ('git checkout -b v1.0.1)
-* Modify each Flink statement for the modified table so the DDLs and `insert into` of the DLMs use the new version postfix
-* Propagate to the children Flink Statements to consume from the new versioned tables, continue recursively to the sink Kafka Connector.
-* Get the list of tables impacted, review execution plan
+* Get the list of Flink statements modified in `main` branch since a given date:
+	```sh
+	shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 main
+	```
+	This will create `$HOME/.shift_left/modified_flink_files.txt` and `$HOME/.shift_left/modified_flink_files.json`
+* **Create git release branch** (`git checkout -b v1.0.1`)
+* Potentially modify the `modified_flink_files_short.txt` to include table SREs know they have to change.
+* Modify each Flink statement for the modified tables so the DDLs and `insert into` of the DLMs use the new version postfix, taking into consideration their descendants.
+	```sh
+	shift_left project update-table-version $HOME/.shift_left/modified_flink_files.json --default_version _v2
+	```
+
+* From the list of tables impacted, review execution plan
+	```sh
+	 shift_left pipeline build-execution-plan --table-list-file-name .shift_left/modified_flink_files_short.txt --version _v2
+	```
 * Verify resource (compute pool and CFU usage) availability
-* Deploy to stage environment: an environment with existing Flink statements already running
+* Deploy to the `stage` environment (use a specific config.yaml file): an environment with existing Flink statements are already running
     ```sh
-    shift_left pipeline deploy --table-list-file-name statements-to-deploy.txt`
+	export CONFIG_FILE=staging_config.yaml
+    shift_left pipeline deploy --table-list-file-name .shift_left/modified_flink_files_short.txt
     ```
 
 ###  Data Quality Validation
