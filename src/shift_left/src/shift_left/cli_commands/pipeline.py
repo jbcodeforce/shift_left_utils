@@ -229,17 +229,19 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
         logger.info(f"Health Report: {json.dumps(health_report, indent=2)}")
 
         header = f"{product_name.upper()} Health Report"
-        header_width = 75
+        header_width = 85
         console.print(f"\n[bold]{header.center(header_width, '-')}[/bold]")
         #---- Statement Health Report ----
         console.print(f"[bold]{'Statements'.center(header_width, '-')}[/bold]")
-        console.print(f"[bold]Product    | RUNNING PENDING DEGRADED STOPPED FAILED | UNKNOWN OUT-OF-ORDER[/bold]")
+        console.print(f"[bold]Product    | RUNNING COMPLETED PENDING DEGRADED STOPPED FAILED | UNKNOWN OUT-OF-ORDER[/bold]")
         console.print(f"[bold]{'-'*header_width}[/bold]")
-        t_running = t_pending = t_degraded = t_stopped = t_failed = t_unknown = t_out_of_order = 0
+        t_running = t_completed = t_pending = t_degraded = t_stopped = t_failed = t_unknown = t_out_of_order = 0
         for product_name in health_report:
-            running = pending = degraded = stopped = failed = unknown = out_of_order = 0
+            running = completed = pending = degraded = stopped = failed = unknown = out_of_order = 0
             if "RUNNING" in health_report[product_name]:
                 t_running += (running := len(health_report[product_name]["RUNNING"]))
+            if "COMPLETED" in health_report[product_name]:
+                t_completed += (completed := len(health_report[product_name]["COMPLETED"]))
             if "PENDING" in health_report[product_name]:
                 t_pending += (pending := len(health_report[product_name]["PENDING"]))
             if "DEGRADED" in health_report[product_name]:
@@ -253,10 +255,9 @@ def healthcheck(product_name: Annotated[str, typer.Argument(help="The product na
             if "OUT_OF_ORDER" in health_report[product_name]:
                 t_out_of_order += (out_of_order := len(health_report[product_name]["OUT_OF_ORDER"]))
             total = running + pending + degraded + stopped + failed + unknown
-            console.print(f"{product_name:<10} | {running:>7} {pending:>7} {degraded:>8} {stopped:>7} {failed:>6} | {unknown:>7} {out_of_order:>12}")
+            console.print(f"{product_name:<10} | {running:>7} {completed:>9} {pending:>7} {degraded:>8} {stopped:>7} {failed:>6} | {unknown:>7} {out_of_order:>12}")
         console.print(f"[bold]{'-'*header_width}[/bold]")
-        console.print(f"{'Total':<10} | {t_running:>7} {t_pending:>7} {t_degraded:>8} {t_stopped:>7} {t_failed:>6} | {t_unknown:>7} {t_out_of_order:>12}")
-
+        console.print(f"{'Total':<10} | {t_running:>7} {t_completed:>9} {t_pending:>7} {t_degraded:>8} {t_stopped:>7} {t_failed:>6} | {t_unknown:>7} {t_out_of_order:>12}")
         #---- statements out-of-order report ----
         if t_out_of_order > 0:
             console.print(f"\n[bold]{'Statements Out-Of-Order'.center(header_width, '-')}[/bold]")
