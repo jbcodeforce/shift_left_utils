@@ -178,6 +178,7 @@ class ConfluentCloudClient:
     def wait_response(self, url: str, statement_name: str, start_time ) -> StatementResult:
         """
         wait to get a non pending state
+        TODO: Provide an option to wait for a specific status. e.g when stopping, wait for STOPPED status, when resuming, wait for RUNNING status.
         """
         timer= self.config['flink'].get("poll_timer", 10)
         logger.info(f"As status is PENDING, start polling response for {statement_name}")
@@ -390,6 +391,26 @@ class ConfluentCloudClient:
             return rep
         except requests.exceptions.RequestException as e:
             logger.info(f"Error executing rest call: {e}")
+
+    def patch_flink_statement(self, statement_name: str,  stopped: bool):
+        url, auth_header = self.build_flink_url_and_auth_header()
+        try:
+            statement_data = [ {
+                "path": "/spec/stopped",
+                "op": "replace",
+                "value": stopped
+            } ]
+
+            logger.info(f" patch_flink_statement payload: {statement_data}")
+            start_time = time.perf_counter()
+            statement=self.make_request(method="PATCH", url=f"{url}/statements/{statement_name}", data=statement_data, auth_header=auth_header )
+            logger.info(f" patch_flink_statement: {statement_name}")
+            rep = self.wait_response(url, statement_name, start_time)
+            logger.info(f" patch_flink_statement: {rep}")
+            return rep
+        except requests.exceptions.RequestException as e:
+            logger.info(f"Error executing rest call: {e}")
+
 
     # ---- Metrics related methods ----
     def get_metrics(self, view: str, qtype: str, query: str) -> dict:
