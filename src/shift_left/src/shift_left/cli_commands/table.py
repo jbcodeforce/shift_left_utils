@@ -7,14 +7,14 @@ from importlib import import_module
 from rich import print
 from typing_extensions import Annotated
 from shift_left.core.table_mgr import (
-    search_source_dependencies_for_dbt_table, 
-    get_short_table_name, 
-    update_makefile_in_folder, 
+    search_source_dependencies_for_dbt_table,
+    get_short_table_name,
+    update_makefile_in_folder,
     validate_table_cross_products,
     update_sql_content_for_file,
     update_all_makefiles_in_folder,
 )
-from shift_left.core.process_src_tables import migrate_one_file
+from shift_left.ai.process_src_tables import migrate_one_file
 from shift_left.core.utils.file_search import list_src_sql_files
 from shift_left.core.utils.app_config import session_log_dir, get_config
 from shift_left.core.utils.secure_typer import create_secure_typer_app
@@ -56,7 +56,7 @@ def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argumen
                                 src_project_folder: Annotated[str, typer.Argument(envvar=["SRC_FOLDER"], help="Folder name for all the dbt sources (e.g. models)")]):
     """
     Search the parent for a given table from the source project (dbt, sql or ksql folders).
-    Example: shift_left table search-source-dependencies $SRC_FOLDER/ 
+    Example: shift_left table search-source-dependencies $SRC_FOLDER/
     """
     if not table_sql_file_name.endswith(".sql"):
         exit(1)
@@ -67,7 +67,7 @@ def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argumen
     for table in dependencies:
         print(f"  - {table['table']} (in {table['src_dbt']})")
     print("#" * 80)
-        
+
 
 @app.command()
 def migrate(
@@ -79,7 +79,7 @@ def migrate(
         product_name: str = typer.Option(default=None, help="Product name to use for the table. If not provided, it will use the table_path last folder as product name"),
         recursive: bool = typer.Option(False, "--recursive", help="Indicates whether to process recursively up to the sources. (default is False)")):
     """
-    Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
+    Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work.
     The command uses the SRC_FOLDER to access to src_path folder.
     """
     print("\n" + "#" * 30)
@@ -148,7 +148,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         count=0
         processed=0
         for file in files_to_process:
-            print(f"Assessing file {file}")    
+            print(f"Assessing file {file}")
             updated=update_sql_content_for_file(file, runner_class(), string_to_change_from, string_to_change_to)
             if updated:
                 print(f"-> {file} processed ")
@@ -161,7 +161,7 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
 
 @app.command()
 def init_unit_tests(
-    # ✅ 
+    # ✅
     table_name: Annotated[str, typer.Argument(help="Name of the table to unit tests.")],
     create_csv: bool = typer.Option(False, "--create-csv", help="If set, also create a CSV file for the unit test data."),
     nb_test_cases: int = typer.Option(default=test_mgr.DEFAULT_TEST_CASES_COUNT, help="Number of test cases to create. Default is 2."),
@@ -174,12 +174,12 @@ def init_unit_tests(
     print("#" * 30 + f" Unit tests initialization for {table_name}")
     test_mgr.init_unit_test_for_table(table_name, create_csv=create_csv, nb_test_cases=nb_test_cases, use_ai=ai)
     print("#" * 30 + f" Unit tests initialization for {table_name} completed")
-    
+
 @app.command()
 def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of the table to unit tests.")],
                 test_case_name: str = typer.Option(default=None, help= "Name of the individual unit test to run. By default it will run all the tests"),
                 run_all: bool = typer.Option(False, "--run-all", help="By default run insert sqls and foundations, with this flag it will also run validation sql too."),
-                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."), 
+                compute_pool_id: str = typer.Option(default=None, envvar=["CPOOL_ID"], help="Flink compute pool ID. If not provided, it will use config.yaml one."),
                 post_fix_unit_test: str = typer.Option(default=None, help="Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.")):
     """
     Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
@@ -196,8 +196,8 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     print("#" * 30 + f" Unit tests execution for {table_name} - {compute_pool_id}")
     print(f"Cluster name: {get_config().get('flink').get('database_name')}")
     logger.info(f"Unit tests execution for {table_name} test: {test_case_name} - {compute_pool_id} Cluster name: {get_config().get('flink').get('database_name')} post_fix_unit_test: {post_fix_unit_test}")
-    test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name, 
-                                                test_case_name=test_case_name, 
+    test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name,
+                                                test_case_name=test_case_name,
                                                 compute_pool_id=compute_pool_id,
                                                 run_validation=run_all)
 
@@ -268,7 +268,7 @@ def delete_unit_tests(table_name: Annotated[str, typer.Argument(help= "Name of t
     print("#" * 30 + f" Unit tests deletion for {table_name}")
     test_mgr.delete_test_artifacts(table_name, compute_pool_id)
     print("#" * 30 + f" Unit tests deletion for {table_name} completed")
-    
+
 @app.command()
 def explain(table_name: str=  typer.Option(None,help= "Name of the table to get Flink execution plan explanations from."),
             product_name: str = typer.Option(None, help="The directory to run the explain on each tables found within this directory. table or dir needs to be provided."),
@@ -278,11 +278,11 @@ def explain(table_name: str=  typer.Option(None,help= "Name of the table to get 
     """
     Get the Flink execution plan explanations for a given table or a group of tables using the product name or a list of tables from a file.
     """
-    
+
     if table_name:
         print("#" * 30 + f" Flink execution plan explanations for {table_name}")
-        table_report=table_mgr.explain_table(table_name=table_name, 
-                                             compute_pool_id=compute_pool_id, 
+        table_report=table_mgr.explain_table(table_name=table_name,
+                                             compute_pool_id=compute_pool_id,
                                              persist_report=persist_report)
         print(f"Table: {table_report['table_name']}")
         print("-"*50)
@@ -290,19 +290,19 @@ def explain(table_name: str=  typer.Option(None,help= "Name of the table to get 
         print("#" * 30 + f" Flink execution plan explanations for {table_name} completed")
     elif product_name:
         print("#" * 30 + f" Flink execution plan explanations for the product: {product_name}")
-        tables_report=table_mgr.explain_tables_for_product(product_name=product_name, 
-                                                           compute_pool_id=compute_pool_id, 
+        tables_report=table_mgr.explain_tables_for_product(product_name=product_name,
+                                                           compute_pool_id=compute_pool_id,
                                                            persist_report=persist_report)
         print(tables_report)
         print("#" * 30 + f" Flink execution plan explanations for the product {product_name} completed")
     elif table_list_file_name:
         print("#" * 30 + f" Flink execution plan explanations for the tables in {table_list_file_name}")
-        tables_report=table_mgr.explain_tables_for_list_of_tables(table_list_file_name=table_list_file_name, 
-                                                                  compute_pool_id=compute_pool_id, 
+        tables_report=table_mgr.explain_tables_for_list_of_tables(table_list_file_name=table_list_file_name,
+                                                                  compute_pool_id=compute_pool_id,
                                                                   persist_report=persist_report)
         print(tables_report)
         print("#" * 30 + f" Flink execution plan explanations for the tables in {table_list_file_name} completed")
     else:
         print("[red]Error: table or dir needs to be provided.[/red]")
         exit(1)
-    
+

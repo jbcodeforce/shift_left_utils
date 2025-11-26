@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS filtering (
+CREATE TABLE IF NOT EXISTS table_struct (
 
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- equipment
-TABLE_NAME=equipment
+# --- table_struct
+TABLE_NAME=table_struct
 SCRIPT_PRE_KEBAB=dev-usw2-ut
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -13,7 +13,7 @@ DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_equipment: create_flink_ddl  create_flink_dml
+create_table_struct: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source

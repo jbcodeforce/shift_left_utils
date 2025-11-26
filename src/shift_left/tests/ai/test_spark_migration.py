@@ -6,7 +6,7 @@ import pathlib
 import os
 from unittest.mock import patch
 
-from shift_left.core.utils.translator_to_flink_sql import get_or_build_sql_translator_agent
+from shift_left.ai.translator_to_flink_sql import get_or_build_sql_translator_agent
 from shift_left.core.utils.app_config import get_config
 
 """
@@ -18,9 +18,9 @@ class TestDbtMigration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
-        os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging") 
+        os.environ["STAGING"] = str(cls.data_dir / "flink-project/staging")
         os.environ["SRC_FOLDER"] = str(cls.data_dir / "spark-project")
-        os.makedirs(os.environ["STAGING"], exist_ok=True)   
+        os.makedirs(os.environ["STAGING"], exist_ok=True)
         os.makedirs(os.environ["STAGING"] + "/data_product", exist_ok=True)
 
     def _process_one_spark_file(self, dbt_file: str):
@@ -50,7 +50,7 @@ class TestDbtMigration(unittest.TestCase):
     @patch('builtins.input')
     def test_1_spark_basic_table(self, mock_input):
         """
-        Test a basic table spark fact users table migration. 
+        Test a basic table spark fact users table migration.
         """
         dbt_file = "facts/p5/fct_users.sql"
         mock_input.return_value = "n"
@@ -135,7 +135,7 @@ class TestDbtMigration(unittest.TestCase):
         Integration test to validate all Spark SQL examples can be processed.
         """
         mock_input.return_value = "n"
-        
+
         spark_examples = [
             "facts/p5/fct_users.sql",
             "sources/src_product_analytics.sql",
@@ -147,10 +147,10 @@ class TestDbtMigration(unittest.TestCase):
             "sources/src_temporal_analytics.sql",
             "sources/src_advanced_transformations.sql"
         ]
-        
+
         success_count = 0
         total_count = len(spark_examples)
-        
+
         for example in spark_examples:
             try:
                 self._process_one_spark_file(example)
@@ -158,9 +158,9 @@ class TestDbtMigration(unittest.TestCase):
                 print(f"✓ Successfully processed: {example}")
             except Exception as e:
                 print(f"✗ Failed to process {example}: {e}")
-        
+
         print(f"\nIntegration Test Results: {success_count}/{total_count} examples processed successfully")
-        
+
         # Allow some failures but expect most to work
         success_rate = success_count / total_count
         assert success_rate >= 0.7, f"Integration test failed: only {success_rate:.1%} of examples processed successfully"

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS filtering (
+CREATE TABLE IF NOT EXISTS basic_table_stream (
 
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

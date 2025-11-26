@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS filtering (
+CREATE TABLE IF NOT EXISTS kpi_config_table (
 
   -- put here column definitions
   PRIMARY KEY(default_key) NOT ENFORCED

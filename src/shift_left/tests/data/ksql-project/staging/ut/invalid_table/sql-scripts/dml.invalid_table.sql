@@ -1,4 +1,4 @@
-INSERT INTO filtering
+INSERT INTO invalid_table
 SELECT 
 -- part to select stuff
 FROM src_table

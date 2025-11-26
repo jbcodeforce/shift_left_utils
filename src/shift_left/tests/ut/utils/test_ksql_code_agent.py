@@ -13,7 +13,7 @@ from pydantic import ValidationError
 # Set up test environment
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 
-from shift_left.core.utils.ksql_code_agent import (
+from shift_left.ai.ksql_code_agent import (
     KsqlToFlinkSqlAgent,
     KsqlTableDetection,
     KsqlFlinkSql,

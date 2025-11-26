@@ -1,4 +1,4 @@
-INSERT INTO filtering
+INSERT INTO basic_table_stream
 SELECT 
 -- part to select stuff
 FROM src_table

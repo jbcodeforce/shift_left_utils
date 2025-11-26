@@ -2,21 +2,21 @@
 
 ???- info "Version"
     Created Dec - 2024 
-    Updated Nov 05 - 2025
+    Updated Nov 25 - 2025
 
 
-The current implementation supported by this tool enables migration of:
+The current AI based migration implementation supported by this tool enables migration of:
 
-* dbt/Spark SQL to Flink SQL statements
+* dbt/Spark SQL to Flink SQL
 * ksqlDB to Flink SQL
 
-The approach uses LLM agents. This document covers the methodology, setup, usage of the `shift_left` tool for automated SQL migrations, and how to extend it to get better results.
+The approach uses LLM agents local or remote. This document covers the design approach, development environment setup, and how to use the `shift_left` tool for automated SQL migrations. Finally it addresses how to extend the AI prompts or workflows to get better results.
 
-The core idea is to leverage LLMs to understand the source SQL semantics and translate them to Flink SQL. 
+The core idea is to leverage LLMs to understand the source SQL semantics and to translate them to Flink SQLs. 
 
 **This is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
 
-The implementation use the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` model can be used locally using Ollama on Mac M3 Pro with 36GB RAM. Other models running remotely and supporting OpenAI APIs may be used. 
+The implementation use the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` or `qwen-coder-30b-a3b-instruct-mlx-4bit` models can be used locally using Osaurus on Mac M3 Pro with 36GB RAM., or Ollama on Linux VM. Other models running remotely and supporting OpenAI APIs may be used too using your own API key. 
 
 ## Migration Context
 
@@ -66,9 +66,8 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
   shift_left table migrate customer_journey $SRC_FOLDER/sources/src_customer_journey.sql $STAGING --source-type spark
   ```
 
-  We will review setup in [this section]().
 
-* When using the start schema of Kimball methodology, it is possible to process the fact tables up to their sources; the tool will migrate all tables recursively. This could take time if the dependency graph is large. We recommend at the beginning of the migration project to go one table at a time.
+* When using the star schema of Kimball methodology, it is possible to process the fact tables up to their sources; the tool will migrate all tables recursively. This could take time if the dependency graph is large. We recommend at the beginning of the migration project to go one table at a time.
 
   ```sql
   shift_left table migrate $SRC_FOLDER/facts/fct_examination_data.sql $STAGING --recursive --source-type spark
@@ -93,7 +92,7 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
     ...
     ```
 
-For a given table, the tool creates one folder with the table name, a Makefile to help manage the Flink statements with Confluent CLI, a `sql-scripts` folder for the Flink DDL and DML statements, and a `tests` folder to add `test_definitions.yaml` (using `shift_left table init-unit-tests`) for unit testing.
+For a given table, the tool creates one folder with the table name, a Makefile to help manage the Flink statements with Confluent CLI, a `sql-scripts` folder for the Flink DDL and DML statements. 
 
 Example of created folders:
 
@@ -109,35 +108,38 @@ facts
 
 As part of the process, developers need to validate the generated DDL and update the PRIMARY key to reflect the expected key. This information is hidden in many files in dbt, and key extraction is not yet automated by the migration tools.
 
-Normally, the DML is not executable until all dependent input tables are created.
+**Attention**, the DML is not executable until all dependent input tables are created.
   
 ### ksqlDB to Flink SQL
 
-ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses keywords to define such integration. LLM may have limited access to ksql code during the training. 
+ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. 
 
 The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
 
-* The base of ksqldb files to test the migration are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
+* The ksqldb files to test, the migration from, are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
 * Set the environment variables to run shift_left using the [setup instructions](../setup.md)
   ```
   PROJECT_ROOT=shift_left_utils/tree/main/src/shift_left/tests/
   export CONFIG_FILE=$PROJECT_ROOT/config.yaml
   export SRC_FOLDER=$PROJECT_ROOT/data/ksql-project/sources
   export STAGING=$PROJECT_ROOT/data/ksql-project/staging
-  export SL_LLM_BASE_URL=http://localhost:11434/v1
-  export SL_LLM_MODEL=qwen3:30b
-  export SL_LLM_API_KEY=ollama_test_key
+  export SL_LLM_BASE_URL=http://localhost:1337/v1
+  export SL_LLM_MODEL=qwen-coder-30b-a3b-instruct-mlx-4bit
+  export SL_LLM_API_KEY=osaurus_test_key
   ```
 * Start ollama: 
   ```sh
-  olama serve
+  osaurus serve
+  # or 
+  ollama serve
   ```
 
-* Be sure to have one of the following model (`ollama list`): By default qwen3:30b is used.
-  ```
-  gpt-oss:20b   13 GB        
-  qwen3:30b     18 GB
-  ```
+* Be sure to have one of the following model (`osaurus list` or `ollama list`): By default `qwen-coder-30b-a3b-instruct-mlx-4bit` or `qwen3:30b` is used.
+```sh
+gpt-oss:20b   13 GB        
+qwen3:30b     18 GB
+qwen-coder-30b-a3b-instruct-mlx-4bit
+```
 
 
 * Example command to migrate one of ksqlDB script:
@@ -145,17 +147,17 @@ The migration and prompts need to support more examples outside of the classical
   shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql 
   ```
 
-* Status of working migration
+* Status of the working migration
 
-| Source | Status |
-| --- | --- |
-| | |
+| Source | Status | Test Case |
+| --- | --- | --- |
+| | | |
 
 ## Current Agentic Approach
 
 The current agentic workflow includes:
 
-1. **Translate** the given SQL content
+1. **Translate** the given SQL content to Flink SQL
 1. **Validate** the syntax and semantics
 1. **Generate** DDL derived from DML
 1. **Get human validation** to continue or not the automation
@@ -188,15 +190,15 @@ Supporting class of the workflow is [ksqlDB code agent](https://github.com/jbcod
 
 #### Spark to Flink agents
 
-Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/spark_sql_code_agent.py)
-Same approach for spark SQL with the prompts being in the `core/utils/prompts/spark_fsql` folder.
+Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/spark_sql_code_agent.py)
+Same approach for spark SQL with the prompts being in the `ai/prompts/spark_fsql` folder.
 
 | Agent | Scope | Prompt File |
 | --- | --- | --- |
-| **Translator** | Spark SQL to Flink SQL translation | `core/utils/prompts/spark_fsql/translator.txt` |
-| **Table Detection** | Identify multiple CREATE statements | `core/utils/prompts/spark_fsql/table_detection.txt` |
-| **Validation** | Validate Flink SQL constructs | `core/utils/prompts/ksql_fsql/mandatory_validation.txt` |
-| **Refinement** | Fix deployment errors | `core/utils/prompts/ksql_fsql/refinement.txt` |
+| **Translator** | Spark SQL to Flink SQL translation | `ai/prompts/spark_fsql/translator.txt` |
+| **Table Detection** | Identify multiple CREATE statements | `ai/prompts/spark_fsql/table_detection.txt` |
+| **Validation** | Validate Flink SQL constructs | `ai/prompts/spark_fsql/mandatory_validation.txt` |
+| **Refinement** | Fix deployment errors | `ai/prompts/spark_fsql/refinement.txt` |
 
 ### Class diagram
 
