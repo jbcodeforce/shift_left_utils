@@ -89,62 +89,136 @@ def delete_all_compute_pools(product_name: Annotated[str, typer.Argument(help="T
         print(f"Done")
 
 @app.command()
-def housekeep_statements( starts_with: str = typer.Option(None, "--starts-with", help="Statements names starting with this string. [default: workspace]"),
+def housekeep_statements( compute_pool_id: str = typer.Option(None, "--compute-pool-id", help="Flink compute pool ID. [default: None]"),
+                      action: str = typer.Option(None, "--action", help="Action to take on the statements. [default: None]"),
+                      statement_name: str = typer.Option(None, "--statement-name", help="Action to take on specific statement. [default: None]"),
+                      starts_with: str = typer.Option(None, "--starts-with", help="Statements names starting with this string. [default: workspace]"),
                       status: str = typer.Option(None, "--status", help="Statements with this status. [default: COMPLETED, FAILED]"),
                       age: int = typer.Option(None, "--age", help="Statements with created_date >= age (days). [default: 0]")):
         """
         Delete statements in FAILED or COMPLETED state that starts with string 'workspace' in it ( default ).
-        Applies optional starts-with and age filters when provided.
+        Applies optional starts-with, age, status filters when provided.
+        Note: [starts_with, status, age] and [action] are mutually exclusive.
         """
         reserved_words = ['dev','stage','prod']
         default_status = ['COMPLETED', 'FAILED']
         allowed_status = ['COMPLETED', 'FAILED', 'STOPPED']
+        allowed_pool_statement_actions = ['PAUSE', 'RESUME', 'DELETE']
         statement_status = []
 
         current_time = datetime.now(timezone.utc)
         completed_stmnt_cnt = failed_stmnt_cnt = stopped_stmnt_cnt = 0
 
-        if not starts_with:
-            starts_with='workspace'
-        elif starts_with.lower().startswith(tuple(reserved_words)):
-           print(f"Search String cannot start with one of these reserved words {reserved_words}")
-           sys.exit()
+        # Enforce mutual exclusivity: [starts_with, status, age] vs action based on compute_pool_id
+        if not compute_pool_id:
+            # When compute_pool_id is NOT provided: action must be None, use starts_with/status/age
+            if action:
+                print("Error: --action optin is valid only when --compute-pool-id is provided. Use --starts-with, --status, and --age instead.")
+                sys.exit()
 
-        if not status:
-            statement_status = default_status
-        elif status.upper() not in allowed_status:
-           print(f"Allowed Status are {allowed_status}")
-           sys.exit()
+            if not starts_with:
+                starts_with='workspace'
+            elif starts_with.lower().startswith(tuple(reserved_words)):
+                print(f"Error: Search String cannot start with one of these reserved words {reserved_words}")
+                sys.exit()
+
+            if not status:
+                statement_status = default_status
+            elif status.upper() not in allowed_status:
+                print(f"Error: Allowed Status are {allowed_status}")
+                sys.exit()
+            else:
+                statement_status.append(status.upper())
+
+            if not age:
+                age=0
+
+            statement_list = statement_mgr.get_statement_list().copy()
         else:
-            statement_status.append(status.upper())
+            # When compute_pool_id IS provided: action is required, starts_with/status/age must be None
+            if not action:
+                print("Error: --action is required when --compute-pool-id is provided. Allowed actions: STOP, DELETE, RESUME")
+                sys.exit()
+            if action.upper() not in allowed_pool_statement_actions:
+                print(f"Error: Allowed actions are {allowed_pool_statement_actions}")
+                sys.exit()
+            action = action.upper()  # Normalize to uppercase
+            if action == 'RESUME' and not statement_name:  # RESUME action requires a specific statement name
+                print("Error: --statement-name is required when --action is RESUME")
+                sys.exit()
+            if starts_with or status or age:
+                print("Error: --starts-with, --status, and --age cannot be used with --compute-pool-id. Use --action instead.")
+                sys.exit()
+            compute_pool_list = compute_pool_mgr.get_compute_pool_list()
+            compute_pool_found = False
+            for pool in compute_pool_list.pools:
+                if pool.id == compute_pool_id:
+                    compute_pool_found = True
+                    break
+            if not compute_pool_found:
+                print(f"Error: Compute pool {compute_pool_id} not found in the list of compute pools")
+                sys.exit()
 
-        if not age:
-            age=0
+            statement_list = statement_mgr.get_statement_list(compute_pool_id).copy()
 
+        if not statement_list:
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} No statements found")
+            sys.exit()
 
-        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Clean statements starting with [ {starts_with} ] in {statement_status} state, with a age >= [ {age} ]")
+        if not compute_pool_id:
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Clean statements starting with [ {starts_with} ] in {statement_status} state, with a age >= [ {age} ]")
+            for stmnt_name in statement_list:
+                statement = statement_list[stmnt_name]
+                statement_created_time = datetime.strptime(statement.created_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+                time_difference = current_time - statement_created_time
+                statement_age = time_difference.days
+                #print(f"stmnt_name: {stmnt_name} statement_age: {statement_age} statement_status: {statement.status_phase}")
+                if statement.name.startswith(starts_with) and statement.status_phase in statement_status and statement_age >= age:
+                    statement_mgr.delete_statement_if_exists(stmnt_name)
+                    if statement.status_phase == 'COMPLETED':
+                        completed_stmnt_cnt+=1
+                    elif statement.status_phase == 'FAILED':
+                        failed_stmnt_cnt+=1
+                    elif statement.status_phase == 'STOPPED':
+                        stopped_stmnt_cnt+=1
+                    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} delete {stmnt_name} {statement.status_phase}")
 
-        statement_list = statement_mgr.get_statement_list().copy()
-        for statement_name in statement_list:
-            statement = statement_list[statement_name]
-            statement_created_time = datetime.strptime(statement.created_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'), '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
-            time_difference = current_time - statement_created_time
-            statement_age = time_difference.days
-            #print(f"statement_name: {statement_name} statement_age: {statement_age} statement_status: {statement.status_phase}")
-            if statement.name.startswith(starts_with) and statement.status_phase in statement_status and statement_age >= age:
-                statement_mgr.delete_statement_if_exists(statement_name)
-                if statement.status_phase == 'COMPLETED':
-                    completed_stmnt_cnt+=1
-                elif statement.status_phase == 'FAILED':
-                    failed_stmnt_cnt+=1
-                elif statement.status_phase == 'STOPPED':
-                    stopped_stmnt_cnt+=1
-                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} delete {statement_name} {statement.status_phase}")
-
-        if completed_stmnt_cnt == 0 and failed_stmnt_cnt == 0 and stopped_stmnt_cnt == 0:
-            print("No statements deleted")
+            if completed_stmnt_cnt == 0 and failed_stmnt_cnt == 0 and stopped_stmnt_cnt == 0:
+                print("No statements deleted")
+            else:
+                print("\n" + str(completed_stmnt_cnt) + " COMPLETED statements deleted, " + str(failed_stmnt_cnt) + " FAILED statements deleted, " + str(stopped_stmnt_cnt) + " STOPPED statements deleted")
         else:
-            print("\n" + str(completed_stmnt_cnt) + " COMPLETED statements deleted, " + str(failed_stmnt_cnt) + " FAILED statements deleted, " + str(stopped_stmnt_cnt) + " STOPPED statements deleted")
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statements in compute pool {compute_pool_id} will be {action}'d")
+            action_cnt = 0
+            for stmnt_name in statement_list:
+                if statement_name and stmnt_name != statement_name:
+                    continue  # Skip if statement_name is provided and does not match the statement name
+                statement_info = statement_list[stmnt_name]
+                if action == 'PAUSE':   # Pause RUNNING statements
+                    if statement_info.status_phase == 'RUNNING':
+                        statement = statement_mgr.get_statement(stmnt_name)
+                        rep=statement_mgr.patch_statement_if_exists(stmnt_name, stopped=True)
+                        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {stmnt_name} is paused in compute pool {compute_pool_id}")
+                        action_cnt+=1
+                    else:
+                        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {stmnt_name} is NOT running, skipping")
+                elif action == 'RESUME':   # Resume STOPPED statements
+                    if statement_info.status_phase == 'STOPPED':
+                        statement = statement_mgr.get_statement(stmnt_name)
+                        rep=statement_mgr.patch_statement_if_exists(stmnt_name, stopped=False)   
+                        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {stmnt_name} is resumed in compute pool {compute_pool_id}")
+                        action_cnt+=1
+                    else:
+                        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {stmnt_name} is NOT paused, skipping")
+                elif action == 'DELETE':   # Delete All statements in the compute pool
+                    rep=statement_mgr.delete_statement_if_exists(stmnt_name)
+                    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deleted statement {stmnt_name} in compute pool {compute_pool_id}")
+                    action_cnt+=1
+            
+            if action_cnt == 0:
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} No statements {action}ed")
+            else:
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} {action_cnt} statements {action}ed")
 
 @app.command()
 def validate_config():

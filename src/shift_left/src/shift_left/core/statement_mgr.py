@@ -155,6 +155,13 @@ def delete_statement_if_exists(statement_name) -> str | None:
         statement_list.pop(statement_name)
     return result
 
+def patch_statement_if_exists(statement_name: str, stopped: bool) -> str | None:
+    logger.info(f"Enter with {statement_name}")
+    config = get_config()
+    client = ConfluentCloudClient(config)
+    result=client.patch_flink_statement(statement_name, stopped)
+    return result
+
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """
     Get the statement given the statement name
