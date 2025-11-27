@@ -373,13 +373,6 @@ def reset_all_caches() -> None:
   except (ImportError, AttributeError):
     pass
 
-  # Reset translator caches
-  try:
-    import shift_left.core.utils.translator_to_flink_sql as translator
-    translator._agent_class = None
-  except (ImportError, AttributeError):
-    pass
-
 
 try:
     config = get_config()

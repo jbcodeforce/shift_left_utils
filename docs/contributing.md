@@ -174,19 +174,32 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 * Fork the `https://github.com/jbcodeforce/shift_left_utils` repo in your github account.
 * Clone your repo to your local computer.
 * Add the upstream repository: see guide for step 1-3 here: [forking a repo](https://help.github.com/articles/fork-a-repo/)
-* Verify you have [set up the pre-requisited](./setup.md#pre-requisites) with the below differences:
-    * Create a new virtual environment in any folder, but could be the : `uv venv`
+* Verify you have [set up the pre-requisited](./setup.md#pre-requisites)
+1. Install [uv](https://github.com/astral-sh/uv) for Python package management
+    ```sh
+    # Install uv if not already installed
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # To update existing version
+    uv self update
+    ```
 
-* Activate the environment:
+1. **Python Environment**: Ensure Python 3.12+ and create a virtual environment
+   ```bash
+   uv venv --python 3.12.0
+   source .venv/bin/activate  # On Windows WSL: .venv\Scripts\activate
+   ```
 
-```sh
-source .venv/bin/activate
-```
+1. **Install Dependencies**: Use `uv` package manager (recommended)
+   ```bash
+   cd src/shift_left
+   # Install project dependencies
+   uv sync
+   ```
+
 * Define a config.yaml file to keep the important parameters of the CLI. 
-
-```sh
-cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
-```
+	```sh
+	cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
+	```
 
 * Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool, modify the config.yaml file
 
@@ -204,8 +217,26 @@ cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
 * Set the CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
 
 ```sh
-export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config-ccloud.yaml
+export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
 ```
+
+* **Install shift_left Tool**:
+   ```bash
+   # under src/shift_left
+   ls -al dist/
+   # select the last version, for example:
+   uv tool install dist/shift_left-0.1.28-py3-none-any.whl
+   # Verify installation
+   shift_left --help
+   shift_left version
+   ```
+
+    You can also use `pip` if you have an existing Python environment:
+    ```sh
+    pip install src/shift_left/dist/shift_left-0.1.28-py3-none-any.whl
+    ```
+
+* Make sure you are logged into Confluent Cloud and have defined at least one compute pool.
 
 ## Development activities
 

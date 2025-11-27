@@ -1,0 +1,11 @@
+CREATE STREAM rock_songs (artist VARCHAR, title VARCHAR)
+    WITH (KAFKA_TOPIC='rock_songs', PARTITIONS=1, VALUE_FORMAT='AVRO');
+
+CREATE STREAM classical_songs (artist VARCHAR, title VARCHAR)
+    WITH (KAFKA_TOPIC='classical_songs', PARTITIONS=1, VALUE_FORMAT='AVRO');
+
+CREATE STREAM all_songs (artist VARCHAR, title VARCHAR, genre VARCHAR)
+    WITH (KAFKA_TOPIC='all_songs', PARTITIONS=1, VALUE_FORMAT='AVRO');
+
+INSERT INTO all_songs SELECT artist, title, 'rock' AS genre FROM rock_songs;
+INSERT INTO all_songs SELECT artist, title, 'classical' AS genre FROM classical_songs;

@@ -1,4 +1,4 @@
-s"""
+"""
 Copyright 2024-2025 Confluent, Inc.
 
 Integration tests for the enhanced SparkToFlinkSqlAgent with agentic validation flow.
@@ -160,9 +160,9 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         SELECT * FROM sales_data WHERE total_amount > 100;
         """
 
-        ddl, dml = self.agent.translate_to_flink_sqls(simple_spark_sql, validate=False)
+        ddl, dml = self.agent.translate_to_flink_sqls(table_name="simple_test", sql=simple_spark_sql, validate=False)
 
-        self._validate_translation_output(ddl, dml, "simple_test", simple_spark_sql)
+        self._validate_translation_output(ddl[0], dml[0], "simple_test", simple_spark_sql)
         self.assertEqual(len(self.agent.get_validation_history()), 0,
                         "No validation history should exist when validation is disabled")
         print(f"Final DDL: {ddl}")
@@ -184,10 +184,10 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
                 (True, "DDL Statement is valid"),
                 (True, "Statement is valid")
             ]
+            table_name = "advanced_transformations"
+            ddl, dml = self.agent.translate_to_flink_sqls(table_name=table_name, sql=spark_sql, validate=True)
 
-            ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=True)
-
-            self._validate_translation_output(ddl, dml, "advanced_transformations", spark_sql)
+            self._validate_translation_output(ddl[0], dml[0], "advanced_transformations", spark_sql)
 
             # Check validation history
             history = self.agent.get_validation_history()
@@ -279,9 +279,9 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
                     spark_sql = self._load_spark_sql_file(test_file)
 
                     # Test without validation for speed
-                    ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=False)
+                    ddl, dml = self.agent.translate_to_flink_sqls(table_name=test_file, sql=spark_sql, validate=False)
 
-                    self._validate_translation_output(ddl, dml, test_file, spark_sql)
+                    self._validate_translation_output(ddl[0], dml[0], test_file, spark_sql)
 
                     logger.info(f"✅ Translation successful for {test_file}")
 
@@ -300,7 +300,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         with patch.object(self.agent, '_validate_flink_sql_on_cc') as mock_validate:
             mock_validate.return_value = (True, "Valid")
 
-            ddl, dml = self.agent.translate_to_flink_sqls(simple_sql, validate=True)
+            ddl, dml = self.agent.translate_to_flink_sqls(table_name="simple_test", sql=simple_sql, validate=True)
 
             history = self.agent.get_validation_history()
             self.assertGreater(len(history), 0, "History should be recorded")
@@ -326,20 +326,20 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
             mock_validate.return_value = (True, "Statement is valid")
 
             # Test complete flow
-            ddl, dml = self.agent.translate_to_flink_sqls(spark_sql, validate=True)
+            ddl, dml = self.agent.translate_to_flink_sqls(table_name="fct_users", sql=spark_sql, validate=True)
 
             # Comprehensive validation
-            self._validate_translation_output(ddl, dml, "fct_users.sql", spark_sql)
+            self._validate_translation_output(ddl[0], dml[0], "fct_users.sql", spark_sql)
 
             # Check that the complete flow executed
             history = self.agent.get_validation_history()
             self.assertGreater(len(history), 0, "Validation should have occurred")
 
             # Verify final output quality
-            self.assertIn("INSERT INTO", dml.upper(), "DML should be an INSERT statement")
+            self.assertIn("INSERT INTO", dml[0].upper(), "DML should be an INSERT statement")
 
             if ddl:
-                self.assertIn("CREATE TABLE", ddl.upper(), "DDL should create a table")
+                self.assertIn("CREATE TABLE", ddl[0].upper(), "DDL should create a table")
 
         logger.info("✅ End-to-end translation flow test passed")
 

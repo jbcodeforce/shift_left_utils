@@ -3,16 +3,16 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import pathlib
-from importlib import import_module 
+from importlib import import_module
 import os
 from typing import Tuple
 os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 from shift_left.core.utils.app_config import get_config
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import (
-    TableWorker, 
+    TableWorker,
     ReplaceEnvInSqlContent,
-    Change_CompressionType, 
+    Change_CompressionType,
     Change_SchemaContext)
 
 from shift_left.core.utils.file_search import list_src_sql_files
@@ -24,7 +24,7 @@ class TestTableWorker(unittest.TestCase):
         data_dir = pathlib.Path(__file__).parent.parent / "../data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 
-    
+
     def test_update_dml_statement(self):
         print("Test update dml sql content")
         with open("test_file", "w") as f:
@@ -33,8 +33,8 @@ class TestTableWorker(unittest.TestCase):
         class TestUpdate(TableWorker):
             def update_sql_content(self, sql_in : str, string_to_change_from: str= None, string_to_change_to: str= None) -> Tuple[bool, str]:
                 return True, sql_in.replace("from t2", "from t2 join t3 on t3.id = t2.id")
-        
-        updated = tm.update_sql_content_for_file(sql_file_name="test_file", 
+
+        updated = tm.update_sql_content_for_file(sql_file_name="test_file",
                                                  processor=TestUpdate(),
                                                  string_to_change_from="t2",
                                                  string_to_change_to="t2 join t3 on t3.id = t2.id")
@@ -63,7 +63,7 @@ class TestTableWorker(unittest.TestCase):
         assert updated
         assert "'changelog.mode' = 'upsert'" in sql_out
         print(sql_out)
-    
+
     def test_upsert_update(self):
         sql_in="""
         create table Tupdatechangemode (
@@ -189,7 +189,7 @@ class TestTableWorker(unittest.TestCase):
             'key.format' = 'avro-registry',
             'value.format' = 'avro-registry'
         )
-        """ 
+        """
         updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert updated
@@ -204,7 +204,7 @@ class TestTableWorker(unittest.TestCase):
         get_config()['kafka']['src_topic_prefix']='replicated'
         sql_in="""
         INSERT INTO src_order
-        SELECT 
+        SELECT
             id,
             status,
             name,
@@ -225,7 +225,7 @@ class TestTableWorker(unittest.TestCase):
         get_config()['kafka']['src_topic_prefix']='replicated'
         sql_in="""
         INSERT INTO src_order
-        SELECT 
+        SELECT
             id,
             status,
             name,
@@ -233,7 +233,7 @@ class TestTableWorker(unittest.TestCase):
         FROM
             `ap-tag-order-dev.template`
         );
-        """ 
+        """
         updated, sql_out= runner_class().update_sql_content(sql_in,'','p4')
         print(sql_out)
         assert updated
@@ -269,11 +269,11 @@ class TestTableWorker(unittest.TestCase):
         module_path, class_name = "shift_left.core.utils.table_worker.Change_Concat_to_Concat_WS".rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        updated, sql_out = runner_class.update_sql_content(sql_content=sql_in)
+        updated, sql_out = runner_class().update_sql_content(sql_content=sql_in)
         print(sql_out)
         assert updated
         assert "MD5(CONCAT_WS('''" in sql_out
-        
+
 
     def test_default_string_replacement_in_from_clause(self):
         """Test string replacement in FROM clause"""
@@ -311,7 +311,7 @@ class TestTableWorker(unittest.TestCase):
         print(sql_out)
         assert updated
         assert "'changelog.mode' = 'upsert'" in sql_out
-        
+
 
         # Test with no WITH clause
         sql_in = """
@@ -404,7 +404,7 @@ class TestTableWorker(unittest.TestCase):
         assert updated
         assert "WITH (\n        'kafka.producer.compression.type' = 'snappy'" in sql_out
         assert sql_out.strip().endswith(");")
-        
+
 
     def test_change_schema_context_edge_cases(self):
         """Test edge cases for changing schema context"""
@@ -476,7 +476,7 @@ class TestTableWorker(unittest.TestCase):
         """Test clone.dev is replace by clone.prod in sql content"""
         # Test with invalid SQL content
         sql_in = "insert into src_order select id, status, name, is_migrated from `clone.dev.ap-tag-order-dev.template`;"
-       
+
         get_config()['kafka']['cluster_type']='prod'
         get_config()['kafka']['src_topic_prefix']='replicated'
         worker = ReplaceEnvInSqlContent()
@@ -490,14 +490,14 @@ class TestTableWorker(unittest.TestCase):
         sql_content = """
         INSERT INTO src_l_metadata
         with final as (
-            SELECT 
+            SELECT
                 COALESCE(IF(op = 'd', before.user_detail_id, after.user_detail_id), 'NULL') as `user_detail_id`,
                 COALESCE(IF(op = 'd', before.metadata_id, after.metadata_id), 'NULL') as metadata_id,
                 op,
                 tenant_id,
                 source.lsn as source_lsn
             FROM `ap-.user_detail_metadata`
-        ) 
+        )
         SELECT *  FROM final
         """
         print("\n1-should change the content as the config is a dev environment, there is the expected column to filter on and it is a source table")
@@ -519,7 +519,7 @@ class TestTableWorker(unittest.TestCase):
         print(sql_out)
         assert not " WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = 'p4'" in sql_out
         assert not updated
-        
+
         print("\n4-should not change the content as there is not the expected column to filter on")
         sql_content_4=sql_content.replace("tenant_id", "user_id")
         updated, sql_out= transformer.update_sql_content(sql_content_4, "tenant_id", "p4")
@@ -535,14 +535,14 @@ class TestTableWorker(unittest.TestCase):
         updated, sql_out= transformer.update_sql_content(sql_content, "tenant_id", "p4")
         assert not updated
         assert not "WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = 'p4'" in sql_out
-     
-       
+
+
     def test_validate_only_src_table_is_updated_with_data_limit_logic(self):
         """Test change data limit where condition is only applied to src_ tables"""
         sql_content = """
         INSERT INTO dim_l_metadata
         with final as (
-            SELECT 
+            SELECT
                 a,b,c,d, tenant_id
             FROM `user_detail_metadata`
         )
@@ -555,9 +555,9 @@ class TestTableWorker(unittest.TestCase):
         assert " WHERE tenant_id IN ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = 'p4'" not in sql_out
         assert not updated
         print(sql_out)
-       
-        
-        
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

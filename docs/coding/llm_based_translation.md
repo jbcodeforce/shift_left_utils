@@ -67,12 +67,6 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
   ```
 
 
-* When using the star schema of Kimball methodology, it is possible to process the fact tables up to their sources; the tool will migrate all tables recursively. This could take time if the dependency graph is large. We recommend at the beginning of the migration project to go one table at a time.
-
-  ```sql
-  shift_left table migrate $SRC_FOLDER/facts/fct_examination_data.sql $STAGING --recursive --source-type spark
-  ```
-
 ???- info "Example of Output"
     ```sh
     process SQL file ../src-dbt-project/models/facts/fct_examination_data.sql
@@ -123,9 +117,9 @@ The migration and prompts need to support more examples outside of the classical
   export CONFIG_FILE=$PROJECT_ROOT/config.yaml
   export SRC_FOLDER=$PROJECT_ROOT/data/ksql-project/sources
   export STAGING=$PROJECT_ROOT/data/ksql-project/staging
-  export SL_LLM_BASE_URL=http://localhost:1337/v1
-  export SL_LLM_MODEL=qwen-coder-30b-a3b-instruct-mlx-4bit
-  export SL_LLM_API_KEY=osaurus_test_key
+  export SL_LLM_BASE_URL=http://localhost:11434/v1
+  export SL_LLM_MODEL=qwen3-coder:30b
+  export SL_LLM_API_KEY=not_needed_key
   ```
 * Start ollama: 
   ```sh
@@ -134,24 +128,31 @@ The migration and prompts need to support more examples outside of the classical
   ollama serve
   ```
 
-* Be sure to have one of the following model (`osaurus list` or `ollama list`): By default `qwen-coder-30b-a3b-instruct-mlx-4bit` or `qwen3:30b` is used.
-```sh
-gpt-oss:20b   13 GB        
-qwen3:30b     18 GB
-qwen-coder-30b-a3b-instruct-mlx-4bit
-```
+* Be sure to have one of the following model (`osaurus list` or `ollama list`): By default `qwen-coder-30b-a3b-instruct-mlx-4bit` or `qwen3-coder:30b` is used.
+	```sh
+	gpt-oss:20b   13 GB        
+	qwen-coder-30b-a3b-instruct-mlx-4bit
+	```
+	
+	if not use one of the following command:
+	```sh
+	ollama pull qwen3-coder:30b 
+	#
+	osaurus pull qwen-coder-30b-a3b-instruct-mlx-4bit
+	```
 
 
 * Example command to migrate one of ksqlDB script:
   ```sh
-  shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql 
+  shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql --product-name tax
   ```
 
-* Status of the working migration
+* Status of the working migration: See **test_ksql_migration.py::TestKsqlMigrations** code.
 
 | Source | Status | Test Case |
 | --- | --- | --- |
-| | | |
+| splitting_tutorial | 4 DDLs ✅ 4 DMLs ✅ | test_ksql_splitting_tutorial |
+| merge_tutorial | 3 DDLs ✅ 2 DMLs ✅ | test_ksql_merge_tutorial | 
 
 ## Current Agentic Approach
 
@@ -173,25 +174,55 @@ The multi-agent system with human-in-the-loop validation may use Confluent Cloud
 ![AI Agent Flow](./images/ai_agent_new_flow.drawio.png)
 </figure>
 
+
+Both agents support two validation modes:
+
+1. **Mandatory Validation**: Always performed, checks syntax and best practices
+2. **Live Validation**: Optional, validates against live Confluent Cloud for Apache Flink
+
+The validation process includes:
+
+- Syntax checking
+- Semantic validation
+- Iterative refinement (up to 3 attempts)
+- Human-in-the-loop confirmation for live validation
+
+When validation fails, agents use specialized refinement prompts to:
+
+- Analyze the specific error message
+- Consider validation history
+- Generate corrected SQL that addresses the identified issues
+- Provide explanations of changes made
+
+This creates a self-correcting translation pipeline that improves accuracy through iterative feedback.
+
 ### Agent Roles
 
 As agent is a combination of LLM reference, prompts, and tool definitions, there will be different implementation of those agents if we do ksqlDB to Flink SQL or from Spark to Flink.
 
 #### KsqlDB to Flink agents
 
-Supporting class of the workflow is [ksqlDB code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/utils/ksql_code_agent.py).
+Supporting class of the workflow is [ksqlDB code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/ksql_code_agent.py).
+
+Each agent uses specialized system prompts stored in external files:
 
 | Agent | Scope | Prompt File |
 | --- | --- | --- |
-| **Translator** | Raw KSQL to Flink SQL translation | `core/utils/prompts/ksql_fsql/translator.txt` |
-| **Table Detection** | Identify multiple CREATE statements | `core/utils/prompts/ksql_fsql/table_detection.txt` |
-| **Validation** | Validate Flink SQL constructs | `core/utils/prompts/ksql_fsql/mandatory_validation.txt` |
-| **Refinement** | Fix deployment errors | `core/utils/prompts/ksql_fsql/refinement.txt` |
+| **Translator** | Raw KSQL to Flink SQL translation | `ai/prompts/ksql_fsql/translator.txt` |
+| **Table Detection** | Identify multiple CREATE statements | `ai/prompts/ksql_fsql/table_detection.txt` |
+| **Validation** | Validate Flink SQL constructs | `ai/prompts/ksql_fsql/mandatory_validation.txt` |
+| **Refinement** | Fix deployment errors | `ai/prompts/ksql_fsql/refinement.txt` |
+
+#### Code 
+
+The `src/shift_left/ai` directory contains a suite of Large Language Model (LLM) agents designed to translate SQL from various dialects to Apache Flink SQL, with validation and iterative refinement capabilities.
 
 #### Spark to Flink agents
 
-Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/spark_sql_code_agent.py)
+Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/spark_sql_code_agent.py).
+
 Same approach for spark SQL with the prompts being in the `ai/prompts/spark_fsql` folder.
+Each agent uses specialized system prompts stored in external files:
 
 | Agent | Scope | Prompt File |
 | --- | --- | --- |
@@ -202,234 +233,150 @@ Same approach for spark SQL with the prompts being in the `ai/prompts/spark_fsql
 
 ### Class diagram
 
+The translation system follows a modular, agent-based architecture with three main components:
+
+```
+TranslatorToFlinkSqlAgent (Base Class)
+├── SparkToFlinkSqlAgent (Spark SQL → Flink SQL)
+└── KsqlToFlinkSqlAgent (KSQL → Flink SQL)
+```
+
 
 ![](./images/ai_classes.drawio.png)
 
 
+#### TranslatorToFlinkSqlAgent (`translator_to_flink_sql.py`)
+
+**Purpose**: Base abstract class that defines the common interface and shared functionality for all SQL translation agents.
+
+**Key Features**:
+
+- **LLM Configuration**: Supports multiple models (Qwen, Mistral, Cogito) with configurable endpoints
+- **Validation Pipeline**: Integrates with Confluent Cloud for Apache Flink for live SQL validation
+- **Factory Pattern**: Provides `get_or_build_sql_translator_agent()` for dynamic agent instantiation
+- **Error Handling**: Base framework for iterative refinement when validation fails
+
+
+#### SparkToFlinkSqlAgent (`spark_sql_code_agent.py`)
+
+**Purpose**: Specialized agent for translating Spark SQL to Flink SQL with enhanced error categorization and refinement.
+
+**Translation Workflow**:
+
+```
+Spark SQL Input
+    ↓
+Translation Agent (Spark → Flink DML)
+    ↓
+DDL Generation Agent (DML → DDL)
+    ↓
+Pre-validation (Syntax Check)
+    ↓
+Confluent Cloud Validation
+    ↓
+Iterative Refinement (if errors)
+    ↓
+Final Flink SQL (DDL + DML)
+```
+
+**Key Features**:
+
+- **Structured Responses**: Uses Pydantic models for consistent LLM output parsing
+- **Error Categorization**: Classifies errors into specific types (syntax, function incompatibility, type mismatch, etc.)
+- **Multi-step Validation**: Pre-validation + live validation with up to 3 refinement iterations
+- **DDL Auto-generation**: Automatically creates table definitions from query logic
+- **Validation History**: Tracks all validation attempts for debugging
+
+**Specialized Models**:
+```python
+class SparkSqlFlinkDml(BaseModel):
+    flink_dml_output: str
+
+class SparkSqlFlinkDdl(BaseModel):
+    flink_ddl_output: str
+    key_name: str
+
+class SqlRefinement(BaseModel):
+    refined_ddl: str
+    refined_dml: str
+    explanation: str
+    changes_made: List[str]
+```
+
+#### KsqlToFlinkSqlAgent (`ksql_code_agent.py`)
+
+**Purpose**: Specialized agent for translating KSQL (Kafka SQL) to Flink SQL with multi-table support and comprehensive preprocessing.
+
+**Translation Workflow**:
+```
+KSQL Input
+    ↓
+1. Input Cleaning (Remove DROP statements, comments)
+    ↓
+2. Table Detection (Identify multiple CREATE statements)
+    ↓
+3. Individual Translation (Process each statement separately)
+    ↓
+4. Mandatory Validation (Syntax + best practices)
+    ↓
+5. Optional Live Validation (Confluent Cloud)
+    ↓
+Final Flink SQL Collections (DDL[] + DML[])
+```
+
+**Key Features**:
+
+- **Multi-table Processing**: Automatically detects and processes multiple CREATE TABLE/STREAM statements
+- **Input Preprocessing**: Removes problematic statements and comments that confuse LLMs
+- **Batch Translation**: Handles complex KSQL scripts with multiple related statements
+- **Mandatory Validation**: Always performs syntax and best practices validation
+- **File Snapshots**: Saves intermediate results for debugging and tracking
+
+**Specialized Models**:
+```python
+class KsqlFlinkSql(BaseModel):
+    ksql_input: str
+    flink_ddl_output: Optional[str]
+    flink_dml_output: Optional[str]
+
+class KsqlTableDetection(BaseModel):
+    has_multiple_tables: bool
+    table_statements: List[str]
+    description: str
+```
+
+
 ## A test bed
 
-The current project includes in the tests/data folder some examples of Spark and ksql scripts, but the following git project, [](), is a show case of Spark and Flink projects.
+The current project includes in the `tests/data/` folder some examples of Spark and ksql scripts.
+
+```sh
+tests/data/ksql-project
+├── common.mk
+├── flink-references
+├── sources
+│   ├── aggregation.ksql
+│   ├── ddl-basic-table.ksql
+│   ├── ddl-bigger-file.ksql
+│   ├── ddl-filtering.ksql
+│   ├── ddl-g.ksql
+│   ├── ddl-geo.ksql
+│   ├── ddl-kpi-config-table.ksql
+│   ├── ddl-map_substr.ksql
+│   ├── ddl-measure_alert.ksql
+│   ├── dml-aggregate.ksql
+│   ├── filtering.ksql
+│   ├── geospacial.ksql
+│   ├── merge_tutorial.ksql
+│   ├── movements.ksql
+│   ├── splitter.ksql
+│   ├── splitting_tutorial.ksql
+│   └── w2_processing.ksql
+```
+
+`flink-references` includes some migrated solutions used as reference for validating migrations.
 
 ## Prerequisites and Setup
 
-### Environment Setup
+[See the environment setup for developers section.](../contributing.md/#environment-set-up-for-developers)
 
-1. Clone the [shift_left_utils git repository](https://github.com/jbcodeforce/shift_left_utils)
-  ```sh
-  git clone https://github.com/jbcodeforce/shift_left_utils
-  ```
-
-1. Install [uv](https://github.com/astral-sh/uv) for Python package management
-    ```sh
-    # Install uv if not already installed
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    # To update existing version
-    uv self update
-    ```
-
-1. **Python Environment**: Ensure Python 3.12+ and create a virtual environment
-   ```bash
-   uv venv --python 3.12.0
-   source .venv/bin/activate  # On Windows WSL: .venv\Scripts\activate
-   ```
-
-1. **Install Dependencies**: Use `uv` package manager (recommended)
-   ```bash
-   cd src/shift_left
-   # Install project dependencies
-   uv sync
-   ```
-
-1. **Install shift_left Tool**:
-   ```bash
-   # under src/shift_left
-   ls -al dist/
-   # select the last version, for example:
-   uv tool install dist/shift_left-0.1.28-py3-none-any.whl
-   # Verify installation
-   shift_left --help
-   shift_left version
-   ```
-
-    You can also use `pip` if you have an existing Python environment:
-    ```sh
-    pip install src/shift_left/dist/shift_left-0.1.28-py3-none-any.whl
-    ```
-
-1. Make sure you are logged into Confluent Cloud and have defined at least one compute pool.
-
-### Configuration File Setup
-
-* Create a configuration file (e.g., `config-ccloud.yaml`):
-  ```sh
-  cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config-ccloud.yaml
-  ```
-* Update the content of the config-ccloud.yaml to reflect your Confluent Cloud environment. (For the commands used for migration, you do not need Kafka settings.)
-  ```yaml
-  # Confluent Cloud Configuration
-  confluent_cloud:
-    api_key: "YOUR_API_KEY"
-    api_secret: "YOUR_API_SECRET"
-    organization_id: "YOUR_CLUSTER_ID"
-    environment_id: "YOUR_ENVIRONMENT_ID"
-    url_scope: public
-    region: "YOUR_REGION"
-    provider: aws
-  flink:
-    flink_url: flink....confluent.cloud
-    compute_pool_id: "YOUR_COMPUTE_POOL_ID"
-    api_key: "YOUR_API_KEY"
-    api_secret: "YOUR_API_SECRET"
-    catalog_name: "envionment_name"
-    database_name: "kafka_cluster_name"
-  ```
-
-
-* Set the following environment variables before using the tool. This can be done by:
-    ```sh
-    cp src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
-    ```
-
-    Modify the CONFIG_FILE, FLINK_PROJECT, SRC_FOLDER, SL_LLM_* variables
-
-* Source it:
-    ```sh
-    source set_env
-    ```
-
-* Validate config-ccloud.yaml
-
-```bash
-shift_left project validate-config
-```
-
-## Migration Workflow
-
-### 1. Project Initialization
-
-Create a new target project to keep your Flink statements and pipelines (e.g., my-flink-app):
-
-```bash
-# Initialize project structure
-shift_left project init <your-project> </path/to/your/folder>
-# example 
-shift_left project init my-flink-app $HOME/Code
-```
-
-You should get:
-```sh
-my-flink-app
-├── README.md
-├── docs
-├── pipelines
-│   ├── common.mk
-│   ├── dimensions
-│   ├── facts
-│   ├── intermediates
-│   ├── sources
-│   └── views
-├── sources
-└── staging
-```
-
-### 2. Specific Setup
-
-* Copy your KSQL files to the sources directory:
-
-```bash
-# Copy KSQL files
-cp *.ksql ${SRC_FOLDER}/
-```
-
-* *Optional*: To run locally on a smaller model, download [Ollama](https://ollama.com/download), then install the qwen2.5-coder model:
-  ```sh
-  # Select the size of the model according to your memory
-  ollama pull qwen2.5-coder:32b
-  ollama list
-  ```
-
-* Create an OpenRouter.ai API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use.
-
-* Set environment variables:
-
-### 3. Migration Execution
-
-#### Basic Table Migration
-
-```bash
-# Migrate a simple table
-shift_left table migrate basic_user_table $SRC_FOLDER/user-table.ksql $STAGING --source-type ksql 
-```
-
-The command generates:
-```sh
-# ├── staging/basic_user_table/sql-scripts
-# │   ├── ddl.basic_user_table.sql     # Flink DDL
-# │   ├── dml.basic_user_table.sql     # Flink DML (if any)
-```
-
-### 4. Validation and Deployment
-
-```bash
-# Deploy to Confluent Cloud for Flink
-cd ${STAGING}/basic_user_table
-
-# Deploy DDL statements
-make create_flink_ddl
-
-# Deploy DML statements  
-make create_flink_dml
-```
-
-### 5. Prepare for pipeline management
-
-Flink statements have dependencies, so it is important to use shift_left to manage those dependencies:
-
-* Run after new tables are created
-  ```sh
-  shift_left table build-inventory
-  ```
-
-* Build all the metadata
-  ```sh
-  shift_left pipeline build-all-metadata 
-  ```
-
-
-* Verify an execution plan
-  ```sh
-  shift_left pipeline build-execution-plan --table-name <>
-  ```
-
-
-### 6. Next
-
-* Organize the Flink statements into pipeline folders, possibly using sources, intermediates, dimensions, and facts classification. Think about data products. A candidate hierarchy may look like this:
-  ```sh
-  my-flink-app
-
-  ├── pipelines
-  │   ├── common.mk
-  │   ├── dimensions
-  │   │   ├── data_product_a
-  │   ├── facts
-  │   │   ├── data_product_a
-  │   ├── intermediates
-  │   │   ├── data_product_a
-  │   ├── sources
-  │   │   ├── data_product_a
-  │   │       ├── src_stream
-  │   │       │   ├── Makefile
-  │   │       │   ├── pipeline_definition.json
-  │   │       │   ├── sql-scripts
-  │   │       │   │   ├── ddl.src_stream.sql
-  │   │       │   │   └── dml.src_stream.sql
-  │   │       │   ├── tests
-  │   ├── views
-          └── data_product_a
-  
-  ```
-
-* Add unit tests per table (at least for the complex DML ones) ([see test harness](./test_harness.md))
-* Add source data into the first tables of the pipeline
-* Verify the created records within the sink tables.

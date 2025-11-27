@@ -45,7 +45,7 @@ class AIBasedDataTuning:
     """
 
     def __init__(self):
-        self.qwen_model_name=os.getenv("SL_LLM_MODEL","qwen3:30b")
+        self.qwen_model_name=os.getenv("SL_LLM_MODEL","qwen3-coder:30b")
         self.mistral_model_name=os.getenv("SL_LLM_MODEL","mistral-small:latest")
         self.cogito_model_name=os.getenv("SL_LLM_MODEL","cogito:32b")
         self.kimi_k2_model_name=os.getenv("SL_LLM_MODEL","moonshotai/Kimi-K2-Instruct:novita")
@@ -67,10 +67,10 @@ class AIBasedDataTuning:
         with fname.open("r") as f:
             self.data_validation_sql_update= f.read()
 
-    def _update_synthetic_data_cross_statements(self, 
-                            base_table_path: str, 
-                            dml_content: str, 
-                            test_definition: SLTestDefinition, 
+    def _update_synthetic_data_cross_statements(self,
+                            base_table_path: str,
+                            dml_content: str,
+                            test_definition: SLTestDefinition,
                             ddl_map: dict[str, str],
                             test_case_name: str = None) -> dict[str, OutputTestData]:
         """
@@ -97,7 +97,7 @@ class AIBasedDataTuning:
             return accumulatedOutputStatements
         else:
             test_case = next((tc for tc in test_definition.test_suite if tc.name == test_case_name), None)
-         
+
             # Create structured input data
             input_data_list = []
             output_data_list = {} # important to keep a default output for each table
@@ -111,15 +111,15 @@ class AIBasedDataTuning:
                     table_name=input_data.table_name
                 )
                 default_output = OutputTestData(
-                    table_name=input_data.table_name, 
-                    file_name=file_name, 
+                    table_name=input_data.table_name,
+                    file_name=file_name,
                     output_sql_content=sql_content)
                 output_data_list[input_data.table_name]=default_output
                 input_data_list.append(input_test_data)
-            
+
             # The prompt needs to have all the input sql to get a better view of the existing data.
             prompt = self.data_consistency.format(
-                dml_under_test_content=dml_content, 
+                dml_under_test_content=dml_content,
                 structured_input="\n".join([data.insert_sql_content for data in input_data_list])
             )
             logger.info(f"Prompt for data consistency is:\n {prompt}")
@@ -129,7 +129,7 @@ class AIBasedDataTuning:
                     messages=[{"role": "user", "content": prompt}],
                     response_format=OutputTestDataList
                 )
-                obj_response = response.choices[0].message  
+                obj_response = response.choices[0].message
                 if obj_response.parsed:
                     post_fix_unit_test = get_config().get("app").get("post_fix_unit_test", "_ut")
                     for output in obj_response.parsed.outputs:
@@ -147,11 +147,11 @@ class AIBasedDataTuning:
                     return output_data_list
             except Exception as e:
                 print(f"Error: {e}")
-                return output_data_list 
+                return output_data_list
 
     def _update_synthetic_data_column_type_compliant(self, ddl_content: str, sql_content: str) -> str:
         prompt = self.data_column_type_compliant.format(
-            ddl_content=ddl_content, 
+            ddl_content=ddl_content,
             sql_content=sql_content
         )
         logger.info(f"Prompt for data column type compliant is:\n {prompt}")
@@ -161,7 +161,7 @@ class AIBasedDataTuning:
                 messages=[{"role": "user", "content": prompt}],
                 response_format=OutputTestData
             )
-            obj_response = response.choices[0].message  
+            obj_response = response.choices[0].message
             if obj_response.parsed:
                 return obj_response.parsed.output_sql_content
             else:
@@ -173,10 +173,10 @@ class AIBasedDataTuning:
 
 
     def _update_synthetic_data_validation_sql(self,
-                base_table_path: str,  
-                input_list: dict[str, OutputTestData], 
-                dml_content: str, 
-                test_definition: SLTestDefinition, 
+                base_table_path: str,
+                input_list: dict[str, OutputTestData],
+                dml_content: str,
+                test_definition: SLTestDefinition,
                 test_case_name: str = None) -> dict[str, OutputTestData]:
         """
         Update the synthetic data validation SQL for test cases.
@@ -210,34 +210,34 @@ class AIBasedDataTuning:
                 validation_content = f.read()
             input_sqls = '\n'.join([input_data.output_sql_content for input_data in input_list.values()])
             prompt = self.data_validation_sql_update.format(
-                dml_content=dml_content, 
+                dml_content=dml_content,
                 validation_content=validation_content,
                 input_tables=input_sqls
             )
             logger.info(f"Prompt for data validation sql is:\n {prompt}")
-            validation_output = OutputTestData(table_name=test_case.outputs[0].table_name, 
-                file_name=validation_fname, 
+            validation_output = OutputTestData(table_name=test_case.outputs[0].table_name,
+                file_name=validation_fname,
                 output_sql_content=validation_content)
-        
+
             try:
                 response = self.llm_client.chat.completions.parse(
                     model=self.model_name,
                     messages=[{"role": "user", "content": prompt}],
                     response_format=OutputTestData
                 )
-                obj_response = response.choices[0].message  
+                obj_response = response.choices[0].message
                 if obj_response.parsed:
                     validation_output.output_sql_content=obj_response.parsed.output_sql_content
                 return {validation_output.table_name: validation_output}
             except Exception as e:
                 print(f"Error: {e}")
                 return [validation_content]
-        
 
-    def enhance_test_data(self, 
+
+    def enhance_test_data(self,
                 base_table_path: str,
-                dml_content: str, 
-                test_definition: SLTestDefinition, 
+                dml_content: str,
+                test_definition: SLTestDefinition,
                 test_case_name: str = None) -> list[OutputTestData]:
         """
         Get over all in the insert sql content of all test cases to keep consitency
@@ -249,14 +249,14 @@ class AIBasedDataTuning:
         the joins and modify the data between all inputs.
         2. For each test case get the ddl definition and the insert sql content, and validate
         if the data conforms with the ddl.
-        If not, the LLM will be used to generate new data, and this is repeated until 
+        If not, the LLM will be used to generate new data, and this is repeated until
         """
-        ddl_map = {foundation.table_name: from_pipeline_to_absolute(base_table_path + "/" + foundation.ddl_for_test) for foundation in test_definition.foundations} 
+        ddl_map = {foundation.table_name: from_pipeline_to_absolute(base_table_path + "/" + foundation.ddl_for_test) for foundation in test_definition.foundations}
         output_data_list = self._update_synthetic_data_cross_statements(base_table_path, dml_content, test_definition, ddl_map, test_case_name)
         for  output_table_name, output_data in output_data_list.items():
             ddl_file_name = ddl_map.get(output_table_name, "")
             output_sql_content = output_data.output_sql_content
-            logger.info(f"Update insert sql content for {output_sql_content}")         
+            logger.info(f"Update insert sql content for {output_sql_content}")
             with open(ddl_file_name, "r") as f:
                 ddl_content = f.read()
                 update_sql_content = self._update_synthetic_data_column_type_compliant(ddl_content, output_sql_content)

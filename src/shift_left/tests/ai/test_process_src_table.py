@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import pytest
 import unittest
 import shutil
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch
 import os, pathlib
 import tempfile
 from typing import List
@@ -20,7 +20,6 @@ from shift_left.ai.process_src_tables import (
     _save_dml_ddl,
     _search_matching_topic,
     _find_sub_string,
-    _remove_already_processed_table,
     _process_ddl_file
 )
 
@@ -68,69 +67,6 @@ class TestProcessSrcTable(unittest.TestCase):
             raise ValueError(f"{var_name} environment variable is not set")
         return value
 
-    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
-    def test_process_one_file(self, TranslatorToFlinkSqlAgent):
-        """Test basic file migration without parent processing"""
-        mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
-        # Fixed: Spark agent returns (ddl_string, dml_string)
-        mock_translator_agent.translate_to_flink_sqls.return_value = (DDL, DML)
-
-        staging = self._get_env_var("STAGING")
-        src_folder = self._get_env_var("SRC_FOLDER")
-
-        if os.path.exists(staging):
-            shutil.rmtree(staging)
-        migrate_one_file("fct_users",
-            src_folder + "/facts/p5/fct_users.sql",
-            staging,
-            src_folder,
-            process_parents=False,
-            source_type="spark",
-            validate=False)
-        assert os.path.exists(staging + "/fct_users")
-        assert os.path.exists(staging + "/fct_users/fct_users/sql-scripts/dml.fct_users.sql")
-        assert os.path.exists(staging + "/fct_users/fct_users/sql-scripts/ddl.fct_users.sql")
-
-        # Verify file contents
-        with open(staging + "/fct_users/fct_users/sql-scripts/dml.fct_users.sql", "r") as f:
-            assert DML.strip() in f.read()
-        with open(staging + "/fct_users/fct_users/sql-scripts/ddl.fct_users.sql", "r") as f:
-            content = f.read()
-            # DDL gets processed, so check for key elements
-            assert "CREATE TABLE" in content
-
-    @patch("shift_left.core.process_src_tables.get_or_build_sql_translator_agent")
-    def test_process_one_file_recurring(self, TranslatorToFlinkSqlAgent):
-        """Test file migration with parent processing"""
-        mock_translator_agent = TranslatorToFlinkSqlAgent.return_value
-        # Fixed: Spark agent returns (ddl_string, dml_string)
-        mock_translator_agent.translate_to_flink_sqls.return_value = (DDL, DML)
-
-        staging = self._get_env_var("STAGING")
-        src_folder = self._get_env_var("SRC_FOLDER")
-
-        if os.path.exists(staging):
-            shutil.rmtree(staging)
-
-        migrate_one_file("fct_users",
-            src_folder + "/facts/p5/fct_users.sql",
-            staging,
-            src_folder,
-            process_parents=True,
-            source_type="spark",
-            validate=False)
-        assert os.path.exists(staging + "/raw_active_users")
-        assert os.path.exists(staging + "/raw_active_users/raw_active_users/sql-scripts/dml.raw_active_users.sql")
-        assert os.path.exists(staging + "/raw_active_users/raw_active_users/sql-scripts/ddl.raw_active_users.sql")
-
-        # Fixed: Check actual file content with proper expectations
-        with open(staging + "/dim_user_groups/dim_user_groups/sql-scripts/dml.dim_user_groups.sql", "r") as f:
-            content = f.read()
-            assert DML.strip() in content
-        with open(staging + "/dim_user_groups/dim_user_groups/sql-scripts/ddl.dim_user_groups.sql", "r") as f:
-            content = f.read()
-            # DDL gets processed, check for key elements instead of exact match
-            assert "CREATE TABLE" in content
 
     def test_save_dml_ddl_with_strings(self):
         """Test _save_dml_ddl function with string inputs (recently fixed bug)"""
@@ -140,7 +76,7 @@ class TestProcessSrcTable(unittest.TestCase):
             os.makedirs(scripts_dir)
 
             # Test with strings (the bug scenario)
-            _save_dml_ddl(temp_dir, "test_table", DML, DDL)
+            _save_dml_ddl(temp_dir, "test_table", [DML], [DDL])
 
             # Verify files were created correctly
             dml_file = os.path.join(scripts_dir, "dml.test_table.sql")
@@ -159,21 +95,6 @@ class TestProcessSrcTable(unittest.TestCase):
                 content = f.read()
                 assert len(content) > 10  # Should be full SQL, not single characters
                 assert "CREATE TABLE" in content
-
-    def test_save_dml_ddl_with_lists(self):
-        """Test _save_dml_ddl function with list inputs"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            scripts_dir = os.path.join(temp_dir, "sql-scripts")
-            os.makedirs(scripts_dir)
-
-            # Test with lists
-            _save_dml_ddl(temp_dir, "test_table", [DML], [DDL])
-
-            dml_file = os.path.join(scripts_dir, "dml.test_table.sql")
-            ddl_file = os.path.join(scripts_dir, "ddl.test_table.sql")
-
-            assert os.path.exists(dml_file)
-            assert os.path.exists(ddl_file)
 
     def test_save_dml_ddl_with_multiple_statements(self):
         """Test _save_dml_ddl function with multiple statements"""
@@ -207,7 +128,7 @@ class TestProcessSrcTable(unittest.TestCase):
             assert len(files) == 0
 
             # Test with empty strings
-            _save_dml_ddl(temp_dir, "test_table", "", "")
+            _save_dml_ddl(temp_dir, "test_table", [""], [""])
 
             # Should not create any files
             files = os.listdir(scripts_dir)
@@ -224,7 +145,7 @@ class TestProcessSrcTable(unittest.TestCase):
 
         try:
             # Patch the TOPIC_LIST_FILE at module level
-            with patch('shift_left.core.process_src_tables.TOPIC_LIST_FILE', tmp_file_path):
+            with patch('shift_left.ai.process_src_tables.TOPIC_LIST_FILE', tmp_file_path):
                 result = _search_matching_topic("orders", [])
                 assert result == "org.orders.v1"
 
@@ -244,7 +165,7 @@ class TestProcessSrcTable(unittest.TestCase):
 
         try:
             # Patch the TOPIC_LIST_FILE at module level
-            with patch('shift_left.core.process_src_tables.TOPIC_LIST_FILE', tmp_file_path):
+            with patch('shift_left.ai.process_src_tables.TOPIC_LIST_FILE', tmp_file_path):
                 # Should filter out test. and dev. prefixes
                 result = _search_matching_topic("orders", ["test.", "dev."])
                 assert result == "org.orders.v1"
@@ -288,40 +209,61 @@ class TestProcessSrcTable(unittest.TestCase):
     def test_migrate_one_file_invalid_source_type(self):
         """Test migrate_one_file with invalid source type"""
         with pytest.raises(Exception) as exc_info:
-            migrate_one_file("test_table", "test.sql", "/tmp", "/src",
+            migrate_one_file("test_table", "test.sql",
+                           staging_target_folder="/tmp",
                            source_type="invalid_type")
         assert "source_type parameter needs to be one of" in str(exc_info.value)
 
     def test_migrate_one_file_invalid_file_extension(self):
         """Test migrate_one_file with invalid file extension"""
         with pytest.raises(Exception) as exc_info:
-            migrate_one_file("test_table", "test.txt", "/tmp", "/src",
+            migrate_one_file("test_table", "test.txt", staging_target_folder="/tmp",
                            source_type="spark")
         # Fixed: Match actual error message from code
         assert "sql_src_file parameter needs to be a sql file" in str(exc_info.value)
 
-    @patch("shift_left.core.process_src_tables.KsqlToFlinkSqlAgent")
-    def test_migrate_one_file_ksql(self, mock_ksql_agent):
-        """Test migrate_one_file with KSQL source type"""
-        # Mock the KSQL agent
-        mock_agent_instance = mock_ksql_agent.return_value
-        mock_agent_instance.translate_to_flink_sqls.return_value = ([DDL], [DML])
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create a test KSQL file
-            ksql_file = os.path.join(temp_dir, "test.ksql")
-            with open(ksql_file, 'w') as f:
-                f.write("CREATE STREAM test_stream AS SELECT * FROM source_stream;")
 
-            migrate_one_file("test_stream", ksql_file, temp_dir, temp_dir,
-                           source_type="ksql")
+    @patch("shift_left.ai.ksql_code_agent.KsqlToFlinkSqlAgent.translate_to_flink_sqls")
+    def test_simple_ksql_creation_folders_and_files(self, mock_translate_to_flink_sqls):
+        mock_translate_to_flink_sqls.return_value = ["CREATE TABLE BASIC_TABLE_STREAM"], ["SELECT * FROM BASIC_TABLE_STREAM"]
+        src_folder = str(data_dir / "ksql-project/sources")
+        staging = str(data_dir / "flink-project/staging/ut")
+        product_name = "basic"
+        migrate_one_file(table_name="BASIC_TABLE_STREAM",
+                        sql_src_file=src_folder + "/ddl-basic-table.ksql",
+                        staging_target_folder=staging,
+                        product_name=product_name,
+                        source_type="ksql",
+                        validate=False)
+        assert os.path.exists(staging + "/"+ product_name + "/basic_table_stream")
+        assert os.path.exists(staging + "/"+ product_name + "/basic_table_stream/sql-scripts/dml.basic_table_stream.sql")
+        assert os.path.exists(staging + "/"+ product_name + "/basic_table_stream/sql-scripts/ddl.basic_table_stream.sql")
+        shutil.rmtree(staging)
 
-            # Verify the KSQL agent was called
-            mock_agent_instance.translate_to_flink_sqls.assert_called_once()
-
-            # Verify folder structure was created
-            assert os.path.exists(os.path.join(temp_dir, "test_stream"))
-
+    @patch("shift_left.ai.spark_sql_code_agent.SparkToFlinkSqlAgent.translate_to_flink_sqls")
+    def test_simple_spark_creation_folders_and_files(self, mock_translate_to_flink_sqls):
+        mock_translate_to_flink_sqls.return_value = ["CREATE TABLE src_customer_journey"], ["SELECT * FROM src_customer_journey"]
+        src_folder = str(data_dir / "spark-project/sources")
+        staging = str(data_dir / "flink-project/staging/ut")
+        product_name = "c360"
+        migrate_one_file(table_name="src_customer_journey",
+                        sql_src_file=src_folder + "/c360/src_customer_journey.sql",
+                        staging_target_folder=staging,
+                        product_name=product_name,
+                        source_type="spark",
+                        validate=False)
+        assert os.path.exists(staging + "/"+ product_name + "/src_customer_journey")
+        assert os.path.exists(staging + "/"+ product_name + "/src_customer_journey/sql-scripts/dml.src_customer_journey.sql")
+        assert os.path.exists(staging + "/"+ product_name + "/src_customer_journey/sql-scripts/ddl.src_customer_journey.sql")
+        # Verify file contents
+        with open(staging + "/"+ product_name + "/src_customer_journey/sql-scripts/dml.src_customer_journey.sql", "r") as f:
+            content = f.read()
+            assert len(content) > 10
+        with open(staging + "/"+ product_name + "/src_customer_journey/sql-scripts/ddl.src_customer_journey.sql", "r") as f:
+            content = f.read()
+            assert "CREATE TABLE" in content
+        shutil.rmtree(staging)
 
 if __name__ == "__main__":
     unittest.main()

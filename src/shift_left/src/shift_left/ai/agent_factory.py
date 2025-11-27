@@ -1,14 +1,15 @@
 
 from shift_left.ai.spark_sql_code_agent import SparkToFlinkSqlAgent
 from shift_left.ai.ksql_code_agent import KsqlToFlinkSqlAgent
+from shift_left.ai.translator_to_flink_sql import TranslatorToFlinkSqlAgent
 from shift_left.core.utils.app_config import  logger
 SPARK_AGENT_TYPE = "spark"
 KSQL_AGENT_TYPE = "ksql"
 class AgentFactory:
     def __init__(self):
-        self._agent_class = None
+        self._agent_class: TranslatorToFlinkSqlAgent = None # type: ignore
 
-    def get_or_build_sql_translator_agent(self, type: str = SPARK_AGENT_TYPE):
+    def get_or_build_sql_translator_agent(self, type: str = SPARK_AGENT_TYPE) -> TranslatorToFlinkSqlAgent:
         """
         Factory to get the SQL translator agent using external configuration file, or
         the default one: DbtTranslatorToFlinkSqlAgent

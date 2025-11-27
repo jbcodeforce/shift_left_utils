@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+---
+
+# Markdown Writing Guidelines
+
+When writing or generating markdown content:
+
+## Style Requirements
+- **No emojis**: Never include emoji characters in markdown files
+- **Concise sentences**: Use short, direct sentences that convey information efficiently
+- **Technical tone**: Avoid marketing language, superlatives, and promotional phrasing
+
+## Examples
+
+**Bad:**
+```markdown
+🚀 Our amazing platform makes it super easy to deploy your awesome applications! 
+You'll love how incredibly simple and powerful it is! ✨
+```
+
+**Good:**
+```markdown
+Deploy applications using the platform CLI or API. The deployment process takes 2-5 minutes.
+```
+
+## Specific Patterns to Avoid
+- Exclamation marks (except in code examples or warnings)
+- Words like: amazing, awesome, incredible, revolutionary, game-changing
+- Phrases like: "you'll love", "easily", "simply", "just"
+- Any emoji or decorative unicode characters
+
+## Preferred Approach
+- State facts and features directly
+- Use technical specifications and concrete details
+- Include command examples and code snippets
+- Focus on "what" and "how" rather than "how great"

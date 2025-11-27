@@ -28,7 +28,7 @@ class TestBgTableWorker(unittest.TestCase):
         );
         """
         transformer = ReplaceVersionInSqlContent()
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, string_to_change_to="_v2")
         assert updated
         assert "src_table_v2" in sql_out
         print(sql_out)
@@ -42,11 +42,11 @@ class TestBgTableWorker(unittest.TestCase):
         );
         """
         transformer = ReplaceVersionInSqlContent()
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, string_to_change_to="_v2")
         assert updated
         assert "dim_table_v3" in sql_out
         # continue to verify automation can take table name create by itself.
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_out, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_out, string_to_change_to="_v2")
         assert updated
         assert "dim_table_v4" in sql_out
         print(sql_out)
@@ -62,11 +62,11 @@ class TestBgTableWorker(unittest.TestCase):
         LEFT JOIN categories c ON cte1.id = c.id
         """
         transformer = ReplaceVersionInSqlContent()
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, string_to_change_to="_v2")
         assert updated
         assert "dim_table_v2" in sql_out
         # continue to verify automation can take table name create by itself.
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_out, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_out, string_to_change_to="_v2")
         assert updated
         assert "dim_table_v3" in sql_out
         print(sql_out)
@@ -75,13 +75,13 @@ class TestBgTableWorker(unittest.TestCase):
         with open(os.path.join(os.getenv("PIPELINES"), "intermediates/p2/z/sql-scripts/ddl.z.sql"), 'r') as f:
             sql_content = f.read()
         transformer = ReplaceVersionInSqlContent()
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, string_to_change_to="_v2")
         assert updated
         assert "z_v2" in sql_out
         print(sql_out)
         with open(os.path.join(os.getenv("PIPELINES"), "intermediates/p2/z/sql-scripts/dml.z.sql"), 'r') as f:
             sql_content = f.read()
-        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, version="_v2")
+        updated, sql_out = transformer.update_sql_content(sql_content=sql_content, string_to_change_to="_v2")
         assert updated
         assert "z_v2" in sql_out
         print(sql_out)

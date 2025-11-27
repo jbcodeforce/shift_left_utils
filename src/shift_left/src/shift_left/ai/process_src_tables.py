@@ -12,19 +12,16 @@ import os
 from pathlib import Path
 from jinja2 import Environment, PackageLoader
 
-from shift_left.ai.translator_to_flink_sql import get_or_build_sql_translator_agent
-from shift_left.ai.ksql_code_agent import KsqlToFlinkSqlAgent
-
+from shift_left.ai.agent_factory import AgentFactory
+from shift_left.ai.translator_to_flink_sql import TranslatorToFlinkSqlAgent
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
-    SCRIPTS_DIR,
-    get_or_build_source_file_inventory,
-    extract_product_name
+    SCRIPTS_DIR
 )
-from shift_left.core.utils.app_config import get_config, logger
+from shift_left.core.utils.app_config import logger
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions, get_long_table_name
-from typing import List, Tuple, Optional
+from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
+from typing import Any, List, Tuple, Optional
 
 
 TMPL_FOLDER="templates"
@@ -39,69 +36,53 @@ TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 def migrate_one_file(table_name: str,
                     sql_src_file: str,
                     staging_target_folder: str,
-                    src_folder_path: str,
-                    process_parents: bool = False,
                     source_type: str = "spark",
-                    product_name: str = None,
+                    product_name: str = "",
                     validate: bool = False):
     """ Process one source sql file to extract code from and migrate to Flink SQL.
     This is the enry point of migration, and routes to the different type of migration.
     """
-    if product_name:
-        staging_target_folder = staging_target_folder + "/" + product_name
-    print(f"\nMigrate {source_type} Table defined in {sql_src_file} to {staging_target_folder}/{table_name}")
-    print("-" * 40)
     logger.info(f"Migration process_one_file: {sql_src_file} to {staging_target_folder} as {table_name}")
     create_folder_if_not_exist(staging_target_folder)
+    table_folder = table_name.lower()
+    table_folder, internal_table_name = build_folder_structure_for_table(table_folder, staging_target_folder, product_name)
+
     if source_type in ['dbt', 'spark']:
         if sql_src_file.endswith(".sql"):
-            _process_spark_sql_file(table_name=table_name,
+            ddl_contents, dml_contents = _process_spark_sql_file(table_name=table_name,
                                     sql_src_file_name=sql_src_file,
-                                    target_path=staging_target_folder,
-                                    src_folder_path=src_folder_path,
-                                    walk_parent=process_parents,
                                     validate=validate)
             logger.info(f"Processed {table_name} to {staging_target_folder}")
         else:
             raise Exception("Error: the sql_src_file parameter needs to be a sql file")
     elif source_type == "ksql":
-        _process_ksql_sql_file(table_name=table_name,
+        ddl_contents, dml_contents = _process_ksql_sql_file(table_name=table_name,
                                ksql_src_file=sql_src_file,
-                               target_path=staging_target_folder,
-                               validate=validate,
-                               product_name=product_name)
+                               validate=validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
-
+    _save_dml_ddl(table_folder, internal_table_name, dml_contents, ddl_contents)
 # ------------------------------------------------------------
 # --- private functions
 # ------------------------------------------------------------
 
 def _process_ksql_sql_file(table_name: str,
                            ksql_src_file: str,
-                           target_path: str,
                            validate: bool = False,
-                           product_name: str = None
                            ) -> Tuple[List[str], List[str]]:
     """
     Process a ksql sql file to Flink SQL.
     """
-    table_folder = table_name.lower()
-    table_folder, internal_table_name = build_folder_structure_for_table(table_folder, target_path, product_name)
     agent = AgentFactory().get_or_build_sql_translator_agent("ksql")
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
         ddl_contents, dml_contents = agent.translate_to_flink_sqls(table_name, ksql_content, validate=validate)
-        _save_dml_ddl(table_folder, internal_table_name, dml_contents, ddl_contents)
         return ddl_contents, dml_contents
 
 
 def _process_spark_sql_file(table_name: str,
-                                sql_src_file_name: str,
-                                target_path: str,
-                                src_folder_path: str,
-                                walk_parent: bool = False,
-                                validate: bool = False):
+                            sql_src_file_name: str,
+                            validate: bool = False):
     """
     From Spark SQL to Flink SQL
     :param src_file_name: the file name of the dbt, spark SQL source file
@@ -110,42 +91,16 @@ def _process_spark_sql_file(table_name: str,
     :param walk_parent: Assess if it needs to process the dependencies
     :param validate: Assess if it needs to validate the sql using Confluent Cloud for Flink
     """
-    where_to_write_path = os.path.join(Path(target_path), table_name)
-    logger.info(f"where_to_write_path: {where_to_write_path}")
-    table_folder, internal_table_name = build_folder_structure_for_table(table_name, where_to_write_path, None)
-    logger.info(f"table_folder: {table_folder}, internal_table_name: {internal_table_name}")
-    parents=[]
-    translator_agent = get_or_build_sql_translator_agent("spark")
+    parents=set[str]()
+    translator_agent = AgentFactory().get_or_build_sql_translator_agent("spark")
     with open(sql_src_file_name, "r") as f:
         sql_content= f.read()
         parser = SQLparser()
         parents=parser.extract_table_references(sql_content)
         if table_name in parents:
             parents.remove(table_name)
-        ddl_result, dml_result = translator_agent.translate_to_flink_sqls(table_name=table_name, sql=sql_content, validate=validate)
-        # Convert to lists if they're strings (for consistency across different agents)
-        ddls = [ddl_result] if isinstance(ddl_result, str) else ddl_result
-        dmls = [dml_result] if isinstance(dml_result, str) else dml_result
-        _save_dml_ddl(table_folder, internal_table_name, dmls, ddls)
-    if walk_parent:
-        parents=_remove_already_processed_table(parents)
-        for parent_table_name in parents:
-            _process_from_table_name(parent_table_name, target_path, src_folder_path, walk_parent)
-
-def _process_from_table_name(table_name: str, staging_folder: str, src_folder_path: str, walk_parent: bool):
-    """
-    Load matching sql file given the table name as input.
-    This method may be useful when we get the table name from the dependencies list of another table.
-
-    :param: the table name
-    """
-    all_files= get_or_build_source_file_inventory(src_folder_path)
-    if table_name in all_files:
-        matching_sql_file=all_files[table_name]
-        logger.info(f"\tStart processing the table: {table_name} from the dbt file: {matching_sql_file}")
-        migrate_one_file(table_name, matching_sql_file, staging_folder, src_folder_path, walk_parent)
-    else:
-        logger.error(f"Matching sql file {table_name} not found in {all_files}!")
+        ddls, dmls = translator_agent.translate_to_flink_sqls(table_name=table_name, sql=sql_content, validate=validate)
+    return ddls, dmls
 
 
 def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
@@ -252,56 +207,6 @@ def _save_dml_ddl(content_path: str,
             dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql"
             _save_one_file(dml_fn,dml)
             idx+=1
-
-def _remove_already_processed_table(parents: list[str]) -> list[str]:
-    """
-    If a table in the provided list of parents is already processed, remove it from the list.
-    A processed table is one already define in the pipelines folder hierarchy.
-    """
-    newParents=[]
-    for parent in parents:
-        table_name=parent.replace("src_","").strip()
-        if not _search_table_in_processed_tables(table_name):
-            newParents.append(parent)
-        else:
-            logger.info(f"{table_name} already processed")
-    return newParents
-
-
-
-def _search_table_in_processed_tables(table_name: str) -> bool:
-    pipeline_path=os.getenv("PIPELINES","../pipelines")
-    for _, dirs, _ in os.walk(pipeline_path):
-        for dir in dirs:
-            if table_name == dir:
-                return True
-    else:
-        return False
-
-# TODO this is dead code as of now, to remove later as we may need it.
-def _process_source_sql_file(table_name: str,
-                            src_file_name: str,
-                             target_path: str,
-                             product_name: str,
-                             validate: bool = False):
-    """
-    Transform the source file content to the new Flink SQL format within the source_target_path.
-    It creates a tests folder.
-
-    The source file is added to the table to process tracking file
-
-    :param src_file_name: the file name of the dbt source file
-    :param source_target_path: the path for the newly created Flink sql file
-
-    """
-    print(f"process src SQL file {src_file_name} from {target_path}")
-    table_folder, internal_table_name = build_folder_structure_for_table(table_name,  target_path + "/sources", product_name)
-    config = get_config()
-    fields = _create_src_ddl_statement(internal_table_name, config, f"{table_folder}/{SCRIPTS_DIR}")
-    _create_dml_statement(f"{internal_table_name}", f"{table_folder}/{SCRIPTS_DIR}", fields, config)
-
-
-
 
 def _search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:
     """

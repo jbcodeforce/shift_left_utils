@@ -139,6 +139,43 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
     * `sql_content_modifier` specifies the custom class to use to do some SQL content modification depending of the target environment. This is a way to extend the CLI logic to specific usage.
     
 
+
+### Configuration File Setup
+
+* Update the content of the config.yaml to reflect your Confluent Cloud environment. (For the commands used for migration, you do not need Kafka settings.)
+  ```yaml
+  # Confluent Cloud Configuration
+  confluent_cloud:
+    organization_id: "YOUR_CLUSTER_ID"
+    environment_id: "YOUR_ENVIRONMENT_ID"
+    url_scope: public
+    region: "YOUR_REGION"
+    provider: aws
+  flink:
+    flink_url: flink....confluent.cloud
+    compute_pool_id: "YOUR_COMPUTE_POOL_ID"
+    catalog_name: "envionment_name"
+    database_name: "kafka_cluster_name"
+  ```
+
+
+* Set the following environment variables before using the tool. This can be done by:
+    ```sh
+    cp src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
+    ```
+
+    Modify the CONFIG_FILE, FLINK_PROJECT, SRC_FOLDER, SL_LLM_* variables
+
+* Source it:
+    ```sh
+    source set_env
+    ```
+
+* Validate config.yaml
+	```bash
+	shift_left project validate-config
+	```
+
 ???- warning "Security access"
     The config.yaml file is ignored in Git. So having the keys in this file is not a major concern, as it is used by the developers only. But it may be possible, in the future, to access secrets using a Key manager API. This could be a future enhancement.
 

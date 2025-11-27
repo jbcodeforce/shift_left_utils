@@ -1,19 +1,24 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 
-An enhanced agentic flow to translate Spark SQL to Flink SQL with validation and error correction.
+Spark SQL to Flink SQL Translation Agent
+
+An enhanced agentic flow to translate Spark SQL to Flink SQL with
+validation and error correction.
+
+The translation process includes multiple validation
+steps and can handle both single and multiple table/stream definitions.
+
 """
 
 from pydantic import BaseModel
 from typing import Tuple, List, Dict
 import json
 import importlib.resources
-from enum import Enum
 
-from shift_left.core.utils.app_config import get_config, logger
-from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
-from shift_left.core.models.flink_statement_model import Statement
-from shift_left.ai.translator_to_flink_sql import TranslatorToFlinkSqlAgent
+
+from shift_left.core.utils.app_config import logger
+from shift_left.ai.translator_to_flink_sql import TranslatorToFlinkSqlAgent, SqlTableDetection, FlinkSqlForRefinement, ErrorCategory
 
 class SparkSqlFlinkDml(BaseModel):
     flink_dml_output: str
@@ -28,22 +33,96 @@ class SqlRefinement(BaseModel):
     explanation: str
     changes_made: List[str]
 
-class ErrorCategory(Enum):
-    SYNTAX_ERROR = "syntax_error"
-    FUNCTION_INCOMPATIBILITY = "function_incompatibility"
-    TYPE_MISMATCH = "type_mismatch"
-    WATERMARK_ISSUE = "watermark_issue"
-    CONNECTOR_ISSUE = "connector_issue"
-    SEMANTIC_ERROR = "semantic_error"
-    UNKNOWN = "unknown"
-
 
 class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     def __init__(self):
         super().__init__()
-        self.refinement_system_prompt = ""
-        self.validation_history: List[Dict] = []
         self._load_prompts()
+
+    # -------------------------
+    # Public API
+    # -------------------------
+    def translate_to_flink_sqls(self,
+                    table_name: str,
+                    sql: str,
+                    validate: bool = True
+    ) -> Tuple[List[str], List[str]]:
+        """Translation with validation enabled by default"""
+        print(f"Starting  Spark SQL to Flink SQL translation with {self.model_name}")
+        logger.info(f"Starting translation with validation={validate}")
+
+        # Reset validation history
+        self.validation_history = []
+        logger.info("\n0/ Cleaning SQL input by removing DROP TABLE statements and comments...\n")
+        sql = self._clean_sql_input(sql)
+        logger.info(f"Cleaned SQL input: {sql[:400]}...")
+        logger.info(f"\n1/ Analyzing SQL input for multiple CREATE TABLE statements using: {self.model_name} \n")
+        table_detection = self._table_detection_agent(sql)
+        logger.info(f"Table detection result: {table_detection.model_dump_json()}")
+        final_ddl = []
+        final_dml = []
+        if table_detection.has_multiple_tables:
+            # Process multiple statements individually for better accuracy
+            logger.info(f"Found {len(table_detection.table_statements)} separate CREATE statements. Processing each separately...")
+            for i, table_statement in enumerate(table_detection.table_statements):
+                logger.info(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:100]}...")
+                # Translate individual statement
+                ddl_sql, dml_sql = self._translator_agent(table_statement)
+                logger.info(f"Done with translator agent for statement {i+1}, DDL: {ddl_sql[:100]}..., DML: {dml_sql[:50] if dml_sql else 'empty'}...")
+                self._snapshot_ddl_dml(table_name + "_" + str(i), ddl_sql, dml_sql)
+                # Validate and refine the translation
+                ddl_sql, dml_sql = self._mandatory_validation_agent(ddl_sql, dml_sql)
+                logger.info(f"Done with mandatory validation agent for statement {i+1}")
+                self._snapshot_ddl_dml(table_name + "_" + str(i), ddl_sql, dml_sql)
+                # Collect non-empty results
+                if ddl_sql.strip():
+                    final_ddl.append(ddl_sql)
+                if dml_sql and dml_sql.strip():
+                    final_dml.append(dml_sql)
+        else:
+            # Step 1: Translate Spark SQL to Flink SQL
+            print("\nStep 1: Processing single Spark SQL to Flink SQL...")
+            ddl_sql, dml_sql = self._translator_agent(sql)
+            print(f"Initial Migrated DML: {dml_sql[:300]}..." if len(dml_sql) > 300 else f"Initial DML: {dml_sql}")
+            if not dml_sql or dml_sql.strip() == "":
+                print("Translation failed - no output generated")
+                return [""], [""]
+
+            # Step 2: Generate DDL from DML if needed
+            print("\nStep 2: Generating DDL from DML...")
+            if not ddl_sql or ddl_sql.strip() == "":
+                ddl_sql = self._ddl_generation(dml_sql)
+                print(f"Initial Migrated DDL: {ddl_sql[:300]}..." if len(ddl_sql) > 300 else f"Initial DDL: {ddl_sql}")
+            ddl_sql, dml_sql = self._mandatory_validation_agent(ddl_sql, dml_sql)
+            self._snapshot_ddl_dml(table_name, ddl_sql, dml_sql)
+            final_ddl = [ddl_sql]
+            final_dml = [dml_sql]
+        # Step 3: Validation (if enabled)
+        if validate:
+            print("3/ Start validating the flink SQLs using Confluent Cloud for Flink, do you want to continue? (y/n)")
+            answer = input()
+            if answer == "y":
+                validated_ddls = []
+                validated_dmls = []
+
+                # Validate each DDL/DML pair against live environment
+                for ddl, dml in zip(final_ddl, final_dml):
+                    # Validate DDL first (tables must exist before queries)
+                    ddl, validated = self._iterate_on_validation(ddl)
+                    if validated:
+                        ddl = self._process_syntax_validation(ddl)
+                        if dml:
+                            dml, validated = self._iterate_on_validation(dml)
+                            if validated:
+                                dml = self._process_syntax_validation(dml)
+                    validated_dmls.append(dml)
+                    validated_ddls.append(ddl)
+                    self._snapshot_ddl_dml(table_name, ddl, dml)
+                # Use validated results
+                final_ddl = validated_ddls
+                final_dml = validated_dmls
+
+        return final_ddl, final_dml
 
     def _load_prompts(self):
         fname = importlib.resources.files("shift_left.ai.prompts.spark_fsql").joinpath("translator.txt")
@@ -55,6 +134,12 @@ class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         fname = importlib.resources.files("shift_left.ai.prompts.spark_fsql").joinpath("refinement.txt")
         with fname.open("r") as f:
             self.refinement_system_prompt= f.read()
+        fname = importlib.resources.files("shift_left.ai.prompts.spark_fsql").joinpath("mandatory_validation.txt")
+        with fname.open("r") as f:
+            self.mandatory_validation_system_prompt= f.read()
+        fname = importlib.resources.files("shift_left.ai.prompts.spark_fsql").joinpath("table_detection.txt")
+        with fname.open("r") as f:
+            self.table_detection_system_prompt= f.read()
 
 
     def _translator_agent(self, sql: str) -> str:
@@ -278,45 +363,7 @@ class SparkToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
             return ""
 
 
-    # -------------------------
-    # Public API
-    # -------------------------
-    def translate_to_flink_sqls(self, table_name: str, sql: str, validate: bool = True) -> Tuple[List[str], List[str]]:
-        """Translation with validation enabled by default"""
-        print(f"🚀 Starting  Spark SQL to Flink SQL translation with {self.model_name}")
-        logger.info(f"Starting translation with validation={validate}")
 
-        # Reset validation history
-        self.validation_history = []
-
-        # Step 1: Translate Spark SQL to Flink SQL
-        print("\nStep 1: Translating Spark SQL to Flink SQL...")
-        dml_sql = self._translator_agent(sql)
-        print(f"Initial Migrated DML: {dml_sql[:300]}..." if len(dml_sql) > 300 else f"Initial DML: {dml_sql}")
-
-        if not dml_sql or dml_sql.strip() == "":
-            print("Translation failed - no output generated")
-            return "", ""
-
-        # Step 2: Generate DDL from DML if needed
-        print("\nStep 2: Generating DDL from DML...")
-        ddl_sql = self._ddl_generation(dml_sql)
-        print(f"Initial Migrated DDL: {ddl_sql[:300]}..." if len(ddl_sql) > 300 else f"Initial DDL: {ddl_sql}")
-
-        # Step 3: Validation (if enabled)
-        if validate:
-            print("\nStep 3: Validating with agentic refinement...")
-            final_ddl, final_dml = self._mandatory_validation_agent(ddl_sql, dml_sql)
-        else:
-            print("\nStep 3: Skipping validation (disabled)")
-            final_ddl, final_dml = ddl_sql, dml_sql
-
-        print(f"\nTranslation complete!")
-        print(f"Final DDL length: {len(final_ddl)} characters")
-        print(f"Final DML length: {len(final_dml)} characters")
-
-        logger.info("Translation completed successfully")
-        return final_ddl, final_dml
 
     def get_validation_history(self) -> List[Dict]:
         """Return the validation history for debugging purposes"""

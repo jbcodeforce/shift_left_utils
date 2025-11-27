@@ -46,5 +46,8 @@
   },
   "[markdown]": {
     "files.trimTrailingWhitespace": false
-  }
+},
+"cursorpyright.analysis.extraPaths": [
+	"src/shift_left/src"
+]
 }

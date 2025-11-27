@@ -235,7 +235,9 @@ class ReplaceVersionInSqlContent(TableWorker):
                             string_to_change_from: str= "",
                             string_to_change_to: str= "")  -> Tuple[bool, str]:
         updated = False
-        # TO DO
+        if string_to_change_from in sql_content:
+            sql_content = sql_content.replace(string_to_change_from, string_to_change_to,1)
+            updated = True
         return updated, sql_content
 class ReplaceEnvInSqlContent(TableWorker):
     env = "dev"

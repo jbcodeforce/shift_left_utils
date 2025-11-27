@@ -47,7 +47,10 @@
             "envFile": "${workspaceFolder}/.env",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests",
+				"SL_LLM_BASE_URL" : "http://localhost:11434/v1",
+				"SL_LLM_MODEL" : "qwen3-coder:30b",
+				"SL_LLM_API_KEY" : "ollama_test_key"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },

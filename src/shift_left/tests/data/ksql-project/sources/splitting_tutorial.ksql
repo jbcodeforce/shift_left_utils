@@ -1,0 +1,19 @@
+CREATE STREAM acting_events (name VARCHAR, title VARCHAR, genre VARCHAR)
+    WITH (KAFKA_TOPIC='acting-events',
+          PARTITIONS=1,
+          VALUE_FORMAT='AVRO');
+
+CREATE STREAM acting_events_drama AS
+    SELECT name, title
+    FROM acting_events
+    WHERE genre='drama';
+
+CREATE STREAM acting_events_fantasy AS
+    SELECT name, title
+    FROM acting_events
+    WHERE genre='fantasy';
+
+CREATE STREAM acting_events_other AS
+    SELECT name, title, genre
+    FROM acting_events
+    WHERE genre != 'drama' AND genre != 'fantasy';
