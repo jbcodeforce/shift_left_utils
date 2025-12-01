@@ -1,8 +1,8 @@
-CREATE TABLE IF NOT EXISTS app_orders (
+CREATE TABLE IF NOT EXISTS orders (
     window_start TIMESTAMP(3),
     window_end TIMESTAMP(3),
     customer_id STRING,
-    sum_order_amount DECIMAL(38, 18),
+    order_amount_sum DECIMAL(38, 18),
     PRIMARY KEY (customer_id) NOT ENFORCED
 ) DISTRIBUTED BY HASH(customer_id) INTO 1 BUCKETS WITH (
     'changelog.mode' = 'append',
@@ -13,5 +13,6 @@ CREATE TABLE IF NOT EXISTS app_orders (
     'scan.bounded.mode' = 'unbounded',
     'scan.startup.mode' = 'earliest-offset',
     'value.format' = 'json-registry',
+    'key.format' = 'json-registry'
     'value.fields-include' = 'all'
 );

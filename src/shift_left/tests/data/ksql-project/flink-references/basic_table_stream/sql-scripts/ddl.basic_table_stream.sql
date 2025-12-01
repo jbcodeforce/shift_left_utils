@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS BASIC_TABLE_STREAM (
+CREATE TABLE IF NOT EXISTS basic_table_stream (
   kpiName STRING,
   kpiStatus STRING,
   highMetricThreshold INT,
@@ -7,12 +7,10 @@ CREATE TABLE IF NOT EXISTS BASIC_TABLE_STREAM (
   elementType STRING,
   interfaceName STRING,
   dbTable STRING,
-  PRIMARY KEY(kpiName) NOT ENFORCED
-) DISTRIBUTED BY HASH(kpiName) INTO 1 BUCKETS
-WITH (
+  PRIMARY KEY (kpiName) NOT ENFORCED
+) DISTRIBUTED BY HASH(kpiName) INTO 1 BUCKETS WITH (
   'changelog.mode' = 'append',
-  'key.avro-registry.schema-context' = '.flink-dev',
-  'value.avro-registry.schema-context' = '.flink-dev',
+  'value.json-registry.schema-context' = '.flink-dev',
   'value.format' = 'json-registry',
   'kafka.retention.time' = '0',
   'kafka.producer.compression.type' = 'snappy',

@@ -17,7 +17,7 @@ data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data dir
 os.environ["TOPIC_LIST_FILE"] = str(data_dir / "flink-project/src_topic_list.txt")
 from shift_left.ai.process_src_tables import (
     migrate_one_file,
-    _save_dml_ddl,
+    _save_dmls_ddls,
     _search_matching_topic,
     _find_sub_string,
     _process_ddl_file
@@ -76,7 +76,7 @@ class TestProcessSrcTable(unittest.TestCase):
             os.makedirs(scripts_dir)
 
             # Test with strings (the bug scenario)
-            _save_dml_ddl(temp_dir, "test_table", [DML], [DDL])
+            _save_dmls_ddls(temp_dir, "test_table", [DML], [DDL])
 
             # Verify files were created correctly
             dml_file = os.path.join(scripts_dir, "dml.test_table.sql")
@@ -106,7 +106,7 @@ class TestProcessSrcTable(unittest.TestCase):
             ddl_list = [DDL, "CREATE TABLE table2 (id INT);"]
             dml_list = [DML, "INSERT INTO table2 VALUES (1);"]
 
-            _save_dml_ddl(temp_dir, "test_table", dml_list, ddl_list)
+            _save_dmls_ddls(temp_dir, "test_table", dml_list, ddl_list)
 
             # Should create files with indexes
             assert os.path.exists(os.path.join(scripts_dir, "dml.test_table.sql"))
@@ -121,14 +121,14 @@ class TestProcessSrcTable(unittest.TestCase):
             os.makedirs(scripts_dir)
 
             # Test with None values
-            _save_dml_ddl(temp_dir, "test_table", [], [])
+            _save_dmls_ddls(temp_dir, "test_table", [], [])
 
             # Should not create any files
             files = os.listdir(scripts_dir)
             assert len(files) == 0
 
             # Test with empty strings
-            _save_dml_ddl(temp_dir, "test_table", [""], [""])
+            _save_dmls_ddls(temp_dir, "test_table", [""], [""])
 
             # Should not create any files
             files = os.listdir(scripts_dir)

@@ -260,7 +260,7 @@ class TestSparkToFlinkSqlAgent(unittest.TestCase):
         mock_response.choices[0].message.parsed.changes_made = ["Fixed function compatibility issue"]
 
         with patch.object(self.agent.llm_client.chat.completions, 'parse', return_value=mock_response):
-            refined_ddl, refined_dml = self.agent._refinement_agent(
+            refined_ddl, refined_dml = self.agent._run_refinement_agent(
                 original_ddl, original_dml, error_message, []
             )
 

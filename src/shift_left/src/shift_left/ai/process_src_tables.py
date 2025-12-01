@@ -61,7 +61,7 @@ def migrate_one_file(table_name: str,
                                validate=validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
-    _save_dml_ddl(table_folder, internal_table_name, dml_contents, ddl_contents)
+    _save_dmls_ddls(table_folder, internal_table_name, dml_contents, ddl_contents)
 # ------------------------------------------------------------
 # --- private functions
 # ------------------------------------------------------------
@@ -178,12 +178,13 @@ def _save_one_file(fname: str, content: str):
     with open(fname,"w") as f:
         f.write(content)
 
-def _save_dml_ddl(content_path: str,
+def _save_dmls_ddls(content_path: str,
                   internal_table_name: str,
                   dmls: List[str],
                   ddls: List[str]):
     """
-    creates two files, prefixed by "ddl." and "dml." from the dml and ddl SQL statements
+    save each ddl and dml in files, prefixed by "ddl." and "dml."
+
     """
     logger.info(f"Save DML and DDL statements to {content_path} for {internal_table_name} with {len(ddls)} DDLs and {len(dmls)} DMLs")
     # Ensure we have lists, not strings (to avoid character iteration)
@@ -192,20 +193,28 @@ def _save_dml_ddl(content_path: str,
     if isinstance(dmls, str):
         dmls = [dmls] if dmls.strip() else []
 
+    sql_parser = SQLparser()
     idx=0
     for ddl in ddls:
         if ddl and ddl.strip():  # Only process non-empty DDLs
-            table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+            parsed_table_name = sql_parser.extract_table_name_from_create_statement(ddl)
+            table_name = parsed_table_name if parsed_table_name else internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
             ddl_fn=f"{content_path}/{SCRIPTS_DIR}/ddl.{table_name}.sql"
             _save_one_file(ddl_fn, ddl)
+            # remove templated file if needed:
+            if table_name != internal_table_name and os.path.exists(f"{content_path}/{SCRIPTS_DIR}/ddl.{internal_table_name}.sql"):
+                os.remove(f"{content_path}/{SCRIPTS_DIR}/ddl.{internal_table_name}.sql")
             _process_ddl_file(f"{content_path}/{SCRIPTS_DIR}/",ddl_fn)
             idx+=1
     idx=0
     for dml in dmls:
         if dml and dml.strip():  # Only process non-empty DMLs
-            table_name = internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
+            parsed_table_name = sql_parser.extract_table_name_from_insert_into_statement(dml)
+            table_name = parsed_table_name if parsed_table_name else internal_table_name if idx == 0 else f"{internal_table_name}_{idx}"
             dml_fn=f"{content_path}/{SCRIPTS_DIR}/dml.{table_name}.sql"
             _save_one_file(dml_fn,dml)
+            if table_name != internal_table_name and os.path.exists(f"{content_path}/{SCRIPTS_DIR}/dml.{internal_table_name}.sql"):
+                os.remove(f"{content_path}/{SCRIPTS_DIR}/dml.{internal_table_name}.sql")
             idx+=1
 
 def _search_matching_topic(table_name: str, rejected_prefixes: List[str]) -> str:

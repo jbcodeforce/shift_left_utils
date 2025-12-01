@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 import pathlib
 import os
+import json
 from typing import List
 import shutil
 from unittest.mock import patch, MagicMock
@@ -34,11 +35,6 @@ class TestKsqlMigrations(unittest.TestCase):
 
     def tearDown(self):
         pass
-
-    # -- private methods for testing--
-    def _list_ksql_files(self) -> List[str]:
-        src_folder = os.environ["SRC_FOLDER"]
-        return [f for f in os.listdir(src_folder) if f.endswith(".ksql")]
 
     # -- test methods --
     @patch('builtins.input')
@@ -90,6 +86,53 @@ class TestKsqlMigrations(unittest.TestCase):
 
 
     @patch('builtins.input')
+    def test_ksql_aggregation(self, mock_input):
+        mock_input.return_value = "n"
+        migrate_one_file(table_name="orders",
+                sql_src_file= self.src_folder + "/aggregation.ksql",
+                staging_target_folder=self.staging,
+                product_name=self.product_name,
+                source_type="ksql",
+                validate=False)
+        assert os.path.exists(self.staging + "/" + self.product_name + "/orders/sql-scripts/ddl.orders.sql")
+        assert os.path.exists(self.staging + "/" + self.product_name + "/orders/sql-scripts/ddl.daily_spend.sql")
+        assert os.path.exists(self.staging + "/" + self.product_name + "/orders/sql-scripts/dml.orders.sql")
+        reference_file = self.file_reference_dir + "/aggregation/sql-scripts/ddl.orders.sql"
+        created_file = self.staging + "/" + self.product_name + "/orders/sql-scripts/ddl.orders.sql"
+        result = compare_files_unordered(reference_file, created_file)
+        print(f"-"*40)
+        print(type(result))
+        print(result)
+        print(f"result: {json.dumps(result, indent=4)}")
+        assert result['match_percentage'] >= 80
+        reference_file = self.file_reference_dir + "/aggregation/sql-scripts/dml.aggregation.sql"
+        created_file = self.staging + "/" + self.product_name + "/orders/sql-scripts/dml.orders.sql"
+        result = compare_files_unordered(reference_file, created_file)
+        print(f"-"*40)
+        print(result)
+        print(f"dml result: {json.dumps(result, indent=4)}")
+        assert result['match_percentage'] >= 70
+
+    @patch('builtins.input')
+    def test_ksql_bigger_file(self, mock_input):
+        mock_input.return_value = "n"
+        migrate_one_file(table_name="equipment",
+                sql_src_file= self.src_folder + "/ddl-bigger-file.ksql",
+                staging_target_folder=self.staging,
+                product_name=self.product_name,
+                source_type="ksql",
+                validate=False)
+        assert os.path.exists(self.staging + "/" + self.product_name + "/equipment/sql-scripts/ddl.equipment.sql")
+        assert os.path.exists(self.staging + "/" + self.product_name + "/equipment/sql-scripts/dml.equipment.sql")
+        dml_file_path = self.staging + "/" + self.product_name + "/equipment/sql-scripts/dml.equipment.sql"
+        with open(dml_file_path, "r") as f:
+            dml_content = f.read()
+        assert "EQUIPMENT_STAGE_STREAM" in dml_content
+        assert "ERRORS_TX" in dml_content
+        assert "DISCARDS_RX" in dml_content
+
+
+    @patch('builtins.input')
     def test_2_kpi_config_table_with_latest_offset(self, mock_input):
         mock_input.return_value = "n"
         migrate_one_file(table_name="KPI_CONFIG_TABLE",
@@ -103,7 +146,7 @@ class TestKsqlMigrations(unittest.TestCase):
 
 
     @patch('builtins.input')
-    def test_3_ksql_filtering(self, mock_input):
+    def test_ksql_filtering(self, mock_input):
         """
         Test a filtering ksql create table migration.
         The table FILTERING will be used to other tables.
@@ -115,7 +158,15 @@ class TestKsqlMigrations(unittest.TestCase):
                 product_name=self.product_name,
                 source_type="ksql",
                 validate=False)
-
+        assert os.path.exists(self.staging + "/" + self.product_name + "/filtering/sql-scripts/ddl.orders.sql")
+        assert os.path.exists(self.staging + "/" + self.product_name + "/filtering/sql-scripts/dml.filtering.sql")
+        reference_file = self.file_reference_dir + "/filtering/sql-scripts/ddl.filtered_orders.sql"
+        created_file = self.staging + "/" + self.product_name + "/filtering/sql-scripts/ddl.filtered_orders.sql"
+        result = compare_files_unordered(reference_file, created_file)
+        print(f"-"*40)
+        print(result)
+        print(f"dml result: {json.dumps(result, indent=4)}")
+        assert result['match_percentage'] >= 70
 
     @patch('builtins.input')
     def test_11_w2_processing(self, mock_input):
@@ -142,13 +193,6 @@ class TestKsqlMigrations(unittest.TestCase):
                 validate=False)
 
 
-    def test_ksql_bigger_file(self):
-        migrate_one_file(table_name="equipment",
-                sql_src_file= self.src_folder + "/ddl-bigger-file.ksql",
-                staging_target_folder=self.staging,
-                product_name=self.product_name,
-                source_type="ksql",
-                validate=False)
 
     def test_ksql_g(self):
         ksql_src_file = "ddl-g.ksql"

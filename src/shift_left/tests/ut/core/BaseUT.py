@@ -3,11 +3,10 @@ Base class for all unit tests
 """
 from datetime import datetime
 import unittest
-from shift_left.core.utils.report_mgr import DeploymentReport, StatementBasicInfo
 from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from shift_left.core.compute_pool_mgr import ComputePoolList, ComputePoolInfo
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
+    Statement,
     StatementInfo,
     Status,
     Spec,
@@ -35,10 +34,10 @@ class BaseUT(unittest.TestCase):
         """
         # Reset all caches to ensure test isolation
         reset_all_caches()
-    
+
     # Following set of methods are used to create reusable mock objects and functions
     def _create_mock_get_statement_info(
-        self, 
+        self,
         name: str = "statement_name",
         status_phase: str = "UNKNOWN",
         compute_pool_id: str = "test-pool-123"
@@ -49,19 +48,19 @@ class BaseUT(unittest.TestCase):
             status_phase=status_phase,
             compute_pool_id=compute_pool_id
         )
-    
+
     def _create_mock_statement(
-        self, 
+        self,
         name: str = "statement_name",
         status_phase: str = "UNKNOWN"
     ) -> Statement:
         """Create a mock Statement object."""
         config=get_config()
         if config and config.get('flink'):
-            properties={"sql.current-catalog":  config['flink']['catalog_name'], 
+            properties={"sql.current-catalog":  config['flink']['catalog_name'],
                         "sql.current-database":  config['flink']['database_name']}
         else:
-            properties={"sql.current-catalog": "default", 
+            properties={"sql.current-catalog": "default",
                         "sql.current-database": "default"}
         spec = Spec(compute_pool_id=self.TEST_COMPUTE_POOL_ID_1, principal="test-principal", statement=name, properties=properties, stopped=False)
         metadata = Metadata(created_at=datetime.now().isoformat(),  resource_version="1",
@@ -95,16 +94,16 @@ class BaseUT(unittest.TestCase):
             current_cfu=0
         )
         return ComputePoolList(pools=[pool_1, pool_2, pool_3])
-    
-    def _mock_assign_compute_pool(self, node: FlinkStatementNode, 
+
+    def _mock_assign_compute_pool(self, node: FlinkStatementNode,
                 compute_pool_id: str,
                 pool_creation: bool) -> FlinkStatementNode:
         """Mock function for assigning compute pool to node. deployment_mgr._assign_compute_pool_id_to_node()"""
-        
+
         node.compute_pool_id = compute_pool_id
         node.compute_pool_name = "test-pool"
         return node
-    
+
     def _create_mock_statement_node(
         self,
         table_name: str,

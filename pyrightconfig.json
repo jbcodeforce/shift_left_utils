@@ -4,7 +4,8 @@
     "src/shift_left/tests"
   ],
   "extraPaths": [
-    "src/shift_left/src"
+    "src/shift_left/src",
+    "src/shift_left/tests"
   ],
   "venvPath": ".",
   "pythonVersion": "3.12",

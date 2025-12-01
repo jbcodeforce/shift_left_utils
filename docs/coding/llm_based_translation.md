@@ -380,3 +380,12 @@ tests/data/ksql-project
 
 [See the environment setup for developers section.](../contributing.md/#environment-set-up-for-developers)
 
+
+## Using Cursor.ai
+
+If oyu have access to Cursor with  `cloud-4.5-sonnet` model, a prompt like:
+```sh
+using @src/shift_left/src/shift_left/ai/prompts/ksql_fsql/translator.txt migrate the @src/shift_left/tests/data/ksql-project/sources/w2_processing.ksql  file
+```
+
+Will create a markdown file with the original ksql statements and the flink SQL matching statements at a higher speed than running qwen Ollama locally.

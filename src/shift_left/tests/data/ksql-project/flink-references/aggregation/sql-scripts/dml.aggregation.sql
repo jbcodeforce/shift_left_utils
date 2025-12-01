@@ -1,8 +1,9 @@
-INSERT INTO app_orders
-select 
-    window_start, 
-    window_end, 
-    customer_id, 
-    sum(order_amount) as sum_order_amount
-from table(tumble(table `daily_spend`, DESCRIPTOR(tx_timestamp), interval '24' hours)) 
-group by window_start, window_end, customer_id 
+INSERT INTO orders
+SELECT
+    window_start,
+    window_end,
+    customer_id,
+    SUM(order_amount) as order_amount_sum
+FROM TABLE(TUMBLE(TABLE daily_spend, DESCRIPTOR($rowtime), INTERVAL '86400' SECOND))
+WHERE order_amount > 0
+GROUP BY customer_id, window_start, window_end;

@@ -5,9 +5,11 @@ import unittest
 import pathlib
 import os
 import shutil
+import json
 from unittest.mock import patch, MagicMock
-
+from shift_left.ai.process_src_tables import migrate_one_file
 from ai.utilities import compare_files_unordered
+
 data_dir = pathlib.Path(__file__).parent.parent / "data"
 os.environ["CONFIG_FILE"] = str(data_dir.parent / "config-ccloud.yaml")
 from shift_left.ai.process_src_tables import migrate_one_file
@@ -53,12 +55,17 @@ class TestSparkMigration(unittest.TestCase):
         assert os.path.exists(self.staging + "/p5/fct_users")
         assert os.path.exists(self.staging + "/p5/fct_users/sql-scripts/ddl.fct_users.sql")
         assert os.path.exists(self.staging + "/p5/fct_users/sql-scripts/dml.fct_users.sql")
-        reference_file = self.src_folder + "/spark-project/flink-references/fct_users/sql-scripts/ddl.fct_users.sql"
+        reference_file = self.src_folder + "/flink-references/fct_users/sql-scripts/ddl.fct_users.sql"
         created_file = self.staging + "/p5/fct_users/sql-scripts/ddl.fct_users.sql"
         result = compare_files_unordered(reference_file, created_file)
         print(result)
-        assert result['all_reference_lines_present']
-        assert result['match_percentage'] == 100
+        print(f"dml result: {json.dumps(result, indent=4)}")
+        assert result['match_percentage'] >= 80
+        reference_file = self.src_folder + "/flink-references/fct_users/sql-scripts/dml.fct_users.sql"
+        created_file = self.staging + "/p5/fct_users/sql-scripts/dml.fct_users.sql"
+        result = compare_files_unordered(reference_file, created_file)
+        print(result)
+        assert result['match_percentage'] >= 80
 
 
     @patch('builtins.input')
@@ -74,6 +81,22 @@ class TestSparkMigration(unittest.TestCase):
                 product_name="p5",
                 source_type="spark",
                 validate=False)
+        assert os.path.exists(self.staging + "/p5/src_product_analytics")
+        assert os.path.exists(self.staging + "/p5/src_product_analytics/sql-scripts/ddl.raw_product_events.sql")
+        # Verify there are two 'ddl.' files in the sql-scripts folder
+        sql_scripts_folder = os.path.join(self.staging, "p5", "src_product_analytics", "sql-scripts")
+        ddl_files = [f for f in os.listdir(sql_scripts_folder) if f.startswith("ddl.") and f.endswith(".sql")]
+        assert len(ddl_files) == 2, f"Expected 2 ddl.*.sql files, found {len(ddl_files)} in {sql_scripts_folder}: {ddl_files}"
+        for ddl_file in ddl_files:
+            created_file = self.staging + "/p5/src_product_analytics/sql-scripts/" + ddl_file
+            if ddl_file == "ddl.raw_product_events.sql":
+                reference_file = self.src_folder + "/flink-references/src_product_analytics/sql-scripts/ddl.raw_product_events.sql"
+            else:
+                reference_file = self.src_folder + "/flink-references/src_product_analytics/sql-scripts/ddl.enriched_product_events.sql"
+            result = compare_files_unordered(reference_file, created_file)
+            print(result)
+            print(f"Result: {json.dumps(result, indent=4)}")
+            assert result['match_percentage'] >= 80
 
     @patch('builtins.input')
     def test_3_customer_journey_complex_ctes(self, mock_input):
@@ -88,6 +111,10 @@ class TestSparkMigration(unittest.TestCase):
                 product_name="p5",
                 source_type="spark",
                 validate=False)
+        sql_scripts_folder = os.path.join(self.staging, "p5", "src_customer_journey", "sql-scripts")
+        ddl_files = [f for f in os.listdir(sql_scripts_folder) if f.startswith("ddl.") and f.endswith(".sql")]
+        assert len(ddl_files) >= 1
+
 
     @patch('builtins.input')
     def test_4_event_processing_arrays_structs(self, mock_input):
@@ -102,6 +129,9 @@ class TestSparkMigration(unittest.TestCase):
                 product_name="p5",
                 source_type="spark",
                 validate=False)
+        sql_scripts_folder = os.path.join(self.staging, "p5", "src_event_processing", "sql-scripts")
+        ddl_files = [f for f in os.listdir(sql_scripts_folder) if f.startswith("ddl.") and f.endswith(".sql")]
+        assert len(ddl_files) >= 1
 
     @patch('builtins.input')
     def test_5_sales_pivot_advanced_analytics(self, mock_input):

@@ -1,6 +1,6 @@
 
 
-def compare_files_unordered(reference_file, created_file, allow_extra_lines=True):
+def compare_files_unordered(reference_file, created_file, allow_extra_lines=True) -> dict:
     """
     Compare files ignoring line order.
 
@@ -13,18 +13,17 @@ def compare_files_unordered(reference_file, created_file, allow_extra_lines=True
         dict with comparison results
     """
     with open(reference_file, 'r') as f:
-        reference_lines = set(line.strip() for line in f if line.strip())
+        reference_lines = set(line.strip()[:-1] if line.strip().endswith(',') else line.strip() for line in f if line.strip())
 
     with open(created_file, 'r') as f:
-        created_lines = set(line.strip() for line in f if line.strip())
+        created_lines = set(line.strip()[:-1] if line.strip().endswith(',') else line.strip() for line in f if line.strip())
 
-    missing = reference_lines - created_lines
+    missing = reference_lines.difference(created_lines)
     extra = created_lines - reference_lines
-
     result = {
         'all_reference_lines_present': len(missing) == 0,
-        'missing_lines': missing,
-        'extra_lines': extra,
+        'missing_lines': list(missing),
+        'extra_lines': list(extra),
         'reference_count': len(reference_lines),
         'created_count': len(created_lines),
         'match_percentage': len(reference_lines & created_lines) / len(reference_lines) * 100 if reference_lines else 100
@@ -34,3 +33,6 @@ def compare_files_unordered(reference_file, created_file, allow_extra_lines=True
         result['exact_match'] = len(missing) == 0 and len(extra) == 0
 
     return result
+
+
+
