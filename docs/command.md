@@ -56,6 +56,7 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `report-table-cross-products`: Report the list of tables that are...
 * `list-tables-with-one-child`: Report the list of tables that have...
 * `list-modified-files`: Get the list of files modified in the...
+* `update-tables-version`: Update the table version for the given file
 * `init-integration-tests`: Initialize integration test structure for...
 * `run-integration-tests`: Run integration tests for a given sink table.
 * `delete-integration-tests`: Delete all integration test artifacts...
@@ -144,7 +145,8 @@ $ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
 ### `project housekeep-statements`
 
 Delete statements in FAILED or COMPLETED state that starts with string &#x27;workspace&#x27; in it ( default ).
-Applies optional starts-with and age filters when provided.
+Applies optional starts-with, age, status filters when provided.
+Note:  and  are mutually exclusive.
 
 **Usage**:
 
@@ -154,6 +156,9 @@ $ project housekeep-statements [OPTIONS]
 
 **Options**:
 
+* `--compute-pool-id TEXT`: Flink compute pool ID.
+* `--action TEXT`: Action to take on the statements.
+* `--statement-name TEXT`: Action to take on specific statement.
 * `--starts-with TEXT`: Statements names starting with this string.
 * `--status TEXT`: Statements with this status.
 * `--age INTEGER`: Statements with created_date &gt;= age (days).
@@ -222,6 +227,25 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 * `--project-path TEXT`: Project path where git repository is located  [default: .]
 * `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
 * `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)
+* `--help`: Show this message and exit.
+
+### `project update-tables-version`
+
+Update the table version for the given file
+
+**Usage**:
+
+```console
+$ project update-tables-version [OPTIONS] TABLE_LIST_FILE_NAME
+```
+
+**Arguments**:
+
+* `TABLE_LIST_FILE_NAME`: File name containing json object with table names and file modified url to update the table version for  [required]
+
+**Options**:
+
+* `--default-version TEXT`: Default version to use if not provided in the file  [default: _v2]
 * `--help`: Show this message and exit.
 
 ### `project init-integration-tests`
@@ -421,7 +445,7 @@ $ table search-source-dependencies [OPTIONS] TABLE_SQL_FILE_NAME SRC_PROJECT_FOL
 
 ### `table migrate`
 
-Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work. 
+Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work.
 The command uses the SRC_FOLDER to access to src_path folder.
 
 **Usage**:
@@ -440,8 +464,7 @@ $ table migrate [OPTIONS] TABLE_NAME SQL_SRC_FILE_NAME TARGET_PATH
 
 * `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc.  [default: spark]
 * `--validate`: Validate the migrated sql using Confluent Cloud for Flink.
-* `--product-name TEXT`: Product name to use for the table. If not provided, it will use the table_path last folder as product name
-* `--recursive`: Indicates whether to process recursively up to the sources. (default is False)
+* `--product-name TEXT`: Product name to use for the table. If not provided, it will use the table_path last folder as product name  [default: default]
 * `--help`: Show this message and exit.
 
 ### `table update-makefile`
@@ -519,7 +542,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x1211c6b10&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x108e37350&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -809,6 +832,7 @@ $ pipeline deploy [OPTIONS] INVENTORY_PATH
 * `--parallel / --no-parallel`: By default the deployment will deploy the pipeline in parallel. This flag will deploy the pipeline in parallel.  [default: no-parallel]
 * `--max-thread INTEGER`: The maximum number of threads to use when deploying the pipeline in parallel.  [default: 1]
 * `--pool-creation / --no-pool-creation`: By default the deployment will not create a compute pool per table. This flag will create a pool.  [default: no-pool-creation]
+* `--version TEXT`: The default version to use, at the table level for modified flink statements. But when set the tool will increasing existing version in SQL. Example of string is &#x27;_v2&#x27;. Only used if table_list_file_name is provided.
 * `--help`: Show this message and exit.
 
 ### `pipeline build-execution-plan`
@@ -852,7 +876,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/../flink_project_demos/customer_360/c360_flink_processing/pipelines]
 
 **Options**:
 
@@ -874,7 +898,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/../flink_project_demos/customer_360/c360_flink_processing/pipelines]
 
 **Options**:
 

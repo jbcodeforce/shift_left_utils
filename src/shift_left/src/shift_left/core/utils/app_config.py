@@ -194,7 +194,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
   if not errors:
     # Validate kafka section
     if config.get("kafka"):
-      kafka_required = ["src_topic_prefix", "bootstrap.servers", "cluster_type"]
+      kafka_required = ["bootstrap.servers", "cluster_type", "cluster_id"]
       for field in kafka_required:
         if not config["kafka"].get(field):
           errors.append(f"Configuration is missing kafka.{field}")
@@ -209,7 +209,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
 
     # Validate flink section
     if config.get("flink"):
-      flink_required = ["compute_pool_id", "catalog_name", "database_name"]
+      flink_required = ["catalog_name", "database_name"]
       for field in flink_required:
         if not config["flink"].get(field):
           errors.append(f"Configuration is missing flink.{field}")
@@ -315,11 +315,10 @@ def get_config() -> dict[str,dict[str,str]]:
           config= _apply_default_overrides(config)
           with open(CONFIG_FILE) as f:
             _config = yaml.load(f, Loader=yaml.FullLoader)
-            validate_config(_config)
             _merged_config = _merge_config(_config, config)
             # Apply environment variable overrides for sensitive values
             _config = _apply_env_overrides(_merged_config)
-
+            validate_config(_merged_config)
         except FileNotFoundError:
           print(f"Warning: Configuration file {CONFIG_FILE} not found. Using environment variables only.")
           # Create minimal config structure and apply environment variables

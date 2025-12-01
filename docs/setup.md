@@ -1,76 +1,15 @@
-# Environment Setup
+# Environment Setup - Deeper dive
 
 ???- info "Versions"
     Created January 2025 - Updated 03/21/25: setup guide separation between user of the CLI and developer of this project.
     Update 08/09: config file explanation and how to get the parameters
 
-This chapter addresses how to set up the shift_left CLI tool to manage Flink project. To install the CLI, which is based on Python, use a virtual environment: venv and pip will work, but we have adopted [uv](https://docs.astral.sh/uv/) for package and virtual environment management.
 
-Additionally, when using the tool to do migration of existing code to Apache Flink SQL, a Large Language Model is needed [see dedicated chapter for instruction](./coding/llm_based_translation.md).
+[The new setup lab](./tutorial/setup_lab.md) addresses how to setup the `shift_left` cli and how to validate the installation. 
 
-## Pre-requisites
+This chapter addresses configuration review and tuning. 
 
-* On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install). The shift_left tool was developed on Mac and tested on Linux. Windows WSL should work. Powershell use will not work as of now (09/2025).
-* All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-* Make is used to encapsulate the confluent cli, to make it easier for Data engineers to deploy Flink statement during development: It is not use by shift_left tool, but shift_left creates the Makefile with the `shift_left table init` command (see [the recipe section](./recipes.md/#table-related-tasks)). 
-    * [install make for windows](https://gnuwin32.sourceforge.net/packages/make.htm)
-    * Mac OS: ```brew install make``` 
-    * Linux: ```sudo apt-get install build-essential```
-
-* All Platforms - [install confluent cli](https://docs.confluent.io/confluent-cli/current/install.html), also used for make execution. This is not mandatory to run shift_left tool.
-* If using `uv` as python package manager (developers of the shift left tool), install it [using the documentation](https://docs.astral.sh/uv/getting-started/installation/).
-* All Platforms - [Install Python 3.12](https://www.python.org/downloads/release/python-3120/)
-
-* Clone this repository (this will not be necessary once the CLI will be available in pypi): 
-  ```sh
-  git clone  https://github.com/jbcodeforce/shift_left_utils.git
-  cd shift_left_utils
-  ```
-
-=== "Using Python and pip"
-
-    * Create a Python virtual environment:
-        ```sh
-        python -m venv .venv
-        ```
-    * Activate the environment:
-        ```sh
-        source .venv/bin/activate
-        ```
-    * Be sure to use the pip install in the virtual environment:
-        ```sh
-        python -m pip --version
-        # if pip not present
-        python -m ensurepip
-        # install requirements
-        python -m pip install -r requirements.txt
-        ```
-    * Install the shift_left CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the available wheels, look at the content under the `src/shift_left/dist` folder.  
-        ```sh
-        ls src/shift_left/dist
-        # >.. shift_left-0.1.36-py3-none-any.whl
-        # install the last one for example:
-        pip install src/shift_left/dist/shift_left-0.1.36-py3-none-any.whl
-        ```
-
-=== "uv"
-
-    * Create a new virtual environment in any folder, but could be the : `uv venv`
-    * Activate the environment:
-        ```sh
-        source .venv/bin/activate
-        ```
-    * Verify the list of wheels available in the src/shift_left/dist/ to take the last one. The github also include the list of releases to see the last available version number.
-    * Install the cli:
-        ```sh
-        uv tool list
-        # in case it was already installed
-        uv uninstall shift_left
-        # The weel number may change!
-        uv install shift_left src/shift_left/dist/shift_left-0.1.36-py3-none-any.whl
-        ```
-
-## Set up config.yaml file
+## The config.yaml file
 
 The configuration file `config.yaml` is used intensively to tune the shift_left per environment and will be referenced by the environment variables: CONFIG_FILE. You should have different config.yaml for the different kafka cluster, schema registry and Flink environment.
 
@@ -148,13 +87,11 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
   confluent_cloud:
     organization_id: "YOUR_CLUSTER_ID"
     environment_id: "YOUR_ENVIRONMENT_ID"
-    url_scope: public
     region: "YOUR_REGION"
-    provider: aws
+    provider: "aws"
   flink:
-    flink_url: flink....confluent.cloud
     compute_pool_id: "YOUR_COMPUTE_POOL_ID"
-    catalog_name: "envionment_name"
+    catalog_name: "environment_name"
     database_name: "kafka_cluster_name"
   ```
 
@@ -262,13 +199,4 @@ from shift_left.core.utils.app_config import print_env_var_help
 print_env_var_help()
 ```
 
-## Validate the CLI
-
-```sh
-shift_left version
-shift_left --help
-shift_left project list-topics $PIPELINES
-```
-
-#### Next>> [Recipes section](recipes.md)
 

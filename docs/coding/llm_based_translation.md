@@ -1,4 +1,4 @@
-# SQL Translation Methodology
+# SQL Translation Code Review
 
 ???- info "Version"
     Created Dec - 2024 
@@ -10,61 +10,14 @@ The current AI based migration implementation supported by this tool enables mig
 * dbt/Spark SQL to Flink SQL
 * ksqlDB to Flink SQL
 
-The approach uses LLM agents local or remote. This document covers the design approach, development environment setup, and how to use the `shift_left` tool for automated SQL migrations. Finally it addresses how to extend the AI prompts or workflows to get better results.
+The approach uses LLM agents local or remote. This document covers the design approach, development environment setup, and how to execute test to tune the AI based SQL migrations, specially how to extend the AI prompts or workflows to get better results.
 
-The core idea is to leverage LLMs to understand the source SQL semantics and to translate them to Flink SQLs. 
+The implementation uses the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` or `qwen-coder-30b-a3b-instruct-mlx-4bit` models can be used locally using Osaurus on Mac M3 Pro with 36GB RAM., or Ollama on Linux VM. Other models running remotely and supporting OpenAI APIs may be used too using your own API key. 
 
-**This is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
+## Review the end-user lab
 
-The implementation use the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` or `qwen-coder-30b-a3b-instruct-mlx-4bit` models can be used locally using Osaurus on Mac M3 Pro with 36GB RAM., or Ollama on Linux VM. Other models running remotely and supporting OpenAI APIs may be used too using your own API key. 
+Review the [end user lab for ksql migration](../tutorial/migration_ai_lab.md) to understand the how the data engineer can use the tool for migration.
 
-## Migration Context
-
-As described in the [introduction](../index.md), at a high level, data engineers need to take a source project, define a new Flink project, perform migrations, run Flink statement deployments, manage pipelines, and write and execute tests:
-
-<figure markdown='span'>
-![](../images/components.drawio.png)
-<capture>Shift Left project system context</capture>
-</figure>
-
-All those tasks are described under the [recipe chapter](../recipes.md) and supported by this CLI.
-
-For automatic migration, LLMs alone might not be sufficient to address complex translations in an automated process. Agents help by specializing in specific steps with feedback loops and retries.
-
-???- info "Complexity of language translation"
-      For any programming language translation, we need to start with a corpus of source code. This can be done programmatically from the source language, then for each generated code, implement the semantically equivalent Flink SQL counterparts.
-
-      The goal of corpus creation is to identify common ksqlDB or Spark SQL constructs (joins, aggregations, window functions, UDFs, etc.), then manually translate a smaller, diverse set of queries to establish translation rules. Using these rules, we can generate permutations and variations of queries. It is crucial to test the generated Flink SQL against a test dataset to ensure semantic equivalence.
-
-      Build query pairs to represent the source-to-target set as a corpus. For each query pair, include the relevant table schemas. This is vital for the LLM to understand data types, column names, and relationships. It is not recommended to have different prompts for different parts of a SQL statement, as the LLM's strength comes from the entire context. However, there will still be problems for SQL scripts that have many lines of code, as a 200+ line script will reach thousands of tokens.
-
-      To improve result accuracy, it is possible to use Supervised Fine-tuning techniques:
-
-      * Fine-tune the chosen LLM on the generated code. The goal is for the LLM to learn the translation patterns and nuances between ksqlDB or Spark SQL and Flink SQL.
-      * Prompt Engineering: Experiment with different prompt structures during fine-tuning and inference. A good prompt will guide the LLM effectively. The current implementation leverages this type of prompt: e.g., "Translate the following Spark SQL query to Flink SQL, considering the provided schema. Ensure semantic equivalence and valid Flink syntax."
-      * For evaluation assessment, it is recommended to add a step to the agentic workflow to validate the syntax of the generated Flink SQL. Better validation involves assessing semantic equivalence by determining if the Flink SQL query produces the same results as the ksqlDB or Spark SQL query on a given dataset.
-
-      For validation, it may be relevant to have a knowledge base of common translation errors. When the Validation Agent reports an error, the Refinement Agent attempts to correct the Flink SQL. It might feed the error message back to the LLM with instructions to fix it. The knowledge base should be populated with human-curated rules for common translation pitfalls.
-
-      It may be important to explain why a translation was done a certain way to better tune prompts. For complex queries or failures, human review ("human in the loop") and correction mechanisms will be essential, with the system learning from these corrections.
-
-### Limitations
-
-LLMs cannot magically translate custom UDFs. This will likely require manual intervention or a separate mapping mechanism. The system should identify and flag untranslatable UDFs.
-
-Flink excels at stateful stream processing. Spark SQL's batch orientation means that translating stateful Spark operations (if they exist) to their Flink streaming counterparts would be highly complex and would likely require significant human oversight or custom rules.
-
-### Spark SQL to Flink SQL
-
-While Spark SQL is primarily designed for batch processing, it can be migrated to Flink real-time processing with some refactoring and tuning. Spark also supports streaming via micro-batching. Most basic SQL operators (SELECT, FROM, WHERE, JOIN) are similar between Spark and Flink.
-
-
-* Example command to migrate one Spark SQL script
-  ```sh
-  # set SRC_FOLDER to one of the spark source folder like tests/data/spark-project
-  # set STAGING to the folder target to the migrated content
-  shift_left table migrate customer_journey $SRC_FOLDER/sources/src_customer_journey.sql $STAGING --source-type spark
-  ```
 
 
 ???- info "Example of Output"
@@ -104,11 +57,7 @@ As part of the process, developers need to validate the generated DDL and update
 
 **Attention**, the DML is not executable until all dependent input tables are created.
   
-### ksqlDB to Flink SQL
 
-ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. 
-
-The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
 
 * The ksqldb files to test, the migration from, are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
 * Set the environment variables to run shift_left using the [setup instructions](../setup.md)
@@ -142,10 +91,7 @@ The migration and prompts need to support more examples outside of the classical
 	```
 
 
-* Example command to migrate one of ksqlDB script:
-  ```sh
-  shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql --product-name tax
-  ```
+
 
 * Status of the working migration: See **test_ksql_migration.py::TestKsqlMigrations** code.
 
@@ -380,6 +326,7 @@ tests/data/ksql-project
 
 [See the environment setup for developers section.](../contributing.md/#environment-set-up-for-developers)
 
+* If using `uv` as python package manager (developers of the shift left tool), install it [using the documentation](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## Using Cursor.ai
 

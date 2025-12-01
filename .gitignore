@@ -24,3 +24,4 @@ set_mc_dev_env
 set_mc_stage_env
 set_test_env
 src/shift_left/tests/data/flink-project/staging/
+tutorial/setup/config.yaml
