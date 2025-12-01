@@ -1,0 +1,14 @@
+kafka:
+  bootstrap.servers:  <TO_FILL>
+  cluster_id: lkc-jq9kq
+ confluent_cloud:
+  environment_id:  env-<TO_FILL>
+  region:  <TO_FILL>
+  provider:  <TO_FILL>
+  organization_id: <TO_FILL>
+ flink:
+  compute_pool_id: lfcp- <TO_FILL>
+  catalog_name:  <TO_FILL>
+  database_name:  <TO_FILL>
+ app:
+  logging: INFO

@@ -1,3 +1,22 @@
+## [0.1.46] - 2025-11-30
+
+### Changes:
+- 55ac03c start to work on bg. transformer now support updating sql create and insert content with unique table to change
+- 38c42d9 Merge branch 'main' into develop
+- 8acfa36 update to changelog
+- 8ffa802 Merge branch 'develop' into fix62bis
+- 032fa78 update UT for b/g
+- 6e054e8 finalize version update
+- bb342a5 merge docs update
+- 0116717 Upgrade housekeep_statement to pause statements in a pool
+- 4bef2c4 Merge pull request #76 from jbcodeforce/upgrade_housekeep
+- c60b349 Upgrade housekeep_statement to pause statements in a pool
+- b126638 Merge pull request #77 from jbcodeforce/upgrade_housekeep2
+- aae367d Merge branch 'develop' into fix62bis
+- 207f1e1 deep refactoring of ai processing
+- 72d555d refactoring of ai migration
+- e527268 refactor ai migration code
+
 ## [0.1.45] - 2025-11-10
 
 ### Changes:
