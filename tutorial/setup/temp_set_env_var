@@ -1,0 +1,28 @@
+export SL_KAFKA_API_KEY=
+export SL_KAFKA_API_SECRET=
+export SL_CONFLUENT_CLOUD_API_KEY=
+export SL_CONFLUENT_CLOUD_API_SECRET=
+export SL_FLINK_API_KEY=
+export SL_FLINK_API_SECRET=
+
+
+export CCLOUD_ENV_ID=env-
+export CCLOUD_ENV_NAME=
+export CCLOUD_KAFKA_CLUSTER=<name of the kafka cluster>
+export CLOUD_REGION=us-west-2
+export CLOUD_PROVIDER=aws
+export CCLOUD_CONTEXT=login-<your email>-https://confluent.cloud
+export CCLOUD_COMPUTE_POOL_ID=<compute pool id>
+
+
+
+export FLINK_PROJECT=$PWD/../my-flink-demo/
+export PIPELINES=$FLINK_PROJECT/pipelines
+export STAGING=$FLINK_PROJECT/staging
+export SRC_FOLDER=$PWD/../flink_project_demos/ksql_tutorial/sources
+export CONFIG_FILE=$PWD/tutorial/setup/config.yaml
+
+export SL_LLM_BASE_URL=http://localhost:11434/v1
+export SL_LLM_MODEL=qwen3-coder:30b
+export SL_LLM_API_KEY=not_needed_key
+

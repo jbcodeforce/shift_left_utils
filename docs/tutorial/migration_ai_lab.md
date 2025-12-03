@@ -11,12 +11,48 @@ The core idea is to leverage LLMs to understand the source SQL semantics and to 
 
 **This is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
 
+???+ warning "Lab Environment"
+	The Lab was developed and tested on Mac. `shift_tool` runs on Mac, Linux and Windows WSL.
+
 ## Prerequisites
 
-Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left operational.
+Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left cli operational.
 
-For the 
+For the AI based migration the following needs to be done:
 
+1. [Install Ollama](https://ollama.com/download/mac)
+	```sh
+	# Verify the ollama cli:
+	ollama list 
+	ollama --help
+	```
+
+1. Download the `qwen3-coder:30b` model:
+	```sh
+    ollama pull qwen3-coder:30b
+	```
+
+1. Add or update the following environments variables in your `set_env_var`
+	```sh
+	export SL_LLM_BASE_URL=http://localhost:11434/v1
+	export SL_LLM_MODEL=qwen3-coder:30b
+	export SL_LLM_API_KEY=not_needed_key
+	# and the following variables will be use to control `confluent` cli during statement deployment
+	export CCLOUD_ENV_ID=env-
+	export CCLOUD_ENV_NAME=
+	export CCLOUD_KAFKA_CLUSTER=<name of the kafka cluster>
+	export CLOUD_REGION=us-west-2
+	export CLOUD_PROVIDER=aws
+	export CCLOUD_CONTEXT=login-<your email>-https://confluent.cloud
+	export CCLOUD_COMPUTE_POOL_ID=<compute pool id>
+	```
+
+1. Start Ollama server:
+	```sh
+	ollama serve
+	```
+
+1. As an alternate if you have OpenAI API key, you can change those environment variable to refect openAI end points and key. There is also OpenRouter.ai , where you can define an API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
 
 ## Migration Context
 
@@ -75,24 +111,30 @@ The migration and prompts need to support more examples outside of the classical
   shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql --product-name tax
   ```
 
-## Migration Workflow
+## Migration Workflows
+
+We propose two different migrations to illustrate ksql to Flink SQL query migration using the Confluent KsqlDB tutorials and one Spark to Flink SQL.
+
+You should have cloned the `flink_project_demo` repository during [the setup](setup_lab.md/#2--a-demonstration-project).
 
 ### 1. Project Initialization
 
-Create a new target project to keep your Flink statements and different pipelines (e.g., my-flink-app):
+* Start a Terminal
+* Create a new Flink git project to keep your migrated Flink statements (e.g., my-flink-demo):
 
 ```bash
+# May be create a temporary folder
 mkdir $HOME/Code
 # Initialize project structure
 shift_left project init <your-project> </path/to/your/folder>
 # example 
-shift_left project init my-flink-app $HOME/Code
+shift_left project init my-flink-demo $HOME/Code
 ```
 
-You should get:
+You should get the following project structure, which represents a `start schema` structure.
 ```sh
-my-flink-app
-├── README.md
+my-flink-demo
+├── .git
 ├── docs
 ├── pipelines
 │   ├── common.mk
@@ -101,81 +143,191 @@ my-flink-app
 │   ├── intermediates
 │   ├── sources
 │   └── views
-├── sources
 └── staging
+.gitignore
 ```
 
-### 2. Specific Setup
+* Update the your environment variables, to reflect the project name you just created, taking as source the `set_env_var` file under tutorial/setup:
+	```sh
+	# .... other secrets omitted
+	export FLINK_PROJECT=$PWD/../my-flink-demo/
+	export PIPELINES=$FLINK_PROJECT/pipelines
+	export STAGING=$FLINK_PROJECT/staging
+	export SRC_FOLDER=$PWD/../flink_project_demos/ksql_tutorial/sources
+	export CONFIG_FILE=$PWD/tutorial/setup/config.yaml
+	```
+* The deployment organization is illustrated in the following figure: The cloned flink_project_demo includes ksql sources queries to migrate, and referenced by the SRC_FOLDER environment variable, the tool will save migrated to Flink SQL files to the STAGING folder.
 
-* Copy your KSQL files to the sources directory:
+<figure markdown='span'>
+![](./images/ksql_lab_comp.drawio.png)
+<capture>ksql project organization</capture>
+</figure>
 
-```bash
-# Copy KSQL files
-cp *.ksql ${SRC_FOLDER}/
-```
+### 2, KSQL to Flink SQL Lab
 
-* *Optional*: To run locally on a smaller model, download [Ollama](https://ollama.com/download), then install the qwen2.5-coder model:
-  ```sh
-  # Select the size of the model according to your memory
-  ollama pull qwen2.5-coder:32b
-  ollama list
-  ```
+The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) 
 
-* Create an OpenRouter.ai API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use.
+#### 2.1 Migration Executions
 
-* Set environment variables:
+* Be sure environment variables are set in your Terminal session:
+	```sh
+	source tutorial/setup/set_env_var
+	```
 
-### 3. Migration Execution
+* Migrate a basic splitting ksql query
+	```sh
+ 	shift_left table migrate acting_events $SRC_FOLDER/routing/splitting.ksql $STAGING --source-type ksql 
+	```
 
-#### Basic Table Migration
+	The command generates:
+	```sh
+	my-flink-demo
+	├─ staging/default/acting_events/sql-scripts
+    │   ├── ddl.acting_events_drama.sql
+    │   ├── ddl.acting_events_fantasy.sql
+    │   ├── ddl.acting_events_other.sql
+    │   ├── dml.acting_events_drama.sql
+    │   ├── dml.acting_events_fantasy.sql
+    │   └── dml.acting_events_other.sql
+	```
 
-```bash
-# Migrate a simple table
-shift_left table migrate basic_user_table $SRC_FOLDER/user-table.ksql $STAGING --source-type ksql 
-```
+	The `default` folder is the name of the data product, it can be set in the cli. We will see this in the next migration
 
-The command generates:
+* Looking at the shift_left logs: the shift_left cli create a folder in $HOME/.shilt_left.logs for each execution. The name of the file (e.g. `.shift_left/logs/12-02-25-18-09-34-i9kb` )is given at each execution trace:
+	```sh
+	---------------------------------------- SHIFT_LEFT 0.1.46 ----------------------------------------
+	| CONFIG_FILE     : /Users/jerome/Documents/Code/my-flink-demo/config.yaml
+	| LOGS folder     : /Users/jerome/.shift_left/logs/12-02-25-18-09-34-i9kb
+	| Session started : 2025-12-02 18:09:34
+	```
+
+	It this then possible to see more details of the migration process.
+
+* Run a second example:
+	```sql
+	shift_left table migrate shipped_orders $SRC_FOLDER/joins/stream_stream.ksql $STAGING --source-type ksql --product-name orders
+	```
+
+	which should create:
+	```
+	orders
+	└── shipped_orders
+        ├── Makefile
+        ├── sql-scripts
+        │   ├── ddl.orders.sql
+        │   ├── ddl.shipments.sql
+        │   ├── ddl.shipped_orders.sql
+        │   └── dml.shipped_orders.sql
+        ├── tests
+        └── tracking.md
+	```
+
+#### 2.2 Validation and Deployment
+
+There are two ways to validate the deployment, using `confluent` cli or use the Confluent Cloud Flink Workspace
+
+=== "confluent"
+	```bash
+	confluent login 
+	# Deploy to Confluent Cloud for Flink
+	cd ${STAGING}/default/acting_events
+
+	# Deploy DDL statements
+	make create_flink_ddl
+
+	# Which may generate a trace like:
+	+---------------+--------------------------------------+
+	| Creation Date | 2025-12-03 02:25:39.17975            |
+	|               | +0000 UTC                            |
+	| Name          | dev-usw2-default-ddl-acting-events   |
+	| Statement     | CREATE TABLE IF NOT EXISTS           |
+	|               | acting_events (     name STRING,     |
+	|               |     title STRING,     genre          |
+	|               | STRING,     PRIMARY KEY (name)       |
+	|               | NOT ENFORCED ) DISTRIBUTED BY        |
+	|               | HASH(name) INTO 1 BUCKETS WITH (     |
+	|               |    'changelog.mode' = 'append',      |
+	|               |  'kafka.retention.time' = '0',       |
+	|               | 'kafka.producer.compression.type' =  |
+	|               | 'snappy',     'scan.bounded.mode' =  |
+	|               | 'unbounded',     'scan.startup.mode' |
+	|               | = 'earliest-offset',                 |
+	|               | 'value.fields-include' = 'all',      |
+	|               | 'value.json-registry.schema-context' |
+	|               | = '.flink-dev',     'value.format' = |
+	|               | 'json-registry' );                   |
+	| Compute Pool  | lfcp-xvrvmz                          |
+	| Status        | COMPLETED                            |
+	| Status Detail | Command completed                    |
+	|               | successfully.                        |
+	+---------------+--------------------------------------+
+	# Deploy DML statements  
+	make create_flink_dml
+	```
+
+=== "Workspace"
+	In the Flink Workspace copu/paste one of the ddl or dml
+	![](./images/in_wksp.png)
+
+???- warning "Known Issues"
+	12/2/2025: The makefile creation needs to be improved as the LLM may generate multiple ddls and dmls. 
+
+### 3. Spark to Flink SQL Lab
+
+The concept is to take one of the fact table and migrate it.
+<figure markdown='span'>
+![](./images/spark_lab_comp.drawio.png)
+</figure>
+
+#### 3.1 Change environment variable
+
+Change the SRC_FOLGER to point to the existing Spark project about customer 360 analytics: (adapt the path below)
+
 ```sh
-# ├── staging/basic_user_table/sql-scripts
-# │   ├── ddl.basic_user_table.sql     # Flink DDL
-# │   ├── dml.basic_user_table.sql     # Flink DML (if any)
+export SRC_FOLDER=$HOME/Documents/Code/flink_project_demos/customer_360/c360_spark_processing
 ```
 
-### 4. Validation and Deployment
+#### 3.2 Migrate a fact table
 
-```bash
-# Deploy to Confluent Cloud for Flink
-cd ${STAGING}/basic_user_table
+Migrate the fact table:
 
-# Deploy DDL statements
-make create_flink_ddl
-
-# Deploy DML statements  
-make create_flink_dml
+```sh
+ shift_left table migrate fct_customer_360_profile  $SRC_FOLDER/facts/fct_customer_360_profile.sql  $STAGING --source-type spark --product-name c360
 ```
 
-### 5. Prepare for pipeline management
+Which should create the following content:
 
-Flink statements have dependencies, so it is important to use shift_left to manage those dependencies:
+```
+staging
+├──c360
+    ├── fct_customer_360_profile
+    │   ├── Makefile
+    │   ├── sql-scripts
+    │   │   ├── ddl.support_tickets_raw.sql
+    │   │   └── dml.fct_customer_360_profile.sql
+    │   ├── tests
+    │   └── tracking.md
+```
 
-* Run after new tables are created
-  ```sh
-  shift_left table build-inventory
-  ```
+#### 3.3 Validate on Confluent Cloud
 
-* Build all the metadata
-  ```sh
-  shift_left pipeline build-all-metadata 
-  ```
-
-
-* Verify an execution plan
-  ```sh
-  shift_left pipeline build-execution-plan --table-name <>
-  ```
+Same as above Flink Workspace or confluent cli may be used for deployment.
 
 
-### 6. Next
+## 4. Prepare for pipeline management
+
+When the migration is done, and validated with via statement deployment, it is important to move from Staging to Pipelines. As all the table management will be done by shift_left from the pipeline management.
+
+The move will be done depending of where the flink sql is a source processing, a dimension, a fact or event a view. Most of the shift left pipelines are processing raw data from topics created by CDC processes. Those topics are sources to the sources processing.
+
+The following rule of thumb can be used:
+
+| <div style="width:400px">Type of processing | Candidate Folder |
+| ------------------ | ---------------- |
+| Deduplication, filtering | sources |
+| Joins between sources | dimensions |
+| Joins between dimensions, aggregates | facts |
+| Golden records directly queryable by final BI | views |
 
 * Organize the Flink statements into pipeline folders, possibly using sources, intermediates, dimensions, and facts classification. Think about data products. A candidate hierarchy may look like this:
   ```sh
@@ -203,6 +355,35 @@ Flink statements have dependencies, so it is important to use shift_left to mana
   
   ```
 
-* Add unit tests per table (at least for the complex DML ones) ([see test harness](./test_harness.md))
-* Add source data into the first tables of the pipeline
+Once folders are moved to the pipelines it is possible to build a table inventory:
+
+* Run after new tables are created
+  ```sh
+  shift_left table build-inventory
+  ```
+
+As Flink statements have dependencies, it is important to use shift_left to manage the creation of the dependencies metadata automatically:
+
+* Build all the metadata
+  ```sh
+  shift_left pipeline build-all-metadata 
+  ```
+
+
+* Then for any given table, Data Engineer may want to understand the execution plan
+  ```sh
+  shift_left pipeline build-execution-plan --table-name <>
+  ```
+
+
+## 5. Next
+
+*This will be detailed within another lab*
+
+* Add unit tests per table (at least for the complex DML ones) ([see test harness](../coding/test_harness.md))
+	```sh
+	shift_left table init-unit-tests c360_dim_users --nb-test-cases 1
+	```
+* Add source data into the first tables of the pipeline: under a sources table and tests folder
+
 * Verify the created records within the sink tables.

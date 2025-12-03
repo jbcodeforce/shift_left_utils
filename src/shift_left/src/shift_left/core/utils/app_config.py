@@ -163,7 +163,7 @@ file_handler = RotatingFileHandler(
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
-print("-" * 40 + " SHIFT_LEFT " + "-" * 40)
+print("-" * 40 + " SHIFT_LEFT " + __version__ + " " + "-" * 40)
 header_line=f"""| CONFIG_FILE     : {os.getenv('CONFIG_FILE')}
 | LOGS folder     : {session_log_dir}
 | Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""

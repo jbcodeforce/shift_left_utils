@@ -2,12 +2,11 @@
 
 * Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
 
-### v0.1.45
-* Add list of statement per compute pool id, as part of project commands and in the deployment manager service
-* Add support to exclude-table-list from a deployment or build execution plan. The table will not be restarted or re run
-* Enhance the project list-modified-files
+### v0.1.46
 
-
+* Improve AI migration for KSQLdb. Refactor to leverage common prompts between Spark and Ksql migration. Add more tests for ksql.
+* Enhanced housekeeping feature to delete/ pause / resume statements in a given compute pool
+* Add version in trace
 
 <!-- version list -->
 ### v0.1.45

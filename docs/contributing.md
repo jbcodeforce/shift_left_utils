@@ -354,7 +354,7 @@ Use the following settings for vscode based IDE
 * Deploy the CLI from the wheel: 1/ first the last wheel number and then 2/ execute the commands like:
     ```sh
     uv tool uninstall shift_left
-    uv tool install shift_left@dist/shift_left-0.1.19-py3-none-any.whl
+    uv tool install shift_left@dist/shift_left-0.1.46-py3-none-any.whl
     ```
 
 * To Build the [Command.md](./command.md) documentation from the code run:

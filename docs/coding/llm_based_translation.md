@@ -58,39 +58,7 @@ As part of the process, developers need to validate the generated DDL and update
 **Attention**, the DML is not executable until all dependent input tables are created.
   
 
-
 * The ksqldb files to test, the migration from, are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
-* Set the environment variables to run shift_left using the [setup instructions](../setup.md)
-  ```
-  PROJECT_ROOT=shift_left_utils/tree/main/src/shift_left/tests/
-  export CONFIG_FILE=$PROJECT_ROOT/config.yaml
-  export SRC_FOLDER=$PROJECT_ROOT/data/ksql-project/sources
-  export STAGING=$PROJECT_ROOT/data/ksql-project/staging
-  export SL_LLM_BASE_URL=http://localhost:11434/v1
-  export SL_LLM_MODEL=qwen3-coder:30b
-  export SL_LLM_API_KEY=not_needed_key
-  ```
-* Start ollama: 
-  ```sh
-  osaurus serve
-  # or 
-  ollama serve
-  ```
-
-* Be sure to have one of the following model (`osaurus list` or `ollama list`): By default `qwen-coder-30b-a3b-instruct-mlx-4bit` or `qwen3-coder:30b` is used.
-	```sh
-	gpt-oss:20b   13 GB        
-	qwen-coder-30b-a3b-instruct-mlx-4bit
-	```
-	
-	if not use one of the following command:
-	```sh
-	ollama pull qwen3-coder:30b 
-	#
-	osaurus pull qwen-coder-30b-a3b-instruct-mlx-4bit
-	```
-
-
 
 
 * Status of the working migration: See **test_ksql_migration.py::TestKsqlMigrations** code.
@@ -322,7 +290,7 @@ tests/data/ksql-project
 
 `flink-references` includes some migrated solutions used as reference for validating migrations.
 
-## Prerequisites and Setup
+## Prerequisites and Setup for Developers
 
 [See the environment setup for developers section.](../contributing.md/#environment-set-up-for-developers)
 

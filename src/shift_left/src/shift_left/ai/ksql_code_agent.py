@@ -75,19 +75,26 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         """
 
         logger.info("\n0/ Cleaning KSQL input by removing DROP TABLE statements and comments...\n")
+        print("\n0/ Cleaning SQL input by removing DROP TABLE statements and comments...\n")
+
         ksql = self._clean_sql_input(sql)
         logger.info(f"Cleaned KSQL input: {ksql[:400]}...")
-        sql_parser = SQLparser()
+
         logger.info(f"\n1/ Analyzing KSQL input for multiple CREATE TABLE statements using: {self.model_name} \n")
+        print(f"\n1/ Analyzing KSQL input for multiple CREATE TABLE statements using: {self.model_name} \n")
+
         table_detection = self._detect_multitable_with_agent(ksql)
         logger.info(f"Table detection result: {table_detection.model_dump_json()}")
         final_ddl = []
         final_dml = []
+        print(f"Starting translation using {self.model_name} with cc-validation={validate}")
+        print(f"-"*40)
         if table_detection.has_multiple_tables:
             # Process multiple statements individually for better accuracy
             logger.info(f"Found {len(table_detection.table_statements)} separate CREATE statements. Processing each separately...")
             for i, table_statement in enumerate(table_detection.table_statements):
                 logger.info(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:100]}...")
+                print(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:100]}...")
                 # Translate individual statement
                 ddl_sql, dml_sql = self._do_translation_with_agent(table_statement)
                 logger.info(f"Done with translator agent for statement {i+1}, DDL: {ddl_sql}..., DML: {dml_sql if dml_sql else 'empty'}...")
@@ -104,6 +111,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         else:
             # Process as single statement
             logger.info("2/ Processing single KSQL statement...")
+            print("\n2/: Processing single Spark SQL to Flink SQL...")
             ddl_sql, dml_sql = self._do_translation_with_agent(ksql)
 
             self._snapshot_ddl_dml(table_name, ddl_sql, dml_sql)

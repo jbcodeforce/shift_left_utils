@@ -29,6 +29,7 @@ Think step by step, follow core princiles but I bet 200$ you can't solve this co
 * `SUBSTRING(string, start, length)` → `SUBSTRING(string, start, length)` (same syntax)
 * `LENGHT(string)` → `CHARACTER_LENGTH(string)
 * `EXPLODE(array)`  → CROSS JOIN UNNEST(array) AS u (element);  change
+* `TIMESTAMPTOSTRING(timestamp, string)` →  DATE_FORMAT(timestamp, string)
 
 ### Aggregation and Windowing:
 * `WINDOW TUMBLING (SIZE X SECONDS)` → `TABLE(TUMBLE(TABLE source, DESCRIPTOR($rowtime), INTERVAL 'X' SECOND))`
