@@ -62,6 +62,7 @@ By default use AVRO.
 * Ensure all statements follow valid Apache Flink SQL syntax
 * Verify proper parentheses, commas, and quote usage
 * Validate that all required clauses are present and correctly ordered
+* Transform `!=` → `<>`
 
 ## EXPECTED TABLE STRUCTURE:
 ```sql

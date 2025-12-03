@@ -163,7 +163,7 @@ my-flink-demo
 <capture>ksql project organization</capture>
 </figure>
 
-### 2, KSQL to Flink SQL Lab
+### 2. KSQL to Flink SQL Lab
 
 The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) 
 
