@@ -77,7 +77,7 @@ class TestProjectCLI(unittest.TestCase):
     def test_list_modified_files(self):
         runner = CliRunner()
         project_path =  str(pathlib.Path(__file__).parent.parent.parent.parent.parent.parent)
-        result = runner.invoke(app, [ "list-modified-files", "main", "--project-path", project_path, "--file-filter", "sql", "--since", "2025-08-10"])
+        result = runner.invoke(app, [ "list-modified-files", "develop", "--project-path", project_path, "--file-filter", "sql", "--since", "2025-08-10"])
         print(result.stdout)
         assert result.exit_code == 0
 

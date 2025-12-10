@@ -315,10 +315,14 @@ def update_tables_version(
     if not table_list_file_name.endswith('.json'):
         print(f"File {table_list_file_name} is not a json file")
         raise typer.Exit(1)
-    table_names = _load_table_names_from_file(table_list_file_name)
-    print("#" * 30 + f" Update table version for {len(table_names)} tables")
-    project_manager.update_tables_version(table_names, default_version)
-    print(f"Table version updated in {len(table_names)} tables")
+    table_infos = _load_table_names_from_file(table_list_file_name)
+    print("#" * 30 + f" Update table version for {len(table_infos)} tables")
+    try:
+        project_manager.update_tables_version(table_infos, default_version)
+        print(f"{_get_status_emoji('PASS')} Table version updated in {len(table_infos)} tables")
+    except Exception as e:
+        print(f"{_get_status_emoji('ERROR')} updating table version: {e}")
+        raise typer.Exit(1)
 
 @app.command()
 def init_integration_tests(
@@ -434,7 +438,7 @@ def delete_integration_tests(
     print("#" * 30 + f" Delete Integration Test Artifacts for {sink_table_name}")
 
     if not no_confirm:
-        print("⚠️  This will delete all integration test artifacts including:")
+        print("This will delete all integration test artifacts including:")
         print("   - Flink statements with '_it' postfix")
         print("   - Associated Kafka topics")
         print("   - Test data and temporary resources")
@@ -493,18 +497,12 @@ def _get_status_emoji(status: str) -> str:
     }
     return emoji_map.get(status, "❓")
 
-def _load_table_names_from_file(file_name: str) -> list[str]:
+def _load_table_names_from_file(file_name: str) -> list[ModifiedFileInfo]:
     if not os.path.exists(file_name):
         print(f"[red]Error: file {file_name} does not exist[/red]")
         raise typer.Exit(1)
-    if file_name.endswith('.json'):
-        with open(file_name, 'r') as f:
-            content = json.load(f)
-            return content['file_list']
-    else:
-        file_list=[]
-        with open(file_name, 'r') as f:
-            table_names = f.read().splitlines()
-            for table_name in table_names:
-                file_list.append(ModifiedFileInfo(table_name=table_name, file_modified_url="", same_sql_content=False, running=False).model_dump_json())
-            return file_list
+
+    with open(file_name, 'r') as f:
+        content = json.load(f)
+        return content['file_list']
+

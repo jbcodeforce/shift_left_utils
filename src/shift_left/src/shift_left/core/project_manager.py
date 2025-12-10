@@ -422,6 +422,9 @@ def _update_version_in_current_ddl_dml(currentfile_info: ModifiedFileInfo,
                                processed_files: set[ModifiedFileInfo],
                                default_version: str,
                                inventory: dict):
+    """
+    Update the version of the current ddl and dml files for the given table name
+    """
     try:
         table_ref = inventory[currentfile_info.table_name]
     except KeyError:
