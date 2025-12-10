@@ -205,7 +205,7 @@ def housekeep_statements( compute_pool_id: str = typer.Option(None, "--compute-p
                 elif action == 'RESUME':   # Resume STOPPED statements
                     if statement_info.status_phase == 'STOPPED':
                         statement = statement_mgr.get_statement(stmnt_name)
-                        rep=statement_mgr.patch_statement_if_exists(stmnt_name, stopped=False)   
+                        rep=statement_mgr.patch_statement_if_exists(stmnt_name, stopped=False)
                         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {stmnt_name} is resumed in compute pool {compute_pool_id}")
                         action_cnt+=1
                     else:
@@ -214,7 +214,7 @@ def housekeep_statements( compute_pool_id: str = typer.Option(None, "--compute-p
                     rep=statement_mgr.delete_statement_if_exists(stmnt_name)
                     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deleted statement {stmnt_name} in compute pool {compute_pool_id}")
                     action_cnt+=1
-            
+
             if action_cnt == 0:
                 print(f"{time.strftime('%Y%m%d_%H:%M:%S')} No statements {action}ed")
             else:
@@ -269,7 +269,7 @@ def list_modified_files(
     branch_name: Annotated[str, typer.Argument(help="Git branch name to compare against (e.g., 'main', 'origin/main')")],
     project_path: Annotated[str, typer.Option(help="Project path where git repository is located")] = ".",
     file_filter: Annotated[str, typer.Option(help="File extension filter (e.g., '.sql', '.py')")] = ".sql",
-    since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = None
+    since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = "2025-12-01"
 ):
     """
     Get the list of files modified in the current git branch compared to the specified branch.

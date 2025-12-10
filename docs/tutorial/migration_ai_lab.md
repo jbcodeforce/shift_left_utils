@@ -17,9 +17,9 @@ The core idea is to leverage LLMs to understand the source SQL semantics and to 
 ## Prerequisites
 
 Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left cli operational.
-
 For the AI based migration the following needs to be done:
 
+1. A computer with at least 20GB of Free RAM, with GPU - (All development was done on MAC M3 Pro 36GB )
 1. [Install Ollama](https://ollama.com/download/mac)
 	```sh
 	# Verify the ollama cli:

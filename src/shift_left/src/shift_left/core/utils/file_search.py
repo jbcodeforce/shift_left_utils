@@ -53,8 +53,8 @@ class FlinkTablePipelineDefinition(InfoNode):
     """
     path: str = Field(default="", description="path to the table")
     complexity: Optional[FlinkStatementComplexity] = Field(default=FlinkStatementComplexity(), description="Complexity of the statement")
-    parents: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="parents of this flink dml")
-    children: Optional[Set['FlinkTablePipelineDefinition']] = Field(default=set(), description="users of the table created by this flink dml")
+    parents: Set['FlinkTablePipelineDefinition'] = Field(default=set(), description="parents of this flink dml")
+    children: Set['FlinkTablePipelineDefinition'] = Field(default=set(), description="users of the table created by this flink dml")
 
     def __hash__(self) -> int:
         return hash(self.table_name)

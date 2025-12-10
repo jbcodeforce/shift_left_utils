@@ -1,4 +1,15 @@
+# =============================================================================
+# Shift Left Utils - GPU EC2 Infrastructure
+# =============================================================================
+# This Terraform configuration provisions an EC2 instance with:
+# - GPU support (NVIDIA A10G) for LLM inference via Ollama
+# - 64GB RAM for running large language models
+# - Git, Python, uv, and shift_left CLI pre-installed
+# - Ollama for local LLM inference (qwen2.5-coder model)
+# =============================================================================
+
 terraform {
+  required_version = ">= 1.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -9,86 +20,134 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-
 }
 
-resource "aws_vpc" "Main" {            # Creating VPC here
-  cidr_block       = var.main_vpc_cidr # Defining the CIDR block use 10.0.0.0/24 for demo
-  instance_tenancy = "default"
+# =============================================================================
+# VPC Configuration
+# =============================================================================
+
+resource "aws_vpc" "main" {
+  cidr_block           = var.main_vpc_cidr
+  instance_tenancy     = "default"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "shift-left-vpc"
+  }
 }
 
-resource "aws_internet_gateway" "IGW" { # Creating Internet Gateway
-  vpc_id = aws_vpc.Main.id              # vpc_id will be generated after we create VPC
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "shift-left-igw"
+  }
 }
 
-resource "aws_subnet" "publicsubnets" { # Creating Public Subnets
-  vpc_id                  = aws_vpc.Main.id
-  cidr_block              = var.public_subnets # CIDR block of public subnets
+# =============================================================================
+# Subnets
+# =============================================================================
+
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnets
   availability_zone       = var.availability_zone
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "Public Subnet"
+    Name = "shift-left-public-subnet"
   }
 }
 
-resource "aws_subnet" "privatesubnets" {
-  vpc_id            = aws_vpc.Main.id
-  cidr_block        = var.private_subnets # CIDR block of private subnets
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnets
   availability_zone = var.availability_zone
 
   tags = {
-    Name = "Private Subnet"
+    Name = "shift-left-private-subnet"
   }
 }
 
-resource "aws_route_table" "PublicRT" { # Creating Route Table for Public Subnet
-  vpc_id = aws_vpc.Main.id
+# =============================================================================
+# Route Tables
+# =============================================================================
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
   route {
-    cidr_block = "0.0.0.0/0" # Traffic from Public Subnet reaches Internet via Internet Gateway
-    gateway_id = aws_internet_gateway.IGW.id
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "shift-left-public-rt"
   }
 }
 
-resource "aws_route_table" "PrivateRT" { # Creating RT for Private Subnet
-  vpc_id = aws_vpc.Main.id
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
   route {
-    cidr_block     = "0.0.0.0/0" # Traffic from Private Subnet reaches Internet via NAT Gateway
-    nat_gateway_id = aws_nat_gateway.NATgw.id
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat.id
+  }
+
+  tags = {
+    Name = "shift-left-private-rt"
   }
 }
 
-resource "aws_route_table_association" "PublicRTassociation" {
-  subnet_id      = aws_subnet.publicsubnets.id
-  route_table_id = aws_route_table.PublicRT.id
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "PrivateRTassociation" {
-  subnet_id      = aws_subnet.privatesubnets.id
-  route_table_id = aws_route_table.PrivateRT.id
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
 
-resource "aws_eip" "nateIP" {
+# =============================================================================
+# NAT Gateway
+# =============================================================================
+
+resource "aws_eip" "nat" {
   domain = "vpc"
+
+  tags = {
+    Name = "shift-left-nat-eip"
+  }
 }
 
-resource "aws_nat_gateway" "NATgw" {
-  allocation_id = aws_eip.nateIP.id
-  subnet_id     = aws_subnet.publicsubnets.id
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+
+  tags = {
+    Name = "shift-left-nat-gw"
+  }
+
+  depends_on = [aws_internet_gateway.igw]
 }
 
-# Security Group for SSH and Ollama API access
-resource "aws_security_group" "ollama_sg" {
-  name_prefix = "ollama-sg"
-  vpc_id      = aws_vpc.Main.id
-  description = "Security group for Ollama EC2 instance"
+# =============================================================================
+# Security Group
+# =============================================================================
+
+resource "aws_security_group" "shift_left" {
+  name_prefix = "shift-left-sg"
+  vpc_id      = aws_vpc.main.id
+  description = "Security group for Shift Left GPU EC2 instance"
 
   # SSH access
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ssh_cidrs
     description = "SSH access"
   }
 
@@ -97,7 +156,7 @@ resource "aws_security_group" "ollama_sg" {
     from_port   = 11434
     to_port     = 11434
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ollama_cidrs
     description = "Ollama API access"
   }
 
@@ -111,46 +170,72 @@ resource "aws_security_group" "ollama_sg" {
   }
 
   tags = {
-    Name = "ollama-security-group"
+    Name = "shift-left-security-group"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
-# EC2 Instance for Ollama with GPU support
-resource "aws_instance" "ollama_server" {
+# =============================================================================
+# EC2 Instance - GPU Server for Shift Left
+# =============================================================================
+
+resource "aws_instance" "shift_left_server" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
-  key_name               = var.ssh_api_key
-  subnet_id              = aws_subnet.publicsubnets.id
-  vpc_security_group_ids = [aws_security_group.ollama_sg.id]
+  key_name               = var.ssh_key_name
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.shift_left.id]
 
-  # Enhanced storage for GPU workloads and model storage
+  # Storage for models, code, and data
   root_block_device {
-    volume_size = 200 # Increased for storing large models
-    volume_type = "gp3"
-    iops        = 3000
-    throughput  = 125
-    encrypted   = true
+    volume_size           = var.root_volume_size
+    volume_type           = "gp3"
+    iops                  = 3000
+    throughput            = 125
+    encrypted             = true
+    delete_on_termination = true
   }
 
   # User data script for setup
-  user_data = file("${path.module}/setup.sh")
+  user_data                   = file("${path.module}/setup.sh")
+  user_data_replace_on_change = false
 
   # Enable detailed monitoring
   monitoring = true
 
+  # Metadata options for IMDSv2
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "optional"
+    http_put_response_hop_limit = 1
+  }
+
   tags = {
-    Name        = "Ollama-GPU-Server"
-    Purpose     = "LLM-Inference"
-    Environment = "Development"
+    Name        = var.instance_name
+    Purpose     = "Shift-Left-LLM-Migration"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+
+  volume_tags = {
+    Name = "${var.instance_name}-root-volume"
   }
 }
 
+# =============================================================================
 # Elastic IP for the instance
-resource "aws_eip" "ollama_eip" {
-  instance = aws_instance.ollama_server.id
+# =============================================================================
+
+resource "aws_eip" "server" {
+  instance = aws_instance.shift_left_server.id
   domain   = "vpc"
 
   tags = {
-    Name = "ollama-server-eip"
+    Name = "${var.instance_name}-eip"
   }
+
+  depends_on = [aws_internet_gateway.igw]
 }

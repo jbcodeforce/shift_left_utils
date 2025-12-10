@@ -65,15 +65,22 @@ class TestProjectCLI(unittest.TestCase):
     def test_delete_all_compute_pools_command(self):
         """Test delete-all-compute-pools command"""
         runner = CliRunner()
-        
+
         # This command requires actual Confluent Cloud access
         # We test the command parsing but expect it might fail due to infrastructure
         result = runner.invoke(app, ["delete-all-compute-pools", "test_product"])
-        
+
         # The command should parse correctly even if it fails due to missing infrastructure
         print(result.stdout)
         # We don't assert exit_code here since it depends on actual cloud connectivity
-        
+
+    def test_list_modified_files(self):
+        runner = CliRunner()
+        project_path =  str(pathlib.Path(__file__).parent.parent.parent.parent.parent.parent)
+        result = runner.invoke(app, [ "list-modified-files", "main", "--project-path", project_path, "--file-filter", "sql", "--since", "2025-08-10"])
+        print(result.stdout)
+        assert result.exit_code == 0
+
 
 if __name__ == '__main__':
     unittest.main()

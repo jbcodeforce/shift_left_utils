@@ -1,216 +1,304 @@
-# AWS EC2 for Ollama and Shift Left tools
+# Shift Left GPU EC2 Infrastructure
 
-This Terraform configuration creates a GPU-enabled EC2 instance optimized for running Ollama with large language models. Using Ollama enables local access to large language models like Llama, Qwen, Cogito, and Mistral to ensure data privacy and security. For the Shift Left project, we can run SQL migrations table by table using an EC2 with sufficient GPU resources.
+This Terraform configuration creates a GPU-enabled EC2 instance for running the shift_left CLI with Ollama for AI-powered SQL migrations. The setup enables local access to large language models like Qwen to ensure data privacy and security during SQL transformation tasks.
 
-The `qwen2.5-coder:32b` model has excellent performance on code generation benchmarks and provides outstanding results for transforming KSQL and Spark SQL to Flink SQL. Future solutions may include fine-tuned models specifically for Flink SQL or RAG implementations.
+The `qwen3-coder:30b` model provides excellent performance for transforming KSQL and Spark SQL to Flink SQL.
 
-## GPU-Optimized EC2 Configuration
+## Instance Specifications
 
-### Instance Specifications
-- **Instance Type**: `g5.4xlarge` - Optimized for GPU workloads ($1.01/hour)
-- **vCPUs**: 16
-- **RAM**: 64GB
-- **GPU**: 1x NVIDIA A10G with 24GB VRAM
-- **Storage**: 200GB GP3 SSD (encrypted, high IOPS)
-- **OS**: Deep Learning AMI (Amazon Linux 2) with pre-installed NVIDIA drivers and CUDA
+| Specification | Value |
+|--------------|-------|
+| Instance Type | `g5.4xlarge` |
+| vCPUs | 16 |
+| RAM | 64 GB |
+| GPU | 1x NVIDIA A10G (24 GB VRAM) |
+| Storage | 200 GB GP3 SSD (encrypted) |
+| OS | Deep Learning AMI (Amazon Linux 2) |
+| Cost | ~$1.01/hour (on-demand) |
 
-### GPU Advantages for Ollama
-- **Faster Model Loading**: GPU memory allows faster model initialization
-- **Improved Inference Speed**: 10-50x faster than CPU-only inference
-- **Larger Model Support**: 24GB VRAM supports models up to 32B parameters
-- **Concurrent Processing**: Better handling of multiple API requests
+### Alternative Instance Types
 
-### AMI Details
-The configuration uses AWS Deep Learning AMI with:
-- Pre-installed NVIDIA drivers (latest stable)
-- CUDA toolkit and cuDNN libraries
-- Docker support for containerized workloads
-- Optimized for machine learning frameworks
+| Instance Type | RAM | GPU | VRAM | Cost/hr | Use Case |
+|--------------|-----|-----|------|---------|----------|
+| g5.4xlarge | 64 GB | 1x A10G | 24 GB | $1.01 | Default - 32B models |
+| g5.8xlarge | 128 GB | 1x A10G | 24 GB | $2.02 | Large context windows |
+| g5.12xlarge | 192 GB | 4x A10G | 96 GB | $4.04 | 70B+ models |
+| g4dn.4xlarge | 64 GB | 1x T4 | 16 GB | $1.20 | Budget option |
 
-**Current AMI**: `ami-0c2d3e23c876c6093` (us-west-2 region)
-*Note: If you change regions, update the AMI ID in terraform.tfvars*
+## Pre-installed Components
 
-## Infrastructure Components
+The setup script automatically installs:
 
-The Terraform configuration creates:
-
-### Network Infrastructure
-- **VPC**: Isolated virtual network with CIDR 10.0.0.0/24
-- **Public Subnet**: For the EC2 instance with internet access
-- **Private Subnet**: For future scalability and security
-- **Internet Gateway**: Enables public internet access
-- **NAT Gateway**: Allows private subnet outbound internet access
-- **Route Tables**: Properly configured routing for both subnets
-
-### Security
-- **Security Group**: Configured for:
-  - SSH access (port 22) from anywhere
-  - Ollama API access (port 11434) from anywhere
-  - All outbound traffic allowed
-- **Elastic IP**: Static public IP for consistent access
-
-### Compute Resources
-- **GPU-enabled EC2 Instance**: Optimized for Ollama LLM inference
-- **Enhanced Storage**: 200GB GP3 with high IOPS for model storage
-- **Automated Setup**: User data script installs and configures Ollama
+- Git client
+- Python 3.11 with pip
+- uv (fast Python package manager)
+- Docker
+- Ollama with GPU support
+- shift_left CLI (from repository)
+- qwen2.5-coder:32b model (downloads in background)
 
 ## Prerequisites
 
-1. **AWS CLI**: Configure with your AWS credentials
+1. **AWS CLI**: Configure with your credentials
    ```bash
    aws configure
    ```
 
-2. **Terraform CLI**: Install from [HashiCorp's website](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+2. **Terraform**: Install from [HashiCorp](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 
-3. **SSH Key Pair**: Create or use existing AWS key pair
-   - Update `ssh_api_key` in `terraform.tfvars` with your key name
-   - Ensure you have the corresponding `.pem` file locally
-
-4. **Update Configuration**: Modify `terraform.tfvars` as needed:
-   ```hcl
-   ssh_api_key = "your-key-name"  # Replace with your AWS key pair name
-   aws_region = "us-west-2"       # Change if needed
+3. **SSH Key Pair**: Create or use existing key pair
+   ```bash
+   # Create new key pair
+   aws ec2 create-key-pair --key-name my-shift-left-key \
+     --query 'KeyMaterial' --output text > ~/.ssh/my-shift-left-key.pem
+   chmod 400 ~/.ssh/my-shift-left-key.pem
    ```
 
-## Deployment Instructions
+4. **Update Configuration**: Edit `terraform.tfvars`:
+   ```hcl
+   ssh_key_name = "my-shift-left-key"  # Your key pair name
+   aws_region   = "us-west-2"          # Your preferred region
+   ```
+
+## Deployment
 
 ### 1. Initialize Terraform
+
 ```bash
 cd IaC/tf_aws_ec2
 terraform init
 ```
 
-### 2. Plan the Deployment
+### 2. Review Plan
+
 ```bash
 terraform plan
 ```
-Review the planned resources to ensure everything looks correct.
 
-### 3. Deploy the Infrastructure
+### 3. Deploy
+
 ```bash
 terraform apply
 ```
-Type `yes` when prompted to confirm the deployment.
 
-### 4. Access Your Instance
-After deployment, Terraform will output connection details:
+Type `yes` to confirm. Deployment takes 3-5 minutes.
+
+### 4. Get Connection Details
+
 ```bash
-# Get connection information
 terraform output ssh_command
 terraform output ollama_api_url
+terraform output quick_start
+```
 
-# Connect via SSH
+## Usage
+
+### Connect to Instance
+
+```bash
+# Use the SSH command from terraform output
 ssh -i ~/.ssh/your-key.pem ec2-user@<public-ip>
 ```
 
-### 5. Verify Ollama Installation
+### Check Server Status
+
 ```bash
-# Check GPU status
-nvidia-smi
+./check_status.sh
+```
 
-# Check Ollama status
-sudo systemctl status ollama
+This shows:
+- GPU status and memory usage
+- Ollama service status
+- Available models
+- Model download progress
+- shift_left version
 
-# List available models
+### Set Up Environment
+
+```bash
+source ./set_env.sh
+```
+
+### Run Shift Left CLI
+
+```bash
+# Check version
+shift_left version
+
+# View available commands
+shift_left --help
+
+# Validate configuration
+shift_left project validate-config
+
+# Run SQL migration
+shift_left table migrate my_table input.sql output/ --source-type ksql
+```
+
+### Test Ollama
+
+```bash
+# Quick test
+./test_ollama.sh
+
+# Manual API test
+curl http://localhost:11434/api/generate -d '{
+  "model": "qwen2.5-coder:32b",
+  "prompt": "Write a Flink SQL query to deduplicate records",
+  "stream": false
+}' | jq .response
+```
+
+### Monitor Model Download
+
+The 32B model (~20GB) downloads in the background after boot:
+
+```bash
+# Check progress
+tail -f /var/log/ollama-pull.log
+
+# Check if complete
 ollama list
-
-# Test API (from local machine)
-curl http://<public-ip>:11434/api/tags
 ```
 
-## Usage Examples
+## Infrastructure Components
 
-### Using Ollama API
+### Network
+- VPC with public and private subnets
+- Internet Gateway for public access
+- NAT Gateway for private subnet outbound traffic
+- Elastic IP for stable public address
+
+### Security
+- Security group with SSH (22) and Ollama API (11434) access
+- Encrypted EBS volume
+- IMDSv2 enabled
+
+### Compute
+- GPU-optimized EC2 instance
+- 200GB high-IOPS storage for models
+- Automated provisioning via user data
+
+## Configuration Options
+
+### Restrict Access (Recommended for Production)
+
+Edit `terraform.tfvars` to limit access:
+
+```hcl
+# Only allow SSH from your IP
+allowed_ssh_cidrs = ["203.0.113.50/32"]
+
+# Only allow Ollama API from your IP
+allowed_ollama_cidrs = ["203.0.113.50/32"]
+```
+
+### Change Model
+
+Edit `terraform.tfvars`:
+
+```hcl
+ollama_model = "codellama:34b"  # or any supported model
+```
+
+Then update the model on the server:
+
 ```bash
-# Generate code completion
-curl -X POST http://<public-ip>:11434/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen2.5-coder:32b",
-    "prompt": "Convert this KSQL to Flink SQL: CREATE STREAM...",
-    "stream": false
-  }'
+ollama pull codellama:34b
 ```
 
-### SSH into Instance
-```bash
-# Connect to instance
-ssh -i ~/.ssh/your-key.pem ec2-user@<public-ip>
+### Increase Storage
 
-# Check system resources
-htop
-nvtop  # GPU monitoring
+Edit `terraform.tfvars`:
 
-# Manage Ollama
-sudo systemctl status ollama
-sudo systemctl restart ollama
+```hcl
+root_volume_size = 300  # GB
 ```
 
-## Cost Optimization
+## Cost Management
 
-- **Instance Cost**: ~$1.01/hour for g5.4xlarge
-- **Storage Cost**: ~$20/month for 200GB GP3
-- **Data Transfer**: Minimal for API usage
+| Component | Estimated Cost |
+|-----------|---------------|
+| g5.4xlarge | ~$1.01/hour |
+| 200GB GP3 | ~$20/month |
+| Elastic IP | Free while attached |
+| NAT Gateway | ~$32/month |
 
-**Cost-Saving Tips**:
-- Stop instance when not in use: `terraform destroy`
-- Use spot instances for development (manual configuration)
-- Monitor usage with AWS Cost Explorer
+### Cost-Saving Tips
+
+1. **Stop when not in use**: Stop the instance from AWS Console
+2. **Use terraform destroy**: Remove all resources when done
+3. **Spot instances**: For non-critical work (requires manual configuration)
 
 ## Troubleshooting
 
-### Common Issues
+### Ollama Not Accessible
 
-1. **Ollama not accessible**:
-   ```bash
-   # Check service status
-   sudo systemctl status ollama
-   
-   # Check logs
-   sudo journalctl -u ollama -f
-   
-   # Restart service
-   sudo systemctl restart ollama
-   ```
+```bash
+# Check service status
+sudo systemctl status ollama
 
-2. **GPU not detected**:
-   ```bash
-   # Check NVIDIA drivers
-   nvidia-smi
-   
-   # Reinstall if needed
-   sudo yum update -y
-   sudo reboot
-   ```
+# View logs
+sudo journalctl -u ollama -f
 
-3. **Model loading issues**:
-   ```bash
-   # Check disk space
-   df -h
-   
-   # Re-pull model
-   ollama pull qwen2.5-coder:32b
-   ```
+# Restart service
+sudo systemctl restart ollama
+```
 
-### Logs and Monitoring
-- **User Data Logs**: `/var/log/user-data.log`
-- **Ollama Logs**: `sudo journalctl -u ollama`
-- **System Logs**: `/var/log/messages`
+### GPU Not Detected
+
+```bash
+# Check NVIDIA drivers
+nvidia-smi
+
+# Reboot if needed
+sudo reboot
+```
+
+### shift_left Not Found
+
+```bash
+# Source the environment
+source ~/set_env.sh
+
+# Or use full path
+cd ~/shift_left_utils/src/shift_left
+uv run shift_left version
+```
+
+### Model Download Failed
+
+```bash
+# Check logs
+cat /var/log/ollama-pull.log
+
+# Manual retry
+ollama pull qwen2.5-coder:32b
+```
+
+### Logs Location
+
+| Log | Location |
+|-----|----------|
+| Setup script | `/var/log/user-data.log` |
+| Model download | `/var/log/ollama-pull.log` |
+| Ollama service | `sudo journalctl -u ollama` |
+| System | `/var/log/messages` |
 
 ## Cleanup
 
-To destroy all resources and avoid ongoing costs:
+Remove all resources to stop charges:
+
 ```bash
 terraform destroy
 ```
-Type `yes` when prompted to confirm destruction.
 
-## Security Considerations
+Type `yes` to confirm.
 
-- The security group allows public access to ports 22 and 11434
-- For production use, consider:
-  - Restricting SSH access to specific IP ranges
-  - Using a bastion host for SSH access
-  - Implementing API authentication for Ollama
-  - Using AWS Systems Manager Session Manager instead of SSH
+## Security Notes
+
+- Default configuration allows public access to SSH and Ollama API
+- For production, restrict CIDRs in `terraform.tfvars`
+- Consider using AWS Systems Manager Session Manager instead of SSH
+- Enable AWS CloudTrail for audit logging
+- Use IAM roles instead of long-term credentials

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS z (
+CREATE TABLE IF NOT EXISTS z_v2 (
   default_key STRING,
   z_value STRING,
   -- put here column definitions

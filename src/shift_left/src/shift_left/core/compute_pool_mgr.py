@@ -30,7 +30,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
         if os.path.exists(COMPUTE_POOL_LIST_FILE):
             with open(COMPUTE_POOL_LIST_FILE, "r") as f:
                 _compute_pool_list = ComputePoolList.model_validate(json.load(f))
-            if _compute_pool_list.created_at and (datetime.now() - _compute_pool_list.created_at).total_seconds() < config['app']['cache_ttl']:  
+            if _compute_pool_list.created_at and (datetime.now() - _compute_pool_list.created_at).total_seconds() < config['app']['cache_ttl']:
                 # keep the list if it was created in the last 60 minutes
                 reload = False
         if reload:
@@ -41,7 +41,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
             _compute_pool_list = ComputePoolList(created_at=datetime.now())
             for pool in response.data:
                 cp_pool = ComputePoolInfo(id=pool.id,
-                                        name=pool.spec.display_name, 
+                                        name=pool.spec.display_name,
                                         env_id=pool.spec.environment.id,
                                         max_cfu=pool.spec.max_cfu,
                                         region=pool.spec.region,
@@ -51,7 +51,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
             _save_compute_pool_list(_compute_pool_list)
             logger.info(f"Compute pool list has {len(_compute_pool_list.pools)} compute pools")
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Compute pool list has {len(_compute_pool_list.pools)} compute pools")
-    elif (_compute_pool_list.created_at 
+    elif (_compute_pool_list.created_at
          and (datetime.now() - _compute_pool_list.created_at).total_seconds() > get_config()['app']['cache_ttl']):
         logger.info("Compute pool list cache is expired, reload it")
         _compute_pool_list = None
@@ -65,9 +65,10 @@ def reset_compute_list():
 
 def save_compute_pool_info_in_metadata(statement_name, compute_pool_id: str):
     data = {}
+    logger.info(f"Save compute pool info in metadata file {STATEMENT_COMPUTE_POOL_FILE}")
     if os.path.exists(STATEMENT_COMPUTE_POOL_FILE):
         with open(STATEMENT_COMPUTE_POOL_FILE, "r")  as f:
-            data=json.load(f) 
+            data=json.load(f)
     data[statement_name] = {"statement_name": statement_name, "compute_pool_id": compute_pool_id}
     with open(STATEMENT_COMPUTE_POOL_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -133,7 +134,7 @@ def is_pool_valid(compute_pool_id) -> bool:
             logger.info(f"Compute Pool not found")
             raise Exception(f"The given compute pool {compute_pool_id} is not found, will use parameter or config.yaml one")
         logger.info(f"Using compute pool {compute_pool_id} with {pool_info['status']['current_cfu']} CFUs for a max: {pool_info['spec']['max_cfu']} CFUs")
-        ratio = get_pool_usage_from_dict(pool_info) 
+        ratio = get_pool_usage_from_dict(pool_info)
         if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
             raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
         return pool_info['status']['phase'] == "PROVISIONED"
@@ -141,7 +142,7 @@ def is_pool_valid(compute_pool_id) -> bool:
         logger.warning(e)
         logger.info("Continue processing using another compute pool from parameter or config.yaml")
         return False
-    
+
 
 def create_compute_pool(table_name: str) -> Tuple[str, str]:
     config = get_config()
@@ -157,12 +158,12 @@ def create_compute_pool(table_name: str) -> Tuple[str, str]:
             if _verify_compute_pool_provisioned(client, pool_id, env_id):
                 logger.info(f"Compute pool {pool_id} created and provisioned")
                 get_compute_pool_list().pools.append(ComputePoolInfo(
-                                        id=pool_id, 
-                                        name=result['spec']['display_name'], 
-                                        env_id=env_id, 
-                                        max_cfu=result['spec']['max_cfu'], 
-                                        region=result['spec']['region'], 
-                                        status_phase=result['status']['phase'], 
+                                        id=pool_id,
+                                        name=result['spec']['display_name'],
+                                        env_id=env_id,
+                                        max_cfu=result['spec']['max_cfu'],
+                                        region=result['spec']['region'],
+                                        status_phase=result['status']['phase'],
                                         current_cfu=result['status']['current_cfu']))
                 return pool_id, result['spec']['display_name']
         elif result.get('errors').get('status') == "409":
@@ -199,20 +200,20 @@ def delete_all_compute_pools_of_product(product_name: str):
     if product_name:
         compute_pool_list = get_compute_pool_list()
         logger.info(f"Delete all compute pools for product {product_name}")
-        
+
         # First, collect all pools that need to be deleted
         pools_to_delete = []
         for pool in compute_pool_list.pools:
             if product_name in pool.name:
                 pools_to_delete.append(pool)
-        
+
         # Then delete them in a separate loop
         count = 0
         for pool in pools_to_delete:
             delete_compute_pool(pool.id)
             print(f"Deleted compute pool {pool.id} for product {product_name}")
             count += 1
-            
+
         logger.info(f"Deleted {count} compute pools for product {product_name}")
         print(f"Deleted {count} compute pools for product {product_name}")
     else:

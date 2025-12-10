@@ -1,4 +1,4 @@
-INSERT INTO z
+INSERT INTO z_v2
 SELECT
 y.default_key,
 concat(y.y_value,'-', x.x_value) as z_value

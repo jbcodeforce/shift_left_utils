@@ -131,7 +131,11 @@ def list_tables_with_one_child(project_path: str):
             tables_with_one_child.append(table_name)
     return tables_with_one_child
 
-def list_modified_files(project_path: str, branch_name: str, since: str, file_filter: str, output_file: str) -> ModifiedFilesResult:
+def list_modified_files(project_path: str,
+                        branch_name: str,
+                        since: str,
+                        file_filter: str,
+                        output_file: str) -> ModifiedFilesResult:
     """List modified files and return structured result.
 
     Args:
@@ -151,7 +155,7 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
     try:
         # Change to project directory
         original_cwd = os.getcwd()
-        if project_path != ".":
+        if project_path and project_path != ".":
             os.chdir(project_path)
 
         # Get the current branch name
@@ -185,13 +189,21 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
 
         all_modified_files = git_diff_result.stdout.strip().split('\n')
         all_modified_files = [f for f in all_modified_files if f.strip()]  # Remove empty strings
-
         # Filter for specific file types (default: SQL files)
-        filtered_files = set()
+        filtered_files = set[str]()
         for file_path in all_modified_files:
             lowered_file_path = file_path.lower()
-            if file_filter in lowered_file_path and "/tests/" not in lowered_file_path and PIPELINE_FOLDER_NAME in lowered_file_path:
-                absolute_file_path = from_pipeline_to_absolute(file_path)
+            if file_filter in lowered_file_path and PIPELINE_FOLDER_NAME in lowered_file_path:
+                logger.info(f"Checking file: {file_path}")
+                # Exclude files that have a parent folder named 'tests'
+                # (i.e., a path segment '/tests/' or startswith 'tests/')
+                normalized_path = os.path.normpath(file_path)
+                path_parts = normalized_path.split(os.sep)
+                # Check if any parent directory is 'tests'
+                if "tests" in path_parts[-2]:
+                    logger.info(f"Skipping file: {file_path} because it has a parent folder named 'tests'")
+                    continue
+                absolute_file_path = project_path + "/" + file_path
                 if not os.path.exists(absolute_file_path):
                     logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
                     continue
@@ -270,16 +282,35 @@ def list_modified_files(project_path: str, branch_name: str, since: str, file_fi
         os.chdir(original_cwd)
 
 
-def update_tables_version(file_info_list: list[ModifiedFileInfo], default_version: str):
+def update_tables_version(to_process_tables: list[ModifiedFileInfo], default_version: str):
     """
-    Update the table version within the DDL and DMLSQL content for the given list of table names
+    Update the table version within the DDL and DML SQL content for the given list of table names
     """
     inventory = get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), False)
     processed_files = set[ModifiedFileInfo]()
-    for file_info in file_info_list:
+    for file_info in to_process_tables:
         _update_version_in_current_ddl_dml(file_info, processed_files, default_version, inventory)
+        _add_children_to_process_files(file_info, to_process_tables, inventory)
+    return processed_files
 
-
+def _add_children_to_process_files(file_info: ModifiedFileInfo, to_process_tables: list[ModifiedFileInfo], inventory: dict):
+    """
+    Add the children of the table to the list of tables to process
+    """
+    table_ref = inventory[file_info.table_name]
+    if not table_ref:
+        logger.error(f"Error: table {file_info.table_name} not found in inventory")
+        return
+    pipeline_definition = read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
+    if not pipeline_definition:
+        logger.error(f"Error: pipeline definition not found for table {file_info.table_name}")
+        return
+    for child in pipeline_definition.children:
+        to_process_tables.append(ModifiedFileInfo(table_name=child.table_name,
+                                                  file_modified_url=child.dml_ref,
+                                                  same_sql_content=False,
+                                                  running=False,
+                                                  new_table_name=child.table_name))
 def _change_version_in_ddl(fname: str,
                            old_table_name: str,
                            default_version: str):
@@ -297,7 +328,7 @@ def _change_version_in_ddl(fname: str,
             return
         with open(fname, 'w') as f2:
             f2.write(sql_content)
-        print("-"*10 +f"\n{sql_content}\n" + "-"*10)
+        logger.info("-"*10 +f"\n{sql_content}\n" + "-"*10)
 
 def _replace_table_name_in_sql_clauses(sql_content: str, old_table_name: str, new_table_name: str) -> str:
     """
@@ -385,14 +416,15 @@ def _change_version_in_dml(processed_files: set[ModifiedFileInfo], fname, table_
     if updated:
         with open(fname, 'w') as f:
             f.write(sql_content)
-    print("-"*10 +f"\n{sql_content}\n" + "-"*10)
+    logger.info("-"*10 +f"\n{sql_content}\n" + "-"*10)
 
 def _update_version_in_current_ddl_dml(currentfile_info: ModifiedFileInfo,
                                processed_files: set[ModifiedFileInfo],
                                default_version: str,
                                inventory: dict):
-    table_ref = inventory[currentfile_info.table_name]
-    if not table_ref:
+    try:
+        table_ref = inventory[currentfile_info.table_name]
+    except KeyError:
         logger.error(f"Error: table {currentfile_info.table_name} not found in inventory")
         return
     pipeline_definition = read_pipeline_definition_from_file(table_ref['table_folder_name'] + "/" + PIPELINE_JSON_FILE_NAME)
@@ -404,16 +436,6 @@ def _update_version_in_current_ddl_dml(currentfile_info: ModifiedFileInfo,
         _change_version_in_ddl(pipeline_definition.ddl_ref, currentfile_info.table_name, default_version)
         _change_version_in_dml(processed_files, pipeline_definition.dml_ref, currentfile_info.table_name, default_version)
         logger.info(f"Updated version in {pipeline_definition.ddl_ref} and {pipeline_definition.dml_ref}")
-        if pipeline_definition.children:
-            logger.info(f"Updating version in children of {pipeline_definition.table_name}")
-            for child in pipeline_definition.children:
-                child_file_info = ModifiedFileInfo(table_name=child.table_name,
-                                                   file_modified_url=child.dml_ref,
-                                                   same_sql_content=False,
-                                                   running=False,
-                                                   new_table_name=child.table_name)
-                _update_version_in_current_ddl_dml(child_file_info, processed_files, default_version, inventory)
-
 
 
 def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
@@ -533,7 +555,7 @@ def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: 
     Returns (same_sql, running) where same_sql indicates if the SQL is the same as the running statement and running indicates if the statement is running.
     """
 
-    inventory = get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), False)
+    inventory = get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), True)
     table_ref = get_table_ref_from_inventory(table_name, inventory)
     if not table_ref:
         print(f"Error: Table {table_name} not found in inventory")

@@ -209,7 +209,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
 
     # Validate flink section
     if config.get("flink"):
-      flink_required = ["catalog_name", "database_name"]
+      flink_required = ["catalog_name", "database_name", "compute_pool_id"]
       for field in flink_required:
         if not config["flink"].get(field):
           errors.append(f"Configuration is missing flink.{field}")
