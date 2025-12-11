@@ -39,10 +39,10 @@ drop_table:
 
 # --- DML
 describe_flink_dml:
-	$(call describe_flink_statement,  $(DML_STATEMENT), $(DML_PROPERTIES))
+	$(call describe_flink_statement,  $(DML_STATEMENT))
 
 create_flink_dml:
-	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT)) 
+	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT), $(DML_PROPERTIES)) 
 
 create_flink_dev:
 	$(call create_flink_statement, $(DML_STATEMENT), $(DML_TESTS_SCRIPT)) 
