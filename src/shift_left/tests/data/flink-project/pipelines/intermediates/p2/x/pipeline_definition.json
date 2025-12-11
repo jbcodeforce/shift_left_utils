@@ -76,7 +76,7 @@
    ],
    "children": [
       {
-         "table_name": "z_v2",
+         "table_name": "z",
          "product_name": "p2",
          "type": "intermediate",
          "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",

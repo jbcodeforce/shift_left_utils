@@ -181,6 +181,41 @@ ollama list
 
 ## Configuration Options
 
+### Using an Existing VPC
+
+To deploy into an existing VPC instead of creating new network infrastructure:
+
+1. **Find your VPC and Subnet IDs**:
+   ```bash
+   # List VPCs
+   aws ec2 describe-vpcs --query 'Vpcs[*].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+
+   # List public subnets (must have internet gateway route)
+   aws ec2 describe-subnets --filters "Name=vpc-id,Values=vpc-xxx" \
+     --query 'Subnets[*].[SubnetId,AvailabilityZone,CidrBlock,Tags[?Key==`Name`].Value|[0]]' --output table
+   ```
+
+2. **Update `terraform.tfvars`**:
+   ```hcl
+   # Use existing VPC
+   use_existing_vpc   = true
+   existing_vpc_id    = "vpc-0123456789abcdef0"
+   existing_subnet_id = "subnet-0123456789abcdef0"  # Must be a public subnet
+
+   # Optional: use existing security group (leave empty to create new one)
+   existing_security_group_id = ""
+   ```
+
+3. **Subnet Requirements**:
+   - Must be in a public subnet with a route to an Internet Gateway
+   - Must have `map_public_ip_on_launch` enabled OR use the Elastic IP
+   - Must allow outbound internet access for package installation
+
+4. **Security Group Requirements** (if using existing):
+   - Allow inbound SSH (port 22)
+   - Allow inbound Ollama API (port 11434)
+   - Allow all outbound traffic
+
 ### Restrict Access (Recommended for Production)
 
 Edit `terraform.tfvars` to limit access:
@@ -217,18 +252,19 @@ root_volume_size = 300  # GB
 
 ## Cost Management
 
-| Component | Estimated Cost |
-|-----------|---------------|
-| g5.4xlarge | ~$1.01/hour |
-| 200GB GP3 | ~$20/month |
-| Elastic IP | Free while attached |
-| NAT Gateway | ~$32/month |
+| Component | Estimated Cost | Notes |
+|-----------|---------------|-------|
+| g5.4xlarge | ~$1.01/hour | Main cost driver |
+| 200GB GP3 | ~$20/month | Persistent storage |
+| Elastic IP | Free while attached | Charged if unattached |
+| NAT Gateway | ~$32/month | Only if creating new VPC |
 
 ### Cost-Saving Tips
 
-1. **Stop when not in use**: Stop the instance from AWS Console
-2. **Use terraform destroy**: Remove all resources when done
-3. **Spot instances**: For non-critical work (requires manual configuration)
+1. **Use existing VPC**: Set `use_existing_vpc = true` to avoid NAT Gateway costs (~$32/month)
+2. **Stop when not in use**: Stop the instance from AWS Console (EBS charges continue)
+3. **Use terraform destroy**: Remove all resources when done
+4. **Spot instances**: For non-critical work (requires manual configuration)
 
 ## Troubleshooting
 

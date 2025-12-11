@@ -3,6 +3,7 @@
 ???- info "Versions"
     Created January 2025 - Updated 03/21/25: setup guide separation between user of the CLI and developer of this project.
     Update 08/09: config file explanation and how to get the parameters
+	Update 12/05/25: move content to tutorial
 
 
 [The new setup lab](./tutorial/setup_lab.md) addresses how to setup the `shift_left` cli and how to validate the installation. 
@@ -11,11 +12,11 @@ This chapter addresses configuration review and tuning.
 
 ## The config.yaml file
 
-The configuration file `config.yaml` is used intensively to tune the shift_left per environment and will be referenced by the environment variables: CONFIG_FILE. You should have different config.yaml for the different kafka cluster, schema registry and Flink environment.
+The configuration file `config.yaml` is used intensively to tune the `shift_left` per environment and will be referenced by the environment variables: CONFIG_FILE. You should have different config.yaml for the different kafka cluster, schema registry and Flink environment.
 
 * Copy the `config_tmpl.yaml` template file to keep some important parameters for the CLI. 
   ```sh
-  cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
+  curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/config_tmpl.yaml  -o  ./config.yaml
   ```
 
 * Modify the `config.yaml` with values from your Confluent Cloud settings. See the tabs below for the different sections of this file: 
@@ -27,8 +28,7 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
     kafka:
       bootstrap.servers: lkc-2qxxxx-pyyyy.us-west-2.aws.confluent.cloud:9092
       cluster_type: stage
-      src_topic_prefix: clone
-      reject_topics_prefixes: ["clone","dim_","src_"]
+	  cluster_id: lkc-2qxxxx
     ```
 
 
@@ -98,7 +98,7 @@ The configuration file `config.yaml` is used intensively to tune the shift_left 
 
 * Set the following environment variables before using the tool. This can be done by:
     ```sh
-    cp src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
+     curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
     ```
 
     Modify the CONFIG_FILE, FLINK_PROJECT, SRC_FOLDER, SL_LLM_* variables

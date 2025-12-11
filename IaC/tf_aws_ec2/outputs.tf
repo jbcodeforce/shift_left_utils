@@ -50,18 +50,23 @@ output "ollama_api_curl_test" {
 # -----------------------------------------------------------------------------
 
 output "vpc_id" {
-  description = "ID of the VPC"
-  value       = aws_vpc.main.id
+  description = "ID of the VPC (existing or created)"
+  value       = local.vpc_id
 }
 
-output "public_subnet_id" {
-  description = "ID of the public subnet"
-  value       = aws_subnet.public.id
+output "subnet_id" {
+  description = "ID of the subnet used by the instance"
+  value       = local.subnet_id
 }
 
 output "security_group_id" {
   description = "ID of the security group"
-  value       = aws_security_group.shift_left.id
+  value       = local.security_group_ids[0]
+}
+
+output "using_existing_vpc" {
+  description = "Whether using an existing VPC or a newly created one"
+  value       = var.use_existing_vpc
 }
 
 # -----------------------------------------------------------------------------
@@ -114,7 +119,7 @@ output "quick_start" {
     5. Test Ollama:
        ./test_ollama.sh
 
-    Note: The LLM model (qwen2.5-coder:32b) downloads in the background.
+    Note: The LLM model downloads in the background.
     This takes 30-60 minutes. Check progress:
        tail -f /var/log/ollama-pull.log
 

@@ -19,24 +19,52 @@ variable "availability_zone" {
 }
 
 # -----------------------------------------------------------------------------
-# VPC Configuration
+# VPC Configuration - Use Existing or Create New
+# -----------------------------------------------------------------------------
+
+variable "use_existing_vpc" {
+  type        = bool
+  description = "Set to true to use an existing VPC instead of creating a new one"
+  default     = false
+}
+
+variable "existing_vpc_id" {
+  type        = string
+  description = "ID of existing VPC to use (required if use_existing_vpc = true)"
+  default     = ""
+}
+
+variable "existing_subnet_id" {
+  type        = string
+  description = "ID of existing public subnet to use (required if use_existing_vpc = true). Must have internet access."
+  default     = ""
+}
+
+variable "existing_security_group_id" {
+  type        = string
+  description = "ID of existing security group to use (optional). If empty, a new one will be created."
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
+# New VPC Configuration (only used if use_existing_vpc = false)
 # -----------------------------------------------------------------------------
 
 variable "main_vpc_cidr" {
   type        = string
-  description = "CIDR block for the VPC"
+  description = "CIDR block for the VPC (only used when creating new VPC)"
   default     = "10.0.0.0/24"
 }
 
 variable "public_subnets" {
   type        = string
-  description = "CIDR block for public subnet"
+  description = "CIDR block for public subnet (only used when creating new VPC)"
   default     = "10.0.0.128/26"
 }
 
 variable "private_subnets" {
   type        = string
-  description = "CIDR block for private subnet"
+  description = "CIDR block for private subnet (only used when creating new VPC)"
   default     = "10.0.0.192/26"
 }
 

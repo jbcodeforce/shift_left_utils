@@ -5,7 +5,11 @@
 # - GPU support (NVIDIA A10G) for LLM inference via Ollama
 # - 64GB RAM for running large language models
 # - Git, Python, uv, and shift_left CLI pre-installed
-# - Ollama for local LLM inference (qwen2.5-coder model)
+# - Ollama for local LLM inference
+#
+# Supports two modes:
+# 1. Create new VPC (default): Creates all networking infrastructure
+# 2. Use existing VPC: Set use_existing_vpc=true and provide VPC/subnet IDs
 # =============================================================================
 
 terraform {
@@ -15,6 +19,10 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.80"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0"
+    }
   }
 }
 
@@ -23,10 +31,41 @@ provider "aws" {
 }
 
 # =============================================================================
-# VPC Configuration
+# Local Values - Determine which resources to use
+# =============================================================================
+
+locals {
+  # Use existing or created resources
+  vpc_id             = var.use_existing_vpc ? var.existing_vpc_id : aws_vpc.main[0].id
+  subnet_id          = var.use_existing_vpc ? var.existing_subnet_id : aws_subnet.public[0].id
+  security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : [aws_security_group.shift_left[0].id]
+
+  # Determine if we need to create network resources
+  create_vpc = !var.use_existing_vpc
+  create_sg  = var.existing_security_group_id == ""
+}
+
+# =============================================================================
+# Data Sources - Look up existing resources when using existing VPC
+# =============================================================================
+
+data "aws_vpc" "existing" {
+  count = var.use_existing_vpc ? 1 : 0
+  id    = var.existing_vpc_id
+}
+
+data "aws_subnet" "existing" {
+  count = var.use_existing_vpc ? 1 : 0
+  id    = var.existing_subnet_id
+}
+
+# =============================================================================
+# VPC Configuration (only created if use_existing_vpc = false)
 # =============================================================================
 
 resource "aws_vpc" "main" {
+  count = local.create_vpc ? 1 : 0
+
   cidr_block           = var.main_vpc_cidr
   instance_tenancy     = "default"
   enable_dns_hostnames = true
@@ -38,7 +77,9 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
+  count = local.create_vpc ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   tags = {
     Name = "shift-left-igw"
@@ -46,11 +87,13 @@ resource "aws_internet_gateway" "igw" {
 }
 
 # =============================================================================
-# Subnets
+# Subnets (only created if use_existing_vpc = false)
 # =============================================================================
 
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
+  count = local.create_vpc ? 1 : 0
+
+  vpc_id                  = aws_vpc.main[0].id
   cidr_block              = var.public_subnets
   availability_zone       = var.availability_zone
   map_public_ip_on_launch = true
@@ -61,7 +104,9 @@ resource "aws_subnet" "public" {
 }
 
 resource "aws_subnet" "private" {
-  vpc_id            = aws_vpc.main.id
+  count = local.create_vpc ? 1 : 0
+
+  vpc_id            = aws_vpc.main[0].id
   cidr_block        = var.private_subnets
   availability_zone = var.availability_zone
 
@@ -71,15 +116,17 @@ resource "aws_subnet" "private" {
 }
 
 # =============================================================================
-# Route Tables
+# Route Tables (only created if use_existing_vpc = false)
 # =============================================================================
 
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
+  count = local.create_vpc ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
+    gateway_id = aws_internet_gateway.igw[0].id
   }
 
   tags = {
@@ -88,11 +135,13 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
+  count = local.create_vpc ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
+    nat_gateway_id = aws_nat_gateway.nat[0].id
   }
 
   tags = {
@@ -101,20 +150,26 @@ resource "aws_route_table" "private" {
 }
 
 resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+  count = local.create_vpc ? 1 : 0
+
+  subnet_id      = aws_subnet.public[0].id
+  route_table_id = aws_route_table.public[0].id
 }
 
 resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
+  count = local.create_vpc ? 1 : 0
+
+  subnet_id      = aws_subnet.private[0].id
+  route_table_id = aws_route_table.private[0].id
 }
 
 # =============================================================================
-# NAT Gateway
+# NAT Gateway (only created if use_existing_vpc = false)
 # =============================================================================
 
 resource "aws_eip" "nat" {
+  count = local.create_vpc ? 1 : 0
+
   domain = "vpc"
 
   tags = {
@@ -123,8 +178,10 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public.id
+  count = local.create_vpc ? 1 : 0
+
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
 
   tags = {
     Name = "shift-left-nat-gw"
@@ -134,12 +191,14 @@ resource "aws_nat_gateway" "nat" {
 }
 
 # =============================================================================
-# Security Group
+# Security Group (created unless existing_security_group_id is provided)
 # =============================================================================
 
 resource "aws_security_group" "shift_left" {
+  count = local.create_sg ? 1 : 0
+
   name_prefix = "shift-left-sg"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = local.vpc_id
   description = "Security group for Shift Left GPU EC2 instance"
 
   # SSH access
@@ -186,8 +245,8 @@ resource "aws_instance" "shift_left_server" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
   key_name               = var.ssh_key_name
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.shift_left.id]
+  subnet_id              = local.subnet_id
+  vpc_security_group_ids = local.security_group_ids
 
   # Storage for models, code, and data
   root_block_device {
@@ -237,5 +296,27 @@ resource "aws_eip" "server" {
     Name = "${var.instance_name}-eip"
   }
 
+  # Only depend on IGW if we created it
   depends_on = [aws_internet_gateway.igw]
+}
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+# Ensure required variables are provided when using existing VPC
+resource "null_resource" "validate_existing_vpc" {
+  count = var.use_existing_vpc ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.existing_vpc_id != ""
+      error_message = "existing_vpc_id must be provided when use_existing_vpc is true."
+    }
+
+    precondition {
+      condition     = var.existing_subnet_id != ""
+      error_message = "existing_subnet_id must be provided when use_existing_vpc is true."
+    }
+  }
 }

@@ -63,6 +63,8 @@ class TestProjectManager(BaseUT):
         assert new_table_name == "f_v2"
         new_table_name = pm._build_new_table_name("f_v4", "_v2")
         assert new_table_name == "f_v5"
+        new_table_name = pm._build_new_table_name("a_b_f_v4", "_v2")
+        assert new_table_name == "a_b_f_v5"
 
 
     def test_update_version_intermediate_table(self):
@@ -91,11 +93,22 @@ class TestProjectManager(BaseUT):
         with open(os.path.join(os.getenv("PIPELINES"),z_sql_name.lstrip("/")), 'r') as f:
             sql_content = f.read()
         assert "z_v2" in sql_content
+        # verify children tables are updated
         p_sql_path = os.path.join(os.getenv("PIPELINES"), "/facts/p2/p/sql-scripts/dml.p.sql".lstrip("/"))
         with open(p_sql_path, 'r') as f:
             sql_content = f.read()
-        assert "z_v2" in sql_content
-        assert "p_v2" in sql_content
+            assert "z_v2" in sql_content
+            assert "p_v2" in sql_content
+        c_sql_path = os.path.join(os.getenv("PIPELINES"), "/intermediates/p2/c/sql-scripts/dml.c.sql".lstrip("/"))
+        with open(c_sql_path, 'r') as f:
+            sql_content = f.read()
+            assert "z_v2" in sql_content
+            assert "c_v2" in sql_content
+        e_sql_path = os.path.join(os.getenv("PIPELINES"), "/facts/p2/e/sql-scripts/dml.e.sql".lstrip("/"))
+        with open(e_sql_path, 'r') as f:
+            sql_content = f.read()
+            assert "e_v2" in sql_content
+            assert "c_v2" in sql_content
         self._restore_file(z_dml_backup)
         self._restore_file(z_ddl_backup)
         self._restore_file(d_dml_backup)

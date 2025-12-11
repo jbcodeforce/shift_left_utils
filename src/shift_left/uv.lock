@@ -1621,7 +1621,6 @@ dependencies = [
     { name = "openai" },
     { name = "pydantic" },
     { name = "pydantic-yaml" },
-    { name = "pytest" },
     { name = "pytz" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1629,6 +1628,11 @@ dependencies = [
     { name = "sqlglot" },
     { name = "toml" },
     { name = "typer" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -1643,7 +1647,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.97.1" },
     { name = "pydantic", specifier = ">=2.6.10" },
     { name = "pydantic-yaml", specifier = ">=1.4.0" },
-    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.5" },
     { name = "pytz", specifier = ">=2025.2" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.3" },
@@ -1652,6 +1656,7 @@ requires-dist = [
     { name = "toml", specifier = ">=0.10.2" },
     { name = "typer", specifier = ">=0.15.2" },
 ]
+provides-extras = ["dev"]
 
 [[package]]
 name = "six"

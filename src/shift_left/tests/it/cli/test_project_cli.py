@@ -17,7 +17,7 @@ class TestProjectCLI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../data"  # Path to the data directory
+        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging")
@@ -55,9 +55,9 @@ class TestProjectCLI(unittest.TestCase):
         os.environ["CONFIG_FILE"] =  shift_left_dir +  "/config-stage-flink.yaml"
         runner = CliRunner()
         try:
-            result = runner.invoke(app, [ "clean-completed-failed-statements"])
+            result = runner.invoke(app, [ "housekeep-statements"])
             print(result)
-            assert "Workspace statements cleaned" in result.stdout
+            assert "Clean statements starting" in result.stdout
         finally:
             if original_config:
                 os.environ["CONFIG_FILE"] = original_config
@@ -77,9 +77,10 @@ class TestProjectCLI(unittest.TestCase):
     def test_list_modified_files(self):
         runner = CliRunner()
         project_path =  str(pathlib.Path(__file__).parent.parent.parent.parent.parent.parent)
-        result = runner.invoke(app, [ "list-modified-files", "develop", "--project-path", project_path, "--file-filter", "sql", "--since", "2025-08-10"])
+        result = runner.invoke(app, [ "list-modified-files", "develop", "--project-path", project_path, "--file-filter", "sql", "--since", "2025-12-08"])
         print(result.stdout)
         assert result.exit_code == 0
+        print(result.stdout)
 
 
 if __name__ == '__main__':

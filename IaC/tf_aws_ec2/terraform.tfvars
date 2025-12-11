@@ -11,11 +11,20 @@ aws_region        = "us-west-2"
 availability_zone = "us-west-2a"
 
 # -----------------------------------------------------------------------------
-# VPC Network Configuration
+# VPC Configuration - Choose ONE option:
 # -----------------------------------------------------------------------------
-main_vpc_cidr   = "10.0.0.0/24"
-public_subnets  = "10.0.0.128/26"
-private_subnets = "10.0.0.192/26"
+
+# OPTION 1: Create new VPC (default)
+use_existing_vpc = false
+main_vpc_cidr    = "10.0.0.0/24"
+public_subnets   = "10.0.0.128/26"
+private_subnets  = "10.0.0.192/26"
+
+# OPTION 2: Use existing VPC (uncomment and fill in values)
+# use_existing_vpc   = true
+# existing_vpc_id    = "vpc-0123456789abcdef0"   # Your existing VPC ID
+# existing_subnet_id = "subnet-0123456789abcdef0" # Public subnet with internet access
+# existing_security_group_id = ""                 # Optional: leave empty to create new SG
 
 # -----------------------------------------------------------------------------
 # EC2 Instance Configuration
@@ -28,9 +37,9 @@ ssh_key_name = "j9r-keys"
 # Deep Learning AMI with NVIDIA GPU support and CUDA pre-installed (us-west-2)
 # Find the latest AMI:
 #   aws ec2 describe-images --owners amazon \
-#     --filters "Name=name,Values=Deep Learning AMI GPU PyTorch*Amazon Linux 2*" \
+#     --filters "Name=name,Values=Deep Learning*PyTorch*Amazon*" \
 #     --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --output text
-ami_id = "ami-0c2d3e23c876c6093"
+ami_id = "ami-0dc360caa1a423aa5"
 
 # Instance type with GPU and 64GB RAM
 # g5.4xlarge: 16 vCPUs, 64GB RAM, 1x A10G GPU (24GB VRAM) - ~$1.01/hour

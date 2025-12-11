@@ -6,9 +6,9 @@ To install the CLI, which is based on Python, use a Python virtual environment l
 
 ## 1 - Preparation
 
-We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cluster available.
+We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cluster available. **shift_left** is now available on *[PyPi](https://pypi.org/project/shift_left/)*.
 
-1. Clone this repository (this will not be necessary once the CLI will be available in pypi): 
+1. Clone this repository if you want to run the AI processing to be able to tune the system prompts: 
   ```sh
   git clone  https://github.com/jbcodeforce/shift_left_utils.git
   cd shift_left_utils
@@ -16,7 +16,7 @@ We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cl
 
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install). The shift_left tool was developed on Mac and tested on Linux. Windows WSL should work. Powershell will not work as of now (11/2025).
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-* `make` is used to encapsulate the confluent cli, to make it easier for Data Engineers to deploy Flink statement during development: It is not used by shift_left tool, but shift_left creates the Makefile with the `shift_left table init` command (see [the recipe section](./recipes.md/#table-related-tasks)). 
+* `make` is used to encapsulate the confluent cli, to make it easier for Data Engineers to deploy Flink statement during development: It is not used by `shift_left` tool, but `shift_left` creates the Makefile with the `shift_left table init` command (see [the recipe section](./recipes.md/#table-related-tasks)). 
     * [install make for windows](https://gnuwin32.sourceforge.net/packages/make.htm)
     * Mac OS: ```brew install make``` 
     * Linux: ```sudo apt-get install build-essential```
@@ -41,16 +41,10 @@ We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cl
         ```sh
         source .venv/bin/activate
         ```
-    * Verify the list of wheels available in the `src/shift_left/dist/` to take the last one. The github also includes the list of releases to see the last available version number.
+
     * Install the cli:
         ```sh
-        uv tool list
-        # in case it was already installed
-        uv tool uninstall shift_left
-        # The weel number may change!
-		ls src/shift_left/dist
-		 # >.. shift_left-0.1.46-py3-none-any.whl
-        uv tool install src/shift_left/dist/shift_left-0.1.46-py3-none-any.whl
+        uv pip install shift_left
         ```
 
 === "Using Python and pip"
@@ -66,22 +60,15 @@ We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cl
     * Be sure to use the pip install in the virtual environment:
         ```sh
         python -m pip --version
-        # if pip not present
-        python -m ensurepip
-        # install requirements
-        python -m pip install -r requirements.txt
         ```
-    * Install the `shift_left` CLI using the command (this is temporary once the CLI will be loaded to pypi): To get the list of version of the available wheels, look at the content under the `src/shift_left/dist` folder.  
+    * Install the `shift_left` CLI using the command:
         ```sh
-        ls src/shift_left/dist
-        # >.. shift_left-0.1.45-py3-none-any.whl
-        # install the last one for example:
-        pip install src/shift_left/dist/shift_left-0.1.45-py3-none-any.whl
+        pip install shift_left
         ```
 
 ## 2- A Demonstration Project
 
-1. Clone a git repository with data as a product project done in Flink and in Spark. This project includes different demonstrations, but we will use the [Customer c360 analytics project](https://jbcodeforce.github.io/flink_project_demos/c360/) to support the current labs.
+1. [Optional] Clone a git repository with data as a product project done in Flink and in Spark. This project includes different demonstrations, but we will use the [Customer c360 analytics project](https://jbcodeforce.github.io/flink_project_demos/c360/) to support the current labs.
 	```sh
 	cd ..
 	git clone https://github.com/jbcodeforce/flink_project_demos
@@ -94,7 +81,7 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 1. Get the `shift_left` config file template to the tutorial folder:
 	```sh
 	# From the `shift_left_utils` folder
-	cp src/shift_left/src/shift_left/core/templates/min_config_tmpl.yaml tutorial/setup/config.yaml
+	curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/config_tmpl.yaml  -o tutorial/setup/config.yaml
 	```
 
 ### 3.1 Get Environment id from Confluent Cloud
