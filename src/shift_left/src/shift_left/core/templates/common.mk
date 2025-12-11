@@ -23,9 +23,32 @@ delete_schema = \
 	fi
 
 create_flink_statement = \
-	sql_statement=$$(cat $2);\
-	echo $$sql_statement; \
-	confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)  --environment $(ENV_ID) --context $(CC_CONTEXT) --wait 
+	sql_statement=$$(cat $2); \
+	prop_file=$$(echo "$(3)" | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//'); \
+	if [ -n "$$prop_file" ] && [ -f "$$prop_file" ]; then \
+		echo "Reading property file: $$prop_file"; \
+		property_pairs=""; \
+		while IFS= read -r line || [ -n "$$line" ]; do \
+			line=$$(echo "$$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//'); \
+			if [ -n "$$line" ] && ! echo "$$line" | grep -q "^\#" && echo "$$line" | grep -q "="; then \
+				key=$$(echo "$$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//'); \
+				value=$$(echo "$$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//'); \
+				if [ -n "$$key" ] && [ -n "$$value" ]; then \
+					if [ -n "$$property_pairs" ]; then \
+						property_pairs="$$property_pairs,$$key=$$value"; \
+					else \
+						property_pairs="$$key=$$value"; \
+					fi; \
+				fi; \
+			fi; \
+		done < "$$prop_file"; \
+	fi; \
+	if [ -n "$$property_pairs" ]; then \
+		echo "Submitting statement with properties: $$property_pairs"; \
+		confluent flink statement create $1 --sql "$$sql_statement" --property "$$property_pairs" --database $(DB_NAME) --compute-pool $(CPOOLID)  --environment $(ENV_ID) --context $(CC_CONTEXT) --wait; \
+	else \
+		confluent flink statement create $1 --sql "$$sql_statement" --database $(DB_NAME) --compute-pool $(CPOOLID)  --environment $(ENV_ID) --context $(CC_CONTEXT) --wait; \
+	fi;
 
 show_create_table = \
 	sql_statement="show create table $2";\
