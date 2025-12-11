@@ -64,21 +64,22 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
     @patch('shift_left.core.project_manager.datetime.datetime')
-    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
     @patch('shift_left.core.project_manager._assess_flink_statement_state')
     @patch('shift_left.core.utils.sql_parser.SQLparser')
     @patch('shift_left.core.project_manager.os.path.exists')
-    def test_list_modified_files_with_mocked_sql_parsing(self, mock_path_exists, mock_sql_parser_class, mock_assess_state, mock_from_pipeline, mock_datetime_class, mock_chdir, mock_getcwd, mock_subprocess, mock_file):
+    def test_list_modified_files_with_mocked_sql_parsing(self, mock_path_exists,
+                                                         mock_sql_parser_class,
+                                                         mock_assess_state,
+                                                         mock_datetime_class,
+                                                         mock_chdir,
+                                                         mock_getcwd,
+                                                         mock_subprocess,
+                                                         mock_file):
         """Test that list_modified_files calls SQL parser to extract table names from file contents"""
         # Setup mocks
         mock_getcwd.return_value = "/original/path"
         mock_datetime_class.now.return_value = datetime(2024, 1, 15, tzinfo=timezone.utc)
         mock_path_exists.return_value = True  # All files exist
-        # Mock the path conversion function
-        mock_from_pipeline.side_effect = [
-            "/test/project/pipelines/data_product/file1.sql",  # Absolute path for file1
-            "/test/project/pipelines/data_product/file2.sql"   # Absolute path for file2
-        ]
 
         # Mock the assessment function
         mock_assess_state.return_value = (False, True)  # same_sql=False, running=True
@@ -147,13 +148,6 @@ class TestProjectManager(unittest.TestCase):
         ]
         mock_subprocess.assert_has_calls(expected_calls)
 
-        # Verify path conversion was called for each file
-        self.assertEqual(mock_from_pipeline.call_count, 2)
-        mock_from_pipeline.assert_has_calls([
-            call("pipelines/data_product/file1.sql"),
-            call("pipelines/data_product/file2.sql")
-        ])
-
         # Verify assessment function was called for each file
         self.assertEqual(mock_assess_state.call_count, 2)
 
@@ -170,7 +164,6 @@ class TestProjectManager(unittest.TestCase):
     @patch('shift_left.core.project_manager.datetime.datetime')
     @patch('shift_left.core.project_manager.SQLparser')
     @patch('shift_left.core.project_manager._assess_flink_statement_state')
-    @patch('shift_left.core.project_manager.from_pipeline_to_absolute')
     @patch('shift_left.core.project_manager.subprocess.run')
     @patch('shift_left.core.project_manager.os.getcwd')
     @patch('shift_left.core.project_manager.os.chdir')
@@ -182,7 +175,6 @@ class TestProjectManager(unittest.TestCase):
                     mock_chdir,
                     mock_getcwd,
                     mock_subprocess,
-                    mock_from_pipeline,
                     mock_assess_state,
                     mock_sql_parser_class,
                     mock_datetime_class):
@@ -198,12 +190,6 @@ class TestProjectManager(unittest.TestCase):
         mock_parser_instance.extract_table_name_from_insert_into_statement.side_effect = [
             "test1_table",  # First file table name
             "test2_table"   # Second file table name
-        ]
-
-        # Mock path conversion for each file
-        mock_from_pipeline.side_effect = [
-            "/original/path/pipelines/data_product/test1.sql",  # Absolute path for test1.sql
-            "/original/path/pipelines/data_product/test2.sql"   # Absolute path for test2.sql
         ]
 
         # Mock file content reads and output file write
@@ -254,25 +240,18 @@ class TestProjectManager(unittest.TestCase):
         # Verify file details
         file1 = result.file_list.pop()
         self.assertTrue(file1.table_name in ["test1_table", "test2_table"])
-        self.assertIn(file1.file_modified_url, ["/original/path/pipelines/data_product/test1.sql", "/original/path/pipelines/data_product/test2.sql"])
+        self.assertIn(file1.file_modified_url, ["./pipelines/data_product/test1.sql", "./pipelines/data_product/test2.sql"])
         self.assertEqual(file1.same_sql_content, False)
         self.assertEqual(file1.running, True)
 
         file2 = result.file_list.pop()
         self.assertTrue(file2.table_name in ["test1_table", "test2_table"])
-        self.assertIn(file2.file_modified_url, ["/original/path/pipelines/data_product/test2.sql", "/original/path/pipelines/data_product/test1.sql"])
+        self.assertIn(file2.file_modified_url, ["./pipelines/data_product/test2.sql", "./pipelines/data_product/test1.sql"])
         self.assertEqual(file2.same_sql_content, False)
         self.assertEqual(file2.running, True)
 
         # Verify SQL parser was used for both files
         self.assertEqual(mock_parser_instance.extract_table_name_from_insert_into_statement.call_count, 2)
-
-        # Verify path conversion was called for each file
-        self.assertEqual(mock_from_pipeline.call_count, 2)
-        mock_from_pipeline.assert_has_calls([
-            call("pipelines/data_product/test1.sql"),
-            call("pipelines/data_product/test2.sql")
-        ])
 
         # Verify assessment function was called for each file
         self.assertEqual(mock_assess_state.call_count, 2)
@@ -330,13 +309,13 @@ class TestProjectManager(unittest.TestCase):
 
         # Verify SQL files are included (case insensitive)
         file_urls = [f.file_modified_url for f in result.file_list]
-        self.assertIn("/original/path/pipelines/data_product/file1.sql", file_urls)
-        self.assertIn("/original/path/pipelines/data_product/file3.SQL", file_urls)  # Case insensitive
-        self.assertIn("/original/path/pipelines/data_product/script.sql", file_urls)
+        self.assertIn("./pipelines/data_product/file1.sql", file_urls)
+        self.assertIn("./pipelines/data_product/file3.SQL", file_urls)  # Case insensitive
+        self.assertIn("./pipelines/data_product/script.sql", file_urls)
 
         # Verify non-SQL files are not included
-        self.assertNotIn("/original/path/pipelines/data_product/file2.py", file_urls)
-        self.assertNotIn("/original/path/pipelines/data_product/test.java", file_urls)
+        self.assertNotIn("./pipelines/data_product/file2.py", file_urls)
+        self.assertNotIn("pipelines/data_product/test.java", file_urls)
 
         # Verify table names are extracted correctly
         table_names = [f.table_name for f in result.file_list]

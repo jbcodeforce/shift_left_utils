@@ -52,8 +52,8 @@ class TestVersionManagement(unittest.TestCase):
    "table_name": "users",
    "product_name": "c360",
    "type": "dimension",
-   "dml_ref": "dml.users.sql",
-   "ddl_ref": "ddl.users.sql",
+   "dml_ref": TEST_PIPELINES_DIR + "/dml.users.sql",
+   "ddl_ref": TEST_PIPELINES_DIR + "/ddl.users.sql",
    "path": "tmp",
    "complexity": {
       "number_of_regular_joins": 0,
@@ -76,7 +76,9 @@ class TestVersionManagement(unittest.TestCase):
         modified_file = TEST_PIPELINES_DIR + "/dml.users.sql"
         with open(modified_file, 'w') as f:
             f.write(self.DML_QUERY)
-
+        modified_file = TEST_PIPELINES_DIR + "/ddl.users.sql"
+        with open(modified_file, 'w') as f:
+            f.write(self.DDL_QUERY)
         def side_effect_get_or_build_inventory(path, path2, recreate=False):
             return self.INVENTORY_FILE
         def side_effect_read_pipeline_definition_from_file(path):
