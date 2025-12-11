@@ -75,6 +75,7 @@ def build_folder_structure_for_table(table_folder_name: str,
     _create_tracking_doc(internal_table_name, "", table_folder)
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
+    _create_dml_properties_skeleton(internal_table_name, table_folder)
     logger.debug(f"Created folder {table_folder} for the table {table_folder_name}")
     return table_folder, internal_table_name
 
@@ -371,6 +372,10 @@ def _create_dml_skeleton(table_name: str, out_dir: str):
     with open(out_dir + '/sql-scripts/' + dml_name + ".sql", 'w') as f:
         f.write(rendered_dml)
 
+def _create_dml_properties_skeleton(table_name: str, out_dir: str):
+    dml_name = "dml." + table_name
+    with open(out_dir + '/sql-scripts/' + dml_name + ".properties", 'w') as f:
+        f.write("#An optional file to set multiple DML session properties, one per line as shown below.\n#sql.tables.scan.idle-timeout=1s")
     
 def _get_statement_prefix (product_name: str):
 
