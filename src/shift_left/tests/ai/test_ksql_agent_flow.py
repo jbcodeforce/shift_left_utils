@@ -12,7 +12,6 @@ from shift_left.ai.spark_sql_code_agent import SparkToFlinkSqlAgent
 from shift_left.ai.ksql_code_agent import KsqlToFlinkSqlAgent, SqlTableDetection
 from shift_left.ai.process_src_tables import migrate_one_file
 from ai.utilities import compare_files_unordered
-from pyflink.table import TableEnvironment, EnvironmentSettings, Schema, DataTypes
 data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
 
 MULTIPLE_TABLE_KSQL = """
@@ -715,28 +714,6 @@ CREATE STREAM new_stream (id INT) WITH ('kafka.topic' = 'test');
         ]
         self.assertEqual(call_order, expected_order)
 
-    def _test_validate_flink_sql_syntax(self):
-        """Test the validate_flink_sql_on_cc function."""
-        agent = KsqlToFlinkSqlAgent()
-        t_env = TableEnvironment.create(EnvironmentSettings.in_streaming_mode())
-        #t_env.use_catalog("default")
-        #t_env.use_database("default")
-        #t_env.create_table(
-        #    "test",
-        #    Schema.new_builder()
-        #    .column("id", DataTypes.INT())
-        #    .column("name", DataTypes.STRING())
-        #    .build()
-        #).build()
-        sql = "INSERT INTO test (id, name) VALUES (1, 'test');"
-        is_valid, error = agent._validate_flink_sql_syntax(t_env, sql)
-        print(is_valid, error)
-        self.assertTrue(is_valid)
-        self.assertEqual(error, "")
-        sql = "CREATE TABLE test (id INT, name STRING)"
-        is_valid, error = agent._validate_flink_sql_syntax(t_env, sql)
-        self.assertFalse(is_valid)
-        self.assertNotEqual(error, "")
 
     @patch('builtins.input')
     def test_flow_for_ksql_basic_table_no_validation(self, mock_input):

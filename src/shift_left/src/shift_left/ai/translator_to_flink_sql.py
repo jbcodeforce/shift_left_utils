@@ -10,8 +10,6 @@ from enum import Enum
 from typing import Tuple, List, Optional, Dict
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
-from pyflink.table import TableEnvironment, EnvironmentSettings
-from py4j.protocol import Py4JJavaError
 import importlib.resources
 
 class SqlTableDetection(BaseModel):
@@ -438,33 +436,6 @@ class TranslatorToFlinkSqlAgent():
                 print(f"SQL is valid and runs on CC after {iteration_count} iterations")
                 logger.info(f"SQL is valid and runs on CC after {iteration_count} iterations")
         return translated_sql, sql_validated
-
-
-    def _validate_flink_sql_syntax(self, t_env, sql: str) -> Tuple[bool, str]:
-        """
-        Validate Flink SQL syntax by attempting to parse the query.
-
-        Args:
-            t_env: Flink TableEnvironment
-            sql: SQL query string to validate
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        try:
-            t_env.sql_query(sql)
-            return True, ""
-        except Py4JJavaError as e:
-            # PyFlink wraps Java exceptions via Py4J
-            # Extract the Java exception message
-            java_exception = e.java_exception
-            error_msg = str(java_exception) if java_exception else str(e)
-            return False, error_msg
-        except Exception as e:
-            # Catch any other unexpected errors
-            return False, str(e)
-
-
 
     def _snapshot_ddl_dml(self, table_name: str, ddl: str, dml: str):
         """
