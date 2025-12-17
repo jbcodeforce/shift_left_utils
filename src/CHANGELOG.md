@@ -1,3 +1,16 @@
+## [0.1.47] - 2025-12-17
+
+### Changes:
+- 07d7e8a update version for children recursively
+- a691a80 fix UT for project_mgr
+- ee958cc Make update to allow --properties
+- 7f03f95 Make update to allow --properties
+- 79a8522 Make update to allow --properties
+- 71a1ef0 Merge pull request #83 from jbcodeforce/make
+- 74bcfc1 Make update to allow --properties - bugfix
+- 874aaa2 Merge pull request #84 from jbcodeforce/make2
+- 9c48028 update to remove apache-flink dependency
+
 ## [0.1.46] - 2025-11-30
 
 ### Changes:

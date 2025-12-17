@@ -1,6 +1,6 @@
 [project]
 name = "shift_left"
-version = "0.1.46"
+version = "0.1.47"
 description = "The shift-left CLI to manage your shift-left project"
 readme = "README.md"
 license = {text = "Apache-2.0"}
