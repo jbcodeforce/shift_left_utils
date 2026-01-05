@@ -2,6 +2,12 @@
 
 * Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
 
+### v0.1.47
+
+* update version within statement for children recursively for blue-green deployment
+* fix Unit Test for project_mgr
+* Makefile update to allow --properties
+
 ### v0.1.46
 
 * Improve AI migration for KSQLdb. Refactor to leverage common prompts between Spark and Ksql migration. Add more tests for ksql.
