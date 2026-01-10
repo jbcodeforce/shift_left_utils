@@ -26,3 +26,4 @@ set_test_env
 src/shift_left/tests/data/flink-project/staging/
 tutorial/setup/config.yaml
 tutorial/setup/set_env_var
+set_remote_llm_env

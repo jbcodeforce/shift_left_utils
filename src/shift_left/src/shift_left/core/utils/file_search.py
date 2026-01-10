@@ -218,9 +218,7 @@ def derive_table_type_product_name_from_path(path: str) -> Tuple[str, str, str]:
     return table_type, product_name, table_name
 
 def create_folder_if_not_exist(new_path: str) -> str:
-    if not os.path.exists(new_path):
-        os.makedirs(new_path)
-        logger.debug(f"{new_path} folder created")
+    os.makedirs(new_path, exist_ok=True)
     return new_path
 
 def from_absolute_to_pipeline(file_or_folder_name) -> str:

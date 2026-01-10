@@ -59,6 +59,11 @@ output "subnet_id" {
   value       = local.subnet_id
 }
 
+output "availability_zone" {
+  description = "Availability zone of the instance"
+  value       = local.effective_az
+}
+
 output "security_group_id" {
   description = "ID of the security group"
   value       = local.security_group_ids[0]
@@ -67,6 +72,30 @@ output "security_group_id" {
 output "using_existing_vpc" {
   description = "Whether using an existing VPC or a newly created one"
   value       = var.use_existing_vpc
+}
+
+output "vpc_discovery_method" {
+  description = "How the VPC was identified (id, name, or created)"
+  value = var.use_existing_vpc ? (
+    var.existing_vpc_id != "" ? "by_id" :
+    var.existing_vpc_name != "" ? "by_name" :
+    "unknown"
+  ) : "created"
+}
+
+output "subnet_discovery_method" {
+  description = "How the subnet was identified (id, name, auto_discovered, or created)"
+  value = var.use_existing_vpc ? (
+    var.existing_subnet_id != "" ? "by_id" :
+    var.existing_subnet_name != "" ? "by_name" :
+    var.auto_discover_subnet ? "auto_discovered" :
+    "unknown"
+  ) : "created"
+}
+
+output "internet_gateway_id" {
+  description = "ID of the Internet Gateway (existing or created)"
+  value       = var.use_existing_vpc ? try(data.aws_internet_gateway.existing[0].id, "not_found") : aws_internet_gateway.igw[0].id
 }
 
 # -----------------------------------------------------------------------------
