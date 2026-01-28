@@ -280,7 +280,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
     logger.error(sanitized_message)
     exit()
   if len(warnings) > 0:
-    warning_message = "Configuration validation has the following warnings:\n" + "\n".join(f"  - {warning}" for warning in warnings)
+    warning_message = "Configuration validation has the following information:\n" + "\n".join(f"  - {warning}" for warning in warnings)
     sanitized_message = sanitize_error_message(warning_message)
     print(sanitized_message)
     logger.warning(sanitized_message)

@@ -21,7 +21,10 @@ from shift_left.core.project_manager import (
         ModifiedFileInfo,
         KIMBALL_PROJECT_TYPE)
 from shift_left.core.utils.secure_typer import create_secure_typer_app
+from shift_left.core import table_analyzer
 from typing_extensions import Annotated
+from rich.console import Console
+from rich.table import Table
 
 
 """
@@ -486,6 +489,141 @@ def get_statement_list(
     print("#" * 30 + f" Get statement list")
     statement_list = statement_mgr.get_statement_list(compute_pool_id)
     print(statement_list)
+
+@app.command()
+def assess_unused_tables(
+    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Pipeline path where tables are defined")],
+    include_topics: bool = typer.Option(True, "--include-topics/--no-topics", help="Also check for unused Kafka topics"),
+    output_file: str = typer.Option(None, "--output-file", help="File path to save results (default: unused_tables_<timestamp>.txt)")
+):
+    """
+    Assess Flink SQL tables that are not used by any running DML statements.
+
+    This command:
+    - Gets all tables from the inventory
+    - Checks which tables are referenced by running Flink statements
+    - Identifies tables that are not referenced (potentially unused)
+    - Optionally compares Kafka topics to find unused topics
+
+    The analysis uses existing pipeline.json files which contain parent/child relationships,
+    so no SQL parsing is required.
+    """
+    console = Console()
+    print("#" * 30 + f" Assess Unused Tables in {inventory_path}")
+
+    try:
+        # Run the assessment
+        result = table_analyzer.assess_unused_tables(inventory_path, include_topics=include_topics)
+
+        unused_tables = result.get('unused_tables', [])
+        table_details = result.get('table_details', {})
+
+        # Print summary
+        console.print(f"\n[bold]Assessment Summary[/bold]")
+        console.print(f"Total unused tables: [yellow]{len(unused_tables)}[/yellow]")
+
+        if include_topics:
+            unused_topics = result.get('unused_topics', [])
+            total_topics = result.get('total_kafka_topics', 0)
+            console.print(f"Total unused topics: [yellow]{len(unused_topics)}[/yellow] (out of {total_topics} total)")
+
+        # Create table for unused tables
+        if unused_tables:
+            table = Table(title="Unused Tables", show_header=True, header_style="bold magenta")
+            table.add_column("Table Name", style="cyan", no_wrap=True)
+            table.add_column("Type", style="green")
+            table.add_column("Product", style="yellow")
+            table.add_column("Has Children", style="blue")
+            table.add_column("Path", style="dim")
+
+            for table_name in sorted(unused_tables):
+                details = table_details.get(table_name, {})
+                table_type = details.get('type', 'unknown')
+                product = details.get('product_name', 'unknown')
+                has_children = "Yes" if details.get('has_children', False) else "No"
+                path = details.get('path', '')
+
+                # Warn about source tables
+                if table_type == 'source':
+                    table.add_row(
+                        f"[yellow]{table_name}[/yellow]",
+                        f"[yellow]{table_type}[/yellow]",
+                        product,
+                        has_children,
+                        path
+                    )
+                else:
+                    table.add_row(table_name, table_type, product, has_children, path)
+
+            console.print("\n")
+            console.print(table)
+
+            # Warn about tables with children
+            tables_with_children = [
+                name for name, details in table_details.items()
+                if details.get('has_children', False)
+            ]
+            if tables_with_children:
+                console.print(f"\n[yellow]⚠ Warning:[/yellow] {len(tables_with_children)} unused table(s) have children:")
+                for name in tables_with_children:
+                    console.print(f"  - {name} (may be used indirectly)")
+        else:
+            console.print("\n[green]✅ No unused tables found![/green]")
+
+        # Show unused topics if requested
+        if include_topics:
+            unused_topics = result.get('unused_topics', [])
+            if unused_topics:
+                console.print(f"\n[bold]Unused Topics[/bold]")
+                topics_table = Table(show_header=True, header_style="bold magenta")
+                topics_table.add_column("Topic Name", style="cyan")
+
+                for topic in sorted(unused_topics):
+                    topics_table.add_row(topic)
+
+                console.print("\n")
+                console.print(topics_table)
+            else:
+                console.print("\n[green]✅ No unused topics found![/green]")
+
+        # Save to file
+        if output_file is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = os.path.join(shift_left_dir, f"unused_tables_{timestamp}.txt")
+
+        # Write results to file
+        with open(output_file, 'w') as f:
+            f.write(f"Unused Tables Assessment - {datetime.now().isoformat()}\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Total unused tables: {len(unused_tables)}\n\n")
+
+            if unused_tables:
+                f.write("Unused Tables:\n")
+                f.write("-" * 80 + "\n")
+                for table_name in sorted(unused_tables):
+                    details = table_details.get(table_name, {})
+                    f.write(f"{table_name}\n")
+                    f.write(f"  Type: {details.get('type', 'unknown')}\n")
+                    f.write(f"  Product: {details.get('product_name', 'unknown')}\n")
+                    f.write(f"  Has Children: {details.get('has_children', False)}\n")
+                    f.write(f"  Path: {details.get('path', '')}\n")
+                    f.write("\n")
+
+            if include_topics:
+                unused_topics = result.get('unused_topics', [])
+                f.write(f"\nTotal unused topics: {len(unused_topics)}\n\n")
+                if unused_topics:
+                    f.write("Unused Topics:\n")
+                    f.write("-" * 80 + "\n")
+                    for topic in sorted(unused_topics):
+                        f.write(f"{topic}\n")
+
+        console.print(f"\n[green]Results saved to: {output_file}[/green]")
+        print("#" * 30 + f" Assessment Complete")
+
+    except Exception as e:
+        console.print(f"[red]Error during assessment: {e}[/red]")
+        raise typer.Exit(1)
 
 # ------- Private APIS ----------
 def _get_status_emoji(status: str) -> str:

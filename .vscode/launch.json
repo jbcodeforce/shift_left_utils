@@ -8,7 +8,7 @@
             "python.defaultInterpreterPath": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Python Debugger: current file",
+            "name": "SL Python Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -21,24 +21,7 @@
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Debugger: mc-project",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
-                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
-                "PIPELINES": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines",
-                "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
-            },
-            "preLaunchTask": "setup_mc_environment",
-             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
-        },
-        {
-            "name": "Python IT Debugger: current file",
+            "name": "SL Python IT Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",

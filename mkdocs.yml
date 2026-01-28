@@ -17,6 +17,7 @@ nav:
   - Tutorials:
     - Introduction: tutorial/index.md
     - Setup Lab: tutorial/setup_lab.md
+    - Project Management Lab: tutorial/project.md
     - Migration AI Lab: tutorial/migration_ai_lab.md
     - Date Engineer day to day work - Lab: tutorial/de_lab.md
     - SRE CI/CD process and other tasks - Lab: tutorial/sre_lab.md

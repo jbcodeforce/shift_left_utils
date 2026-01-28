@@ -88,9 +88,11 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 
 === "UI"
 	Go to Environments from the left menu, select the environment you want to use
+
 	![](./images/cc_env.png)
 
 	Select the Details tab for the ID, Provider and region 
+	
 	![](./images/cc_env_details.png)
 
 	and update the config.yaml
@@ -118,7 +120,9 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 
 === "UI"
 	Go to the contextual menu on the top right side, and then Organization settings, then copy the ID
+	
 	![](./images/organizations.png)
+
 	and update the config.yaml
 	```yaml
 	 confluent_cloud:
@@ -140,8 +144,11 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 
 === "UI"
 	Go to Environments > Clusters > Select on Kafka Cluster > Cluster Settings > General tab
+
 	![](./images/cc_cluster_settings.png)
+	
 	and update the config.yaml
+	
 	```yaml
 	kafka:
 	   bootstrap.servers: <To FILL with endpoint>
@@ -157,6 +164,7 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 === "Confluent CLI"
 
 	For the cloud provider and region
+
 	```sh
 	confluent kafka cluster list
         ID     |   Name     |  Cloud | Region    |
@@ -181,12 +189,15 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 ### 4.1 Confluent Cloud API Keys and Secrets
 === "UI"
 	Go to the contextual menu on the top right side, and then `Add API Key` button:
+
 	![](./images/cc_org_api_keys.png)
 
 	Select User or Service Account
+	
 	![](./images/cc_api_key_account.png)
 	
 	Then resource scope
+	
 	![](./images/cc_cloud_resource_key.png)
 
 	Set a name and description and download the created API.
@@ -212,15 +223,18 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 
 === "UI"
 	Go to Environments > Cluster > API Keys > Select the Create 
+
 	![](./images/cc_kafka_keys.png)
 
 === "Confluent CLI"
 	List existing keys for your user
+	
 	```sh
 	 confluent api-key list | grep username | grep kafka
 	```
 
 	Create a Kafka api for a cluster id:
+	
 	```sh
 	confluent api-key create  --resource lkc-123456
 	```
@@ -235,6 +249,7 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 
 === "UI"
 	Go to Environments > Flink > API Keys tab
+	
 	![](./images/cc_flink_keys.png)
 
 === "Confluent CLI"
