@@ -6,8 +6,8 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader
 from typing import Tuple
 
-from shift_left.core.pipeline_mgr import ( 
-    read_pipeline_definition_from_file, 
+from shift_left.core.pipeline_mgr import (
+    read_pipeline_definition_from_file,
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME)
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
@@ -16,10 +16,10 @@ from shift_left.core.utils.sql_parser import SQLparser
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import Statement, StatementResult
 from shift_left.core.utils.file_search import (
-    FlinkTableReference, 
-    get_or_build_source_file_inventory, 
+    FlinkTableReference,
+    get_or_build_source_file_inventory,
     get_or_build_inventory,
-    SCRIPTS_DIR, 
+    SCRIPTS_DIR,
     get_table_ref_from_inventory,
     extract_product_name,
     get_table_type_from_file_path,
@@ -31,7 +31,7 @@ from shift_left.core.utils.file_search import (
 
 """
 Table management is for managing table folder, and table content as well as the table inventory and action to
-Flink Table drop table. 
+Flink Table drop table.
 
 Naming convention for table name:
 - For source tables: src_<product_name>_<table_name>
@@ -47,12 +47,12 @@ Naming convention for ddl and dml file names
 """
 
 # --------- Public APIs ---------------
-def build_folder_structure_for_table(table_folder_name: str, 
+def build_folder_structure_for_table(table_folder_name: str,
                                     target_path: str,
                                     product_name: str) -> Tuple[str, str]:
     """
     Create the folder structure for the given table name, under the target path. The structure looks like:
-    
+
     * `target_path/product_name/table_name/sql-scripts/`:  with two template files, one for ddl. and one for dml.
     * `target_path/product_name/table_name/tests`: for test harness content
     * `target_path/product_name/table_name/Makefile`: a makefile to do Flink SQL statement life cycle management
@@ -61,11 +61,11 @@ def build_folder_structure_for_table(table_folder_name: str,
     table_type = get_table_type_from_file_path(target_path)
     if not product_name:
         table_folder = f"{target_path}/{table_folder_name}"
-        product_name= extract_product_name(table_folder) 
+        product_name= extract_product_name(table_folder)
     else:
         table_folder = f"{target_path}/{product_name}/{table_folder_name}"
 
-   
+
     create_folder_if_not_exist(f"{table_folder}/" +  SCRIPTS_DIR)
     create_folder_if_not_exist(f"{table_folder}/tests")
     internal_table_name=get_long_table_name(table_folder_name, product_name, table_type)
@@ -117,7 +117,7 @@ def get_short_table_name(src_file_name: str) -> Tuple[str,str,str]:
         else:
             product_name = table_name.split("_")[0]
             table_type = table_name.split("_")[1]
-            table_name = "_".join(table_name.split("_")[2:])   
+            table_name = "_".join(table_name.split("_")[2:])
     else:
         table_type = ""
         product_name = ""
@@ -132,7 +132,7 @@ def get_long_table_name(table_name: str, product_name: str, table_type: str) -> 
         if table_name.startswith("fct_"):
             table_name= table_name.replace("fct_","",1)
         if product_name:
-            return f"{product_name}_{table_type}_{table_name}"  
+            return f"{product_name}_{table_type}_{table_name}"
         else:
             return f"{table_type}_{table_name}"
     elif table_type == "dimension":
@@ -155,7 +155,7 @@ def get_long_table_name(table_name: str, product_name: str, table_type: str) -> 
         table_type = "mv"
         return f"{product_name}_{table_type}_{table_name}"
     elif table_type == "source":
-        table_type = "src"  
+        table_type = "src"
         if table_name.startswith("src_"):
             table_name= table_name.replace("src_","",1)
         if product_name:
@@ -173,8 +173,8 @@ def update_makefile_in_folder(pipeline_folder: str, table_name: str):
     table_folder = pipeline_folder.replace(PIPELINE_FOLDER_NAME,"",1) + "/" +  existing_path
     product_name=existing_path.split("/")[-2]
     prefix= _get_statement_prefix(product_name)
-    _create_makefile( table_name, 
-                    table_folder, 
+    _create_makefile( table_name,
+                    table_folder,
                     prefix)
 
 def update_all_makefiles_in_folder(folder_path: str) -> int:
@@ -234,9 +234,9 @@ def validate_table_cross_products(rootdir: str):
                     print("{:65s} {:s}".format(sql_file, violation))
 
 
-def update_sql_content_for_file(sql_file_name: str, 
-                                processor: TableWorker, 
-                                string_to_change_from: str= None, 
+def update_sql_content_for_file(sql_file_name: str,
+                                processor: TableWorker,
+                                string_to_change_from: str= None,
                                 string_to_change_to: str= None) -> bool:
     """
     """
@@ -314,14 +314,14 @@ def _get_flink_execution_plan_explanation(table_ref: FlinkTableReference, comput
     _, sql_out= transformer.update_sql_content(explain_query)
     statement_name = f"explain-{config['kafka']['cluster_type']}-{table_ref.table_name.replace('_', '-')}"
     statement_mgr.delete_statement_if_exists(statement_name)
-    result = statement_mgr.post_flink_statement(sql_content=sql_out, 
+    result = statement_mgr.post_flink_statement(sql_content=sql_out,
                                           statement_name=statement_name,
                                           compute_pool_id=compute_pool_id)
     explain_report= {'table_name': table_ref.table_name, 'trace': ''}
     if result and isinstance(result, Statement):
         if result.status.phase == "FAILED":
             logger.error(f"Failed to explain table {table_ref.table_name} error: {result.status.detail}")
-            explain_report['trace']=result.status.detail             
+            explain_report['trace']=result.status.detail
         else:
             statement_results = statement_mgr.get_statement_results(statement_name)
             if statement_results and isinstance(statement_results, StatementResult) and statement_results.results.data:
@@ -376,11 +376,11 @@ def _create_dml_properties_skeleton(table_name: str, out_dir: str):
     dml_name = "dml." + table_name
     with open(out_dir + '/sql-scripts/' + dml_name + ".properties", 'w') as f:
         f.write("#An optional file to set multiple DML session properties, one per line as shown below.\n#sql.tables.scan.idle-timeout=1s")
-    
+
 def _get_statement_prefix (product_name: str):
 
     """
-    Create a prefix for the statement name that is used in the Makefile script 
+    Create a prefix for the statement name that is used in the Makefile script
     """
 
     cluster_type = get_config().get('kafka').get('cluster_type')
@@ -392,8 +392,8 @@ def _get_statement_prefix (product_name: str):
         prefix=cluster_type + '-' + abbv_region + '-' + product_name
     return prefix
 
-def _create_makefile(table_name: str, 
-                     out_dir: str, 
+def _create_makefile(table_name: str,
+                     out_dir: str,
                      prefix: str):
     """
     Create a makefile to help deploy Flink statements for the given table name
@@ -481,7 +481,7 @@ def _validate_table_names(sqls: dict) -> dict[str, any]:
             if not key_context:
                 violations.append('key.avro-registry.schema-context NOT FOUND')
             if not value_context:
-                violations.append('value.avro-registry.schema-context NOT FOUND')    
+                violations.append('value.avro-registry.schema-context NOT FOUND')
 
             match type:
                 case 'sources':
@@ -606,6 +606,9 @@ def _validate_pipelines(sqls: dict, rootdir: str) -> dict[str, any]:
 
     return invalids
 
+
+
+
 def get_column_definitions(table_name: str) -> tuple[str,str]:
     return "-- put here column definitions", "-- put here column definitions"
 
@@ -625,4 +628,4 @@ def _summarize_trace(trace: str) -> str:
     if not "ERROR" in trace or not "Warning" in trace:
         return ""
     return trace
-    
+

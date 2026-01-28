@@ -25,6 +25,7 @@ from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
 )
 from shift_left.core.utils.sql_parser import SQLparser
+from jinja2 import Environment, PackageLoader
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import Statement
 from shift_left.core.utils.table_worker import ReplaceVersionInSqlContent
@@ -70,6 +71,9 @@ def build_project_structure(project_name: str,
         _define_kimball_structure(os.path.join(project_folder, "pipelines"))
     _initialize_git_repo(project_folder)
     _add_important_files(project_folder)
+    _create_terraform_skeleton(project_folder)
+
+
 
 
 def get_topic_list(file_name: str) -> list[dict]:
@@ -293,6 +297,49 @@ def update_tables_version(to_process_tables: list[ModifiedFileInfo], default_ver
         _add_children_to_process_files(file_info, to_process_tables, inventory)
     return processed_files
 
+
+def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
+    logger.info(f"isolate_data_product({product_name}, {source_folder}, {target_folder})")
+    """
+    isolate a data product table hierarchy for a given product name to be copied to a target folder.
+    go to the facts and build a list of tables for this product name.
+    add any children of the tables in the list of facts, recursively.
+    build an integrated execution plan from the list of tables.
+    move all the folder to the target folder.
+    """
+    inventory = get_or_build_inventory(source_folder, source_folder, False)
+    tables = [table for table in inventory if inventory[table]['product_name'] == product_name]
+    tables_to_process = {}
+    visited = set()
+
+    # Process each table and recursively find all its parents
+    for table in tables:
+        logger.info(f"Processing table {table} and finding all its dependencies")
+        _find_all_parent_tables_recursive(table, inventory, visited, tables_to_process)
+
+    logger.info(f"Found {len(tables_to_process)} total tables to process (including all dependencies)")
+
+    # Copy all tables (original + all dependencies) to target folder
+
+    for table, table_folder_name in tables_to_process.items():
+        logger.info(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+
+        # Keep the hierarchy of folder in the table_folder_name
+        print(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
+        shutil.copytree(
+            os.path.join(source_folder, '..', table_folder_name),
+            os.path.join(target_folder, table_folder_name),
+            dirs_exist_ok=True
+        )
+    with open(os.path.join(shift_left_dir, "tables_to_process.txt"), "w") as f:
+        for table, table_folder_name in tables_to_process.items():
+            f.write(f"{table},{table_folder_name}\n")
+
+
+# ----------------------------------
+# --- Private APIs ---
+# ----------------------------------
+
 def _add_children_to_process_files(file_info: ModifiedFileInfo, to_process_tables: list[ModifiedFileInfo], inventory: dict):
     """
     Add the children of the table to the list of tables to process
@@ -441,46 +488,28 @@ def _update_version_in_current_ddl_dml(currentfile_info: ModifiedFileInfo,
         logger.info(f"Updated version in {pipeline_definition.ddl_ref} and {pipeline_definition.dml_ref}")
 
 
-def isolate_data_product(product_name: str, source_folder: str, target_folder: str):
-    logger.info(f"isolate_data_product({product_name}, {source_folder}, {target_folder})")
-    """
-    isolate a data product table hierarchy for a given product name to be copied to a target folder.
-    go to the facts and build a list of tables for this product name.
-    add any children of the tables in the list of facts, recursively.
-    build an integrated execution plan from the list of tables.
-    move all the folder to the target folder.
-    """
-    inventory = get_or_build_inventory(source_folder, source_folder, False)
-    tables = [table for table in inventory if inventory[table]['product_name'] == product_name]
-    tables_to_process = {}
-    visited = set()
-
-    # Process each table and recursively find all its parents
-    for table in tables:
-        logger.info(f"Processing table {table} and finding all its dependencies")
-        _find_all_parent_tables_recursive(table, inventory, visited, tables_to_process)
-
-    logger.info(f"Found {len(tables_to_process)} total tables to process (including all dependencies)")
-
-    # Copy all tables (original + all dependencies) to target folder
-
-    for table, table_folder_name in tables_to_process.items():
-        logger.info(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
-
-        # Keep the hierarchy of folder in the table_folder_name
-        print(f"Copying table: {table}, from {table_folder_name} to {target_folder}")
-        shutil.copytree(
-            os.path.join(source_folder, '..', table_folder_name),
-            os.path.join(target_folder, table_folder_name),
-            dirs_exist_ok=True
-        )
-    with open(os.path.join(shift_left_dir, "tables_to_process.txt"), "w") as f:
-        for table, table_folder_name in tables_to_process.items():
-            f.write(f"{table},{table_folder_name}\n")
-
-# ---------------------------------
-# --- Private APIs ---
-# ---------------------------------
+def _create_terraform_skeleton(project_folder: str):
+    logger.info(f"create_terraform_skeleton({project_folder})")
+    iac_folder = os.path.join(project_folder, "IaC")
+    create_folder_if_not_exist(iac_folder)
+    create_folder_if_not_exist(os.path.join(iac_folder, "environments"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "dev"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "prod"))
+    project_name = Path(project_folder).name
+    env = Environment(loader=PackageLoader("shift_left.core", "templates"))
+    tf_provider_tmpl = env.get_template("tf_provider.jinja")
+    context = {
+        "project_name": project_name,
+        "environment": "demo",
+    }
+    dev_folder = os.path.join(iac_folder, "environments", "dev")
+    providers_tf = os.path.join(dev_folder, "providers.tf")
+    with open(providers_tf, "w") as f:
+        f.write(tf_provider_tmpl.render(context))
+    tf_confluent_tmpl = env.get_template("tf_confluent.jinja")
+    confluent_tf = os.path.join(dev_folder, "confluent.tf")
+    with open(confluent_tf, "w") as f:
+        f.write(tf_confluent_tmpl.render(context))
 
 def _extract_table_name_from_path(file_path: str) -> str:
     """Extract table name from file path.
