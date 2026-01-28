@@ -4,9 +4,10 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 import time
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Dict, Set, Tuple, Any
 import json
 import networkx as nx
+from pyvis.network import Network
 from pydantic_yaml import to_yaml_str
 import typer
 import builtins
@@ -81,7 +82,7 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
 
 
 @app.command()
-def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.")],
+def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. customer_analytics_c360. The name has to exist in inventory as a key.")],
           inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
@@ -167,6 +168,23 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     console.print(tree)
     console.print(f"\n[bold]table names only:[/bold]")
     console.print(summary)
+
+    # Generate interactive HTML graph visualization
+    try:
+        nodes_dict, edges_list = _extract_graph_data(pipeline_def, table_name, parent_only, children_too)
+
+        # Create output filename
+        graph_filename = f"{table_name}_pipeline_graph.html"
+        graph_path = os.path.join(os.getcwd(), graph_filename)
+
+        # Generate and save the graph
+        _display_directed_graph(nodes_dict, edges_list, table_name, graph_path)
+
+        console.print(f"\n[bold green]Graph visualization saved to: {graph_path}[/bold green]")
+        console.print(f"[dim]Open the HTML file in your browser to view the interactive graph[/dim]")
+    except Exception as e:
+        logger.warning(f"Failed to generate graph visualization: {safe_error_display(e)}")
+        console.print(f"[yellow]Warning: Could not generate graph visualization[/yellow]")
 
 @app.command()
 def healthcheck(product_name: Annotated[str, typer.Argument(help="The product name. e.g. qx, aqem, mx. The name has to exist in inventory as a key.")],
@@ -690,20 +708,170 @@ def analyze_pool_usage(
 
 
 
-def _display_directed_graph(nodes, edges):
+def _extract_graph_data(pipeline_def, root_table_name: str, parent_only: bool, children_too: bool) -> Tuple[Dict[str, Dict[str, Any]], List[Tuple[str, str]]]:
     """
-    Displays a directed graph using networkx and matplotlib.
+    Extract nodes and edges from pipeline definition for graph visualization.
 
     Args:
-        nodes: A list of node identifiers.
-        edges: A list of tuples, where each tuple represents a directed edge
-               (source_node, target_node).
-    """
-    G = nx.DiGraph()  # Create a directed graph object
-    G.add_nodes_from(nodes)
-    G.add_edges_from(edges)
+        pipeline_def: FlinkTablePipelineDefinition object
+        root_table_name: Name of the root table
+        parent_only: Whether to include only parents
+        children_too: Whether to include children
 
-    # TODO to replace with better graph visualization
+    Returns:
+        Tuple of (nodes_dict, edges_list) where:
+        - nodes_dict: Dict mapping table_name to metadata dict
+        - edges_list: List of (source, target) tuples
+    """
+    nodes_dict: Dict[str, Dict[str, Any]] = {}
+    edges_list: List[Tuple[str, str]] = []
+    visited: Set[str] = set()
+
+    def add_node(node_data):
+        """Add a node to the nodes dictionary if not already present."""
+        if node_data.table_name not in nodes_dict:
+            nodes_dict[node_data.table_name] = {
+                'table_name': node_data.table_name,
+                'type': node_data.type or 'unknown',
+                'path': node_data.path or '',
+                'dml_ref': node_data.dml_ref or '',
+                'ddl_ref': node_data.ddl_ref or '',
+                'product_name': node_data.product_name or 'common',
+                'is_root': node_data.table_name == root_table_name
+            }
+
+    def process_node(node_data, is_root: bool = False):
+        """Recursively process nodes and their relationships."""
+        if node_data.table_name in visited and not is_root:
+            return
+        visited.add(node_data.table_name)
+
+        add_node(node_data)
+
+        # Process parents - reverse arrow direction (child -> parent)
+        if parent_only and node_data.parents:
+            for parent in node_data.parents:
+                add_node(parent)
+                edges_list.append((node_data.table_name, parent.table_name))
+                process_node(parent)
+
+        # Process children - reverse arrow direction (child -> parent)
+        if children_too and node_data.children:
+            for child in node_data.children:
+                add_node(child)
+                edges_list.append((child.table_name, node_data.table_name))
+                process_node(child)
+
+    # Start with root node
+    process_node(pipeline_def, is_root=True)
+
+    return nodes_dict, edges_list
+
+
+def _get_node_color(node_type: str) -> str:
+    """Get color for node based on table type."""
+    color_map = {
+        'source': '#2ecc71',      # green
+        'dimension': '#3498db',   # blue
+        'fact': '#e67e22',        # orange
+        'view': '#9b59b6',        # purple
+    }
+    return color_map.get(node_type.lower(), '#95a5a6')  # gray for unknown
+
+
+def _display_directed_graph(nodes_dict: Dict[str, Dict[str, Any]], edges_list: List[Tuple[str, str]],
+                            root_table_name: str, output_file: str):
+    """
+    Creates an interactive HTML graph visualization using pyvis.
+
+    Args:
+        nodes_dict: Dictionary mapping table_name to node metadata
+        edges_list: List of (source, target) edge tuples
+        root_table_name: Name of the root table to highlight
+        output_file: Path to save the HTML file
+    """
+    # Create a Network object
+    net = Network(
+        height='800px',
+        width='100%',
+        bgcolor='#222222',
+        font_color='white',
+        directed=True,
+        notebook=False
+    )
+
+    # Configure physics for hierarchical left-to-right layout
+    net.set_options("""
+    {
+      "layout": {
+        "hierarchical": {
+          "enabled": true,
+          "direction": "RL",
+          "sortMethod": "directed",
+          "levelSeparation": 150,
+          "nodeSpacing": 200,
+          "treeSpacing": 200,
+          "blockShifting": true,
+          "edgeMinimization": true,
+          "parentCentralization": true
+        }
+      },
+      "physics": {
+        "hierarchicalRepulsion": {
+          "centralGravity": 0.0,
+          "springLength": 200,
+          "springConstant": 0.01,
+          "nodeDistance": 200,
+          "damping": 0.09
+        },
+        "maxVelocity": 50,
+        "minVelocity": 0.75,
+        "solver": "hierarchicalRepulsion"
+      }
+    }
+    """)
+
+    # Add nodes with styling
+    for table_name, node_data in nodes_dict.items():
+        is_root = node_data['is_root']
+        node_type = node_data['type']
+        color = _get_node_color(node_type)
+
+        # Build tooltip with metadata
+        tooltip = f"<b>{table_name}</b><br>"
+        tooltip += f"Type: {node_type}<br>"
+        if node_data['product_name']:
+            tooltip += f"Product: {node_data['product_name']}<br>"
+        if node_data['path']:
+            tooltip += f"Path: {node_data['path']}<br>"
+        if node_data['dml_ref']:
+            tooltip += f"DML: {node_data['dml_ref']}<br>"
+        if node_data['ddl_ref']:
+            tooltip += f"DDL: {node_data['ddl_ref']}"
+
+        # Configure node appearance
+        node_size = 30 if is_root else 20
+        border_width = 4 if is_root else 2
+        border_color = '#f39c12' if is_root else color
+
+        net.add_node(
+            table_name,
+            label=table_name,
+            title=tooltip,
+            color=color,
+            size=node_size,
+            borderWidth=border_width,
+            borderWidthSelected=6,
+            font={'size': 14, 'face': 'Arial', 'color': 'white'},
+            shape='box'
+        )
+
+    # Add edges with arrows
+    for source, target in edges_list:
+        net.add_edge(source, target, arrows='to', color={'color': '#7f8c8d', 'highlight': '#3498db'})
+
+    # Save the graph
+    net.save_graph(output_file)
 
 
 

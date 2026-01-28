@@ -45,18 +45,6 @@ files_to_process: deque = deque()  # Files to process when parsing SQL dependenc
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
 
 
-
-class PipelineReport(BaseModel):
-    """
-    Class to represent a full pipeline tree without recursion
-    """
-    table_name: str
-    path: str
-    ddl_ref: Optional[str] = Field(default="", description="DDL path")
-    dml_ref: Optional[str] = Field(default="", description="DML path")
-    parents: Optional[Set[Any]] = Field(default=set(),   description="parents of this flink dml")
-    children: Optional[Set[Any]] = Field(default=set(),  description="users of the table created by this flink dml")
-
 class PipelineStatusTree:
     """
     Class to provide the status of each statement in a pipeline given the child table.
@@ -198,7 +186,7 @@ def get_static_pipeline_report_from_table(
         inventory_path: str,
         parent_only: bool = True,
         children_only: bool = False
-) -> PipelineReport:
+) -> FlinkTablePipelineDefinition:
     """
     Walk the static hierarchy of tables given the table name. This function is used to generate a report on the pipeline hierarchy for a given table.
     The function returns a dictionnary with the table name, its DDL and DML path, its parents and children.
@@ -213,18 +201,12 @@ def get_static_pipeline_report_from_table(
     try:
         table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, inventory)
         current_hierarchy: FlinkTablePipelineDefinition= read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
-        root_ref= PipelineReport(table_name= table_ref.table_name,
-                                  path= table_ref.table_folder_name,
-                                  ddl_ref= table_ref.ddl_ref,
-                                  dml_ref= table_ref.dml_ref,
-                                  parents= set(),
-                                  children= set())
         if parent_only:
-            root_ref.parents = _visit_parents(current_hierarchy).parents # at this level all the parent elements are FlinkTablePipelineDefinition
+            current_hierarchy.parents = _visit_parents(current_hierarchy).parents # at this level all the parent elements are FlinkTablePipelineDefinition
         if children_only:
-            root_ref.children = _visit_children(current_hierarchy).children
-        logger.debug(f"Report built is {root_ref.model_dump_json(indent=3)}")
-        return root_ref
+            current_hierarchy.children = _visit_children(current_hierarchy).children
+        logger.debug(f"Report built is {current_hierarchy.model_dump_json(indent=3)}")
+        return current_hierarchy
     except Exception as e:
         logger.error(f"Error in processing pipeline report {e}")
         raise Exception(f"Error in processing pipeline report for {table_name}")
