@@ -1,13 +1,13 @@
 [project]
 name = "shift_left"
-version = "0.1.47"
+version = "0.1.48"
 description = "The shift-left CLI to manage your shift-left project"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "jbcodeforce", email = "jerome.boyer@gmail.com"}
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.14"
 keywords = ["flink", "kafka", "sql", "migration", "streaming", "confluent", "cli", "data-pipeline"]
 classifiers = [
     "Development Status :: 4 - Beta",

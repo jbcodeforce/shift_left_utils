@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import typer
-from shift_left.cli_commands import project, table, pipeline
+from shift_left.cli_commands import project, table, pipeline, validations
 from shift_left.core.utils.secure_typer import create_secure_typer_app, install_secure_exception_handler
 from shift_left.core.utils.app_config import __version__
 
@@ -18,6 +18,7 @@ install_secure_exception_handler()
 app.add_typer(project.app, name="project")
 app.add_typer(table.app, name="table")
 app.add_typer(pipeline.app, name="pipeline")
+app.add_typer(validations.app, name="validations")
 
 @app.command()
 def version():
