@@ -15,7 +15,6 @@ os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 from shift_left.core.models.flink_statement_model import StatementInfo, StatementListCache
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 from shift_left.core.table_analyzer import (
-    get_tables_from_inventory,
     get_tables_referenced_by_running_statements,
     get_topics_for_tables,
     assess_unused_tables
@@ -31,25 +30,12 @@ class TestTableAnalyzer(unittest.TestCase):
         cls.test_table_name = "fct_order"
         cls.test_source_table = "src_table_1"
 
-    def test_get_tables_from_inventory(self):
-        """Test that get_tables_from_inventory returns all tables from inventory"""
-        result = get_tables_from_inventory(self.inventory_path)
-        
-        self.assertIsInstance(result, dict)
-        self.assertGreater(len(result), 0)
-        # Verify structure
-        for table_name, table_info in result.items():
-            self.assertIsInstance(table_name, str)
-            self.assertIsInstance(table_info, dict)
-            # Check that required keys exist
-            self.assertIn('type', table_info)
-            self.assertIn('product_name', table_info)
 
     def test_get_tables_referenced_by_running_statements_empty(self):
         """Test with empty statement list"""
         empty_statements = {}
-        result = get_tables_referenced_by_running_statements(empty_statements, self.inventory_path)
-        
+        result = get_tables_referenced_by_running_statements(empty_statements, {}, self.inventory_path)
+
         self.assertIsInstance(result, set)
         self.assertEqual(len(result), 0)
 
@@ -68,9 +54,9 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
-        result = get_tables_referenced_by_running_statements(mock_statements, self.inventory_path)
-        
+
+        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
+
         self.assertIsInstance(result, set)
         # Should include the tables themselves and their parents
         self.assertIn("fct_order", result)
@@ -95,9 +81,9 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
-        result = get_tables_referenced_by_running_statements(mock_statements, self.inventory_path)
-        
+
+        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
+
         # Should only include fct_order (the running one) and its parents
         self.assertIn("fct_order", result)
         # int_table_1 and int_table_2 should not be directly included (they're not running)
@@ -112,9 +98,9 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
-        result = get_tables_referenced_by_running_statements(mock_statements, self.inventory_path)
-        
+
+        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
+
         # fct_order should be in the result
         self.assertIn("fct_order", result)
         # If fct_order has parents (from pipeline.json), they should also be included
@@ -124,14 +110,14 @@ class TestTableAnalyzer(unittest.TestCase):
         """Test that topics are correctly extracted for tables"""
         tables = {"fct_order", "int_table_1"}
         result = get_topics_for_tables(tables, self.inventory_path)
-        
+
         self.assertIsInstance(result, set)
         # Should return topic names (exact format depends on naming convention)
 
     def test_get_topics_for_tables_empty(self):
         """Test with empty table set"""
         result = get_topics_for_tables(set(), self.inventory_path)
-        
+
         self.assertIsInstance(result, set)
         self.assertEqual(len(result), 0)
 
@@ -145,10 +131,10 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
+
         with patch('shift_left.core.table_analyzer.statement_mgr.get_statement_list', return_value=mock_statements):
             result = assess_unused_tables(self.inventory_path, include_topics=False)
-        
+
         self.assertIsInstance(result, dict)
         self.assertIn('unused_tables', result)
         self.assertIn('table_details', result)
@@ -164,16 +150,16 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
+
         mock_topics = [
             {"topic_name": "fct_order", "cluster_id": "lkc-123", "partitions_count": 3},
             {"topic_name": "unused_topic", "cluster_id": "lkc-123", "partitions_count": 1}
         ]
-        
+
         with patch('shift_left.core.table_analyzer.statement_mgr.get_statement_list', return_value=mock_statements), \
              patch('shift_left.core.table_analyzer.project_manager.get_topic_list', return_value=mock_topics):
             result = assess_unused_tables(self.inventory_path, include_topics=True)
-        
+
         self.assertIn('unused_topics', result)
         self.assertIsInstance(result['unused_topics'], list)
 
@@ -188,10 +174,10 @@ class TestTableAnalyzer(unittest.TestCase):
                 created_at=datetime.now(timezone.utc)
             )
         }
-        
+
         with patch('shift_left.core.table_analyzer.statement_mgr.get_statement_list', return_value=mock_statements):
             result = assess_unused_tables(self.inventory_path, include_topics=False)
-        
+
         # Tables with children should be handled (exact behavior depends on implementation)
         for table_name, details in result['table_details'].items():
             if 'has_children' in details:
@@ -201,10 +187,10 @@ class TestTableAnalyzer(unittest.TestCase):
     def test_assess_unused_tables_source_tables_warning(self):
         """Test that source tables are flagged appropriately"""
         mock_statements = {}
-        
+
         with patch('shift_left.core.table_analyzer.statement_mgr.get_statement_list', return_value=mock_statements):
             result = assess_unused_tables(self.inventory_path, include_topics=False)
-        
+
         # Source tables might be in unused list but should be flagged
         for table_name, details in result['table_details'].items():
             if details.get('type') == 'source':
@@ -219,7 +205,7 @@ class TestTableAnalyzer(unittest.TestCase):
             ("dev-use1-int_table_1-dml", "int_table_1"),
             ("prod-usw2-src_table_1-dml", "src_table_1"),
         ]
-        
+
         # This would test the internal mapping function
         # Implementation depends on how statement names map to tables
         for statement_name, expected_table in test_cases:
@@ -230,7 +216,7 @@ class TestTableAnalyzer(unittest.TestCase):
         """Test that pipeline.json files are correctly read"""
         # Verify that we can read pipeline.json for a known table
         from shift_left.core.pipeline_mgr import get_pipeline_definition_for_table
-        
+
         try:
             pipeline_def = get_pipeline_definition_for_table(self.test_table_name, self.inventory_path)
             self.assertIsInstance(pipeline_def, FlinkTablePipelineDefinition)

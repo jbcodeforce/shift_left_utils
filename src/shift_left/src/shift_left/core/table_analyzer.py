@@ -3,6 +3,7 @@ Copyright 2024-2026 Confluent, Inc.
 
 Module to analyze unused Flink tables by comparing inventory against running statements.
 """
+import os
 from typing import Dict, Set, List, Optional
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.file_search import (
@@ -193,3 +194,25 @@ def assess_unused_tables(
 
     logger.info(f"Assessment complete: {len(unused_table_names)} unused tables found")
     return result
+
+def delete_unused_tables(
+    inventory_path: str,
+    table_list_file: str
+) -> str:
+    """
+    Delete unused tables
+    """
+    logger.info(f"Deleting unused tables in {inventory_path}")
+    if not os.path.exists(table_list_file):
+        logger.error(f"Table list file {table_list_file} does not exist")
+        return f"Table list file {table_list_file} does not exist"
+    else:
+        with open(table_list_file, 'r') as f:
+            table_list = f.readlines()
+            logger.info(f"Found {len(table_list)} tables to delete")
+            for table_name in table_list:
+                logger.info(f"Deleting table {table_name}")
+                statement_mgr.delete_statement_if_exists(table_name)
+                statement_mgr.drop_table(table_name)
+                logger.info(f"Table {table_name} deleted")
+    return f"Unused tables deleted successfully"

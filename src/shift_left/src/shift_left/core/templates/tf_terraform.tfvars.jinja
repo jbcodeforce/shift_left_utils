@@ -1,0 +1,40 @@
+# -----------------------------------------------------------------------------
+# Terraform Variables
+# Confluent Cloud Infrastructure
+# -----------------------------------------------------------------------------
+# Copy this file to terraform.tfvars and fill in your actual values
+
+# General Settings
+prefix      = "c360"
+owner_email = "your-email@example.com"
+
+# AWS Configuration
+cloud_region = "us-west-2"  # AWS region for deployment
+
+# Confluent Cloud
+# Get these from: https://confluent.cloud/settings/api-keys
+confluent_cloud_api_key    = "YOUR_CONFLUENT_CLOUD_API_KEY"
+confluent_cloud_api_secret = "YOUR_CONFLUENT_CLOUD_API_SECRET"
+
+# Confluent Cloud Cluster Configuration
+cc_availability = "SINGLE_ZONE"  # Options: SINGLE_ZONE or MULTI_ZONE
+
+# Existing Resource IDs (optional - leave null to create new resources)
+# If you want to reuse existing resources, uncomment and set the IDs
+# You can use either existing_environment_id OR existing_environment_name (not both)
+existing_environment_id     = "env-xxxxx"  # Leave null to create new environment
+#existing_environment_name   = "my-environment"  # Alternative: use name instead of ID
+existing_kafka_cluster_id   = "lkc-xxxxx"  # Leave null to create new cluster
+existing_schema_registry_id = "lsrc-xxxxx"  # Leave null to use auto-provisioned Schema Registry
+existing_service_account_id = "sa-xxxxx"   # Leave null to create new service account
+
+# Flink Compute Pool Configuration
+# Comment out existing_flink_compute_pool_id to create a new compute pool
+#existing_flink_compute_pool_id = "lfcp-xxxxx"  # Uncomment and set ID to reuse existing
+create_compute_pool = false  # Set to true to create a new compute pool (if existing_flink_compute_pool_id is null)
+flink_max_cfu       = 50     # Maximum CFUs for compute pool (valid values: 5, 10, 20, 30, 40, 50)
+
+# Flink API Credentials (optional - API key is auto-created in confluent.tf)
+# Only needed if you want to use a pre-existing API key instead of the auto-created one
+#flink_api_key    = ""  # Leave empty to use auto-created API key
+#flink_api_secret = ""  # Leave empty to use auto-created API key

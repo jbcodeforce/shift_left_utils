@@ -476,6 +476,65 @@ WITH (
         assert columns['created_date'] == {'name': 'created_date', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['is_active'] == {'name': 'is_active', 'type': 'BOOLEAN', 'nullable': True, 'primary_key': False}
 
+    def test_build_column_metadata_from_dml_select_simple(self):
+        """Extract column metadata from INSERT INTO ... SELECT col1, col2 FROM source."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT id, name FROM t"
+        columns = parser.build_column_metadata_from_dml_select(dml, "t")
+        self.assertIn("id", columns)
+        self.assertIn("name", columns)
+        self.assertEqual(columns["id"]["type"], "STRING")
+        self.assertEqual(columns["name"]["type"], "STRING")
+        self.assertEqual(columns["id"]["name"], "id")
+        self.assertFalse(columns["id"]["primary_key"])
+
+    def test_build_column_metadata_from_dml_select_aliases(self):
+        """Extract column names from AS alias in SELECT list."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT id, x AS alias_col FROM t"
+        columns = parser.build_column_metadata_from_dml_select(dml, "t")
+        self.assertIn("id", columns)
+        self.assertIn("alias_col", columns)
+        self.assertEqual(columns["alias_col"]["name"], "alias_col")
+
+    def test_build_column_metadata_from_dml_select_expressions(self):
+        """Infer types for TIMESTAMPDIFF and CASE expressions."""
+        parser = SQLparser()
+        dml = """
+        INSERT INTO src_c360_customers
+        SELECT customer_id, first_name,
+            TIMESTAMPDIFF(YEAR, CAST(date_of_birth AS TIMESTAMP_LTZ(3)), event_ts) AS age_years,
+            CASE WHEN 1=1 THEN 'x' ELSE 'y' END AS segment
+        FROM customers_raw
+        """
+        columns = parser.build_column_metadata_from_dml_select(dml, "customers_raw")
+        self.assertIn("customer_id", columns)
+        self.assertIn("first_name", columns)
+        self.assertIn("age_years", columns)
+        self.assertIn("segment", columns)
+        self.assertEqual(columns["age_years"]["type"], "BIGINT")
+        self.assertEqual(columns["segment"]["type"], "STRING")
+        self.assertEqual(columns["customer_id"]["type"], "STRING")
+
+    def test_build_column_metadata_from_dml_select_empty_source(self):
+        """Return empty dict when source table name does not match."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT a, b FROM other_table"
+        columns = parser.build_column_metadata_from_dml_select(dml, "nonexistent")
+        self.assertEqual(columns, {})
+
+    def test_build_create_table_from_column_metadata(self):
+        """Build minimal CREATE TABLE string from column metadata."""
+        parser = SQLparser()
+        metadata = {
+            "id": {"name": "id", "type": "STRING", "nullable": False, "primary_key": False},
+            "name": {"name": "name", "type": "STRING", "nullable": True, "primary_key": False},
+        }
+        ddl = parser.build_create_table_from_column_metadata("my_table", metadata, table_name_suffix="_ut")
+        self.assertIn("CREATE TABLE IF NOT EXISTS my_table_ut", ddl)
+        self.assertIn("id STRING", ddl)
+        self.assertIn("name STRING", ddl)
+
     def test_should_not_consider_unnest_as_table_name(self):
         parser = SQLparser()
         query="""

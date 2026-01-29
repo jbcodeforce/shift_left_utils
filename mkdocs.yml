@@ -58,7 +58,7 @@ plugins:
       minify_html: true
   - mkdocstrings
   - table-reader
-
+  - mermaid2
 markdown_extensions:
   - abbr
   - attr_list
@@ -70,6 +70,11 @@ markdown_extensions:
   #- pymdownx.blocks.caption
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.smartsymbols
   - toc:
       permalink: true

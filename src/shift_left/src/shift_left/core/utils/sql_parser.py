@@ -217,6 +217,192 @@ class SQLparser:
 
         return columns
 
+    def build_column_metadata_from_dml_select(self, dml_content: str, source_table_name: str) -> Dict[str, Dict]:
+        """
+        Parse INSERT INTO ... SELECT ... FROM source_table DML and extract column metadata
+        from the SELECT list. Used when foundation table is not in table_inventory.
+
+        Args:
+            dml_content: The DML SQL content (table-under-test's INSERT INTO ... SELECT ...)
+            source_table_name: The foundation table name (e.g. customers_raw) referenced in FROM
+
+        Returns:
+            Dict mapping column name to { 'name', 'type', 'nullable', 'primary_key' }
+            compatible with build_column_metadata_from_sql_content. Empty dict if parsing fails.
+        """
+        if not dml_content or not source_table_name:
+            return {}
+        normalized = self._normalize_sql(dml_content)
+        normalized = re.sub(r'`', '', normalized)
+        source_clean = source_table_name.replace('`', '').strip()
+
+        # Find SELECT list: between "SELECT " and " FROM source_table_name" at depth 0
+        insert_select = re.search(r'\bINSERT\s+INTO\s+.+?\bSELECT\s+', normalized, re.IGNORECASE)
+        if not insert_select:
+            return {}
+        start = insert_select.end()
+        select_list_str = self._extract_select_list_before_from(normalized, start, source_clean)
+        if not select_list_str:
+            return {}
+
+        # Split SELECT list by comma respecting parentheses
+        items = self._split_by_comma_respecting_parens(select_list_str)
+        columns = {}
+        for idx, item in enumerate(items):
+            item = item.strip()
+            if not item:
+                continue
+            col_name = self._extract_column_name_from_select_item(item)
+            if not col_name:
+                continue
+            col_type = self._infer_type_from_select_item(item)
+            col_def_info = {
+                'name': col_name,
+                'type': col_type,
+                'nullable': True,
+                'primary_key': False,
+            }
+            columns[col_name] = col_def_info
+        return columns
+
+    def build_create_table_from_column_metadata(
+        self, table_name: str, column_metadata: Dict[str, Dict], table_name_suffix: str = ""
+    ) -> str:
+        """
+        Build a minimal Flink CREATE TABLE statement from column metadata.
+        Used for unit-test DDL when derived from DML (no PRIMARY KEY by default).
+        """
+        full_name = table_name + table_name_suffix
+        lines = [f"CREATE TABLE IF NOT EXISTS {full_name} ("]
+        col_defs = []
+        for col_name, meta in column_metadata.items():
+            col_type = meta.get("type", "STRING")
+            col_defs.append(f"    {col_name} {col_type}")
+        lines.append(",\n".join(col_defs))
+        lines.append(")")
+        return "\n".join(lines)
+
+    def _extract_select_list_before_from(self, sql: str, start: int, source_table_name: str) -> str:
+        """Find SELECT list as substring between start and ' FROM source_table_name' at depth 0."""
+        depth = 0
+        in_string = False
+        quote_char = None
+        i = start
+        n = len(sql)
+        while i < n:
+            c = sql[i]
+            if in_string:
+                if c == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                if c == quote_char:
+                    in_string = False
+                    quote_char = None
+                i += 1
+                continue
+            if c in ("'", '"'):
+                in_string = True
+                quote_char = c
+                i += 1
+                continue
+            if c == "(":
+                depth += 1
+                i += 1
+                continue
+            if c == ")":
+                depth -= 1
+                i += 1
+                continue
+            if depth == 0:
+                # Check for " FROM source_table_name" (case insensitive)
+                rest = sql[i:]
+                from_match = re.match(r"\s+FROM\s+", rest, re.IGNORECASE)
+                if from_match:
+                    after_from = rest[from_match.end() :].lstrip()
+                    # Next token: identifier (word or backtick-quoted)
+                    id_match = re.match(r"([a-zA-Z_][a-zA-Z0-9_-]*)", after_from)
+                    if id_match:
+                        token = id_match.group(1)
+                        if token == source_table_name:
+                            return sql[start:i].strip()
+            i += 1
+        return ""
+
+    def _split_by_comma_respecting_parens(self, s: str) -> List[str]:
+        """Split string by comma at parenthesis depth 0."""
+        depth = 0
+        in_string = False
+        quote_char = None
+        parts = []
+        current = []
+        i = 0
+        n = len(s)
+        while i < n:
+            c = s[i]
+            if in_string:
+                if c == "\\" and i + 1 < n:
+                    current.append(c)
+                    current.append(s[i + 1])
+                    i += 2
+                    continue
+                current.append(c)
+                if c == quote_char:
+                    in_string = False
+                    quote_char = None
+                i += 1
+                continue
+            if c in ("'", '"'):
+                in_string = True
+                quote_char = c
+                current.append(c)
+                i += 1
+                continue
+            if c == "(":
+                depth += 1
+                current.append(c)
+                i += 1
+                continue
+            if c == ")":
+                depth -= 1
+                current.append(c)
+                i += 1
+                continue
+            if depth == 0 and c == ",":
+                parts.append("".join(current).strip())
+                current = []
+                i += 1
+                continue
+            current.append(c)
+            i += 1
+        if current:
+            parts.append("".join(current).strip())
+        return parts
+
+    def _extract_column_name_from_select_item(self, item: str) -> str:
+        """Extract column name: AS alias or last bare identifier."""
+        item = item.strip()
+        # AS alias at end (case insensitive)
+        as_match = re.search(r"\s+AS\s+([a-zA-Z_][a-zA-Z0-9_-]*)\s*$", item, re.IGNORECASE)
+        if as_match:
+            return as_match.group(1).strip()
+        # Last bare identifier (word chars, possibly backtick-quoted)
+        tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_-]*", item)
+        if tokens:
+            return tokens[-1]
+        return ""
+
+    def _infer_type_from_select_item(self, item: str) -> str:
+        """Infer Flink SQL type from SELECT expression (TIMESTAMPDIFF->BIGINT, CAST AS TIMESTAMP->TIMESTAMP, etc.)."""
+        upper = item.upper()
+        if "TIMESTAMPDIFF" in upper:
+            return "BIGINT"
+        if "CAST" in upper and "TIMESTAMP" in upper:
+            return "TIMESTAMP(3)"
+        if "CASE" in upper or "WHEN" in upper:
+            return "STRING"
+        if "THEN" in upper and "END" in upper:
+            return "STRING"
+        return "STRING"
 
     def extract_primary_key_from_sql_content(self, sql_content: str) -> List[str]:
         """

@@ -1,5 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
+
+Service to manage project structure.
 """
 import datetime
 import os
@@ -510,6 +512,18 @@ def _create_terraform_skeleton(project_folder: str):
     confluent_tf = os.path.join(dev_folder, "confluent.tf")
     with open(confluent_tf, "w") as f:
         f.write(tf_confluent_tmpl.render(context))
+    tf_var_tmpl = env.get_template("tf_variables.jinja")
+    variables_tf = os.path.join(dev_folder, "variables.tf")
+    with open(variables_tf, "w") as f:
+        f.write(tf_var_tmpl.render(context))
+    tf_vars = env.get_template("tf_terraform.tfvars.jinja")
+    variables_tfvars = os.path.join(dev_folder, "terraform.tfvars.example")
+    with open(variables_tfvars, "w") as f:
+        f.write(tf_vars.render(context))
+    output_tmpl = env.get_template("tf_outputs.jinja")
+    outputs_tf = os.path.join(dev_folder, "outputs.tf")
+    with open(outputs_tf, "w") as f:
+        f.write(output_tmpl.render(context))
 
 def _extract_table_name_from_path(file_path: str) -> str:
     """Extract table name from file path.
