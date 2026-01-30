@@ -1,7 +1,7 @@
 include ../../../common.mk
 
 # --- src_p2_a
-TABLE_NAME=src_a
+TABLE_NAME=src_p2_a
 SCRIPT_PRE_KEBAB=dev-usw2-p2
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -10,10 +10,11 @@ DROP_DDL_STATEMENT=$(SCRIPT_PRE_KEBAB)-drop-$(SCRIPT_POST_KEBAB)
 DDL_SCRIPT=./sql-scripts/ddl.$(TABLE_NAME).sql
 DML_STATEMENT=$(SCRIPT_PRE_KEBAB)-dml-$(SCRIPT_POST_KEBAB)
 DML_SCRIPT=./sql-scripts/dml.$(TABLE_NAME).sql
+DML_PROPERTIES=./sql-scripts/dml.$(TABLE_NAME).properties
 DML_TESTS_SCRIPT=./tests/dml.$(TABLE_NAME).sql
 
 # --- Entry point
-create_src_a: create_flink_ddl  create_flink_dml
+create_src_p2_a: create_flink_ddl  create_flink_dml
 
 
 # --- Topic used as source
@@ -41,7 +42,7 @@ describe_flink_dml:
 	$(call describe_flink_statement,  $(DML_STATEMENT))
 
 create_flink_dml:
-	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT)) 
+	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT), $(DML_PROPERTIES)) 
 
 create_flink_dev:
 	$(call create_flink_statement, $(DML_STATEMENT), $(DML_TESTS_SCRIPT)) 

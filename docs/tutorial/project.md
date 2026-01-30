@@ -11,8 +11,14 @@ At the highest level the SDLC for flink project may include the following activi
 
 ##  Prerequisite
 
-You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured and running.
+You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured and running. Ensure `CONFIG_FILE`, `PIPELINES`, are set as described there.
 
+In this lab:
+
+- [Initialize a Project](#initialize-a-project)
+- [Add a source table](#add-a-source-table)
+- [Adding unit tests](#adding-unit-tests)
+- [Project Admin Work](#project-admin-work)
 
 ## Initialize a Project
 
@@ -22,15 +28,12 @@ You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured
 	shift_left project init <project_name> <project_path>
 	```
 
-* example for a default Kimball project
+* Example for a default Kimball project
 	```sh
 	shift_left project init dsp .
 	```
 
-* For a project more focused on developing data as a product
-	```sh
-	shift_left project init dsp ../  --project-type data-product
-	```
+
 
 The folder structure looks like:
 ```sh
@@ -62,16 +65,16 @@ The approach is to use Terraform to create Confluent Cloud Environment,  Kafka C
 
 | File | Purpose |
 | --- | --- |
-| provider.tf | |
-| confluent.tf | |
-| variables.tf | |
-| outputs.tf | | 
+| providers.tf | Terraform provider configuration (Confluent, etc.) |
+| confluent.tf | Confluent Cloud resources (environment, Kafka, Schema Registry, compute pool) |
+| variables.tf | Input variables (e.g. region, cluster name) |
+| outputs.tf | Output values (resource IDs, API keys) | 
 
-To be able to run the terraform, a SRE needs to create a service account, confluent cloud key and secrets for the terraform cli to use.
+To be able to run the terraform, a SRE needs to create, in the Confluent Console,  a service account, and the confluent cloud key and secrets for the terraform cli to use.
+`
+It is possible to reuse existing environment, schema registry and kafka cluster by setting their ids in the `terraform.tfvars` file.
 
-It is possible to reuse existing environment, schema registry and kafka cluster by setting their ids in the terraform.tfvars file.
-
-The elements created 
+The elements created are:
 
 
 ```mermaid
@@ -101,35 +104,37 @@ The elements created
 ```
 
 
-In most team environment, it will be possible to get real data to the dev Kafka Cluster. Here is a typical architecture for development using [cluster]() and [schema linking](https://docs.confluent.io/cloud/current/sr/schema-linking.htmll).
+In most environment, it will be possible to get the production or staging real data set to the dev Kafka Cluster. Here is a typical architecture for development using [cluster](https://docs.confluent.io/cloud/current/clusters/index.html) and [schema linking](https://docs.confluent.io/cloud/current/sr/schema-linking.html).
 
 <figure markdown='span'>
 ![](./images/data_replic_env.drawio.png)
 </figure>
 
+This means testing Flink statements on real-life data, is very valuable to verify if the statement works, but also assess data quality and even data skew.
+
 ## Add a source table
 
-The source table goal is to remove duplication and filter records, and maybe do transformation from the raw topic. If the raw topic is coming from a CDC, the record structure matches the table structure in the SQL database. Some column may be VARCHAR with a json object inside. It may be relevant to extract those information as new column in a Flink table. Each source table is published to its own raw topic, so there will be one flink statement per raw topic:
+The goal for source tables, is to remove duplication, filter records, and maybe do transformation from the raw topic. If the raw topic is coming from a CDC, the record structure matches the table structure in the SQL database (CDC software like Debezium also includes envelop like `before` and `after` fields). Some column may be VARCHAR with a json object inside. It may be relevant to extract those information as new column in a Flink table. Each source table is published to its own raw topic, so there will be one Flink statement per raw topic:
 
 <figure markdown='span'>
 ![](./images/raw_to_src.drawio.png)
 </figure>
 
-The goal is to develop a data product for a customer 360 profiling.
+As an example, this tutorial creates some table for a data product for a customer 360 profiling. The final solution is in [this git repo](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing)
 
 * As a Data Engineer the environment variables should be set to point to the created project
 	```sh
 	export FLINK_PROJECT=$HOME/Code/dsp
 	export PIPELINES=$FLINK_PROJECT/pipelines
 	export STAGING=$FLINK_PROJECT/staging
-	export CONFIG_FILE=...a..path..to..the.config.yaml
+	export CONFIG_FILE=$FLINK_PROJECT/config.yaml   # see Setup Lab
 	```
-* The command to add a table in the context of `c360` data product.
+* The command to add a table in the context of the `c360` data product is:
 	```sh
 	shift_left table init src_customers $PIPELINES/sources --product-name c360
 	```
 
-* Now the folder tree looks like this now:
+* Now the folder tree looks like this:
 ```sh
 ├── pipelines
 │   ├── common.mk
@@ -148,12 +153,12 @@ The goal is to develop a data product for a customer 360 profiling.
 │   │           └── tracking.md
 ```
 
-*The approach is to separate the table creation from the insertion logic.*
+*The approach to have DDL and DML in different files, is to separate the table creation from the insertion logic to avoid droping the table each time there is a change to the logic during development*
 
 
 ### Update the DDL content
 
-Change the DDL content in the file: `ddl.src_c360_c360_customers.sql` to the following content:
+Change the DDL content in the file: `ddl.src_c360_customers.sql` to the following content:
 	```sql
 	CREATE TABLE IF NOT EXISTS src_c360_customers (
 		customer_id STRING,
@@ -192,7 +197,7 @@ Change the DDL content in the file: `ddl.src_c360_c360_customers.sql` to the fol
 	);
 	```
 
-	The table is upsert changelog mode with a primary key, so records will be deduplicated. As multiple Kafka Clusters are defined in Confluent Cloud environment, and there is one schema registry in t he environement, this is good practices to isolate the schema-context in the schema registry. [See product schema-context documentation](https://docs.confluent.io/platform/current/schema-registry/schema-contexts-cp.html).
+	The table is upsert changelog mode with a primary key, so records will be deduplicated automatically by the Flink engine. As multiple Kafka Clusters are defined in Confluent Cloud environment, and there is one schema registry in t he environement, this is good practices to isolate the schema-context in the schema registry. [See product schema-context documentation](https://docs.confluent.io/platform/current/schema-registry/schema-contexts-cp.html).
 
 
 ### Update the DML content
@@ -320,19 +325,21 @@ Execute unit tests for a table by sending data to `_ut` topics and validating re
 
 ```sh
 # Run all unit tests for the table (inserts and foundations only)
-shift_left table run-unit-tests src_customers
+shift_left table run-unit-tests src_c360_customers
 
 # Run a specific test case and include validation
-shift_left table run-unit-tests src_customers --test-case-name _1 --run-all
+shift_left table run-unit-tests src_c360_customers --test-case-name _1 --run-all
 
 # Use a dedicated compute pool and topic suffix
-shift_left table run-unit-tests src_customers --compute-pool-id <pool_id> --post-fix-unit-test _ut
+shift_left table run-unit-tests src_c360_customers --compute-pool-id <pool_id> --post-fix-unit-test _ut
 ```
 
 Related commands:
 
 - **run-validation-tests** (or **validate-unit-tests**): Run only the validation SQL for the table. Same options as run-unit-tests.
 - **delete-unit-tests**: Remove Flink statements and Kafka topics created for the table's unit tests. Options: `--compute-pool-id`, `--post-fix-unit-test`.
+
+To deploy DDL and DML to Confluent Cloud (create/run Flink statements), see [Pipeline Management](../pipeline_mgr.md) and [Blue/Green Deployment](../blue_green_deploy.md).
 
 ## Project Admin Work
 
@@ -350,7 +357,7 @@ Check that the config file (from `CONFIG_FILE`) is valid before running other pr
 shift_left project validate-config
 ```
 
-### Build Table RelationShip
+### Build Table RelationShips
 
 For each table created by Flink statement it is easy by parsing the SQL statement to know the direct parents using the JOINS, FROM clauses. The following command creates a `pipeline_definition.json` file for each table that includes the parent list and also assess the complexity of the statement so we could compute the global complexity of a data product.
 
@@ -461,9 +468,13 @@ shift_left project list-compute-pools
 
 ### Getting the list of statements running in a compute pool
 
+List Flink statements in a given compute pool. Output includes statement name, status (e.g. RUNNING), compute pool ID, and catalog/database.
+
 ```sh
-shift_left project get-statement-list lfcp-xvrvmz
+shift_left project get-statement-list <compute_pool_id>
 ```
+
+Here is an extracted content for one statement:
 
 ```json
 'dev-usw2-c360-dml-src-c360-tx-items': StatementInfo(
@@ -544,14 +555,13 @@ shift_left project list-modified-files main
 shift_left project list-modified-files origin/main --since 2026-01-01
 ```
 
-### Getting Orphan Tables
+### Orphan and unused tables
 
-During the life cycle of the project, it may be possible that some tables were created and not deleted. Getting the list of topic in a given kafka cluster may give a first level of information but this is not enought. 
+During the life cycle of the project, it may be possible that some tables were created and not deleted. Getting the list of topics in a given Kafka cluster may give a first level of information but this is not enough.
 The git repository includes an inventory of all the tables and getting the list of tables can be done as seen before.
 
-To find Flink SQL tables that are not referenced by any running DML statement. 
-The command reads the table inventory and pipeline metadata (parent/child from `pipeline_definition.json`), compares them to running Flink statements, and 
-reports tables that appear unused. Optionally it compares Kafka topics to list topics that have no corresponding running statement.
+To find Flink SQL tables that are not referenced by any running DML statement,
+the command reads the table inventory and pipeline metadata (parent/child from `pipeline_definition.json`), compares them to running Flink statements, and reports tables that appear unused. Optionally it compares Kafka topics to list topics that have no corresponding running statement.
 
 Use this to identify tables or topics that can be retired or to spot tables that are unused but still have children (indirect use).
 
@@ -572,6 +582,8 @@ shift_left project assess-unused-tables $PIPELINES --no-topics --output-file ./u
 ```
 
 Example of report:
+
+The full report includes an "Unused Tables" section (table name, type, product, has children, path) and, when `--include-topics` is set, an "Unused Topics" section. Below is an example of the topics table:
 
 ```sh
 

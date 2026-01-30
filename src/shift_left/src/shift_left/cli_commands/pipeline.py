@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from typing import List, Dict, Set, Tuple, Any
 import json
 import networkx as nx
-from pyvis.network import Network
 from pydantic_yaml import to_yaml_str
 import typer
 import builtins
@@ -790,6 +789,8 @@ def _display_directed_graph(nodes_dict: Dict[str, Dict[str, Any]], edges_list: L
         root_table_name: Name of the root table to highlight
         output_file: Path to save the HTML file
     """
+    from pyvis.network import Network
+
     # Create a Network object
     net = Network(
         height='800px',
