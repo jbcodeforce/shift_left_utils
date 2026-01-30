@@ -94,7 +94,7 @@ print_success "Created release branch ${RELEASE_BRANCH}"
 
 # Step 2: Update version in app_config.py
 print_info "Updating version in app_config.py"
-APP_CONFIG_FILE="src/shift_left/src/shift_left/core/utils/app_config.py"
+APP_CONFIG_FILE="src/shift_left/shift_left/core/utils/app_config.py"
 sed -i.bak "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" ${APP_CONFIG_FILE}
 rm ${APP_CONFIG_FILE}.bak
 print_success "Updated app_config.py version to ${VERSION}"

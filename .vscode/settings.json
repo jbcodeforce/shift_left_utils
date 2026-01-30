@@ -1,7 +1,7 @@
 {
   // Python-specific settings
   "python.analysis.extraPaths": [
-    "src/shift_left/src"
+    "src/shift_left"
   ],
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
 
@@ -48,6 +48,6 @@
     "files.trimTrailingWhitespace": false
 },
 "cursorpyright.analysis.extraPaths": [
-	"src/shift_left/src"
+	"src/shift_left"
 ]
 }

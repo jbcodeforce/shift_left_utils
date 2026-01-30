@@ -16,7 +16,7 @@
             "cwd": "${fileDirname}",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
@@ -32,7 +32,7 @@
             "env": {
                 // Note: Variables from envFile are loaded first, then these override/add to them
                 // The Python script also loads .env at module level to ensure variables are available
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests",
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests",
 				"SL_LLM_BASE_URL" : "http://localhost:11434/v1",
 				"SL_LLM_MODEL" : "qwen3-coder:30b",
 				"SL_LLM_API_KEY" : "ollama_test_key"

@@ -81,7 +81,7 @@ The `shift_left` tool will access Confluent Cloud REST endpoint and will do oper
 1. Get the `shift_left` config file template to the tutorial folder:
 	```sh
 	# From the `shift_left_utils` folder
-	curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/config_tmpl.yaml  -o tutorial/setup/config.yaml
+	curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/shift_left/core/templates/config_tmpl.yaml  -o tutorial/setup/config.yaml
 	```
 
 ### 3.1 Get Environment id from Confluent Cloud

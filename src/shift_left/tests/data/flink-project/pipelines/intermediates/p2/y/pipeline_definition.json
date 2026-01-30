@@ -57,12 +57,12 @@
    ],
    "children": [
       {
-         "table_name": "z",
+         "table_name": "d",
          "product_name": "p2",
          "type": "intermediate",
-         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
-         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
-         "path": "pipelines/intermediates/p2/z",
+         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
+         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
+         "path": "pipelines/intermediates/p2/d",
          "complexity": {
             "number_of_regular_joins": 1,
             "number_of_left_joins": 0,
@@ -76,12 +76,12 @@
          "children": []
       },
       {
-         "table_name": "d",
+         "table_name": "z",
          "product_name": "p2",
          "type": "intermediate",
-         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
-         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
-         "path": "pipelines/intermediates/p2/d",
+         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
+         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
+         "path": "pipelines/intermediates/p2/z",
          "complexity": {
             "number_of_regular_joins": 1,
             "number_of_left_joins": 0,

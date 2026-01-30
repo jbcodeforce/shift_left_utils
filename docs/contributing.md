@@ -105,7 +105,7 @@ The script (`build_and_release.sh`) automates the CLI build and release branch c
 
 1. **Creates release branch**: When code is ready, create a new release branch off the `develop` branch. Run all tests and fixes on this release branch until ready for release.from `develop` (e.g., `v0.1.34`)
 2. **Updates version numbers** in:
-   - `src/shift_left/src/shift_left/cli.py`
+   - `src/shift_left/shift_left/cli.py`
    - `src/shift_left/pyproject.toml`
 3. **Builds the wheel package** using `uv build .`
 4. **Cleans old wheels** (keeps last 10 wheel and tar.gz files)
@@ -161,7 +161,7 @@ The script will provide you with the exact commands to run next:
    ```
 
 **Files Modified by the Script**
-- `src/shift_left/src/shift_left/cli.py` - Updates `__version__` variable
+- `src/shift_left/shift_left/core/utils/app_config.py` - Updates `__version__` variable
 - `src/shift_left/pyproject.toml` - Updates project version
 - `CHANGELOG.md` - Adds new version entry with recent commits
 - `src/shift_left/dist/` - Builds new wheel and cleans old ones
@@ -198,7 +198,7 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 
 * Define a config.yaml file to keep the important parameters of the CLI. 
 	```sh
-	cp src/shift_left/src/shift_left/core/templates/config_tmpl.yaml ./config.yaml
+	cp src/shift_left/shift_left/core/templates/config_tmpl.yaml ./config.yaml
 	```
 
 * Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool, modify the config.yaml file
@@ -287,13 +287,13 @@ export PIPELINES=$(pwd)/tests/flink-project/pipelines
 * Running the cli from python code, be sure to be under the `src/shift_left` folder and use:
 
 ```sh
- uv run src/shift_left/cli.py
+ uv run shift_left
 ```
 
 * It is also possible to test the CLI with python:
 
 ```sh
-uv run src/shift_left/cli.py pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
+uv run shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
 ```
 
 To avoid redundant tests, the tests are grouped in three sets:
@@ -360,7 +360,7 @@ Use the following settings for vscode based IDE
 * To Build the [Command.md](./command.md) documentation from the code run:
     ```sh
     # under the shift_left_utils/src/shift_left folder
-    uv run typer src/shift_left/cli.py utils docs --output ../../docs/command.md
+    uv run typer shift_left/cli.py utils docs --output ../../docs/command.md
     ```
 
 * Recompile a requirements.txt for pip users:

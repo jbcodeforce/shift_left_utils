@@ -1,1 +1,1 @@
-uv run typer src/shift_left/cli.py utils docs --output ../../docs/command.md
+uv run typer shift_left/cli.py utils docs --output ../../docs/command.md

@@ -16,7 +16,7 @@ The configuration file `config.yaml` is used intensively to tune the `shift_left
 
 * Copy the `config_tmpl.yaml` template file to keep some important parameters for the CLI. 
   ```sh
-  curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/config_tmpl.yaml  -o  ./config.yaml
+  curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/shift_left/core/templates/config_tmpl.yaml  -o  ./config.yaml
   ```
 
 * Modify the `config.yaml` with values from your Confluent Cloud settings. See the tabs below for the different sections of this file: 
@@ -98,7 +98,7 @@ The configuration file `config.yaml` is used intensively to tune the `shift_left
 
 * Set the following environment variables before using the tool. This can be done by:
     ```sh
-     curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/src/shift_left/core/templates/set_env_temp ./set_env
+     curl  https://raw.githubusercontent.com/jbcodeforce/shift_left_utils/refs/heads/main/src/shift_left/shift_left/core/templates/set_env_temp ./set_env
     ```
 
     Modify the CONFIG_FILE, FLINK_PROJECT, SRC_FOLDER, SL_LLM_* variables
