@@ -669,3 +669,162 @@ class SQLparser:
                 unique_cte_names.append(name)
 
         return unique_cte_names
+
+    def _extract_select_list_and_from_clause(self, dml_content: str) -> Tuple[str, str]:
+        """Find SELECT list and FROM clause in INSERT INTO ... SELECT ... FROM.
+
+        Returns:
+            Tuple of (select_list_str, from_clause_str). from_clause is the text
+            after FROM up to WHERE/GROUP BY/ORDER BY/LIMIT/; or end.
+        """
+        normalized = self._normalize_sql(dml_content)
+        normalized = re.sub(r"`", "", normalized)
+        insert_select = re.search(r"\bINSERT\s+INTO\s+.+?\bSELECT\s+", normalized, re.IGNORECASE)
+        if not insert_select:
+            return "", ""
+        start = insert_select.end()
+        depth = 0
+        in_string = False
+        quote_char = None
+        n = len(normalized)
+        i = start
+        while i < n:
+            c = normalized[i]
+            if in_string:
+                if c == quote_char:
+                    in_string = False
+                    quote_char = None
+                i += 1
+                continue
+            if c in ("'", '"'):
+                in_string = True
+                quote_char = c
+                i += 1
+                continue
+            if c == "(":
+                depth += 1
+                i += 1
+                continue
+            if c == ")":
+                depth -= 1
+                i += 1
+                continue
+            if depth == 0:
+                rest = normalized[i:]
+                from_match = re.match(r"\s+FROM\s+", rest, re.IGNORECASE)
+                if from_match:
+                    select_list_str = normalized[start : i].strip()
+                    from_start = i + from_match.end()
+                    from_rest = normalized[from_start:]
+                    end_match = re.search(
+                        r"\s+(WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT|;)\s",
+                        from_rest,
+                        re.IGNORECASE,
+                    )
+                    if end_match:
+                        from_clause_str = from_rest[: end_match.start()].strip()
+                    else:
+                        from_clause_str = from_rest.rstrip().rstrip(";").strip()
+                    return select_list_str, from_clause_str
+            i += 1
+        return "", ""
+
+    def extract_alias_to_table_map(self, dml_content: str) -> Dict[str, str]:
+        """Build alias -> canonical table name from FROM and JOIN clauses.
+
+        For FROM t1 a and JOIN t2 b ON ... returns {'a': 't1', 't1': 't1', 'b': 't2', 't2': 't2'}.
+        Tables without alias map their name to itself.
+        """
+        _, from_clause = self._extract_select_list_and_from_clause(dml_content)
+        if not from_clause:
+            return {}
+        alias_to_table: Dict[str, str] = {}
+        from_keywords = {"left", "right", "inner", "full", "cross", "join", "on", "where", "group", "order", "limit", "and", "or"}
+        # First table in FROM clause (from_clause is text after " FROM ", so no leading FROM)
+        first_pattern = r"^([a-zA-Z_][a-zA-Z0-9_-]*)\s+(?:(?:AS\s+)?([a-zA-Z_][a-zA-Z0-9_-]*))?"
+        first_match = re.match(first_pattern, from_clause.strip(), re.IGNORECASE)
+        if first_match:
+            table = first_match.group(1).strip()
+            raw_alias = first_match.group(2).strip() if first_match.group(2) else None
+            alias = raw_alias if (raw_alias and raw_alias.lower() not in from_keywords) else table
+            alias_to_table[alias] = table
+            alias_to_table[table] = table
+        # JOIN table [AS] alias (LEFT JOIN, INNER JOIN, etc.)
+        join_pattern = r"\b(?:LEFT|RIGHT|INNER|FULL|CROSS)?\s*JOIN\s+([a-zA-Z_][a-zA-Z0-9_-]*)\s*(?:\s+AS\s+)?([a-zA-Z_][a-zA-Z0-9_-]*)?"
+        for m in re.finditer(join_pattern, from_clause, re.IGNORECASE):
+            table = m.group(1).strip()
+            raw_alias = m.group(2).strip() if m.group(2) else None
+            alias = raw_alias if (raw_alias and raw_alias.lower() not in from_keywords) else table
+            alias_to_table[alias] = table
+            alias_to_table[table] = table
+        return alias_to_table
+
+    def _resolve_select_item_to_source(
+        self, item: str, alias_to_table: Dict[str, str], parent_table_names: Set[str]
+    ) -> List[Tuple[str, str]]:
+        """Resolve a SELECT list item to (source_table, source_column) pairs.
+
+        Returns list of (table, col). Empty if expression or unresolved.
+        """
+        item = item.strip()
+        # Qualified: alias.col or table.col
+        qual_pattern = r"^([a-zA-Z_][a-zA-Z0-9_-]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*$"
+        qual_match = re.match(qual_pattern, item)
+        if qual_match:
+            alias_or_table = qual_match.group(1)
+            col = qual_match.group(2)
+            table = alias_to_table.get(alias_or_table) or (
+                alias_or_table if alias_or_table in parent_table_names else None
+            )
+            if table:
+                return [(table, col)]
+            return []
+        # Bare column: use single parent if only one
+        bare_match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_-]*)\s*$", item)
+        if bare_match and len(parent_table_names) == 1:
+            col = bare_match.group(1)
+            return [(next(iter(parent_table_names)), col)]
+        if bare_match and parent_table_names:
+            col = bare_match.group(1)
+            return [(t, col) for t in parent_table_names]
+        return []
+
+    def extract_field_lineage_edges_from_dml(
+        self,
+        dml_content: str,
+        target_table_name: str,
+        parent_table_names: Set[str],
+    ) -> List[Dict[str, str]]:
+        """Extract field-level lineage: (target_column, source_table, source_column).
+
+        Returns list of dicts with keys: target_table, target_column, source_table, source_column.
+        Uses alias map from FROM/JOIN; resolves qualified alias.col and bare col.
+        """
+        alias_to_table = self.extract_alias_to_table_map(dml_content)
+        select_list_str, _ = self._extract_select_list_and_from_clause(dml_content)
+        if not select_list_str:
+            return []
+        items = self._split_by_comma_respecting_parens(select_list_str)
+        edges: List[Dict[str, str]] = []
+        for item in items:
+            item = item.strip()
+            if not item:
+                continue
+            target_col = self._extract_column_name_from_select_item(item)
+            if not target_col:
+                continue
+            if re.match(r"^\s*\*\s*$", item):
+                continue
+            sources = self._resolve_select_item_to_source(
+                item, alias_to_table, parent_table_names
+            )
+            for source_table, source_column in sources:
+                edges.append(
+                    {
+                        "target_table": target_table_name,
+                        "target_column": target_col,
+                        "source_table": source_table,
+                        "source_column": source_column,
+                    }
+                )
+        return edges

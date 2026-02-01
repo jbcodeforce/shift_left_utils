@@ -1408,5 +1408,52 @@ WHERE row_num = 1
         expected = ["section_detail", "tenant", "attachment"]
         self.assertEqual(result, expected)
 
+    def test_extract_alias_to_table_map_single_table(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, s.transaction_id
+        FROM src_sdp_shipments s
+        """
+        alias_map = parser.extract_alias_to_table_map(dml)
+        self.assertIn("s", alias_map)
+        self.assertEqual(alias_map["s"], "src_sdp_shipments")
+        self.assertIn("src_sdp_shipments", alias_map)
+        self.assertEqual(alias_map["src_sdp_shipments"], "src_sdp_shipments")
+
+    def test_extract_alias_to_table_map_join(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, t.customer_id
+        FROM src_sdp_shipments s
+        LEFT JOIN src_c360_transactions t ON s.transaction_id = t.transaction_id
+        """
+        alias_map = parser.extract_alias_to_table_map(dml)
+        self.assertEqual(alias_map.get("s"), "src_sdp_shipments")
+        self.assertEqual(alias_map.get("t"), "src_c360_transactions")
+
+    def test_extract_field_lineage_edges_from_dml_qualified(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, s.transaction_id, t.customer_id
+        FROM src_sdp_shipments s
+        LEFT JOIN src_c360_transactions t ON s.transaction_id = t.transaction_id
+        """
+        parent_names = {"src_sdp_shipments", "src_c360_transactions"}
+        edges = parser.extract_field_lineage_edges_from_dml(
+            dml, "dim_sdp_order_fulfillment", parent_names
+        )
+        self.assertGreater(len(edges), 0)
+        target_cols = {e["target_column"] for e in edges}
+        self.assertIn("shipment_id", target_cols)
+        self.assertIn("transaction_id", target_cols)
+        self.assertIn("customer_id", target_cols)
+        shipment_edges = [e for e in edges if e["target_column"] == "shipment_id"]
+        self.assertEqual(len(shipment_edges), 1)
+        self.assertEqual(shipment_edges[0]["source_table"], "src_sdp_shipments")
+        self.assertEqual(shipment_edges[0]["source_column"], "shipment_id")
+
 if __name__ == '__main__':
     unittest.main()

@@ -2,6 +2,21 @@
 
 * Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
 
+### v0.1.48  - 2026-01-30
+
+* Add graph view for pipeline relationships
+* Add terraform for ec2 with gpu to run inference
+* Add new sub- command in project command to search for unused tables: the Flink statements may have create tables and kafka topics that are not used by anybody. This could be a way to clean orphan objects.
+* Create a project tutorial to revisit all tasks related to a project management.
+* Move shift_left code one level higher
+* As part of project init, the command adds terraform files into IaC folder to be able to create Kafka cluster, compute pools and schema registry.
+
+### v0.1.47 - 2025-12-17
+
+* Remove apache-flink dependency
+* Update version for children recursively in the case of blue/green deployment
+* Add support to .properties file in each table to externalize table properties
+
 ### v0.1.46
 
 * Improve AI migration for KSQLdb. Refactor to leverage common prompts between Spark and Ksql migration. Add more tests for ksql.

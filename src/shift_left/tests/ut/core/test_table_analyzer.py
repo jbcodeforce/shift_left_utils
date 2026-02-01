@@ -34,7 +34,7 @@ class TestTableAnalyzer(unittest.TestCase):
     def test_get_tables_referenced_by_running_statements_empty(self):
         """Test with empty statement list"""
         empty_statements = {}
-        result = get_tables_referenced_by_running_statements(empty_statements, {}, self.inventory_path)
+        result = get_tables_referenced_by_running_statements(empty_statements,  self.inventory_path)
 
         self.assertIsInstance(result, set)
         self.assertEqual(len(result), 0)
@@ -46,16 +46,18 @@ class TestTableAnalyzer(unittest.TestCase):
             "dev-use1-fct_order-dml": StatementInfo(
                 name="dev-use1-fct_order-dml",
                 status_phase="RUNNING",
+                sql_content="insert into fct_order select * from int_table_1",
                 created_at=datetime.now(timezone.utc)
             ),
             "dev-use1-int_table_1-dml": StatementInfo(
                 name="dev-use1-int_table_1-dml",
                 status_phase="RUNNING",
+                sql_content="insert into int_table_1 select * from src_table_1",
                 created_at=datetime.now(timezone.utc)
             )
         }
 
-        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
+        result = get_tables_referenced_by_running_statements(mock_statements,  self.inventory_path)
 
         self.assertIsInstance(result, set)
         # Should include the tables themselves and their parents
@@ -68,43 +70,30 @@ class TestTableAnalyzer(unittest.TestCase):
             "dev-use1-fct_order-dml": StatementInfo(
                 name="dev-use1-fct_order-dml",
                 status_phase="RUNNING",
+                sql_content="insert into fct_order select * from int_table_1",
                 created_at=datetime.now(timezone.utc)
             ),
             "dev-use1-int_table_1-dml": StatementInfo(
                 name="dev-use1-int_table_1-dml",
                 status_phase="COMPLETED",  # Not running
+                sql_content="insert into int_table_1 select * from src_table_1",
                 created_at=datetime.now(timezone.utc)
             ),
             "dev-use1-int_table_2-dml": StatementInfo(
                 name="dev-use1-int_table_2-dml",
                 status_phase="FAILED",  # Not running
+                sql_content="insert into int_table_2 select * from src_table_2",
                 created_at=datetime.now(timezone.utc)
             )
         }
 
-        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
+        result = get_tables_referenced_by_running_statements(mock_statements,  self.inventory_path)
 
         # Should only include fct_order (the running one) and its parents
         self.assertIn("fct_order", result)
         # int_table_1 and int_table_2 should not be directly included (they're not running)
         # But if they're parents of fct_order, they should be included
 
-    def test_get_tables_referenced_includes_parents(self):
-        """Test that parent tables from pipeline.json are included"""
-        mock_statements = {
-            "dev-use1-fct_order-dml": StatementInfo(
-                name="dev-use1-fct_order-dml",
-                status_phase="RUNNING",
-                created_at=datetime.now(timezone.utc)
-            )
-        }
-
-        result = get_tables_referenced_by_running_statements(mock_statements, {}, self.inventory_path)
-
-        # fct_order should be in the result
-        self.assertIn("fct_order", result)
-        # If fct_order has parents (from pipeline.json), they should also be included
-        # This depends on the actual pipeline.json structure in test data
 
     def test_get_topics_for_tables(self):
         """Test that topics are correctly extracted for tables"""
