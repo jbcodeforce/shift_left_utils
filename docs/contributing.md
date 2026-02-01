@@ -357,13 +357,27 @@ Use the following settings for vscode based IDE
     uv tool install shift_left@dist/shift_left-0.1.46-py3-none-any.whl
     ```
 
-* To Build the [Command.md](./command.md) documentation from the code run:
+* To Build the [docs/command.md](./command.md) documentation from the code run:
     ```sh
     # under the shift_left_utils/src/shift_left folder
-    uv run typer shift_left/cli.py utils docs --output ../../docs/command.md
+    ./updateDoc.sh
+	# same as
+	uv run typer shift_left/cli.py utils docs --output ../../docs/command.md
+
     ```
 
 * Recompile a requirements.txt for pip users:
     ```sh
     uv pip compile pyproject.toml -o requirements.txt
     ```
+
+### Publish to PyPI
+
+From `src/shift_left`, build then publish only the current version to avoid uploading older wheels in `dist/`:
+
+```sh
+cd src/shift_left
+uv build .
+VERSION=$(grep '^version' pyproject.toml | cut -d'"' -f2)
+UV_PUBLISH_TOKEN=pypi-xxxxxxxx uv publish dist/shift_left-${VERSION}*
+```

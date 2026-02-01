@@ -4,7 +4,7 @@ Copyright 2024-2026 Confluent, Inc.
 Module to analyze unused Flink tables by comparing inventory against running statements.
 """
 import os
-from typing import Dict, Set, List, Optional
+from typing import Any, Dict, Set, List, Optional
 from shift_left.core.utils.sql_parser import SQLparser
 from shift_left.core.utils.file_search import (
     get_or_build_inventory,
@@ -25,7 +25,6 @@ import shift_left.core.project_manager as project_manager
 
 def get_tables_referenced_by_running_statements(
     statement_list: Dict[str, any],
-    all_tables: Dict[str, FlinkTableReference],
     inventory_path: str
 ) -> Set[str]:
     """
@@ -39,7 +38,7 @@ def get_tables_referenced_by_running_statements(
     Returns:
         Set of table names that are referenced by running statements
     """
-    referenced_tables = set()
+    referenced_tables = set[str]()
 
     # Filter to only RUNNING statements
     running_statements = {
@@ -51,24 +50,25 @@ def get_tables_referenced_by_running_statements(
     parser = SQLparser()
     for statement_name, statement_info in running_statements.items():
         # Map statement name to table name
-        table_name = parser.extract_table_name_from_insert_into_statement(statement_info.sql_content)
-        if table_name:
-            referenced_tables.add(table_name)
+        if statement_info.sql_content is not None:
+            table_name = parser.extract_table_name_from_insert_into_statement(statement_info.sql_content)
+            if table_name:
+                referenced_tables.add(table_name)
 
-            # Read pipeline.json to get parent tables
-            try:
-                pipeline_def = get_pipeline_definition_for_table(table_name, inventory_path)
+                # Read pipeline.json to get parent tables
+                try:
+                    pipeline_def = get_pipeline_definition_for_table(table_name, inventory_path)
 
-                # Add all parent tables
-                for parent in pipeline_def.parents:
-                    referenced_tables.add(parent.table_name)
-                    logger.debug(f"Added parent table {parent.table_name} for {table_name}")
+                    # Add all parent tables
+                    for parent in pipeline_def.parents:
+                        referenced_tables.add(parent.table_name)
+                        logger.debug(f"Added parent table {parent.table_name} for {table_name}")
 
-            except Exception as e:
-                logger.warning(f"Could not read pipeline.json for table {table_name}: {e}")
-        else:
-            logger.debug(f"Could not map statement {statement_name} to a table")
-
+                except Exception as e:
+                    logger.warning(f"Could not read pipeline.json for table {table_name}: {e}")
+            else:
+                logger.debug(f"Could not map statement {statement_name} to a table")
+    logger.info(f"Referenced tables: {referenced_tables}")
     return referenced_tables
 
 
@@ -125,7 +125,7 @@ def assess_unused_tables(
     statement_list = statement_mgr.get_statement_list()
     logger.info(f"Found {len(statement_list)} total statements")
 
-    referenced_tables = get_tables_referenced_by_running_statements(statement_list,all_tables, inventory_path)
+    referenced_tables = get_tables_referenced_by_running_statements(statement_list, inventory_path)
     logger.info(f"Found {len(referenced_tables)} tables referenced by running statements")
 
     # Find unused tables
@@ -134,28 +134,32 @@ def assess_unused_tables(
     # Build table details
     table_details = {}
     for table_name in unused_table_names:
-        table_info = all_tables[table_name]
+        table_info: FlinkTableReference = all_tables[table_name]
+        if table_info is not None:
+             # Check if table has children (might be used indirectly)
+            logger.info(f"{table_info} is instance of {type(table_info)}")
+            has_children = False
+            try:
+                pipeline_def = get_pipeline_definition_for_table(table_name, inventory_path)
+                logger.info(f"Pipeline definition: {pipeline_def}")
+                has_children = len(pipeline_def.children) > 0
+            except Exception as e:
+                logger.debug(f"Could not check children for {table_name}: {e}")
 
-        # Check if table has children (might be used indirectly)
-        has_children = False
-        try:
-            pipeline_def = get_pipeline_definition_for_table(table_name, inventory_path)
-            has_children = len(pipeline_def.children) > 0
-        except Exception as e:
-            logger.debug(f"Could not check children for {table_name}: {e}")
-
-        table_details[table_name] = {
-            'type': table_info.type,
-            'product_name': table_info.product_name,
-            'path': table_info.table_folder_name,
-            'has_children': has_children
-        }
+            table_details[table_name] = {
+                'type': table_info['type'],
+                'product_name': table_info['product_name'],
+                'path': table_info['table_folder_name'],
+                'has_children': has_children
+            }
+        else:
+            logger.warning(f"Table {table_name} not found in inventory")
 
     result = {
         'unused_tables': list(unused_table_names),
         'table_details': table_details
     }
-
+    logger.info(f"Result: {result}")
     # Check topics if requested
     if include_topics:
         try:
@@ -203,16 +207,12 @@ def delete_unused_tables(
     Delete unused tables
     """
     logger.info(f"Deleting unused tables in {inventory_path}")
-    if not os.path.exists(table_list_file):
-        logger.error(f"Table list file {table_list_file} does not exist")
-        return f"Table list file {table_list_file} does not exist"
-    else:
-        with open(table_list_file, 'r') as f:
-            table_list = f.readlines()
-            logger.info(f"Found {len(table_list)} tables to delete")
-            for table_name in table_list:
-                logger.info(f"Deleting table {table_name}")
-                statement_mgr.delete_statement_if_exists(table_name)
-                statement_mgr.drop_table(table_name)
-                logger.info(f"Table {table_name} deleted")
+    with open(table_list_file, 'r') as f:
+        table_list = f.readlines()
+        logger.info(f"Found {len(table_list)} tables to delete")
+        for table_name in table_list:
+            table_name = table_name.strip()
+            print(f"Deleting table {table_name}...")
+            statement_mgr.drop_table(table_name)
+            print(f"Table {table_name} deleted")
     return f"Unused tables deleted successfully"

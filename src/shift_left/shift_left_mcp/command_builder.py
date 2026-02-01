@@ -35,6 +35,7 @@ def build_command(tool_name: str, arguments: dict) -> list[str]:
         "shift_left_table_delete_unit_tests": ["shift_left", "table", "delete-unit-tests"],
         "shift_left_pipeline_deploy": ["shift_left", "pipeline", "deploy"],
         "shift_left_pipeline_build_metadata": ["shift_left", "pipeline", "build-metadata"],
+        "shift_left_pipeline_field_lineage": ["shift_left", "pipeline", "field-lineage"],
         "shift_left_version": ["shift_left", "version"]
     }
     
@@ -101,6 +102,15 @@ def build_command(tool_name: str, arguments: dict) -> list[str]:
     
     elif tool_name == "shift_left_pipeline_build_metadata":
         cmd.extend([arguments["dml_file_name"], arguments["pipeline_path"]])
-    
+
+    elif tool_name == "shift_left_pipeline_field_lineage":
+        cmd.append(arguments["table_name"])
+        if arguments.get("pipeline_path"):
+            cmd.append(arguments["pipeline_path"])
+        if arguments.get("output_dir"):
+            cmd.extend(["--output-dir", arguments["output_dir"]])
+        if arguments.get("open_browser"):
+            cmd.append("--open")
+
     return cmd
 

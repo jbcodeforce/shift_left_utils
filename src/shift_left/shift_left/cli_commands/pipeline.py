@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Dict, Set, Tuple, Any
+from typing import List, Dict, Set, Tuple, Any, Optional
 import json
 import networkx as nx
 from pydantic_yaml import to_yaml_str
@@ -14,11 +14,12 @@ from rich import print
 from rich.tree import Tree
 from rich.console import Console
 from typing_extensions import Annotated
-from shift_left.core.utils.app_config import get_config
+from shift_left.core.utils.app_config import get_config, shift_left_dir
 from shift_left.core.utils.file_search import get_or_build_inventory
 from shift_left.core.utils.error_sanitizer import safe_error_display
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 import shift_left.core.deployment_mgr as deployment_mgr
+import shift_left.core.field_lineage as field_lineage_module
 import shift_left.core.pipeline_mgr as pipeline_mgr
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
@@ -40,6 +41,38 @@ Manage a pipeline entity:
 """
 app = create_secure_typer_app(no_args_is_help=True, pretty_exceptions_show_locals=False)
 
+
+
+@app.command("field-lineage")
+def field_lineage(
+    table_name: Annotated[str, typer.Argument(help="Table name (must exist in inventory).")],
+    pipeline_path: Annotated[
+        str,
+        typer.Argument(envvar=["PIPELINES"], help="Pipeline path; uses $PIPELINES if not set."),
+    ],
+    output_dir: str = typer.Option(None, "--output-dir", "-o", help="Output directory for lineage JSON and HTML graph."),
+    open_browser: bool = typer.Option(False, "--open", help="Open the generated HTML graph in the default browser."),
+):
+    """
+    Compute field-level lineage for a table up to sources and save metadata plus graph under $HOME/.shift_left/field_lineage.
+    """
+    if not pipeline_path:
+        print("[red]Error: pipeline_path or PIPELINES environment variable is required[/red]")
+        raise typer.Exit(1)
+    try:
+        out_path = field_lineage_module.run_field_lineage_from_table(table_name, pipeline_path, output_dir)
+        print(f"[green]Field lineage written to: {out_path}[/green]")
+        lineage_json = os.path.join(out_path, "lineage.json")
+        graph_html = os.path.join(out_path, "field_lineage.html")
+        print(f"  lineage.json: {lineage_json}")
+        print(f"  field_lineage.html: {graph_html}")
+        if open_browser and os.path.exists(graph_html):
+            import webbrowser
+            webbrowser.open(f"file://{os.path.abspath(graph_html)}")
+    except Exception as e:
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -82,12 +115,13 @@ def build_all_metadata(pipeline_path: Annotated[str, typer.Argument(envvar=["PIP
 
 @app.command()
 def report(table_name: Annotated[str, typer.Argument(help="The table name containing pipeline_definition.json. e.g. customer_analytics_c360. The name has to exist in inventory as a key.")],
-          inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
+          pipeline_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help= "Pipeline path, if not provided will use the $PIPELINES environment variable.")],
           to_yaml: bool = typer.Option(False, "--yaml", help="Output the report in YAML format"),
           to_json: bool = typer.Option(False, "--json", help="Output the report in JSON format"),
         children_too: bool = typer.Option(False, help="By default the report includes only parents, this flag focuses on getting children"),
         parent_only: bool = typer.Option(True, help="By default the report includes only parents"),
-        output_file_name: str= typer.Option(None, help="Output file name to save the report."),):
+        output_file_name: str= typer.Option(None, help="Output file name to save the report."),
+        open_browser: bool = typer.Option(False, "--open", help="Open the generated HTML graph in the default browser.")):
     """
     Generate a report showing the static pipeline hierarchy for a given table using its pipeline_definition.json
     """
@@ -96,7 +130,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
     print(f"Generating pipeline report for table {table_name}")
     try:
         parent_only = not children_too
-        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, inventory_path, parent_only, children_too)
+        pipeline_def=pipeline_mgr.get_static_pipeline_report_from_table(table_name, pipeline_path, parent_only, children_too)
         if pipeline_def is None:
             print(f"[red]Error: pipeline definition not found for table {table_name}[/red]")
             raise typer.Exit(1)
@@ -114,7 +148,7 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
         result=pipeline_def.model_dump_json(indent=3)
         print(result)
     else:
-        result=pipeline_def
+        result=pipeline_def.model_dump_json(indent=3)
     if output_file_name:
         with open(output_file_name,"w") as f:
             f.write(result)
@@ -174,13 +208,16 @@ def report(table_name: Annotated[str, typer.Argument(help="The table name contai
 
         # Create output filename
         graph_filename = f"{table_name}_pipeline_graph.html"
-        graph_path = os.path.join(os.getcwd(), graph_filename)
+        graph_path = os.path.join(shift_left_dir, graph_filename)
 
         # Generate and save the graph
         _display_directed_graph(nodes_dict, edges_list, table_name, graph_path)
 
         console.print(f"\n[bold green]Graph visualization saved to: {graph_path}[/bold green]")
         console.print(f"[dim]Open the HTML file in your browser to view the interactive graph[/dim]")
+        if open_browser and os.path.exists(graph_path):
+            import webbrowser
+            webbrowser.open(f"file://{os.path.abspath(graph_path)}")
     except Exception as e:
         logger.warning(f"Failed to generate graph visualization: {safe_error_display(e)}")
         console.print(f"[yellow]Warning: Could not generate graph visualization[/yellow]")

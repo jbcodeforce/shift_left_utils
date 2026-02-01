@@ -627,13 +627,17 @@ def assess_unused_tables(
 
 @app.command()
 def delete_unused_tables(
-    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Pipeline path where tables are defined")],
-    table_list_file: Annotated[str, typer.Argument(help="File path to table list to delete")]
+    table_list_file: Annotated[str, typer.Argument(help="File path to table list to delete")],
+    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Pipeline path where tables are defined")]
 ):
     """
     Delete unused tables
     """
     print("#" * 30 + f" Delete Unused Tables and Kafka Topics in {inventory_path}")
+
+    if not os.path.exists(table_list_file):
+        print(f"[red]Error: file {table_list_file} does not exist[/red]")
+        raise typer.Exit(1)
     final_msg = table_analyzer.delete_unused_tables(inventory_path,table_list_file)
     print(final_msg)
 

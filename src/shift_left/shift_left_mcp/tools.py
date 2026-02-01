@@ -210,11 +210,37 @@ TOOLS = [
                     "description": "Path to the DML file"
                 },
                 "pipeline_path": {
-                    "type": "string", 
+                    "type": "string",
                     "description": "Pipeline base path"
                 }
             },
             "required": ["dml_file_name", "pipeline_path"]
+        }
+    },
+    {
+        "name": "shift_left_pipeline_field_lineage",
+        "description": "Compute field-level lineage for a table up to sources. Saves lineage.json and field_lineage.html under $HOME/.shift_left/field_lineage/<run_id>. Table must exist in inventory.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Table name (must exist in pipeline inventory)"
+                },
+                "pipeline_path": {
+                    "type": "string",
+                    "description": "Pipeline path; uses PIPELINES env if not set"
+                },
+                "output_dir": {
+                    "type": "string",
+                    "description": "Output directory for lineage JSON and HTML (optional)"
+                },
+                "open_browser": {
+                    "type": "boolean",
+                    "description": "Open the generated HTML graph in the browser"
+                }
+            },
+            "required": ["table_name"]
         }
     },
     {

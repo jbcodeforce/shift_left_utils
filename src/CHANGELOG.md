@@ -1,3 +1,15 @@
+## [0.1.48] - 2026-01-30
+
+### Changes:
+- 8d78f57 add terraform for ec2 with gpu to run inference
+- dee9734 add unused tables command
+- 3c5a6a4 add better graph representation of a pipeline
+- 82e65fa update to project tutorial
+- e95ab63 update to project tutorial, clean table_analyser code, fix some unit tests. Add terraform templates
+- 0fc6a8d add mermaid for mkdocs
+- ce05348 update pm tutorial
+- fcf8c33 move shift_left code one level higher
+
 ## [0.1.47] - 2025-12-17
 
 ### Changes:

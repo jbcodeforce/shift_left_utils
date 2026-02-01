@@ -156,24 +156,24 @@ RECENT_COMMITS=$(git log --oneline main..develop --reverse)
 if [ ! -z "$RECENT_COMMITS" ]; then
     # Create a temporary file with new changelog entry
     TEMP_CHANGELOG=$(mktemp)
-    
+
     # Add new version header
     echo "## [${VERSION}] - $(date +%Y-%m-%d)" > ${TEMP_CHANGELOG}
     echo "" >> ${TEMP_CHANGELOG}
     echo "### Changes:" >> ${TEMP_CHANGELOG}
-    
+
     # Add recent commits
     while IFS= read -r commit; do
         echo "- ${commit}" >> ${TEMP_CHANGELOG}
     done <<< "${RECENT_COMMITS}"
-    
+
     echo "" >> ${TEMP_CHANGELOG}
-    
+
     # Prepend to existing changelog if it exists
     if [ -f ${CHANGELOG_FILE} ]; then
         cat ${CHANGELOG_FILE} >> ${TEMP_CHANGELOG}
     fi
-    
+
     mv ${TEMP_CHANGELOG} ${CHANGELOG_FILE}
     print_success "Updated CHANGELOG.md with recent commits"
 else
@@ -217,6 +217,15 @@ echo "5. Create GitHub release referencing tag ${VERSION}"
 echo ""
 echo "6. Delete release branch:"
 echo "   ${YELLOW}git branch -d ${RELEASE_BRANCH}${NC}"
+echo ""
+echo "7. Update the mkdocs.yml file with the new version"
+echo "   ${YELLOW}sed -i 's/site_name: Shift Left Utilities v.*$/site_name: Shift Left Utilities v${VERSION}/' mkdocs.yml${NC}"
+echo "   ${YELLOW}git commit -m \"Update mkdocs.yml to version ${VERSION}\"${NC}"
+echo "   ${YELLOW}git push${NC}"
+echo ""
+echo "8. Update push new pypi package"
+echo "   export UV_PUBLISH_TOKEN=YOUR_TOKEN_HERE"
+echo "   ${YELLOW}uv publish${NC}"
 echo ""
 echo "Files updated:"
 echo "- ${CLI_FILE}"

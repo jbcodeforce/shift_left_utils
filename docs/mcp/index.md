@@ -151,6 +151,7 @@ The MCP server exposes the following shift_left commands:
 ### Pipeline Management
 - `shift_left_pipeline_deploy` - Deploy Flink pipelines
 - `shift_left_pipeline_build_metadata` - Build pipeline metadata
+- `shift_left_pipeline_field_lineage` - Compute field-level lineage for a table (by name) up to sources; saves lineage.json and field_lineage.html under $HOME/.shift_left/field_lineage
 
 ### Utility
 - `shift_left_version` - Show CLI version
