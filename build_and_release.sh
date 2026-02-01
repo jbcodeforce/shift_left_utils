@@ -106,6 +106,18 @@ sed -i.bak "s/version = \".*\"/version = \"${VERSION}\"/" ${PYPROJECT_FILE}
 rm ${PYPROJECT_FILE}.bak
 print_success "Updated pyproject.toml version to ${VERSION}"
 
+# Also update version in mkdocs.yml for site_name
+print_info "Updating site_name version in mkdocs.yml"
+MKDOCS_FILE="mkdocs.yml"
+if [ -f "$MKDOCS_FILE" ]; then
+    sed -i.bak "s/^site_name: Shift Left Utilities v.*/site_name: Shift Left Utilities v${VERSION}/" "$MKDOCS_FILE"
+    rm "${MKDOCS_FILE}.bak"
+    print_success "Updated mkdocs.yml site_name to v${VERSION}"
+else
+    print_error "mkdocs.yml not found at $MKDOCS_FILE"
+    exit 1
+fi
+
 # Step 4: Build the wheel
 print_info "Building the wheel package"
 cd src/shift_left
@@ -204,28 +216,23 @@ echo "   ${YELLOW}git checkout main${NC}"
 echo "   ${YELLOW}git merge --no-ff ${RELEASE_BRANCH}${NC}"
 echo "   ${YELLOW}git push${NC}"
 echo ""
-echo "3. Tag the main branch:"
+echo "3. Update push new pypi package"
+echo "   export UV_PUBLISH_TOKEN=YOUR_TOKEN_HERE"
+echo "   ${YELLOW}uv publish${NC}"
+echo ""
+echo "4. Tag the main branch:"
 echo "   ${YELLOW}git tag -a ${VERSION} -m \"Release version ${VERSION}\"${NC}"
 echo "   ${YELLOW}git push origin ${VERSION}${NC}"
 echo ""
-echo "4. Merge back to develop:"
+echo "5. Merge back to develop:"
 echo "   ${YELLOW}git checkout develop${NC}"
 echo "   ${YELLOW}git merge --no-ff main ${NC}"
 echo "   ${YELLOW}git push${NC}"
 echo ""
-echo "5. Create GitHub release referencing tag ${VERSION}"
+echo "6. Create GitHub release referencing tag ${VERSION}"
 echo ""
-echo "6. Delete release branch:"
+echo "7. Delete release branch:"
 echo "   ${YELLOW}git branch -d ${RELEASE_BRANCH}${NC}"
-echo ""
-echo "7. Update the mkdocs.yml file with the new version"
-echo "   ${YELLOW}sed -i 's/site_name: Shift Left Utilities v.*$/site_name: Shift Left Utilities v${VERSION}/' mkdocs.yml${NC}"
-echo "   ${YELLOW}git commit -m \"Update mkdocs.yml to version ${VERSION}\"${NC}"
-echo "   ${YELLOW}git push${NC}"
-echo ""
-echo "8. Update push new pypi package"
-echo "   export UV_PUBLISH_TOKEN=YOUR_TOKEN_HERE"
-echo "   ${YELLOW}uv publish${NC}"
 echo ""
 echo "Files updated:"
 echo "- ${CLI_FILE}"

@@ -7,6 +7,7 @@
 * Add graph view for pipeline relationships
 * Add terraform for ec2 with gpu to run inference
 * Add new sub- command in project command to search for unused tables: the Flink statements may have create tables and kafka topics that are not used by anybody. This could be a way to clean orphan objects.
+* Add a command at the project level to delete all tables listed in a .txt file.
 * Create a project tutorial to revisit all tasks related to a project management.
 * Move shift_left code one level higher
 * As part of project init, the command adds terraform files into IaC folder to be able to create Kafka cluster, compute pools and schema registry.
