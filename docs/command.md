@@ -62,6 +62,8 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `delete-integration-tests`: Delete all integration test artifacts...
 * `isolate-data-product`: Isolate the data product from the project
 * `get-statement-list`: Get the list of statements
+* `assess-unused-tables`: Assess Flink SQL tables that are not used...
+* `delete-unused-tables`: Delete unused tables
 
 ### `project init`
 
@@ -226,7 +228,7 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 
 * `--project-path TEXT`: Project path where git repository is located  [default: .]
 * `--file-filter TEXT`: File extension filter (e.g., &#x27;.sql&#x27;, &#x27;.py&#x27;)  [default: .sql]
-* `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)
+* `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)  [default: 2025-12-01]
 * `--help`: Show this message and exit.
 
 ### `project update-tables-version`
@@ -350,6 +352,54 @@ $ project get-statement-list [OPTIONS] COMPUTE_POOL_ID
 **Arguments**:
 
 * `COMPUTE_POOL_ID`: Compute pool id to get the statement list for  [required]
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+### `project assess-unused-tables`
+
+Assess Flink SQL tables that are not used by any running DML statements.
+
+This command:
+- Gets all tables from the inventory
+- Checks which tables are referenced by running Flink statements
+- Identifies tables that are not referenced (potentially unused)
+- Optionally compares Kafka topics to find unused topics
+
+The analysis uses existing pipeline.json files which contain parent/child relationships,
+so no SQL parsing is required.
+
+**Usage**:
+
+```console
+$ project assess-unused-tables [OPTIONS] INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `INVENTORY_PATH`: Pipeline path where tables are defined  [env var: PIPELINES; required]
+
+**Options**:
+
+* `--include-topics / --no-topics`: Also check for unused Kafka topics  [default: include-topics]
+* `--output-file TEXT`: File path to save results (default: unused_tables_&lt;timestamp&gt;.txt)
+* `--help`: Show this message and exit.
+
+### `project delete-unused-tables`
+
+Delete unused tables
+
+**Usage**:
+
+```console
+$ project delete-unused-tables [OPTIONS] TABLE_LIST_FILE INVENTORY_PATH
+```
+
+**Arguments**:
+
+* `TABLE_LIST_FILE`: File path to table list to delete  [required]
+* `INVENTORY_PATH`: Pipeline path where tables are defined  [env var: PIPELINES; required]
 
 **Options**:
 
@@ -542,7 +592,7 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x108e37350&gt;]]
+* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x106cfd040&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -687,6 +737,7 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
+* `field-lineage`: Compute field-level lineage for a table up...
 * `build-metadata`: Build a pipeline definition metadata by...
 * `delete-all-metadata`: Delete all pipeline definition json files...
 * `build-all-metadata`: Go to the hierarchy of folders for...
@@ -698,6 +749,27 @@ $ pipeline [OPTIONS] COMMAND [ARGS]...
 * `undeploy`: From a given sink table, this command goes...
 * `prepare`: Execute the content of the sql file, line...
 * `analyze-pool-usage`: Analyze compute pool usage and assess...
+
+### `pipeline field-lineage`
+
+Compute field-level lineage for a table up to sources and save metadata plus graph under $HOME/.shift_left/field_lineage.
+
+**Usage**:
+
+```console
+$ pipeline field-lineage [OPTIONS] TABLE_NAME PIPELINE_PATH
+```
+
+**Arguments**:
+
+* `TABLE_NAME`: Table name (must exist in inventory).  [required]
+* `PIPELINE_PATH`: Pipeline path; uses $PIPELINES if not set.  [env var: PIPELINES; required]
+
+**Options**:
+
+* `-o, --output-dir TEXT`: Output directory for lineage JSON and HTML graph.
+* `--open`: Open the generated HTML graph in the default browser.
+* `--help`: Show this message and exit.
 
 ### `pipeline build-metadata`
 
@@ -761,13 +833,13 @@ Generate a report showing the static pipeline hierarchy for a given table using 
 **Usage**:
 
 ```console
-$ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
+$ pipeline report [OPTIONS] TABLE_NAME PIPELINE_PATH
 ```
 
 **Arguments**:
 
-* `TABLE_NAME`: The table name containing pipeline_definition.json. e.g. src_aqem_tag_tag. The name has to exist in inventory as a key.  [required]
-* `INVENTORY_PATH`: Pipeline path, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
+* `TABLE_NAME`: The table name containing pipeline_definition.json. e.g. customer_analytics_c360. The name has to exist in inventory as a key.  [required]
+* `PIPELINE_PATH`: Pipeline path, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; required]
 
 **Options**:
 
@@ -776,6 +848,7 @@ $ pipeline report [OPTIONS] TABLE_NAME INVENTORY_PATH
 * `--children-too / --no-children-too`: By default the report includes only parents, this flag focuses on getting children  [default: no-children-too]
 * `--parent-only / --no-parent-only`: By default the report includes only parents  [default: parent-only]
 * `--output-file-name TEXT`: Output file name to save the report.
+* `--open`: Open the generated HTML graph in the default browser.
 * `--help`: Show this message and exit.
 
 ### `pipeline healthcheck`
@@ -876,7 +949,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/../flink_project_demos/customer_360/c360_flink_processing/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -898,7 +971,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/../flink_project_demos/customer_360/c360_flink_processing/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
 
 **Options**:
 
