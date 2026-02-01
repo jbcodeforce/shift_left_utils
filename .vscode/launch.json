@@ -8,7 +8,7 @@
             "python.defaultInterpreterPath": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Python Debugger: current file",
+            "name": "SL Python Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -16,38 +16,23 @@
             "cwd": "${fileDirname}",
             "env": {
                 "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests"
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
-            "name": "Debugger: mc-project",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "CONFIG_FILE": "/Users/jerome/.shift_left/config-mc-dev2.yaml",
-                //"CONFIG_FILE": "/Users/jerome/.shift_left/config-stage2b.yaml",
-                "PIPELINES": "/Users/jerome/Documents/Code/customers/mc/data-platform-flink/pipelines",
-                "PYTHONPATH": "${workspaceFolder}/src/shift_left/src:${workspaceFolder}/src/shift_left/tests"
-            },
-            "preLaunchTask": "setup_mc_environment",
-             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
-        },
-        {
-            "name": "Python IT Debugger: current file",
+         "name": "SL Python IT Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
-            "envFile": "${workspaceFolder}/.env",
+            "preLaunchTask": "verify_env_file",
+            "envFile": "${workspaceFolder}/../flink_project_demos/customer_360/c360_flink_processing/.env",
             "env": {
-                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left/src:${fileWorkspaceFolder}/src/shift_left/tests",
+                // Note: Variables from envFile are loaded first, then these override/add to them
+                // The Python script also loads .env at module level to ensure variables are available
+                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests",
 				"SL_LLM_BASE_URL" : "http://localhost:11434/v1",
 				"SL_LLM_MODEL" : "qwen3-coder:30b",
 				"SL_LLM_API_KEY" : "ollama_test_key"

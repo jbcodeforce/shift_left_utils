@@ -1,0 +1,36 @@
+# -----------------------------------------------------------------------------
+# Terraform Providers Configuration
+# {{ project_name }}
+# -----------------------------------------------------------------------------
+
+terraform {
+  required_version = ">= 1.3.0"
+
+  required_providers {
+    confluent = {
+      source  = "confluentinc/confluent"
+      version = "~> 2.58"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5"
+    }
+  }
+}
+
+
+
+# -----------------------------------------------------------------------------
+# Confluent Cloud Provider
+# -----------------------------------------------------------------------------
+provider "confluent" {
+  cloud_api_key    = var.confluent_cloud_api_key != "" ? var.confluent_cloud_api_key : try(env("CONFLUENT_CLOUD_API_KEY"), null)
+  cloud_api_secret = var.confluent_cloud_api_secret != "" ? var.confluent_cloud_api_secret : try(env("CONFLUENT_CLOUD_API_SECRET"), null)
+}
+
+# -----------------------------------------------------------------------------
+# Random ID for unique resource naming
+# -----------------------------------------------------------------------------
+resource "random_id" "env_display_id" {
+  byte_length = 4
+}

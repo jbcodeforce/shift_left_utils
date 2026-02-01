@@ -1,7 +1,7 @@
-site_name: Shift Left Utilities v0.1.47
+site_name: Shift Left Utilities v0.1.48
 repo_url: https://github.com/jbcodeforce/shift_left_utils
 site_url: https://jeromeboyer.net/shift_left_utils
-copyright: Copyright &copy; 2024 Jerome Boyer
+copyright: Copyright &copy; 2024-2026 Jerome Boyer
 nav:
   - Introduction: index.md
   - User Guide:
@@ -17,6 +17,7 @@ nav:
   - Tutorials:
     - Introduction: tutorial/index.md
     - Setup Lab: tutorial/setup_lab.md
+    - Project Management Lab: tutorial/project.md
     - Migration AI Lab: tutorial/migration_ai_lab.md
     - Date Engineer day to day work - Lab: tutorial/de_lab.md
     - SRE CI/CD process and other tasks - Lab: tutorial/sre_lab.md
@@ -57,7 +58,7 @@ plugins:
       minify_html: true
   - mkdocstrings
   - table-reader
-
+  - mermaid2
 markdown_extensions:
   - abbr
   - attr_list
@@ -69,6 +70,11 @@ markdown_extensions:
   #- pymdownx.blocks.caption
   - pymdownx.arithmatex:
       generic: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.smartsymbols
   - toc:
       permalink: true

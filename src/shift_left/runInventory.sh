@@ -1,1 +1,1 @@
-uv run python src/shift_left/cli.py table build-inventory $PIPELINES
+uv run shift_left table build-inventory $PIPELINES

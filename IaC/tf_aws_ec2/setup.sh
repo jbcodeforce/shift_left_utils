@@ -29,7 +29,6 @@ sudo yum install -y \
     wget \
     curl \
     htop \
-    nvtop \
     jq \
     unzip \
     tar \
@@ -181,7 +180,7 @@ sudo chmod +x /usr/local/bin/shift_left
 
 echo "[8/8] Pulling Ollama model (background)..."
 # Pull model in background since it can take 30+ minutes for large models
-nohup bash -c 'sleep 60 && ollama pull qwen3-coder:30b' > /var/log/ollama-pull.log 2>&1 &
+nohup bash -c 'sleep 60 && ollama pull qwen3-coder:30b' > ./ollama-pull.log 2>&1 &
 
 # =============================================================================
 # Create Helper Scripts
@@ -205,7 +204,7 @@ curl -s http://localhost:11434/api/tags | jq -r '.models[]?.name // "No models i
 echo ""
 echo "--- Model Pull Progress ---"
 if pgrep -f "ollama pull" > /dev/null; then
-    echo "Model download in progress. Check: tail -f /var/log/ollama-pull.log"
+    echo "Model download in progress. Check: tail -f ./ollama-pull.log"
 else
     echo "No model download in progress"
 fi

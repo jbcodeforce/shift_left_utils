@@ -39,12 +39,54 @@ The setup script automatically installs:
 
 ## Prerequisites
 
+### 1. Install Required Tools
+
+1. AWS CLI
+	**On macOS (using Homebrew):**
+
+	```bash
+	# Install Terraform
+	brew install terraform
+
+	# Install AWS CLI
+	brew install awscli
+	```
+
+	**On Linux:**
+
+	```bash
+	# Terraform
+	wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+	echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+	sudo apt update && sudo apt install terraform
+
+	# AWS CLI
+	curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+	unzip awscliv2.zip
+	sudo ./aws/install
+	```
+
+2. **Terraform**: Install from [HashiCorp](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+
+### 2. Configure AWS Credentials
+
 1. **AWS CLI**: Configure with your credentials
    ```bash
    aws configure
    ```
 
-2. **Terraform**: Install from [HashiCorp](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+	You will be prompted for:
+
+	- **AWS Access Key ID**: Your access key
+	- **AWS Secret Access Key**: Your secret key
+	- **Default region**: `us-west-2` (recommended for free tier)
+	- **Output format**: `yaml`
+
+	To get AWS credentials:
+
+	1. Log in to [AWS Console](https://console.aws.amazon.com/)
+	2. Go to **IAM** > **Users** > **Your User** > **Security credentials**
+	3. Click **Create access key**
 
 3. **SSH Key Pair**: Create or use existing key pair
    ```bash
@@ -55,35 +97,41 @@ The setup script automatically installs:
    ```
 
 4. **Update Configuration**: Edit `terraform.tfvars`:
-   ```hcl
+   ```sh
    ssh_key_name = "my-shift-left-key"  # Your key pair name
    aws_region   = "us-west-2"          # Your preferred region
    ```
 
+### 3. Verify Configuration
+
+```bash
+# Check AWS CLI is configured
+aws sts get-caller-identity
+
+# Check Terraform is installed
+terraform version
+```
+
 ## Deployment
 
-### 1. Initialize Terraform
+### Quick Start
 
 ```bash
-cd IaC/tf_aws_ec2
+cd deployment/ec2_tf
+
+# Initialize Terraform
 terraform init
-```
 
-### 2. Review Plan
-
-```bash
+# Preview what will be created
 terraform plan
-```
 
-### 3. Deploy
-
-```bash
+# Create the infrastructure
 terraform apply
 ```
 
-Type `yes` to confirm. Deployment takes 3-5 minutes.
+Type `yes` when prompted to confirm.
 
-### 4. Get Connection Details
+### Get Connection Details
 
 ```bash
 terraform output ssh_command
@@ -95,31 +143,38 @@ terraform output quick_start
 
 ### Connect to Instance
 
+Use script:
+
+```sh
+./connect.sh
+```
+
+OR
+
 ```bash
 # Use the SSH command from terraform output
 ssh -i ~/.ssh/your-key.pem ec2-user@<public-ip>
 ```
 
-### Check Server Status
+Then within the EC2 instance:
 
 ```bash
 ./check_status.sh
 ```
 
-This shows:
+This script displays:
 - GPU status and memory usage
 - Ollama service status
 - Available models
 - Model download progress
 - shift_left version
 
-### Set Up Environment
 
 ```bash
 source ./set_env.sh
 ```
 
-### Run Shift Left CLI
+### Run Shift Left CLI inside EC2
 
 ```bash
 # Check version
@@ -148,6 +203,81 @@ curl http://localhost:11434/api/generate -d '{
   "stream": false
 }' | jq .response
 ```
+
+## Using Remote Ollama for AI Migration
+
+The primary use case for this infrastructure is running AI-powered SQL migrations from your local machine using a remote GPU-accelerated Ollama server.
+
+### Configure Remote Ollama
+
+After deployment, get the Ollama API URL:
+
+```bash
+terraform output ollama_api_url
+# Example: http://54.201.123.45:11434
+```
+
+### Local Machine Setup
+
+On your local development machine, set the environment variable to point to the remote Ollama:
+
+```bash
+# Set the remote Ollama host
+export OLLAMA_HOST="http://<EC2_PUBLIC_IP>:11434"
+
+# Verify connectivity
+curl $OLLAMA_HOST/api/tags
+```
+
+### Run AI Migration with shift_left CLI
+
+With the remote Ollama configured, run migrations from your local machine:
+
+```bash
+# Navigate to your Flink project
+cd /path/to/your/flink_project
+
+# Run AI-powered SQL migration from KSQL to Flink SQL
+shift_left table migrate my_table input.ksql output/ --source-type ksql --validate
+
+# Migrate from Spark SQL
+shift_left table migrate my_table spark_query.sql output/ --source-type spark --validate
+
+# Migrate from dbt models
+shift_left table migrate my_table dbt_model.sql output/ --source-type dbt
+```
+
+### Example Migration Workflow
+
+```bash
+# 1. Set up environment
+export OLLAMA_HOST="http://$(terraform output -raw instance_public_ip):11434"
+export PIPELINES="/path/to/your/pipelines"
+
+# 2. Validate configuration
+shift_left project validate-config
+
+# 3. Migrate a KSQL stream to Flink SQL
+shift_left table migrate customer_events \
+  $SRC_FOLDER/customer_events.ksql \
+  $STAGING \
+  --source-type ksql \
+  --validate \
+  --recursive
+
+# 4. Build table inventory
+shift_left table build-inventory $PIPELINES
+
+# 5. Deploy to Confluent Cloud
+shift_left pipeline deploy $PIPELINES --table-name customer_events
+```
+
+### Performance Tips
+
+- The 30B parameter model provides high-quality translations
+- First inference after model load takes longer (model warm-up)
+- Subsequent translations are faster due to GPU memory caching
+- For batch migrations, process multiple tables sequentially to benefit from warm cache
 
 ### Monitor Model Download
 
@@ -183,38 +313,77 @@ ollama list
 
 ### Using an Existing VPC
 
-To deploy into an existing VPC instead of creating new network infrastructure:
+Deploy into an existing VPC instead of creating new network infrastructure. This saves costs (no NAT Gateway) and integrates with your existing network setup.
 
-1. **Find your VPC and Subnet IDs**:
-   ```bash
-   # List VPCs
-   aws ec2 describe-vpcs --query 'Vpcs[*].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+#### Option A: Discover VPC by Name (Recommended)
 
-   # List public subnets (must have internet gateway route)
-   aws ec2 describe-subnets --filters "Name=vpc-id,Values=vpc-xxx" \
-     --query 'Subnets[*].[SubnetId,AvailabilityZone,CidrBlock,Tags[?Key==`Name`].Value|[0]]' --output table
-   ```
+The easiest approach - reference your VPC and subnet by their Name tags:
 
-2. **Update `terraform.tfvars`**:
-   ```hcl
-   # Use existing VPC
-   use_existing_vpc   = true
-   existing_vpc_id    = "vpc-0123456789abcdef0"
-   existing_subnet_id = "subnet-0123456789abcdef0"  # Must be a public subnet
+```hcl
+# terraform.tfvars
+use_existing_vpc     = true
+existing_vpc_name    = "my-company-vpc"      # Name tag of your VPC
+existing_subnet_name = "my-public-subnet"    # Name tag of public subnet
+```
 
-   # Optional: use existing security group (leave empty to create new one)
-   existing_security_group_id = ""
-   ```
+#### Option B: Auto-Discover Public Subnet
 
-3. **Subnet Requirements**:
-   - Must be in a public subnet with a route to an Internet Gateway
-   - Must have `map_public_ip_on_launch` enabled OR use the Elastic IP
-   - Must allow outbound internet access for package installation
+Let Terraform find a suitable public subnet automatically:
 
-4. **Security Group Requirements** (if using existing):
-   - Allow inbound SSH (port 22)
-   - Allow inbound Ollama API (port 11434)
-   - Allow all outbound traffic
+```hcl
+# terraform.tfvars
+use_existing_vpc     = true
+existing_vpc_name    = "my-company-vpc"      # Name tag of your VPC
+auto_discover_subnet = true                   # Finds first public subnet
+```
+
+This discovers subnets with `map_public_ip_on_launch=true`.
+
+#### Option C: Use Explicit IDs
+
+Reference resources by their AWS IDs:
+
+```hcl
+# terraform.tfvars
+use_existing_vpc   = true
+existing_vpc_id    = "vpc-0123456789abcdef0"
+existing_subnet_id = "subnet-0123456789abcdef0"
+```
+
+#### Finding Your VPC and Subnet Information
+
+```bash
+# List VPCs with names
+aws ec2 describe-vpcs \
+  --query 'Vpcs[*].[VpcId,Tags[?Key==`Name`].Value|[0],CidrBlock]' \
+  --output table
+
+# List subnets in a VPC with public IP mapping status
+aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=vpc-xxx" \
+  --query 'Subnets[*].[SubnetId,Tags[?Key==`Name`].Value|[0],AvailabilityZone,MapPublicIpOnLaunch]' \
+  --output table
+
+# Find public subnets (those with map_public_ip_on_launch=true)
+aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=vpc-xxx" "Name=map-public-ip-on-launch,Values=true" \
+  --query 'Subnets[*].[SubnetId,Tags[?Key==`Name`].Value|[0]]' \
+  --output table
+```
+
+#### Subnet Requirements
+
+The subnet must:
+- Have a route to an Internet Gateway (public subnet)
+- Have `map_public_ip_on_launch=true` OR rely on the Elastic IP
+- Allow outbound internet access for package installation
+
+#### Security Group Requirements (if using existing)
+
+If providing `existing_security_group_id`, ensure it allows:
+- Inbound SSH (port 22) from your IP
+- Inbound Ollama API (port 11434) from your IP
+- All outbound traffic
 
 ### Restrict Access (Recommended for Production)
 

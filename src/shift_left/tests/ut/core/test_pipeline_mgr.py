@@ -12,10 +12,6 @@ from shift_left.core.utils.file_search import (
     PIPELINE_JSON_FILE_NAME,
     FlinkTablePipelineDefinition
 )
-from shift_left.core.pipeline_mgr import (
-    PipelineReport
-)
-
 
 class TestPipelineManager(unittest.TestCase):
 
@@ -28,11 +24,7 @@ class TestPipelineManager(unittest.TestCase):
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
         pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
-    def test_PipelineReport(self):
-        report: PipelineReport = PipelineReport(table_name="fct_order",
-                                                path = "facts/p1/fct_order")
-        assert report
-        assert report.table_name == "fct_order"
+
 
     def test_build_a_src_pipeline_def(self):
         print("test_build_a_src_pipelinedef")

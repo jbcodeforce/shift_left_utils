@@ -63,7 +63,7 @@ class TestValidateConfig(unittest.TestCase):
         for call_message in all_print_calls:
             if "Configuration validation failed with the following errors:" in call_message:
                 error_message = call_message
-            elif "Configuration validation has the following warnings:" in call_message:
+            elif "Configuration validation has the following information:" in call_message:
                 warning_message = call_message
 
         return error_message, warning_message, all_print_calls
@@ -444,7 +444,7 @@ class TestValidateConfig(unittest.TestCase):
 
             # May also have warnings if deprecated fields are present
             if warning_message:
-                assert "Configuration validation has the following warnings:" in warning_message
+                assert "Configuration validation has the following information:" in warning_message
 
 
     def test_comprehensive_validation_with_all_errors(self):
@@ -565,7 +565,7 @@ class TestValidateConfig(unittest.TestCase):
             assert "Configuration is missing app.dml_naming_convention_modifier" in error_message
 
             # Check warning content
-            assert "Configuration validation has the following warnings:" in warning_message
+            assert "Configuration validation has the following information" in warning_message
             assert "Warning: flink.api_key is deprecated use environment variables instead" in warning_message
             # Check for the actual format of the pkafka_cluster warning message
             assert "kafka.pkafka_cluster is set to overide default value, or may be removed from config file" in warning_message

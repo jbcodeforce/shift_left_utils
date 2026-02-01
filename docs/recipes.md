@@ -274,7 +274,7 @@ make init
 This action creates the Kafka topic with the name of the table and creates the schema definitions for the key and the value in the Schema Registry of the Confluent Cloud environment. A DDL execution will terminate and the Flink job statement is set to be Completed. The Make tsarget also ask for deleting the DDL Flink statement as we need to keep a unique name for the Flink statement. As a Flink-developer role, you need to be able to delete Flink Statement.
 
 ???- info "How it works"
-    Each makefile is reusing targets defined in a common.mk file that is under the $PIPELINES folder. This file uses environment variables so each Developer can have their own compute pool, and work in different environment. [See setup env variables section](./setup.md#environment-variables). See the top of the common.mk file for the usage of those environment variables [the template is here](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/core/templates/common.mk). 
+    Each makefile is reusing targets defined in a common.mk file that is under the $PIPELINES folder. This file uses environment variables so each Developer can have their own compute pool, and work in different environment. [See setup env variables section](./setup.md#environment-variables). See the top of the common.mk file for the usage of those environment variables [the template is here](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/shift_left/core/templates/common.mk). 
 
 * Verify the completion of the job using cli:
 
@@ -513,7 +513,7 @@ During the life of a project it may be relevant to add specific Make target, cha
 shift_left table update-all-makefiles $PIPELINES
 ```
 
-As of now the template is in the source folder: `shift_left_utils/src/shift_left/src/shift_left/core/templates/makefile_ddl_dml_tmpl.jinja`.
+As of now the template is in the source folder: `shift_left_utils/src/shift_left/shift_left/core/templates/makefile_ddl_dml_tmpl.jinja`.
 
 
 ## Build table inventory
@@ -729,7 +729,7 @@ class TableWorker():
 When Data engineers or SREs need to develop specific transformations, they can create an extension class and modify the config.yaml. Here are the steps:
 
 1. Clone the shift_left git repository
-1. Under the src/shift_left/src/shift_left folder, create an extension folder (same level as core and cli_commands folder):
+1. Under the src/shift_left/shift_left folder, create an extension folder (same level as core and cli_commands folder):
     ```sh
     └── shift_left
     ├── dist

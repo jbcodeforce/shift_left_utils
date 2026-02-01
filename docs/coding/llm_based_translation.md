@@ -116,7 +116,7 @@ As agent is a combination of LLM reference, prompts, and tool definitions, there
 
 #### KsqlDB to Flink agents
 
-Supporting class of the workflow is [ksqlDB code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/ksql_code_agent.py).
+Supporting class of the workflow is [ksqlDB code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/shift_left/ai/ksql_code_agent.py).
 
 Each agent uses specialized system prompts stored in external files:
 
@@ -129,11 +129,11 @@ Each agent uses specialized system prompts stored in external files:
 
 #### Code 
 
-The `src/shift_left/ai` directory contains a suite of Large Language Model (LLM) agents designed to translate SQL from various dialects to Apache Flink SQL, with validation and iterative refinement capabilities.
+The `src/shift_left/shift_left/ai` directory contains a suite of Large Language Model (LLM) agents designed to translate SQL from various dialects to Apache Flink SQL, with validation and iterative refinement capabilities.
 
 #### Spark to Flink agents
 
-Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/src/shift_left/ai/spark_sql_code_agent.py).
+Supporting class of the workflow is [Spark sql code agent](https://github.com/jbcodeforce/shift_left_utils/blob/main/src/shift_left/shift_left/ai/spark_sql_code_agent.py).
 
 Same approach for spark SQL with the prompts being in the `ai/prompts/spark_fsql` folder.
 Each agent uses specialized system prompts stored in external files:
@@ -300,7 +300,7 @@ tests/data/ksql-project
 
 If oyu have access to Cursor with  `cloud-4.5-sonnet` model, a prompt like:
 ```sh
-using @src/shift_left/src/shift_left/ai/prompts/ksql_fsql/translator.txt migrate the @src/shift_left/tests/data/ksql-project/sources/w2_processing.ksql  file
+using @src/shift_left/shift_left/ai/prompts/ksql_fsql/translator.txt migrate the @src/shift_left/tests/data/ksql-project/sources/w2_processing.ksql  file
 ```
 
 Will create a markdown file with the original ksql statements and the flink SQL matching statements at a higher speed than running qwen Ollama locally.

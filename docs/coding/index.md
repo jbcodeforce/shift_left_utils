@@ -124,13 +124,13 @@ export CCLOUD_COMPUTE_POOL_ID=lfcp-
 1. Assess dependencies from the source project (see the tests/data/dbt-project folder) with the command:
 
     ```sh
-    uv run python src/shift_left/cli.py table search-source-dependencies $SRC_FOLDER/facts/p7/fct_user_role.sql
+    uv run shift_left table search-source-dependencies $SRC_FOLDER/facts/p7/fct_user_role.sql
     ```
 
 1. Migrate a fact table and the others related ancestors to Staging using the table name that will be the folder name too.
 
     ```sh
-    uv run python src/shift_left/cli.py table migrate user_role $SRC_FOLDER/facts/p7/fct_user_role.sql $STAGING --recursive
+    uv run shift_left table migrate user_role $SRC_FOLDER/facts/p7/fct_user_role.sql $STAGING --recursive
     ```
 
     The tool creates a folder in `./tests/data/flink-project/staging/facts/p7`, run the LLM , and generate migrate Flink SQL statement
@@ -138,7 +138,7 @@ export CCLOUD_COMPUTE_POOL_ID=lfcp-
 
 ### Work on pipeline deployment
 
-1. Be sure the inventory is created: `uv run python src/shift_left/cli.py table build-inventory $PIPELINES`
+1. Be sure the inventory is created: `uv run shift_left table build-inventory $PIPELINES`
 
 ## Developer's notes
 

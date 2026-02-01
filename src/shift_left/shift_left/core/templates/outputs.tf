@@ -1,0 +1,107 @@
+# -----------------------------------------------------------------------------
+# Outputs
+# Confluent Cloud Infrastructure
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Confluent Cloud Outputs
+# -----------------------------------------------------------------------------
+output "confluent_environment_id" {
+  description = "Confluent Cloud environment ID"
+  value       = local.environment_id
+}
+
+
+output "kafka_cluster_id" {
+  description = "Kafka cluster ID"
+  value       = local.kafka_cluster_id
+}
+
+output "kafka_cluster_name" {
+  description = "Kafka cluster display name"
+  value       = var.existing_kafka_cluster_id != null ? data.confluent_kafka_cluster.cdc_cluster[0].display_name : confluent_kafka_cluster.cdc_cluster[0].display_name
+}
+
+output "schema_registry_id" {
+  description = "Schema Registry cluster ID"
+  value       = local.schema_registry_id
+}
+
+output "schema_registry_endpoint" {
+  description = "Schema Registry endpoint"
+  value       = local.schema_registry_endpoint
+}
+
+output "service_account_id" {
+  description = "Service account ID"
+  value       = local.service_account_id
+}
+
+output "service_account_name" {
+  description = "Service account display name"
+  value       = var.existing_service_account_id != null ? data.confluent_service_account.cdc_sa[0].display_name : confluent_service_account.cdc_sa[0].display_name
+}
+
+output "flink_compute_pool_id" {
+  description = "Flink compute pool ID"
+  value       = local.flink_compute_pool_id
+}
+
+output "flink_compute_pool_name" {
+  description = "Flink compute pool display name"
+  value       = var.existing_flink_compute_pool_id != null ? data.confluent_flink_compute_pool.cdc_compute_pool[0].display_name : confluent_flink_compute_pool.cdc_compute_pool[0].display_name
+}
+
+output "cloud_region" {
+  description = "AWS region"
+  value       = var.cloud_region
+}
+
+output "kafka_api_key_id" {
+  description = "Kafka API Key ID for service account"
+  value       = confluent_api_key.cdc_sa_kafka_key.id
+  sensitive   = false
+}
+
+output "kafka_api_key_secret" {
+  description = "Kafka API Key Secret for service account"
+  value       = confluent_api_key.cdc_sa_kafka_key.secret
+  sensitive   = true
+}
+
+output "app-manager-schema-registry-api-key" {
+  description = "Flink API Key ID for service account"
+  value       = confluent_api_key.app-manager-schema-registry-api-key.id
+  sensitive   = false
+}
+
+output "app-manager-schema-registry-api-secret" {
+  description = "Flink API Key Secret for service account"
+  value       = confluent_api_key.app-manager-schema-registry-api-key.secret
+  sensitive   = true
+}
+
+output "flink_api_key_id" {
+  description = "Flink API Key ID for service account"
+  value       = confluent_api_key.cdc_sa_flink_key.id
+  sensitive   = false
+}
+
+output "flink_api_key_secret" {
+  description = "Flink API Key Secret for service account"
+  value       = confluent_api_key.cdc_sa_flink_key.secret
+  sensitive   = true
+}
+
+output "tableflow_api_key" {
+  description = "Tableflow API Key ID for service account"
+  value       = confluent_api_key.cdc_sa_tableflow_key.id
+  sensitive   = false
+}
+
+output "tableflow_api_secret" {
+  description = "Tableflow API Key Secret for service account"
+  value       = confluent_api_key.cdc_sa_tableflow_key.secret
+  sensitive   = true
+}
+

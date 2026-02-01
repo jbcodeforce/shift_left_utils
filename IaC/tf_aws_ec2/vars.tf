@@ -30,14 +30,32 @@ variable "use_existing_vpc" {
 
 variable "existing_vpc_id" {
   type        = string
-  description = "ID of existing VPC to use (required if use_existing_vpc = true)"
+  description = "ID of existing VPC to use. Either this OR existing_vpc_name is required when use_existing_vpc = true"
+  default     = ""
+}
+
+variable "existing_vpc_name" {
+  type        = string
+  description = "Name tag of existing VPC to look up. Alternative to existing_vpc_id for easier VPC discovery."
   default     = ""
 }
 
 variable "existing_subnet_id" {
   type        = string
-  description = "ID of existing public subnet to use (required if use_existing_vpc = true). Must have internet access."
+  description = "ID of existing public subnet to use. Either this, existing_subnet_name, or auto_discover_subnet is required when use_existing_vpc = true. Must have internet access."
   default     = ""
+}
+
+variable "existing_subnet_name" {
+  type        = string
+  description = "Name tag of existing subnet to look up. Alternative to existing_subnet_id for easier subnet discovery."
+  default     = ""
+}
+
+variable "auto_discover_subnet" {
+  type        = bool
+  description = "When true and using existing VPC, automatically discover a public subnet (one with map_public_ip_on_launch=true)"
+  default     = false
 }
 
 variable "existing_security_group_id" {
@@ -87,7 +105,15 @@ variable "environment" {
 variable "ssh_key_name" {
   type        = string
   description = "Name of the AWS key pair for SSH access"
+  default = "sl-key"
 }
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR block allowed to SSH into the instance (default: your IP only)"
+  type        = string
+  default     = "0.0.0.0/0" # Change to your IP for better security: "YOUR_IP/32"
+}
+
 
 variable "ami_id" {
   type        = string

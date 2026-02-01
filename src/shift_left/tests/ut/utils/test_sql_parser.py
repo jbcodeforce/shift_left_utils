@@ -476,6 +476,65 @@ WITH (
         assert columns['created_date'] == {'name': 'created_date', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         assert columns['is_active'] == {'name': 'is_active', 'type': 'BOOLEAN', 'nullable': True, 'primary_key': False}
 
+    def test_build_column_metadata_from_dml_select_simple(self):
+        """Extract column metadata from INSERT INTO ... SELECT col1, col2 FROM source."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT id, name FROM t"
+        columns = parser.build_column_metadata_from_dml_select(dml, "t")
+        self.assertIn("id", columns)
+        self.assertIn("name", columns)
+        self.assertEqual(columns["id"]["type"], "STRING")
+        self.assertEqual(columns["name"]["type"], "STRING")
+        self.assertEqual(columns["id"]["name"], "id")
+        self.assertFalse(columns["id"]["primary_key"])
+
+    def test_build_column_metadata_from_dml_select_aliases(self):
+        """Extract column names from AS alias in SELECT list."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT id, x AS alias_col FROM t"
+        columns = parser.build_column_metadata_from_dml_select(dml, "t")
+        self.assertIn("id", columns)
+        self.assertIn("alias_col", columns)
+        self.assertEqual(columns["alias_col"]["name"], "alias_col")
+
+    def test_build_column_metadata_from_dml_select_expressions(self):
+        """Infer types for TIMESTAMPDIFF and CASE expressions."""
+        parser = SQLparser()
+        dml = """
+        INSERT INTO src_c360_customers
+        SELECT customer_id, first_name,
+            TIMESTAMPDIFF(YEAR, CAST(date_of_birth AS TIMESTAMP_LTZ(3)), event_ts) AS age_years,
+            CASE WHEN 1=1 THEN 'x' ELSE 'y' END AS segment
+        FROM customers_raw
+        """
+        columns = parser.build_column_metadata_from_dml_select(dml, "customers_raw")
+        self.assertIn("customer_id", columns)
+        self.assertIn("first_name", columns)
+        self.assertIn("age_years", columns)
+        self.assertIn("segment", columns)
+        self.assertEqual(columns["age_years"]["type"], "BIGINT")
+        self.assertEqual(columns["segment"]["type"], "STRING")
+        self.assertEqual(columns["customer_id"]["type"], "STRING")
+
+    def test_build_column_metadata_from_dml_select_empty_source(self):
+        """Return empty dict when source table name does not match."""
+        parser = SQLparser()
+        dml = "INSERT INTO target SELECT a, b FROM other_table"
+        columns = parser.build_column_metadata_from_dml_select(dml, "nonexistent")
+        self.assertEqual(columns, {})
+
+    def test_build_create_table_from_column_metadata(self):
+        """Build minimal CREATE TABLE string from column metadata."""
+        parser = SQLparser()
+        metadata = {
+            "id": {"name": "id", "type": "STRING", "nullable": False, "primary_key": False},
+            "name": {"name": "name", "type": "STRING", "nullable": True, "primary_key": False},
+        }
+        ddl = parser.build_create_table_from_column_metadata("my_table", metadata, table_name_suffix="_ut")
+        self.assertIn("CREATE TABLE IF NOT EXISTS my_table_ut", ddl)
+        self.assertIn("id STRING", ddl)
+        self.assertIn("name STRING", ddl)
+
     def test_should_not_consider_unnest_as_table_name(self):
         parser = SQLparser()
         query="""
@@ -1348,6 +1407,53 @@ WHERE row_num = 1
         result = parser._extract_cte_names(sql)
         expected = ["section_detail", "tenant", "attachment"]
         self.assertEqual(result, expected)
+
+    def test_extract_alias_to_table_map_single_table(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, s.transaction_id
+        FROM src_sdp_shipments s
+        """
+        alias_map = parser.extract_alias_to_table_map(dml)
+        self.assertIn("s", alias_map)
+        self.assertEqual(alias_map["s"], "src_sdp_shipments")
+        self.assertIn("src_sdp_shipments", alias_map)
+        self.assertEqual(alias_map["src_sdp_shipments"], "src_sdp_shipments")
+
+    def test_extract_alias_to_table_map_join(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, t.customer_id
+        FROM src_sdp_shipments s
+        LEFT JOIN src_c360_transactions t ON s.transaction_id = t.transaction_id
+        """
+        alias_map = parser.extract_alias_to_table_map(dml)
+        self.assertEqual(alias_map.get("s"), "src_sdp_shipments")
+        self.assertEqual(alias_map.get("t"), "src_c360_transactions")
+
+    def test_extract_field_lineage_edges_from_dml_qualified(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO dim_sdp_order_fulfillment
+        SELECT s.shipment_id, s.transaction_id, t.customer_id
+        FROM src_sdp_shipments s
+        LEFT JOIN src_c360_transactions t ON s.transaction_id = t.transaction_id
+        """
+        parent_names = {"src_sdp_shipments", "src_c360_transactions"}
+        edges = parser.extract_field_lineage_edges_from_dml(
+            dml, "dim_sdp_order_fulfillment", parent_names
+        )
+        self.assertGreater(len(edges), 0)
+        target_cols = {e["target_column"] for e in edges}
+        self.assertIn("shipment_id", target_cols)
+        self.assertIn("transaction_id", target_cols)
+        self.assertIn("customer_id", target_cols)
+        shipment_edges = [e for e in edges if e["target_column"] == "shipment_id"]
+        self.assertEqual(len(shipment_edges), 1)
+        self.assertEqual(shipment_edges[0]["source_table"], "src_sdp_shipments")
+        self.assertEqual(shipment_edges[0]["source_column"], "shipment_id")
 
 if __name__ == '__main__':
     unittest.main()

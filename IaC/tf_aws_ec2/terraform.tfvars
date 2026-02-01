@@ -15,16 +15,30 @@ availability_zone = "us-west-2a"
 # -----------------------------------------------------------------------------
 
 # OPTION 1: Create new VPC (default)
-use_existing_vpc = false
-main_vpc_cidr    = "10.0.0.0/24"
-public_subnets   = "10.0.0.128/26"
-private_subnets  = "10.0.0.192/26"
+#use_existing_vpc = false
+#main_vpc_cidr    = "10.0.0.0/24"
+#public_subnets   = "10.0.0.128/26"
+#private_subnets  = "10.0.0.192/26"
 
-# OPTION 2: Use existing VPC (uncomment and fill in values)
-# use_existing_vpc   = true
-# existing_vpc_id    = "vpc-0123456789abcdef0"   # Your existing VPC ID
-# existing_subnet_id = "subnet-0123456789abcdef0" # Public subnet with internet access
-# existing_security_group_id = ""                 # Optional: leave empty to create new SG
+# OPTION 2: Use existing VPC by ID (uncomment to use)
+use_existing_vpc   = true
+existing_vpc_id    = "vpc-03016998064d00b78"    # Your existing VPC ID
+existing_subnet_id = "subnet-0519597a0ec7b9919" # Public subnet with internet access
+# existing_security_group_id = ""                  # Optional: leave empty to create new SG
+
+# OPTION 3: Use existing VPC by NAME (uncomment to use)
+# Discover VPC and subnet by their Name tags - easier than finding IDs
+# use_existing_vpc     = true
+# existing_vpc_name    = "my-company-vpc"         # Name tag of your VPC
+# existing_subnet_name = "my-public-subnet"       # Name tag of public subnet
+# existing_security_group_id = ""                  # Optional: leave empty to create new SG
+
+# OPTION 4: Use existing VPC with AUTO-DISCOVERY (uncomment to use)
+# Automatically finds a public subnet in the VPC
+# use_existing_vpc     = true
+# existing_vpc_name    = "my-company-vpc"         # Name tag of your VPC
+# auto_discover_subnet = true                      # Auto-find a public subnet
+# existing_security_group_id = ""                  # Optional: leave empty to create new SG
 
 # -----------------------------------------------------------------------------
 # EC2 Instance Configuration
@@ -32,7 +46,7 @@ private_subnets  = "10.0.0.192/26"
 
 # Name of your AWS SSH key pair (must exist in the target region)
 # Create one via: aws ec2 create-key-pair --key-name my-key --query 'KeyMaterial' --output text > my-key.pem
-ssh_key_name = "j9r-keys"
+ssh_key_name = "my-shift-left-key"
 
 # Deep Learning AMI with NVIDIA GPU support and CUDA pre-installed (us-west-2)
 # Find the latest AMI:
@@ -59,10 +73,10 @@ root_volume_size = 200
 # Restrict these CIDRs for production deployments
 
 # SSH access - replace with your IP for security (e.g., ["203.0.113.0/32"])
-allowed_ssh_cidrs = ["0.0.0.0/0"]
+allowed_ssh_cidrs = ["73.189.157.48/32"]
 
 # Ollama API access - replace with your IP for security
-allowed_ollama_cidrs = ["0.0.0.0/0"]
+allowed_ollama_cidrs = ["73.189.157.48/32"]
 
 # -----------------------------------------------------------------------------
 # Shift Left Configuration

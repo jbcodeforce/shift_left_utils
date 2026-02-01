@@ -9,7 +9,9 @@ The approach uses LLM agents local or remote. After this lab you should be able 
 
 The core idea is to leverage LLMs to understand the source SQL semantics and to translate them to Flink SQLs. 
 
-**This is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
+**This is github repositiory is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
+
+**Migration** is a one time shot, and should not be a practice to develop Flink solution.
 
 ???+ warning "Lab Environment"
 	The Lab was developed and tested on Mac. `shift_tool` runs on Mac, Linux and Windows WSL.
@@ -52,7 +54,25 @@ For the AI based migration the following needs to be done:
 	ollama serve
 	```
 
-1. As an alternate if you have OpenAI API key, you can change those environment variable to refect openAI end points and key. There is also OpenRouter.ai , where you can define an API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
+### Use Cloud SaaS
+
+If you are using a sevice like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai , AWS Bedrock, use their API key and change the environment variable to refect openAI end points and key. There is also , where you can define an API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
+
+### Use your own remote service
+
+Some users have deployed an inference server to their own VPC. The [IaC/tf_aws_c2 folder](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) includes the terraform manifests to deploy an EC2 with GPU and ollama as an inference engine. The security group for AWS EC2 firewall is set to use the user IP address so only this machine can interact with the EC2 machine.
+
+To run the migration set the following environment variable:
+
+```sh
+export SL_LLM_BASE_URL="http://<EC2_PUBLIC_IP>:11434"
+```
+
+Then run one of the  migration (see detail in next section):
+
+```sh
+shift_left table migrate  ...
+```
 
 ## Migration Context
 
@@ -108,7 +128,12 @@ The migration and prompts need to support more examples outside of the classical
 
 * Example command to migrate one of ksqlDB script:
   ```sh
-  shift_left table migrate w2_processing $SRC_FOLDER/w2_processing.ksql $STAGING --source-type ksql --product-name tax
+  export FLINK_PROJECT=$HOME/Documents/Code/shift_left_utils/src/shift_left/tests/data/ksql-project/flink-project
+  export PIPELINES=$FLINK_PROJECT/pipelines
+  export STAGING=$FLINK_PROJECT/../staging
+  export SRC_FOLDER=$(pwd)/src/shift_left/tests/data/ksql-project/sources
+
+  shift_left table migrate mig_test $SRC_FOLDER/ddl-measure_alert.ksql $STAGING --source-type ksql --product-name net
   ```
 
 ## Migration Workflows

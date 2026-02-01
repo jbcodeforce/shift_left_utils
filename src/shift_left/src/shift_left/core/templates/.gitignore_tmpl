@@ -1,4 +1,0 @@
-.env
-**/config*.yaml
-.gitconfig
-**/pipeline_definition.json

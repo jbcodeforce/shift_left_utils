@@ -12,51 +12,126 @@
 # 2. Use existing VPC: Set use_existing_vpc=true and provide VPC/subnet IDs
 # =============================================================================
 
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.80"
-    }
-    null = {
-      source  = "hashicorp/null"
-      version = ">= 3.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
-
 # =============================================================================
 # Local Values - Determine which resources to use
 # =============================================================================
 
 locals {
-  # Use existing or created resources
-  vpc_id             = var.use_existing_vpc ? var.existing_vpc_id : aws_vpc.main[0].id
-  subnet_id          = var.use_existing_vpc ? var.existing_subnet_id : aws_subnet.public[0].id
+  # Resolve VPC ID from various sources:
+  # 1. Explicit ID provided
+  # 2. Look up by name tag
+  # 3. Create new VPC
+  resolved_vpc_id = (
+    var.existing_vpc_id != "" ? var.existing_vpc_id :
+    var.existing_vpc_name != "" ? data.aws_vpc.by_name[0].id :
+    null
+  )
+
+  # Resolve Subnet ID from various sources:
+  # 1. Explicit ID provided
+  # 2. Look up by name tag
+  # 3. Auto-discover public subnet in VPC
+  # 4. Create new subnet
+  resolved_subnet_id = (
+    var.existing_subnet_id != "" ? var.existing_subnet_id :
+    var.existing_subnet_name != "" ? data.aws_subnet.by_name[0].id :
+    var.auto_discover_subnet && length(try(data.aws_subnets.public[0].ids, [])) > 0 ? data.aws_subnets.public[0].ids[0] :
+    null
+  )
+
+  # Final resource IDs to use
+  vpc_id             = var.use_existing_vpc ? local.resolved_vpc_id : aws_vpc.main[0].id
+  subnet_id          = var.use_existing_vpc ? local.resolved_subnet_id : aws_subnet.public[0].id
   security_group_ids = var.existing_security_group_id != "" ? [var.existing_security_group_id] : [aws_security_group.shift_left[0].id]
 
   # Determine if we need to create network resources
   create_vpc = !var.use_existing_vpc
   create_sg  = var.existing_security_group_id == ""
+
+  # Availability zone - use from discovered subnet if available, otherwise from variable
+  effective_az = var.use_existing_vpc && local.resolved_subnet_id != null ? (
+    var.existing_subnet_id != "" ? data.aws_subnet.by_id[0].availability_zone :
+    var.existing_subnet_name != "" ? data.aws_subnet.by_name[0].availability_zone :
+    var.auto_discover_subnet && length(try(data.aws_subnets.public[0].ids, [])) > 0 ? data.aws_subnet.auto_discovered[0].availability_zone :
+    var.availability_zone
+  ) : var.availability_zone
 }
 
 # =============================================================================
 # Data Sources - Look up existing resources when using existing VPC
 # =============================================================================
 
-data "aws_vpc" "existing" {
-  count = var.use_existing_vpc ? 1 : 0
+# Look up VPC by ID (when explicit ID is provided)
+data "aws_vpc" "by_id" {
+  count = var.use_existing_vpc && var.existing_vpc_id != "" ? 1 : 0
   id    = var.existing_vpc_id
 }
 
-data "aws_subnet" "existing" {
-  count = var.use_existing_vpc ? 1 : 0
+# Look up VPC by name tag (when name is provided instead of ID)
+data "aws_vpc" "by_name" {
+  count = var.use_existing_vpc && var.existing_vpc_id == "" && var.existing_vpc_name != "" ? 1 : 0
+
+  filter {
+    name   = "tag:Name"
+    values = [var.existing_vpc_name]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
+# Look up subnet by ID (when explicit ID is provided)
+data "aws_subnet" "by_id" {
+  count = var.use_existing_vpc && var.existing_subnet_id != "" ? 1 : 0
   id    = var.existing_subnet_id
+}
+
+# Look up subnet by name tag (when name is provided instead of ID)
+data "aws_subnet" "by_name" {
+  count = var.use_existing_vpc && var.existing_subnet_id == "" && var.existing_subnet_name != "" ? 1 : 0
+
+  filter {
+    name   = "tag:Name"
+    values = [var.existing_subnet_name]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
+# Auto-discover a public subnet in the VPC (when no specific subnet is provided)
+data "aws_subnets" "public" {
+  count = var.use_existing_vpc && var.existing_subnet_id == "" && var.existing_subnet_name == "" && var.auto_discover_subnet ? 1 : 0
+
+  filter {
+    name   = "vpc-id"
+    values = [local.resolved_vpc_id]
+  }
+
+  filter {
+    name   = "map-public-ip-on-launch"
+    values = ["true"]
+  }
+}
+
+# Get details of the first discovered public subnet
+data "aws_subnet" "auto_discovered" {
+  count = var.use_existing_vpc && var.existing_subnet_id == "" && var.existing_subnet_name == "" && var.auto_discover_subnet && length(try(data.aws_subnets.public[0].ids, [])) > 0 ? 1 : 0
+  id    = data.aws_subnets.public[0].ids[0]
+}
+
+# Look up the Internet Gateway for the VPC (to verify subnet connectivity)
+data "aws_internet_gateway" "existing" {
+  count = var.use_existing_vpc ? 1 : 0
+
+  filter {
+    name   = "attachment.vpc-id"
+    values = [local.resolved_vpc_id]
+  }
 }
 
 # =============================================================================
@@ -310,13 +385,25 @@ resource "null_resource" "validate_existing_vpc" {
 
   lifecycle {
     precondition {
-      condition     = var.existing_vpc_id != ""
-      error_message = "existing_vpc_id must be provided when use_existing_vpc is true."
+      condition     = var.existing_vpc_id != "" || var.existing_vpc_name != ""
+      error_message = "Either existing_vpc_id or existing_vpc_name must be provided when use_existing_vpc is true."
     }
 
     precondition {
-      condition     = var.existing_subnet_id != ""
-      error_message = "existing_subnet_id must be provided when use_existing_vpc is true."
+      condition     = var.existing_subnet_id != "" || var.existing_subnet_name != "" || var.auto_discover_subnet
+      error_message = "Either existing_subnet_id, existing_subnet_name, or auto_discover_subnet must be set when use_existing_vpc is true."
+    }
+  }
+}
+
+# Validate that auto-discovered subnet was found
+resource "null_resource" "validate_auto_discover" {
+  count = var.use_existing_vpc && var.auto_discover_subnet && var.existing_subnet_id == "" && var.existing_subnet_name == "" ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(try(data.aws_subnets.public[0].ids, [])) > 0
+      error_message = "No public subnet found in VPC with map_public_ip_on_launch=true. Please specify existing_subnet_id or existing_subnet_name."
     }
   }
 }

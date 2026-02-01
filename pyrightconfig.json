@@ -1,10 +1,10 @@
 {
   "include": [
-    "src/shift_left/src",
+    "src/shift_left",
     "src/shift_left/tests"
   ],
   "extraPaths": [
-    "src/shift_left/src",
+    "src/shift_left",
     "src/shift_left/tests"
   ],
   "venvPath": ".",

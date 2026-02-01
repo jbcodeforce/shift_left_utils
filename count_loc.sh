@@ -14,7 +14,7 @@ echo
 # Count files
 echo "=== FILE COUNTS ==="
 total_py_files=$(find . -name "*.py" -not -path "./.venv/*" -not -path "*/.venv/*" -not -path "*/site-packages/*" -not -path "*/__pycache__/*" | wc -l | tr -d ' ')
-source_files=$(find ./src/shift_left/src -name "*.py" | wc -l | tr -d ' ')
+source_files=$(find ./src/shift_left/shift_left -name "*.py" | wc -l | tr -d ' ')
 test_files=$(find ./src/shift_left/tests -name "*.py" | wc -l | tr -d ' ')
 older_utils=$(find ./older-utils-to-clean -name "*.py" | wc -l | tr -d ' ')
 
@@ -27,7 +27,7 @@ echo
 # Count lines of code
 echo "=== LINES OF CODE ==="
 total_loc=$(find . -name "*.py" -not -path "./.venv/*" -not -path "*/.venv/*" -not -path "*/site-packages/*" -not -path "*/__pycache__/*" -exec wc -l {} + | tail -1 | awk '{print $1}')
-source_loc=$(find ./src/shift_left/src -name "*.py" -exec wc -l {} + | tail -1 | awk '{print $1}')
+source_loc=$(find ./src/shift_left/shift_left -name "*.py" -exec wc -l {} + | tail -1 | awk '{print $1}')
 test_loc=$(find ./src/shift_left/tests -name "*.py" -exec wc -l {} + | tail -1 | awk '{print $1}')
 older_loc=$(find ./older-utils-to-clean -name "*.py" -exec wc -l {} + | tail -1 | awk '{print $1}')
 

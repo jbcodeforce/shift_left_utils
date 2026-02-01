@@ -293,10 +293,9 @@ class TestTyperSecurityConfiguration(BaseUT):
 
     def test_cli_files_have_secure_configuration(self):
         """Test that all CLI files are configured to hide local variables in exceptions."""
-        # Get the source directory path - we're in shift_left/tests/ut/core, need to go to shift_left/src/shift_left
-        # Go up 4 levels: test_error_security.py -> core -> ut -> tests -> shift_left/
+        # Package root is .../shift_left; CLI sources are in shift_left/shift_left/
         shift_left_root = pathlib.Path(__file__).parent.parent.parent.parent
-        src_dir = shift_left_root / "src" / "shift_left"
+        src_dir = shift_left_root / "shift_left"
         
         cli_files = [
             src_dir / "cli.py",
@@ -320,7 +319,7 @@ class TestTyperSecurityConfiguration(BaseUT):
     def test_error_sanitization_used_in_cli_commands(self):
         """Test that CLI command files use error sanitization functions."""
         shift_left_root = pathlib.Path(__file__).parent.parent.parent.parent  # Gets us to shift_left/
-        pipeline_file = shift_left_root / "src" / "shift_left" / "cli_commands" / "pipeline.py"
+        pipeline_file = shift_left_root / "shift_left" / "cli_commands" / "pipeline.py"
         
         if pipeline_file.exists():
             with open(pipeline_file, 'r') as f:

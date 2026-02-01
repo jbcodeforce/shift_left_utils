@@ -5,6 +5,12 @@
             "type": "shell",
             "command": "source ${workspaceFolder}/set_mc_dev_env",
             "problemMatcher": []
+        },
+        {
+            "label": "verify_env_file",
+            "type": "shell",
+            "command": "test -f \"${workspaceFolder}/../flink_project_demos/customer_360/c360_flink_processing/.env\" && echo '✓ .env file found' || (echo '✗ .env file not found!' && exit 1)",
+            "problemMatcher": []
         }
     ]
 }

@@ -1,11 +1,11 @@
 mkdocs-material
 mkdocs-minify-plugin
 mkdocs
-#mkdocs-mermaid2-plugin
+mkdocs-mermaid2-plugin
 #mkdocs-jupyter
 #matplotlib
 pytest
-mkdocstrings-python
+mkdocstrings
 pymdown-extensions
 mkdocs-table-reader-plugin
 mcp>=0.9.0

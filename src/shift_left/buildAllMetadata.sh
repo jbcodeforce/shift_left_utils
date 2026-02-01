@@ -1,1 +1,1 @@
-uv run python src/shift_left/cli.py pipeline build-all-metadata $PIPELINES
+uv run shift_left pipeline build-all-metadata $PIPELINES

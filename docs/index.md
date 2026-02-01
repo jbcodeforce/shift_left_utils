@@ -196,6 +196,10 @@ Adopt the naming convention from the change data capture, like Debezium for the 
 
 ## Navigate the documentation
 
+To get hands-on lab:
+
+[:material-book: guided tutorials](./tutorial/index.md){ .md-button }
+
 As a developer of this project read:
 
 [:material-source-branch: How to contribute article](./contributing.md){ .md-button }
