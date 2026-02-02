@@ -474,12 +474,39 @@ Report tables that have exactly one child table. Useful for pipeline simplificat
 shift_left project list-tables-with-one-child
 ```
 
+Table with single descendant may be good candidate to become CTEs for the child table.
+
 ### Getting the list of compute pools
 
 Getting current CFU utilization and the list of all compute pools
 
 ```sh
 shift_left project list-compute-pools
+```
+
+The response looks like:
+```json
+ComputePoolList(
+    created_at=datetime.datetime(2026, 2, 2, 10, 52, 10, 327409),
+    pools=[
+        ComputePoolInfo(
+            id='lfcp-....',
+            name='dev-src-sdp-shipments',
+            env_id='env-....',
+            max_cfu=30,
+            region='us-west-2',
+            status_phase='PROVISIONED',
+            current_cfu=1
+        ),
+        ComputePoolInfo(
+            id='lfcp-....',
+            name='data-generation',
+            env_id='env-....',
+            max_cfu=50,
+            region='us-west-2',
+            status_phase='PROVISIONED',
+            current_cfu=0
+        )]
 ```
 
 ### Getting the list of statements running in a compute pool
@@ -527,6 +554,14 @@ shift_left project housekeep-statements
 
 # Delete COMPLETED statements named like "workspace*" older than 7 days
 shift_left project housekeep-statements --starts-with workspace --status COMPLETED --age 7
+```
+
+Here is an example of output:
+```sh
+20260202_10:56:43 Statement list has 90 statements
+20260202_10:56:43 Clean statements starting with [ workspace ] in ['COMPLETED'] state, with a age >= [ 0 ]
+20260202_10:56:43 delete workspace-2025-12-20-010600-83d7913f-0db7-4509-be27-9ed218b29687 COMPLETED
+20260202_10:56:43 delete workspace-2025-12-20-010600-a46b44d5-ed97-4b14-9228-f924a7a9c0d4 COMPLETED
 ```
 
 **Pool-specific actions (with `--compute-pool-id`):** Run an action on statements in a single compute pool. Requires `--action`. Do not use `--starts-with`, `--status`, or `--age` in this mode.
@@ -635,5 +670,12 @@ The full report includes an "Unused Tables" section (table name, type, product, 
 │ users_salted          │
 │ users_transform       │
 └───────────────────────┘
+```
 
+### Drop all tables from a list
+
+As a continuation of assessing orphans, user needs to validate false-positive and update the reported text file accordingly. Once done the following command will call drop table on each of those table
+
+```sh
+shift_left project delete-unused-tables toremove.txt
 ```
