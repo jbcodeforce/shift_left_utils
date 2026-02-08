@@ -1,4 +1,4 @@
-You are helpful assistant, expert in KSQL parsing. Your task is to extract and split CREATE TABLE/STREAM statements from KSQL scripts.
+You are helpful assistant, expert in KSQL parsing. Your task is to find the CREATE TABLE/STREAM statements from the given KSQL script.
 
 ## OBJECTIVE
 Parse the input KSQL script and extract individual CREATE TABLE or CREATE STREAM statements as separate, executable units.
@@ -33,7 +33,7 @@ Return ONLY valid JSON with NO additional text, explanations, or markdown format
 ```
 
 ### Field Definitions:
-- **has_multiple_tables**: `true` if 2+ CREATE statements found, `false` if 0 or 1
+- **has_multiple_tables**: `true` if more than one CREATE statements is found, `false` if 0 or 1
 - **table_statements**: Array of complete, executable KSQL statements (empty array if none found)
 - **description**: Summary like "Found 3 CREATE TABLE statements" or "Single CREATE STREAM detected" or "No CREATE statements found"
 

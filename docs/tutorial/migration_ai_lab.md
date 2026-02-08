@@ -22,24 +22,56 @@ Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left cli opera
 For the AI based migration the following needs to be done:
 
 1. A computer with at least 20GB of Free RAM, with GPU - (All development was done on MAC M3 Pro 36GB )
-1. [Install Ollama](https://ollama.com/download/mac)
-	```sh
-	# Verify the ollama cli:
-	ollama list 
-	ollama --help
-	```
+1. Install one of the local LLM server. (On Mac, server needs to support MLX, so LMStudio is a good candidate for that)
 
-1. Download the `qwen3-coder:30b` model:
-	```sh
-    ollama pull qwen3-coder:30b
-	```
+	=== "LMStudio"
+		1. [Install LMS cli or LMStudio](https://ollama.com/download/mac)
+			```sh
+			curl -fsSL https://lmstudio.ai/install.sh | bash
 
-1. Add or update the following environments variables in your `set_env_var`
+			# Verify the lms cli:
+			lms ls
+			lms server start
+			```
+		1. Download the `qwen3-coder-30b-a3b-instruct` model:
+			```sh
+			lms get qwen3-coder-30b-a3b-instruct-mlx 
+			lms ls
+			```
+		1. Set env variables:
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:1234/v1
+			export SL_LLM_MODEL=qwen3-coder-30b-a3b-instruct-mlx
+			export SL_LLM_API_KEY=not_needed_key
+			```
+
+	=== "Ollama"
+		1. [Install Ollama](https://ollama.com/download/mac)
+			```sh
+			# Verify the ollama cli:
+			ollama list 
+			ollama --help
+			```
+		1. Download the `qwen3-coder:30b` model:
+			```sh
+			ollama pull qwen3-coder:30b
+			```
+		1. Start Ollama server:
+			```sh
+			ollama serve
+			```
+		1. Set environment variables
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:11434/v1
+			export SL_LLM_MODEL=qwen3-coder:30b
+			export SL_LLM_API_KEY=not_needed_key
+			```
+
+
+
+1. Add or update the following environments variables in your `set_env_var`. The following variables will be used to control `confluent` cli during statement deployment using makefile.
+
 	```sh
-	export SL_LLM_BASE_URL=http://localhost:11434/v1
-	export SL_LLM_MODEL=qwen3-coder:30b
-	export SL_LLM_API_KEY=not_needed_key
-	# and the following variables will be use to control `confluent` cli during statement deployment
 	export CCLOUD_ENV_ID=env-
 	export CCLOUD_ENV_NAME=
 	export CCLOUD_KAFKA_CLUSTER=<name of the kafka cluster>
@@ -49,18 +81,15 @@ For the AI based migration the following needs to be done:
 	export CCLOUD_COMPUTE_POOL_ID=<compute pool id>
 	```
 
-1. Start Ollama server:
-	```sh
-	ollama serve
-	```
+
 
 ### Use Cloud SaaS
 
-If you are using a sevice like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai , AWS Bedrock, use their API key and change the environment variable to refect openAI end points and key. There is also , where you can define an API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
+If you are using a sevice like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai , AWS Bedrock, use their API key and change the environment variable to reflect openAI endpoints and key. There is also [openrouter](https://openrouter.ai/) to get access to a set of models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
 
 ### Use your own remote service
 
-Some users have deployed an inference server to their own VPC. The [IaC/tf_aws_c2 folder](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) includes the terraform manifests to deploy an EC2 with GPU and ollama as an inference engine. The security group for AWS EC2 firewall is set to use the user IP address so only this machine can interact with the EC2 machine.
+Some users have deployed an inference server to their own VPC. The [IaC/tf_aws_c2 folder](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) includes the terraform manifests to deploy an EC2 with GPU and `ollama` as an inference engine server. The security group for AWS EC2 firewall is set to use the user IP address so only the user's machine can interact with the EC2 machine.
 
 To run the migration set the following environment variable:
 
@@ -122,7 +151,7 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
 
 ### ksqlDB to Flink SQL
 
-ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. 
+ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. We are thinking to add a RAG system to get similar mapping.
 
 The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
 
@@ -190,7 +219,7 @@ my-flink-demo
 
 ### 2. KSQL to Flink SQL Lab
 
-The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) 
+The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) under the `ksql_tutorial/sources` folder.
 
 #### 2.1 Migration Executions
 

@@ -146,6 +146,7 @@ EMIT CHANGES;
 
 ## QUALITY VALIDATION:
 * Ensure streaming semantics are preserved
+* Replace '\\n' with empty space
 * Verify connector properties are complete and valid
 * Confirm primary key constraints are appropriate
 * Validate that window operations use proper time attributes

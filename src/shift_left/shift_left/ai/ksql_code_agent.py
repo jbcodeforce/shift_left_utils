@@ -102,7 +102,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
                 # Validate and refine the translation
                 ddl_sql, dml_sql = self._run_mandatory_validation_agent(ddl_sql, dml_sql)
                 logger.info(f"Done with mandatory validation agent for statement {i+1}")
-                self._snapshot_ddl_dml(table_name + "_" + str(i), ddl_sql, dml_sql)
+                self._snapshot_ddl_dml(table_name + "_v_" + str(i), ddl_sql, dml_sql)
                 # Collect non-empty results
                 if ddl_sql.strip():
                     final_ddl.append(ddl_sql)

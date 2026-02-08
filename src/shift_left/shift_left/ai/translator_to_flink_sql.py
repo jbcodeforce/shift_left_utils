@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 from pydantic import BaseModel
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 import json
 from importlib import import_module
 from enum import Enum
@@ -189,30 +190,36 @@ class TranslatorToFlinkSqlAgent():
                 - flink_dml_output: Flink SQL DML statements (INSERT, SELECT, etc.)
         """
         translator_prompt_template = "ksql_input: {sql_input}"
-        messages=[
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self.translator_system_prompt},
             {"role": "user", "content": translator_prompt_template.format(sql_input=sql)}
         ]
-        # print(f"Messages: {messages}")
+        logger.info(f"Messages: {messages}")
         try:
             # Use structured output to separate DDL and DML components
             response= self.llm_client.chat.completions.parse(
                 model=self.model_name,
                 response_format=SourceSql2FlinkSql,
-                messages=messages  # pyright: ignore[reportArgumentType]
+                messages=messages
             )
 
             obj_response = response.choices[0].message
             logger.info(f"\nTranslation Response: {obj_response.parsed}")
-            print(f"Response: {obj_response.parsed}")
+            print(f"nTranslation Response: {obj_response.parsed}")
             if obj_response.parsed:
-                return obj_response.parsed.flink_ddl_output, obj_response.parsed.flink_dml_output
+                ddl_output = obj_response.parsed.flink_ddl_output
+                dml_output = obj_response.parsed.flink_dml_output
+                if ddl_output:
+                    ddl_output = ddl_output.replace('\\n', ' ')
+                if dml_output:
+                    dml_output = dml_output.replace('\\n', ' ')
+                return ddl_output, dml_output
             else:
                 # Return empty strings if parsing fails
-                return "", ""
+                return sql, ""
         except Exception as e:
             logger.error(f"Error in translator agent: {e}")
-            return "", ""
+            return sql, ""
 
     def _detect_multitable_with_agent(self, sql: str) -> SqlTableDetection:
         """
@@ -232,17 +239,18 @@ class TranslatorToFlinkSqlAgent():
                 - Description of the detection result
         """
         table_detection_prompt_template = "src_sql_input: {src_sql_input}"
-        messages=[
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self.table_detection_system_prompt},
             {"role": "user", "content": table_detection_prompt_template.format(src_sql_input=sql)}
         ]
         # Use structured output to ensure consistent response format
+        logger.info(f"Table detection messages: {messages}")
         try:
             response = self.llm_client.chat.completions.parse(
                 model=self.model_name,
                 response_format=SqlTableDetection,
                 reasoning_effort="none",  # pyright: ignore[reportArgumentType]
-                messages=messages  # pyright: ignore[reportArgumentType]
+                messages=messages
             )
 
             obj_response = response.choices[0].message
@@ -286,11 +294,11 @@ class TranslatorToFlinkSqlAgent():
         """
         logger.info(f"Starting mandatory validation agent with {self.model_name}")
         syntax_checker_prompt_template = "ddl_sql_input: {ddl_sql_input}\ndml_sql_input: {dml_sql_input}"
-        messages=[
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self.mandatory_validation_system_prompt},
             {"role": "user", "content": syntax_checker_prompt_template.format(ddl_sql_input=ddl_sql, dml_sql_input=dml_sql)}
         ]
-
+        logger.info(f"Mandatory validation messages: {messages}")
         try:
             # Use structured output to maintain DDL/DML separation
             response= self.llm_client.chat.completions.parse(
@@ -381,7 +389,7 @@ class TranslatorToFlinkSqlAgent():
         try:
             refinement_prompt_template = "flink_sql_input: {sql_input}\nhistory of the conversation: {history}\nreported error: {error_message}"
 
-            messages = [
+            messages: list[ChatCompletionMessageParam] = [
                 {"role": "system", "content": self.refinement_system_prompt},
                 {"role": "user", "content": refinement_prompt_template.format(sql_input=sql, history=history, error_message=error_message)}
             ]
