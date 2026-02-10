@@ -2,6 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import os
+import re
 from pydantic import BaseModel
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -12,6 +13,32 @@ from typing import Tuple, List, Optional, Dict
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.statement_mgr import post_flink_statement, delete_statement_if_exists
 import importlib.resources
+
+def _split_ksql_create_statements(sql: str) -> List[str]:
+    """
+    Split KSQL script into separate CREATE TABLE and CREATE STREAM statements (deterministic).
+    Statement boundaries: each CREATE runs until the next semicolon or the next CREATE keyword.
+    """
+    if not sql or not sql.strip():
+        return []
+    pattern = re.compile(r"\bCREATE\s+(?:TABLE|STREAM)\b", re.IGNORECASE)
+    starts = [m.start() for m in pattern.finditer(sql)]
+    if not starts:
+        return []
+    statements: List[str] = []
+    for i, start in enumerate(starts):
+        end: int
+        next_create = starts[i + 1] if i + 1 < len(starts) else len(sql)
+        semi = sql.find(";", start)
+        if semi != -1 and semi < next_create:
+            end = semi + 1
+        else:
+            end = next_create
+        stmt = sql[start:end].strip()
+        if stmt:
+            statements.append(stmt)
+    return statements
+
 
 class SqlTableDetection(BaseModel):
     """
@@ -107,6 +134,7 @@ class TranslatorToFlinkSqlAgent():
         self.llm_client = OpenAI(api_key=self.llm_api_key, base_url=self.llm_base_url)
         self.validation_history: List[Dict] = []
         self.translator_system_prompt = ""
+        self.use_rag_for_translation = False
         fname = importlib.resources.files("shift_left.ai.prompts.common").joinpath("refinement.txt")
         with fname.open("r") as f:
             self.refinement_system_prompt= f.read()
@@ -173,6 +201,49 @@ class TranslatorToFlinkSqlAgent():
 
         return '\n'.join(cleaned_lines)
 
+    def _clean_output(self,output: str) -> str:
+        """
+        Cleans the output string by replacing unwanted patterns like '\\\\n', '\\n', etc.
+        Add additional patterns as necessary.
+        """
+        if not output:
+            return output
+        cleaned = output.replace('\\\\n', ' ')
+        cleaned = cleaned.replace('\\n', ' ')
+        cleaned = cleaned.replace('\n', ' ')
+        cleaned = cleaned.replace('\\', ' ')
+        return cleaned
+
+    def _build_rag_examples_block(self, sql: str) -> str:
+        """
+        If RAG is enabled and a store is available, retrieve similar (ksql, Flink) examples
+        and return a prompt block; otherwise return empty string.
+        """
+        if not getattr(self, "use_rag_for_translation", False):
+            return ""
+        try:
+            from shift_left.ai.rag import get_rag_store, rag_enabled, rag_top_k
+            if not rag_enabled():
+                return ""
+            store = get_rag_store()
+            if store is None:
+                return ""
+            pairs = store.search(sql, top_k=rag_top_k())
+            if not pairs:
+                return ""
+            lines = ["\n\n## Retrieved similar examples (use as reference for style and patterns):\n"]
+            for i, p in enumerate(pairs, 1):
+                lines.append(f"Example {i}:")
+                lines.append(f"KSQL:\n{p.ksql_text}")
+                if p.flink_ddl:
+                    lines.append(f"Flink DDL:\n{p.flink_ddl}")
+                if p.flink_dml:
+                    lines.append(f"Flink DML:\n{p.flink_dml}")
+                lines.append("")
+            return "\n".join(lines)
+        except ImportError:
+            return ""
+
     def _do_translation_with_agent(self, sql: str) -> Tuple[str | None, str | None ]:
         """
         Translate a single KSQL or Spark SQL statement to Flink SQL using LLM.
@@ -189,9 +260,10 @@ class TranslatorToFlinkSqlAgent():
                 - flink_ddl_output: Flink SQL DDL statements (CREATE TABLE, etc.)
                 - flink_dml_output: Flink SQL DML statements (INSERT, SELECT, etc.)
         """
+        system_content = self.translator_system_prompt + self._build_rag_examples_block(sql)
         translator_prompt_template = "ksql_input: {sql_input}"
         messages: list[ChatCompletionMessageParam] = [
-            {"role": "system", "content": self.translator_system_prompt},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": translator_prompt_template.format(sql_input=sql)}
         ]
         logger.info(f"Messages: {messages}")
@@ -200,19 +272,18 @@ class TranslatorToFlinkSqlAgent():
             response= self.llm_client.chat.completions.parse(
                 model=self.model_name,
                 response_format=SourceSql2FlinkSql,
-                messages=messages
+                messages=messages,
+                temperature=0.2,
+                max_completion_tokens=10000,
+                reasoning_effort="medium"
             )
 
             obj_response = response.choices[0].message
             logger.info(f"\nTranslation Response: {obj_response.parsed}")
             print(f"nTranslation Response: {obj_response.parsed}")
             if obj_response.parsed:
-                ddl_output = obj_response.parsed.flink_ddl_output
-                dml_output = obj_response.parsed.flink_dml_output
-                if ddl_output:
-                    ddl_output = ddl_output.replace('\\n', ' ')
-                if dml_output:
-                    dml_output = dml_output.replace('\\n', ' ')
+                ddl_output = self._clean_output(obj_response.parsed.flink_ddl_output)
+                dml_output = self._clean_output(obj_response.parsed.flink_dml_output)
                 return ddl_output, dml_output
             else:
                 # Return empty strings if parsing fails
@@ -225,8 +296,7 @@ class TranslatorToFlinkSqlAgent():
         """
         Analyze SQL input to detect multiple CREATE TABLE/STREAM statements.
 
-        This agent determines whether the input contains multiple table or stream
-        definitions that should be processed separately. Processing multiple statements
+        Uses deterministic split first (no LLM call). Processing multiple statements
         individually often yields better translation results than processing them together.
 
         Args:
@@ -238,40 +308,28 @@ class TranslatorToFlinkSqlAgent():
                 - List of individual statements if multiple were found
                 - Description of the detection result
         """
-        table_detection_prompt_template = "src_sql_input: {src_sql_input}"
-        messages: list[ChatCompletionMessageParam] = [
-            {"role": "system", "content": self.table_detection_system_prompt},
-            {"role": "user", "content": table_detection_prompt_template.format(src_sql_input=sql)}
-        ]
-        # Use structured output to ensure consistent response format
-        logger.info(f"Table detection messages: {messages}")
-        try:
-            response = self.llm_client.chat.completions.parse(
-                model=self.model_name,
-                response_format=SqlTableDetection,
-                reasoning_effort="none",  # pyright: ignore[reportArgumentType]
-                messages=messages
+        # Deterministic first: no agent call when split is sufficient
+        split_list = _split_ksql_create_statements(sql)
+        n = len(split_list)
+        if n > 1:
+            logger.info(f"Table detection (deterministic): {n} CREATE statements")
+            return SqlTableDetection(
+                has_multiple_tables=True,
+                table_statements=split_list,
+                description=f"Split by CREATE boundaries: {n} statements"
             )
-
-            obj_response = response.choices[0].message
-            logger.info(f"Table detection result: {obj_response}")
-            if obj_response.parsed:
-                if len(obj_response.parsed.table_statements) > 1 and not obj_response.parsed.has_multiple_tables:
-                    obj_response.parsed.has_multiple_tables = True
-                return obj_response.parsed
-            else:
-                return SqlTableDetection(
-                    has_multiple_tables=False,
-                    table_statements=[sql],
-                    description="Error in detection, treating as single statement"
-                )
-        except Exception as e:
-            logger.error(f"Error in table detection: {e}")
+        if n == 1:
             return SqlTableDetection(
                 has_multiple_tables=False,
-                table_statements=[sql],
-                description=f"Error in detection: {str(e)}, treating as single statement"
+                table_statements=split_list,
+                description="Single CREATE statement"
             )
+        # No CREATE TABLE/STREAM found: treat as single script (downstream uses full sql)
+        return SqlTableDetection(
+            has_multiple_tables=False,
+            table_statements=[sql],
+            description="No CREATE statements found, treating as single script"
+        )
 
     def _run_mandatory_validation_agent(self, ddl_sql: str, dml_sql: str) -> Tuple[str, str]:
         """
@@ -293,6 +351,7 @@ class TranslatorToFlinkSqlAgent():
                 - Validated and potentially corrected DML statements
         """
         logger.info(f"Starting mandatory validation agent with {self.model_name}")
+        print(f"Starting mandatory validation agent with {self.model_name}")
         syntax_checker_prompt_template = "ddl_sql_input: {ddl_sql_input}\ndml_sql_input: {dml_sql_input}"
         messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": self.mandatory_validation_system_prompt},
@@ -310,6 +369,7 @@ class TranslatorToFlinkSqlAgent():
             obj_response = response.choices[0].message
             if obj_response.parsed:
                 logger.info(f"Mandatory validation response: {obj_response.parsed}")
+                print(f"Mandatory validation response: {obj_response.parsed}")
                 return obj_response.parsed.flink_ddl_output, obj_response.parsed.flink_dml_output
             else:
                 # Return original inputs if validation fails

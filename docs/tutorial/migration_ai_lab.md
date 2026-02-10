@@ -151,7 +151,18 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
 
 ### ksqlDB to Flink SQL
 
-ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. We are thinking to add a RAG system to get similar mapping.
+ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. A **RAG (Retrieval-Augmented Generation) system** is available: similar ksql + Flink SQL pairs are retrieved from a vector index and added as few-shot examples to the translator prompt.
+
+**RAG setup (optional):**
+
+1. Install optional RAG dependencies: `pip install -e ".[rag]"` (chromadb, sentence-transformers).
+2. Build the vector index from a ksql-project corpus (folder with `flink-references/` and `sources/`):
+   ```sh
+   shift_left rag build /path/to/ksql-project --index /path/to/rag_index
+   ```
+3. Enable RAG when migrating: set `SL_RAG_ENABLED=1` and `SL_RAG_INDEX_PATH=/path/to/rag_index`. Optionally set `SL_RAG_TOP_K=3` (number of similar examples to inject).
+
+You can add your own (ksql, Flink DDL/DML) solution pairs by following the same folder structure under your ksql-project and running `shift_left rag build` again to refresh the index.
 
 The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
 

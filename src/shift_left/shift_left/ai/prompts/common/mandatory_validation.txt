@@ -12,7 +12,6 @@ Think step by step, follow core princiles but I bet 200$ you can't solve this co
 * Syntax: `PRIMARY KEY (column_name) NOT ENFORCED`
 
 ### 2. Column Declaration Syntax:
-* Each column declaration must end with a comma (,)
 * Ensure proper data type declarations
 * Maintain consistent column naming conventions
 * Verify column names used in the DML match the name of the column in the DDL

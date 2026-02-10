@@ -10,7 +10,7 @@ At the highest level, the SDLC for flink project, may include the following acti
 
 This labs introduces such activities.
 
-##  Prerequisite
+##  Prerequisites
 
 You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured and running. Ensure `CONFIG_FILE`, `PIPELINES`, are set as described.
 
@@ -31,31 +31,29 @@ In this lab, we are addressing the folling
 	shift_left project init dsp .
 	```
 
-
-
-The created folder structure looks like:
-```sh
-dsp
-├── docs
-├── IaC
-│   └── environments
-│       ├── dev
-│       │   ├── confluent_tf_graph.md
-│       │   ├── confluent.tf
-│       │   ├── outputs.tf
-│       │   ├── providers.tf
-│       │   ├── terraform.tfvars.example
-│       │   └── variables.tf
-│       └── prod
-├── pipelines
-│   ├── common.mk
-│   ├── dimensions
-│   ├── facts
-│   ├── intermediates
-│   ├── sources
-│   └── views
-└── staging
-```
+* The created folder structure looks like:
+	```sh
+	dsp
+	├── docs
+	├── IaC
+	│   └── environments
+	│       ├── dev
+	│       │   ├── confluent_tf_graph.md
+	│       │   ├── confluent.tf
+	│       │   ├── outputs.tf
+	│       │   ├── providers.tf
+	│       │   ├── terraform.tfvars.example
+	│       │   └── variables.tf
+	│       └── prod
+	├── pipelines
+	│   ├── common.mk
+	│   ├── dimensions
+	│   ├── facts
+	│   ├── intermediates
+	│   ├── sources
+	│   └── views
+	└── staging
+	```
 
 ## Leveraging Infrastructure As Code
 
@@ -63,10 +61,10 @@ The approach is to use Terraform to create Confluent Cloud Environment,  Kafka C
 
 | File | Purpose |
 | --- | --- |
-| providers.tf | Terraform provider configuration (Confluent, etc.) |
-| confluent.tf | Confluent Cloud resources (environment, Kafka, Schema Registry, compute pool) |
-| variables.tf | Input variables (e.g. region, cluster name) |
-| outputs.tf | Output values (resource IDs, API keys) | 
+| **providers.tf** | Terraform provider configuration (Confluent, etc.) |
+| **confluent.tf** | Confluent Cloud resources (environment, Kafka, Schema Registry, compute pool) |
+| **variables.tf** | Input variables (e.g. region, cluster name) |
+| **outputs.tf** | Output values (resource IDs, API keys) | 
 
 To be able to run the terraform, a SRE needs to create, in the Confluent Console,  a service account, and the confluent cloud key and secrets for the terraform cli to use.
 

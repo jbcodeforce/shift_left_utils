@@ -1,0 +1,3 @@
+'{ "sql_input": "CREATE STREAM acting_events (name VARCHAR, title VARCHAR, genre VARCHAR)\\", \\"WITH (KAFKA_TOPIC=\'acting-events\',\\", \\"PARTITIONS=1,\\", \\"VALUE_FORMAT=\'AVRO\');",
+"flink_ddl_output": "CREATE TABLE IF NOT EXISTS acting_events (\\", " ,
+"flink_dml_output": "INSERT INTO acting_events\\", \\"SELECT * FROM src_table\\" }" }'

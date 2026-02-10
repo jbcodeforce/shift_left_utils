@@ -45,6 +45,10 @@ dependencies = [
 dev = [
     "pytest>=8.3.5",
 ]
+rag = [
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+]
 
 [tool.pytest.ini_options]
 markers = [

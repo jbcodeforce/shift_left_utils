@@ -1,0 +1,7 @@
+# Optional manifest: map flink-references folder name to source ksql file (relative to corpus root).
+# Used when folder name does not match sources/<name>.ksql (e.g. basic_table_stream -> ddl-basic-table.ksql).
+mapping:
+  basic_table_stream: sources/ddl-basic-table.ksql
+  filtering: sources/ddl-filtering.ksql
+  geospacial: sources/ddl-geo.ksql
+  kpi_config_table: sources/ddl-kpi-config-table.ksql

@@ -33,9 +33,11 @@
                 // Note: Variables from envFile are loaded first, then these override/add to them
                 // The Python script also loads .env at module level to ensure variables are available
                 "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests",
-				"SL_LLM_BASE_URL" : "http://localhost:11434/v1",
-				"SL_LLM_MODEL" : "qwen3-coder:30b",
-				"SL_LLM_API_KEY" : "ollama_test_key"
+				"SL_LLM_BASE_URL" : "http://localhost:1234/v1",
+				"SL_LLM_MODEL" : "qwen3-coder-30b-a3b-instruct-mlx",
+				"SL_LLM_API_KEY" : "llm_test_key",
+				"SL_RAG_ENABLED" : "1",
+				"SL_RAG_INDEX_PATH" : "${workspaceFolder}/../flink_project_demos/ksql_tutorial/rag_index"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },

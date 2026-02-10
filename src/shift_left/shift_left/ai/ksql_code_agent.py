@@ -38,6 +38,11 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
     def __init__(self):
         super().__init__()
         self._load_prompts()
+        try:
+            from shift_left.ai.rag import rag_enabled
+            self.use_rag_for_translation = rag_enabled()
+        except ImportError:
+            self.use_rag_for_translation = False
 
     # -------------------------
     # Public API
@@ -93,8 +98,8 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
             # Process multiple statements individually for better accuracy
             logger.info(f"Found {len(table_detection.table_statements)} separate CREATE statements. Processing each separately...")
             for i, table_statement in enumerate(table_detection.table_statements):
-                logger.info(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:100]}...")
-                print(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:100]}...")
+                logger.info(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:150]}...")
+                print(f"\n2.{i+1}/ Processing statement {i+1}: {table_statement[:150]}...")
                 # Translate individual statement
                 ddl_sql, dml_sql = self._do_translation_with_agent(table_statement)
                 logger.info(f"Done with translator agent for statement {i+1}, DDL: {ddl_sql}..., DML: {dml_sql if dml_sql else 'empty'}...")
@@ -111,7 +116,7 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
         else:
             # Process as single statement
             logger.info("2/ Processing single KSQL statement...")
-            print("\n2/: Processing single Spark SQL to Flink SQL...")
+            print("\n2/: Processing single Ksql SQL to Flink SQL...")
             ddl_sql, dml_sql = self._do_translation_with_agent(ksql)
 
             self._snapshot_ddl_dml(table_name, ddl_sql, dml_sql)
