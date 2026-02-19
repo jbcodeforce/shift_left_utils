@@ -298,4 +298,4 @@ shift_left project validate-config
 A CONFIG_FILE matches a specific environment, kafka cluster and Flink. So when working with different environments or different Kafka Clusters within an environment, it is recommended to use different config.yaml and environment variables.
 
 ???- warning "Security access"
-    The config.yaml and environment variable files should ignored in Git. 
+    The config.yaml and environment variable files should be ignored in Git. 

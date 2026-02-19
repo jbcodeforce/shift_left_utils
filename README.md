@@ -4,13 +4,11 @@ A comprehensive toolkit for migrating SQL batch processing to real-time Apache F
 
 ## What it does
 
-**SQL Migration & Translation**: Automatically migrate KSQL, Spark SQL, and DBT code to Flink SQL using LLM-based agents with validation and refinement capabilities.
+**Project** (`shift_left project`): Create and manage Flink project layout (kimball or data-product: sources, intermediates, dimensions, facts, views). Validate `config.yaml`, list Kafka topics and compute pools. Track git changes for blue-green deployment (`list-modified-files`). Report cross-product table usage, tables with one child, and isolate a data product. Init, run, or delete integration tests. Assess and delete unused tables; housekeep failed or completed statements.
 
-**Pipeline Management**: Build, validate, and deploy Flink SQL pipelines with dependency management, execution planning, and blue-green deployment strategies.
+**Table** (`shift_left table`): Add table folder structure (sql-scripts, Makefile) with `init`. Build table inventory from the pipeline path. Migrate KSQL, Spark SQL, or DBT to Flink SQL via LLM-based agents (`migrate --source-type ksql|spark|dbt`) with optional Confluent validation. Validate naming conventions, search source dependencies, update Makefiles or SQL in bulk. Get Flink execution plan explanations (`explain`). Unit test harness: init templates with synthetic data, run or delete unit tests on Confluent Cloud.
 
-**Project Structure**: Scaffold and manage Flink projects following medallion architecture (sources → intermediates → dimensions → facts → views) with comprehensive metadata and testing frameworks.
-
-**Test Harness**: Develop unit test SQL template with synthetic data to unit test a Flink SQL statement. 
+**Pipeline** (`shift_left pipeline`): Build pipeline metadata from DDL/DML (parent-child graph) and table inventory. Build execution plans for deployment order. Deploy by table name, product name, directory, or table list file (e.g. from `list-modified-files`) to Confluent Cloud, with optional DML-only or parallel deployment. Report pipeline hierarchy, healthcheck, and running statements. Compute field-level lineage. Undeploy from a sink; analyze compute pool usage. 
 
 
 ## Cursor AI Integration
@@ -31,16 +29,14 @@ This project includes **MCP (Model Context Protocol)** integration for Cursor AI
 
 ## Documentation
 
-📖 **[Complete Documentation](https://jbcodeforce.github.io/shift_left_utils/)** - Comprehensive guides, tutorials, and API reference
+**[Complete Documentation](https://jbcodeforce.github.io/shift_left_utils/)** - Comprehensive guides, tutorials, and API reference
 
-📋 **[Quick Start & Commands](docs/command.md)** - CLI reference and usage examples
+**[Blue-Green Deployment](https://jbcodeforce.github.io/shift_left_utils/blue_green_deploy.md)** - Git-based change tracking and deployment strategies
 
-🚀 **[Blue-Green Deployment](https://jbcodeforce.github.io/shift_left_utils/blue_green_deploy.md)** - Git-based change tracking and deployment strategies
-
-🤖 **[AI based migration](https://jbcodeforce.github.io/shift_left_utils/coding/llm_based_translation)**
+**[AI based migration](https://jbcodeforce.github.io/shift_left_utils/coding/llm_based_translation)**
 
 
-## 🙏 Support my work
+## Support my work
 
 Love it? Give it a ⭐️ by clicking below:
 

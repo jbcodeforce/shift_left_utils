@@ -4,17 +4,18 @@ The current AI based migration implementation supported by this tool enables mig
 
 * dbt/Spark SQL to Flink SQL
 * ksqlDB to Flink SQL
+* PySpark to Flink SQL
 
 The approach uses LLM agents local or remote. After this lab you should be able to use the `shift_left` tool to partially automate your SQL migration to Flink SQL.
 
-The core idea is to leverage LLMs to understand the source SQL semantics and to translate them to Flink SQLs. 
+The core idea is to leverage LLMs and parser tools to understand the source SQL semantics and to translate them to Flink SQLs. 
 
 **This is github repositiory is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
 
 **Migration** is a one time shot, and should not be a practice to develop Flink solution.
 
 ???+ warning "Lab Environment"
-	The Lab was developed and tested on Mac. `shift_tool` runs on Mac, Linux and Windows WSL.
+	The Lab was developed and tested on Mac. `shift_left` runs on Mac, Linux and Windows WSL.
 
 ## Prerequisites
 
@@ -22,7 +23,23 @@ Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left cli opera
 For the AI based migration the following needs to be done:
 
 1. A computer with at least 20GB of Free RAM, with GPU - (All development was done on MAC M3 Pro 36GB )
-1. Install one of the local LLM server. (On Mac, server needs to support MLX, so LMStudio is a good candidate for that)
+1. Install one of the local LLM server. (On Mac, server needs to support MLX, so Osaurus or LMStudio are good candidates)
+
+	=== "Osaurus"
+		[Osaurus](https://osaurus.ai/) is dedicate AI environment for Mac to leverage MLX capabilities, and is native Swift implementation with low memory footprint.
+
+		1. Install
+			```sh
+			brew install osaurus
+			```
+
+		2. Download model `qwen3-coder-30b-a3b-instruct-mlx-4bit`
+		1. Set env variables:
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:1334/v1
+			export SL_LLM_MODEL=qwen3-coder-30b-a3b-instruct-mlx
+			export SL_LLM_API_KEY=not_needed_key
+			```
 
 	=== "LMStudio"
 		1. [Install LMS cli or LMStudio](https://ollama.com/download/mac)
@@ -68,24 +85,9 @@ For the AI based migration the following needs to be done:
 			```
 
 
-
-1. Add or update the following environments variables in your `set_env_var`. The following variables will be used to control `confluent` cli during statement deployment using makefile.
-
-	```sh
-	export CCLOUD_ENV_ID=env-
-	export CCLOUD_ENV_NAME=
-	export CCLOUD_KAFKA_CLUSTER=<name of the kafka cluster>
-	export CLOUD_REGION=us-west-2
-	export CLOUD_PROVIDER=aws
-	export CCLOUD_CONTEXT=login-<your email>-https://confluent.cloud
-	export CCLOUD_COMPUTE_POOL_ID=<compute pool id>
-	```
-
-
-
 ### Use Cloud SaaS
 
-If you are using a sevice like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai , AWS Bedrock, use their API key and change the environment variable to reflect openAI endpoints and key. There is also [openrouter](https://openrouter.ai/) to get access to a set of models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
+If you are using a service like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai, AWS Bedrock, use their API key and change the environment variable to reflect openAI endpoints and key. There is also [openrouter](https://openrouter.ai/) to get access to a set of models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
 
 ### Use your own remote service
 

@@ -10,24 +10,17 @@ there is one pipeline per sink table.
 """
 import os
 from pathlib import Path
-from jinja2 import Environment, PackageLoader
-
 from shift_left.ai.agent_factory import AgentFactory
-from shift_left.ai.translator_to_flink_sql import TranslatorToFlinkSqlAgent
+
 from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
     SCRIPTS_DIR
 )
 from shift_left.core.utils.app_config import logger
 from shift_left.core.utils.sql_parser import SQLparser
-from shift_left.core.table_mgr import build_folder_structure_for_table, get_column_definitions
-from typing import Any, List, Tuple, Optional
+from shift_left.core.table_mgr import build_folder_structure_for_table
+from typing import List, Tuple
 
-
-TMPL_FOLDER="templates"
-CREATE_TABLE_TMPL="create_table_skeleton.jinja"
-DML_DEDUP_TMPL="dedup_dml_skeleton.jinja"
-TEST_DEDUL_TMPL="test_dedup_statement.jinja"
 
 TOPIC_LIST_FILE=os.getenv("TOPIC_LIST_FILE",'src_topic_list.txt')
 
@@ -53,11 +46,21 @@ def migrate_one_file(table_name: str,
                                     sql_src_file_name=sql_src_file,
                                     validate=validate)
             logger.info(f"Processed {table_name} to {staging_target_folder}")
+        elif sql_src_file.endswith(".py"):
+            ddl_contents, dml_contents = _process_pyspark_python_file(
+                table_name=table_name,
+                py_src_file_name=sql_src_file,
+                validate=validate)
+            logger.info(f"Processed PySpark Python file {table_name} to {staging_target_folder}")
         else:
-            raise Exception("Error: the sql_src_file parameter needs to be a sql file")
+            raise Exception("Error: the sql_src_file parameter needs to be a .sql or .py file")
     elif source_type == "ksql":
         ddl_contents, dml_contents = _process_ksql_sql_file(table_name=table_name,
                                ksql_src_file=sql_src_file,
+                               validate=validate)
+    elif source_type == "pyspark":
+        ddl_contents, dml_contents = _process_pyspark_python_file(table_name=table_name,
+                               py_src_file_name=sql_src_file,
                                validate=validate)
     else:
         raise Exception(f"Error: the source_type parameter needs to be one of ['dbt', 'spark', 'ksql']")
@@ -73,6 +76,7 @@ def _process_ksql_sql_file(table_name: str,
     """
     Process a ksql sql file to Flink SQL.
     """
+    print(f"Processing KSQL file: {ksql_src_file}", flush=True)
     agent = AgentFactory().get_or_build_sql_translator_agent("ksql")
     with open(ksql_src_file, "r") as f:
         ksql_content = f.read()
@@ -85,14 +89,13 @@ def _process_spark_sql_file(table_name: str,
                             validate: bool = False):
     """
     From Spark SQL to Flink SQL
-    :param src_file_name: the file name of the dbt, spark SQL source file
-    :param target_path
-    :param source_target_path: the path for the newly created Flink sql file
-    :param walk_parent: Assess if it needs to process the dependencies
+    :param table_name: the table name for the sql file
+    :param sql_src_file_name: the file name of the dbt, spark SQL source file
     :param validate: Assess if it needs to validate the sql using Confluent Cloud for Flink
     """
     parents=set[str]()
     translator_agent = AgentFactory().get_or_build_sql_translator_agent("spark")
+    print(f"Processing Spark SQL file: {sql_src_file_name}", flush=True)
     with open(sql_src_file_name, "r") as f:
         sql_content= f.read()
         parser = SQLparser()
@@ -103,70 +106,70 @@ def _process_spark_sql_file(table_name: str,
     return ddls, dmls
 
 
-def _create_src_ddl_statement(table_name:str, config: dict, target_folder: str):
+def _process_pyspark_python_file(table_name: str,
+    py_src_file_name: str,
+    validate: bool = False) -> Tuple[List[str], List[str]]:
     """
-    Create in the target folder a ddl sql squeleton file for the given table name
-
-    :param table_name: The table name for the ddl sql to create
-    :param target_folder: The folder where to create the ddl statement as sql file
-    :return: create a file in the target folder
+    From PySpark Python file to Flink SQL via LLM extract + Catalyst plan + FlinkSQLGenerator.
+    Reads the .py file, uses the LLM to extract the DataFrame pipeline snippet, runs it in Spark
+    to get the logical plan JSON, then translates to Flink SQL with the Catalyst visitor.
+    Requires pyspark and shift_left.ai.pyspark_extractor / catalyst_to_flink.
     """
-    if config["app"]["default_PK"]:
-        pk_to_use= config["app"]["default_PK"]
-    else:
-        pk_to_use="__pd"
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+    from shift_left.ai.pyspark_extractor import extract_pipeline_from_pyspark
+    from shift_left.ai.catalyst_to_flink import FlinkSQLGenerator
 
-    file_name=f"{target_folder}/ddl.{table_name}.sql"
-    logger.info(f"Create DDL Skeleton for {table_name}")
-    env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    sql_template = env.get_template(f"{CREATE_TABLE_TMPL}")
+    print(f"Processing PySpark Python file: {py_src_file_name}", flush=True)
+    with open(py_src_file_name, "r") as f:
+        source = f.read()
+    snippet, table_names = extract_pipeline_from_pyspark(source)
+    logger.info("LLM extracted snippet (%s chars), tables: %s", len(snippet), table_names)
+
+    sample_rows = [("user_1", "purchase"), ("user_1", "view"), ("user_2", "purchase")]
+    sample_schema = "user_id string, event_name string"
+
+    spark = SparkSession.builder.appName("PySparkExtract").master("local[1]").getOrCreate()
     try:
-        logger.info("try to get the column definitions by calling Confluent Cloud REST API")
-        column_definitions, fields=get_column_definitions(table_name)
-    except Exception as e:
-        logger.error(e)
-        column_definitions = "-- add columns"
-        fields=""
-    context = {
-        'table_name': table_name,
-        'column_definitions': column_definitions,
-        'default_PK': pk_to_use
-    }
-    rendered_sql = sql_template.render(context)
-    logger.info(f"writing file {file_name}")
-    with open(file_name, 'w') as f:
-        f.write(rendered_sql)
-    return fields
+        for name in table_names or ["ecommerce_events"]:
+            spark.createDataFrame(sample_rows, sample_schema).createOrReplaceTempView(name)
+        namespace = {
+            "spark": spark,
+            "col": F.col,
+            "count": F.count,
+            "sum": F.sum,
+            "min": F.min,
+            "max": F.max,
+            "avg": F.avg,
+            "lit": F.lit,
+            "when": F.when,
+            "expr": F.expr,
+        }
+        exec(snippet, namespace)
+        result_df = namespace["result_df"]
+        qe = result_df._jdf.queryExecution()
+        try:
+            plan = qe.optimizedPlan()
+        except Exception:
+            plan = qe.logical()
+        plan_json_str = plan.toJSON()
+    finally:
+        spark.stop()
 
-def _create_dml_statement(table_name:str, target_folder: str, fields: str, config):
-    """
-    Create in the target folder a dml sql squeleton file for the given table name
-
-    :param table_name: The table name for the dml sql to create
-    :param target_folder: The folder where to create the dml statement as sql file
-    :return: create a file in the target folder
-    """
-
-    file_name=f"{target_folder}/dml.{table_name}.sql"
-    env = Environment(loader=PackageLoader("shift_left.core","templates"))
-    sql_template = env.get_template(f"{DML_DEDUP_TMPL}")
-    topic_name=_search_matching_topic(table_name, config['kafka']['reject_topics_prefixes'])
-    context = {
-        'table_name': table_name,
-        'topic_name': f"`{topic_name}`",
-        'fields': fields
-    }
-    rendered_sql = sql_template.render(context)
-    logger.info(f"writing file {file_name}")
-    with open(file_name, 'w') as f:
-        f.write(rendered_sql)
-
+    import json
+    plan_obj = json.loads(plan_json_str)
+    gen = FlinkSQLGenerator()
+    gen.visit(plan_obj)
+    flink_sql = gen.generate_sql()
+    if validate:
+        logger.info(f"Validate Flink SQL: {flink_sql} NOT IMPLEMENTED YET")
+    return [], [flink_sql]
 
 def _process_ddl_file(file_path: str, sql_file: str):
     """
     Process a ddl file, replacing the ``` final AS (``` and SELECT * FROM final
     """
-    print(f"Process {sql_file} in {file_path}")
+    print(f"Process {sql_file} in {file_path}", flush=True)
     file_name=Path(sql_file)
     content = file_name.read_text()
     update_content = content.replace("``` final AS (","```").replace("SELECT * FROM final","")

@@ -20,7 +20,8 @@ class TestDebugIntegrationTests(unittest.TestCase):
         os.environ["STAGING"] =  data_dir + "/ksql-project/staging/ut"
         os.environ["SRC_FOLDER"] =  data_dir + "/ksql-project/sources"
         runner = CliRunner()
-        result = runner.invoke(app, ['table', 'migrate', 'acting_events', os.getenv('SRC_FOLDER','.') + '/splitting.ksql', '--source-type', 'ksql', '--product-name', 'basic'])
+        # result = runner.invoke(app, ['table', 'migrate', 'acting_events', os.getenv('SRC_FOLDER','.') + '/splitting.ksql', '--source-type', 'ksql', '--product-name', 'basic'])
+        result = runner.invoke(app, ['table', 'migrate', 'daily_order_spent', os.getenv('SRC_FOLDER','.') + '/aggregation.ksql', '--source-type', 'ksql', '--product-name', 'from_ksql'])
         print(result.stdout)
 
     def _test_spark_migration(self):

@@ -12,6 +12,7 @@ os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-c
 
 from shift_left.ai.ksql_code_agent import KsqlToFlinkSqlAgent
 from shift_left.ai.rag.corpus_loader import ExamplePair
+from shift_left.ai.translator_to_flink_sql import _strip_markdown_json
 
 
 class TestRAGPromptAugmentation(unittest.TestCase):
@@ -61,14 +62,12 @@ class TestRAGPromptAugmentation(unittest.TestCase):
                 response = MagicMock()
                 response.choices = [MagicMock()]
                 response.choices[0].message = MagicMock()
-                response.choices[0].message.parsed = MagicMock()
-                response.choices[0].message.parsed.flink_ddl_output = "OUT_DDL"
-                response.choices[0].message.parsed.flink_dml_output = "OUT_DML"
-                agent.llm_client.chat.completions.parse.return_value = response
+                response.choices[0].message.content = '{"flink_ddl_output": "OUT_DDL", "flink_dml_output": "OUT_DML"}'
+                agent.llm_client.chat.completions.create.return_value = response
 
                 ddl, dml = agent._do_translation_with_agent("ksql_input: CREATE STREAM x;")
 
-        call_args = agent.llm_client.chat.completions.parse.call_args
+        call_args = agent.llm_client.chat.completions.create.call_args
         messages = call_args.kwargs.get("messages") or call_args[1].get("messages")
         self.assertIsNotNone(messages)
         system_msg = next((m for m in messages if m.get("role") == "system"), None)
@@ -76,3 +75,27 @@ class TestRAGPromptAugmentation(unittest.TestCase):
         self.assertIn("Retrieved similar examples", system_msg["content"])
         self.assertIn("KSQL_SNIP", system_msg["content"])
         self.assertIn("ksql_input:", next((m for m in messages if m.get("role") == "user"), {}).get("content", ""))
+
+    def test_strip_markdown_json_removes_code_fences(self):
+        wrapped = '```json\n{\n  "flink_ddl_output": "CREATE TABLE x",\n  "flink_dml_output": ""\n}\n```'
+        stripped = _strip_markdown_json(wrapped)
+        self.assertTrue(stripped.startswith("{"), stripped)
+        self.assertTrue(stripped.endswith("}"), stripped)
+        self.assertNotIn("```", stripped)
+
+    def test_do_translation_parses_markdown_wrapped_json(self):
+        agent = KsqlToFlinkSqlAgent()
+        agent.use_rag_for_translation = False
+        agent.llm_client = MagicMock()
+        response = MagicMock()
+        response.choices = [MagicMock()]
+        response.choices[0].message = MagicMock()
+        response.choices[0].message.content = (
+            '```json\n{"flink_ddl_output": "OUT_DDL", "flink_dml_output": "OUT_DML"}\n```'
+        )
+        agent.llm_client.chat.completions.create.return_value = response
+
+        ddl, dml = agent._do_translation_with_agent("CREATE STREAM x;")
+
+        self.assertEqual(ddl, "OUT_DDL")
+        self.assertEqual(dml, "OUT_DML")

@@ -3,6 +3,7 @@
 ???- info "Version"
     Created Dec - 2024 
     Updated Nov 25 - 2025
+	Updated Feb 2026
 
 
 The current AI based migration implementation supported by this tool enables migration of:
@@ -10,56 +11,79 @@ The current AI based migration implementation supported by this tool enables mig
 * dbt/Spark SQL to Flink SQL
 * ksqlDB to Flink SQL
 
-The approach uses LLM agents local or remote. This document covers the design approach, development environment setup, and how to execute test to tune the AI based SQL migrations, specially how to extend the AI prompts or workflows to get better results.
+The approach uses LLM agents local or remote. This document covers the design approach, development environment setup, and how to execute tests to tune the AI based SQL migrations, specially how to extend the AI prompts or workflows to get better results.
 
 The implementation uses the OpenAI SDK, so different LLM models can be used, as soon as they support OpenAI. The `qwen3:30b` or `qwen-coder-30b-a3b-instruct-mlx-4bit` models can be used locally using Osaurus on Mac M3 Pro with 36GB RAM., or Ollama on Linux VM. Other models running remotely and supporting OpenAI APIs may be used too using your own API key. 
 
 ## Review the end-user lab
 
-Review the [end user lab for ksql migration](../tutorial/migration_ai_lab.md) to understand the how the data engineer can use the tool for migration.
+Review the [end user lab for table migration](../tutorial/migration_ai_lab.md) to understand how data engineers may use the tool for migration. It is important to get RBAC to be able to see Flink statements and submit statements via API.
 
-
-
-???- info "Example of Output"
-    ```sh
-    process SQL file ../src-dbt-project/models/facts/fct_examination_data.sql
-    Create folder fct_exam_data in ../flink-project/staging/facts/p1
-
-    --- Start translator AI Agent ---
-    --- Done translator Agent: 
-    INSERT INTO fct_examination_data
-    ...
-    --- Start clean_sql AI Agent ---
-    --- Done Clean SQL Agent: 
-    --- Start ddl_generation AI Agent ---
-    --- Done DDL generator Agent:
-    CREATE TABLE IF NOT EXISTS fct_examination_data (
-        `exam_id` STRING,
-        `perf_id` STRING,
-    ...
-    ```
-
-For a given table, the tool creates one folder with the table name, a Makefile to help manage the Flink statements with Confluent CLI, a `sql-scripts` folder for the Flink DDL and DML statements. 
-
-Example of created folders:
-
-```sh
-facts
-    └── fct_examination_data
-        ├── Makefile
-        ├── sql-scripts
-        │   ├── ddl.fct_examination_data.sql
-        │   └── dml.fct_examination_data.sql
-        └── tests
-```
+For a given table, the tool creates one folder with the table name, a Makefile to help manage the Flink statements with Confluent CLI, a `sql-scripts` folder for the Flink DDL and DML statements. This is the same as `shift_left table init <table_name> ` command.
 
 As part of the process, developers need to validate the generated DDL and update the PRIMARY key to reflect the expected key. This information is hidden in many files in dbt, and key extraction is not yet automated by the migration tools.
 
 **Attention**, the DML is not executable until all dependent input tables are created.
-  
 
-* The ksqldb files to test, the migration from, are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
+## SQL Sources for test
 
+* Spark examples to migrate from are under [src/shift_left/tests/data/spark-project](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/spark-project)
+* The ksqldb files are in [src/shift_left/tests/data/ksql-project/sources](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/ksql-project/sources)
+* PySpark samples are in [src/shift_left/tests/data/pyspark-project](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/data/pyspark-project)
+
+### Python test code to run migration
+
+The different code is under [tests/ai](https://github.com/jbcodeforce/shift_left_utils/tree/main/src/shift_left/tests/ai) folder.
+
+* Be sure to have define config file and environment variables
+	```sh
+	export FLINK_PROJECT=$(pwd)/tests/data/flink-project
+	export PIPELINES=$FLINK_PROJECT/pipelines
+	export STAGING=$FLINK_PROJECT/staging/
+	```
+* Be sure to have access to a local LLM, Osaurus (for Mac MLX), or Ollama, then specify:
+	```sh
+	export SL_LLM_BASE_URL=http://localhost:1337/v1
+	export SL_LLM_MODEL=qwen3-coder-30b-a3b-instruct-mlx-4bit
+	export SL_LLM_API_KEY=not_needed
+	```
+
+#### Spark migration
+
+* Set SRC_FOLDER variable to get Spark SQL source files
+	```
+	export SRC_FOLDER=$FLINK_PROJECT/../spark-project
+	```
+* Run the first spark SQL migration with:
+	```sh
+	uv run pytest -vs tests/ai/test_first_spark_migration.py
+	```
+
+	Which is the same as the following command plus test assertions
+	```sh
+    shift_left table migrate raw_active_users $SRC_FOLDER/sources/users/raw_active_users.sql $STAGING --source-type spark --product-name users
+	```
+
+* To run all spark sources
+	```sh
+	uv run pytest -vs tests/ai/test_all_spark_migration.py
+	```
+
+### KSQL migration
+
+* Set SRC_FOLDER variable to get spark source files
+	```
+	export SRC_FOLDER=$FLINK_PROJECT/../ksql-project
+	```
+* Run the first spark SQL migration with:
+	```sh
+	uv run pytest -vs tests/ai/test_first_ksql_migration.py
+	```
+
+	Which is the same as the following command plus test assertions
+	```sh
+    shift_left table migrate filtering $SRC_FOLDER/sources/filtering.sql $STAGING --source-type ksql --product-name orders
+	```
 
 * Status of the working migration: See **test_ksql_migration.py::TestKsqlMigrations** code.
 
@@ -71,10 +95,10 @@ As part of the process, developers need to validate the generated DDL and update
 ## Current Agentic Approach
 
 The current agentic workflow includes:
-
+1. **Assess** if sql has multiple create table or stream in one file
 1. **Translate** the given SQL content to Flink SQL
 1. **Validate** the syntax and semantics
-1. **Generate** DDL derived from DML
+1. **Generate** DDL derived from DML, if not translated already
 1. **Get human validation** to continue or not the automation
 1. **Deploy** and test with validation agents [optional]
 
@@ -82,7 +106,7 @@ The system uses validation agents that execute syntactic validation and automati
 
 ## Architecture Overview
 
-The multi-agent system with human-in-the-loop validation may use Confluent Cloud's Flink REST API to deploy a generated Flink statement. The following diagram represents the different agents working together:
+The multi-agent system with human-in-the-loop validation may use Confluent Cloud's Flink REST API to deploy the generated Flink statement. The following diagram represents the different agents working together:
 
 <figure markdown='span'>
 ![AI Agent Flow](./images/ai_agent_new_flow.drawio.png)
@@ -175,24 +199,6 @@ TranslatorToFlinkSqlAgent (Base Class)
 
 **Purpose**: Specialized agent for translating Spark SQL to Flink SQL with enhanced error categorization and refinement.
 
-**Translation Workflow**:
-
-```
-Spark SQL Input
-    ↓
-Translation Agent (Spark → Flink DML)
-    ↓
-DDL Generation Agent (DML → DDL)
-    ↓
-Pre-validation (Syntax Check)
-    ↓
-Confluent Cloud Validation
-    ↓
-Iterative Refinement (if errors)
-    ↓
-Final Flink SQL (DDL + DML)
-```
-
 **Key Features**:
 
 - **Structured Responses**: Uses Pydantic models for consistent LLM output parsing
@@ -221,23 +227,6 @@ class SqlRefinement(BaseModel):
 
 **Purpose**: Specialized agent for translating KSQL (Kafka SQL) to Flink SQL with multi-table support and comprehensive preprocessing.
 
-**Translation Workflow**:
-```
-KSQL Input
-    ↓
-1. Input Cleaning (Remove DROP statements, comments)
-    ↓
-2. Table Detection (Identify multiple CREATE statements)
-    ↓
-3. Individual Translation (Process each statement separately)
-    ↓
-4. Mandatory Validation (Syntax + best practices)
-    ↓
-5. Optional Live Validation (Confluent Cloud)
-    ↓
-Final Flink SQL Collections (DDL[] + DML[])
-```
-
 **Key Features**:
 
 - **Multi-table Processing**: Automatically detects and processes multiple CREATE TABLE/STREAM statements
@@ -259,48 +248,14 @@ class KsqlTableDetection(BaseModel):
     description: str
 ```
 
-
-## A test bed
-
-The current project includes in the `tests/data/` folder some examples of Spark and ksql scripts.
-
-```sh
-tests/data/ksql-project
-├── common.mk
-├── flink-references
-├── sources
-│   ├── aggregation.ksql
-│   ├── ddl-basic-table.ksql
-│   ├── ddl-bigger-file.ksql
-│   ├── ddl-filtering.ksql
-│   ├── ddl-g.ksql
-│   ├── ddl-geo.ksql
-│   ├── ddl-kpi-config-table.ksql
-│   ├── ddl-map_substr.ksql
-│   ├── ddl-measure_alert.ksql
-│   ├── dml-aggregate.ksql
-│   ├── filtering.ksql
-│   ├── geospacial.ksql
-│   ├── merge_tutorial.ksql
-│   ├── movements.ksql
-│   ├── splitter.ksql
-│   ├── splitting_tutorial.ksql
-│   └── w2_processing.ksql
-```
-
-`flink-references` includes some migrated solutions used as reference for validating migrations.
-
-## Prerequisites and Setup for Developers
-
-[See the environment setup for developers section.](../contributing.md/#environment-set-up-for-developers)
-
-* If using `uv` as python package manager (developers of the shift left tool), install it [using the documentation](https://docs.astral.sh/uv/getting-started/installation/).
-
 ## Using Cursor.ai
 
-If oyu have access to Cursor with  `cloud-4.5-sonnet` model, a prompt like:
+If you have access to Cursor with  `claude-4.5-sonnet` model or recent model, a prompt like:
+
 ```sh
 using @src/shift_left/shift_left/ai/prompts/ksql_fsql/translator.txt migrate the @src/shift_left/tests/data/ksql-project/sources/w2_processing.ksql  file
 ```
 
-Will create a markdown file with the original ksql statements and the flink SQL matching statements at a higher speed than running qwen Ollama locally.
+Will create a markdown file with the original ksql statements and the flink SQL matching statements at a higher speed than running qwen locally.
+
+Also using the new SKILL.md support, the translator.txt prompt may be use inside any AI agent using skill.
