@@ -10,6 +10,7 @@ from typing_extensions import Annotated
 import typer
 
 from shift_left.core.utils.secure_typer import create_secure_typer_app
+from shift_left.ai.rag import KsqlFlinkVectorStore, load_ksql_flink_corpus
 
 app = create_secure_typer_app(pretty_exceptions_show_locals=False)
 
@@ -50,14 +51,6 @@ def build(
     index_path = str(Path(index_path).resolve())
     Path(index_path).mkdir(parents=True, exist_ok=True)
 
-    try:
-        from shift_left.ai.rag import KsqlFlinkVectorStore, load_ksql_flink_corpus
-    except ImportError:
-        typer.echo(
-            "Error: RAG dependencies not installed. Install with: pip install -e '.[rag]'",
-            err=True,
-        )
-        raise typer.Exit(1)
 
     pairs = load_ksql_flink_corpus(corpus_path)
     if not pairs:

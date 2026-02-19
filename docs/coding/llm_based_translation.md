@@ -72,9 +72,15 @@ The different code is under [tests/ai](https://github.com/jbcodeforce/shift_left
 ### KSQL migration
 
 * Set SRC_FOLDER variable to get spark source files
+	```sh
+	export SRC_FOLDER=$FLINK_PROJECT/../ksql-project/sources
 	```
-	export SRC_FOLDER=$FLINK_PROJECT/../ksql-project
+
+* Set STAGING
+	```sh
+	export STAGING=$SRC_FOLDER/../staging/ut
 	```
+
 * Run the first spark SQL migration with:
 	```sh
 	uv run pytest -vs tests/ai/test_first_ksql_migration.py
@@ -82,20 +88,31 @@ The different code is under [tests/ai](https://github.com/jbcodeforce/shift_left
 
 	Which is the same as the following command plus test assertions
 	```sh
-    shift_left table migrate filtering $SRC_FOLDER/sources/filtering.sql $STAGING --source-type ksql --product-name orders
+    shift_left table migrate filtering $SRC_FOLDER/filtering.sql $STAGING --source-type ksql --product-name orders
 	```
 
-* Status of the working migration: See **test_ksql_migration.py::TestKsqlMigrations** code.
+* To run all KSQL sources migration
+	```sh
+	uv run pytest -vs tests/ai/test_all_ksql_migration.py
+	```
 
-| Source | Status | Test Case |
-| --- | --- | --- |
-| splitting_tutorial | 4 DDLs ✅ 4 DMLs ✅ | test_ksql_splitting_tutorial |
-| merge_tutorial | 3 DDLs ✅ 2 DMLs ✅ | test_ksql_merge_tutorial | 
+* Add RAG to the process, to get current KSQL and Flink mappings inside the vector store so migration can use examples close to current query
+	```sh
+	export SL_RAG_INDEX_PATH=./tests/data/ksql-project/rag_index
+	uv run shift_left/cli.py rag build ./tests/data/ksql-project
+	```
+* Run all the ksql migration using RAG
+	```sh
+	export SL_RAG_ENABLED=1 
+	uv run pytest -vs tests/ai/test_all_ksql_migration.py
+	```
+
 
 ## Current Agentic Approach
 
 The current agentic workflow includes:
-1. **Assess** if sql has multiple create table or stream in one file
+
+1. **Assess** For Spark sql has multiple create table or stream in one file
 1. **Translate** the given SQL content to Flink SQL
 1. **Validate** the syntax and semantics
 1. **Generate** DDL derived from DML, if not translated already

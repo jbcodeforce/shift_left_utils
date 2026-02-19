@@ -67,19 +67,26 @@ class KsqlToFlinkSqlAgent(TranslatorToFlinkSqlAgent):
                 validate: bool = False
     ) -> Tuple[List[str], List[str]]:
 
-        logger.info("\n0/ Cleaning SQL input by removing DROP TABLE statements and comments...\n")
-        print("\n0/ Cleaning SQL input by removing DROP TABLE statements and comments...\n", flush=True)
+        logger.info("\n0/ Cleaning KSQL input by removing DROP TABLE statements and comments...\n")
+        print("\n0/ Cleaning KSQL input by removing DROP TABLE statements and comments...\n", flush=True)
         final_ddl = []
         final_dml = []
         cleaned_sql = self._clean_sql_input(sql)
-        logger.info(f"Cleaned source SQL input: {cleaned_sql[:400]}...")
+        logger.info(f"Cleaned source SQL input: {cleaned_sql}...")
+        print(f"Cleaned source SQL input:\n {cleaned_sql}", flush=True)
+        logger.info("\n1/ Doing the translation with the agent...\n")
+        print("\n1/ Doing the translation with the agent...\n", flush=True)
         ddl_sql, dml_sql = self._do_translation_with_agent(cleaned_sql)
         logger.info(f"Done with translator agent for statement DDL: {ddl_sql}..., DML: {dml_sql if dml_sql else 'empty'}...")
+        print(f"\n\nTranslated DDL: {ddl_sql}\n\nTranslated DML: {dml_sql if dml_sql else 'empty'}", flush=True)
         self._snapshot_ddl_dml(table_name, ddl_sql, dml_sql)
+
         if ddl_sql and ddl_sql.strip():
             final_ddl.append(ddl_sql)
         if dml_sql and dml_sql.strip():
             final_dml.append(dml_sql)
         if validate:
+            logger.info("\n2/ Validating the translation with the agent...\n")
+            print("\n2/ Validating the translation with the agent...\n", flush=True)
             final_ddl, final_dml = self._validate_ddl_dml_on_cc(final_ddl, final_dml)
         return final_ddl, final_dml

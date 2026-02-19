@@ -1,4 +1,4 @@
-INSERT INTO daily_order_spent
+INSERT INTO ddl_basic_table
 SELECT 
 -- part to select stuff
 FROM src_table

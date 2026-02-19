@@ -17,7 +17,7 @@ from shift_left.ai.process_src_tables import migrate_one_file
 
 app_config.validate_config = MagicMock()
 ksql_sources_dir = data_dir / "ksql-project" / "sources"
-staging_base = data_dir / "flink-project" / "staging" / "ut" / "from_ksql"
+staging_base = data_dir / "ksql-project" / "staging" / "ut" / "from_ksql"
 
 
 def _table_name_from_stem(stem: str) -> str:

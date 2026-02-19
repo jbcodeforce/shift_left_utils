@@ -3,7 +3,7 @@ Copyright 2024-2026 Confluent, Inc.
 
 Corpus loader for ksql-to-Flink SQL example pairs.
 
-Reads flink-references subfolders: one folder per example, each with ksql and
+Reads flink-references subfolders: one folder per sample, each with ksql and
 matching ddl/dml (sql-scripts/ddl.*.sql, dml.*.sql). KSQL is read from a .ksql
 file in the same subfolder, from an optional manifest, or from sources/<name>.ksql.
 """

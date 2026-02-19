@@ -6,7 +6,7 @@ KSQL source files live under `tests/data/ksql-project/sources/`. The following t
 
 | KSQL file | Table name | Test / description | status |
 |-----------|------------|---------------------|---|
-| aggregation.ksql | orders | Aggregation tutorial; outputs orders, daily_spend | |
+| aggregation.ksql | orders | Aggregation tutorial; outputs orders, daily_spend | ✅  |
 | ddl-basic-table.ksql | (basic table/stream) | Basic CREATE TABLE/STREAM | |
 | ddl-bigger-file.ksql | equipment | Multi-stream DDL (EQUIPMENT_STAGE_STREAM, ERRORS_TX, DISCARDS_RX) | |
 | ddl-filtering.ksql | filtering | Filtering CREATE TABLE; reference filtered_orders | |

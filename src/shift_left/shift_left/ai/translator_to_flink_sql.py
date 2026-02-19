@@ -329,9 +329,9 @@ class TranslatorToFlinkSqlAgent():
         """
         if not output:
             return output
-        cleaned = output.replace('\\\\n', ' ')
-        cleaned = cleaned.replace('\\n', ' ')
-        cleaned = cleaned.replace('\n', ' ')
+        cleaned = output.replace('\\\\n', '\n')
+        cleaned = output.replace('\\\n', '\n')
+        cleaned = cleaned.replace('\\n', '\n')
         cleaned = cleaned.replace('\\', ' ')
         return cleaned
 
@@ -401,6 +401,8 @@ class TranslatorToFlinkSqlAgent():
                 return sql, ""
             content = _strip_markdown_json(content)
             parsed = SourceSql2FlinkSql.model_validate_json(content)
+            if not parsed.sql_input:
+                parsed.sql_input = sql
             logger.info(f"\nTranslation Response: {parsed}")
             print(f"\nTranslation Response: {parsed}", flush=True)
             ddl_output = self._clean_output(parsed.flink_ddl_output or "")
