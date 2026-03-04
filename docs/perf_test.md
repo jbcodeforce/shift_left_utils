@@ -37,7 +37,7 @@ As Confluent Cloud for Flink is natively integrated with Kafka, the goal of inte
 The goal are: 
 
 1. To measure how it takes to deploy Flink Statements for a table, a pipeline, a data product
-1. To assess how long it takes for a data created at the source is available for end consumption. 
+1. To assess how long it takes for a data created at the source to be available for end consumption. 
 1. To assess how long it takes to process the lag of data in the first topics representing raw data
 
 As an example, we will take a classical shift left processing architecture with a timing representation:
@@ -58,11 +58,6 @@ As an example, we will take a classical shift left processing architecture with 
 * Scalability Testing
 
     * Test horizontal scaling by assessing CFU increase up to the limit, control those statements to assess if we need to split them.
-    * Test with increasing data volumes
-
-* Scalability Testing
-
-    * Test horizontal scaling (adding/removing task managers)
     * Evaluate job manager performance
     * Test with increasing data volumes
     * Monitor resource utilization

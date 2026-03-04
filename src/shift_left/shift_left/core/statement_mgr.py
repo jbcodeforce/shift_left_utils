@@ -116,6 +116,7 @@ def post_flink_statement(compute_pool_id: str,
                 "spec": {
                     "statement": sql_content,
                     "properties": properties,
+                    "principal": config["confluent_cloud"]["service_account_id"],
                     "compute_pool_id": compute_pool_id,
                     "stopped": stopped
                 }

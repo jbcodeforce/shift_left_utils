@@ -31,7 +31,7 @@ ENV_VAR_MAPPING = {
 
     # Flink API credentials
     "flink.api_key": "SL_FLINK_API_KEY",
-    "flink.api_secret": "SL_FLINK_API_SECRET"
+    "flink.api_secret": "SL_FLINK_API_SECRET",
 }
 
 
@@ -110,6 +110,7 @@ def print_env_var_help():
     print("  export SL_CONFLUENT_CLOUD_API_SECRET='your-confluent-cloud-api-secret'")
     print("  export SL_FLINK_API_KEY='your-flink-api-key'")
     print("  export SL_FLINK_API_SECRET='your-flink-api-secret'")
+    print("  export SL_SERVICE_ACCOUNT_ID='your-service-account-id'")
     print("\nNOTE: Environment variables take precedence over config.yaml values")
     print("="*80 + "\n")
 
@@ -175,8 +176,8 @@ print("-" * 92)
 #logger.addHandler(console_handler)
 
 
-def validate_config(config: dict[str,dict[str,str]]) -> None:
-  """Validate the configuration"""
+def validate_config(config: dict[str,dict[str,str]], minimal: bool = False) -> None:
+  """Validate the configuration. When minimal=True, only check structure (required sections); skip deployment and env checks."""
   errors = []
   warnings = []
   if not config:
@@ -190,6 +191,20 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
       errors.append(f"Configuration is missing {section} section")
   warnings = _check_deprecated_fields(config)
 
+  if minimal:
+    if len(errors) > 0:
+      error_message = "Configuration validation failed with the following errors:\n" + "\n".join(f"  - {error}" for error in errors)
+      sanitized_message = sanitize_error_message(error_message)
+      print(sanitized_message)
+      logger.error(sanitized_message)
+      exit()
+    if len(warnings) > 0:
+      warning_message = "Configuration validation has the following information:\n" + "\n".join(f"  - {warning}" for warning in warnings)
+      sanitized_message = sanitize_error_message(warning_message)
+      print(sanitized_message)
+      logger.warning(sanitized_message)
+    return
+
   # Only proceed with detailed validation if main sections exist
   if not errors:
     # Validate kafka section
@@ -202,7 +217,7 @@ def validate_config(config: dict[str,dict[str,str]]) -> None:
 
     # Validate confluent_cloud section
     if config.get("confluent_cloud"):
-      cc_required = ["environment_id", "region", "provider", "organization_id"]
+      cc_required = ["environment_id", "region", "provider", "organization_id", "service_account_id"]
       for field in cc_required:
         if not config["confluent_cloud"].get(field):
           errors.append(f"Configuration is missing confluent_cloud.{field}")
@@ -310,13 +325,17 @@ def get_config() -> dict[str,dict[str,str]]:
       if CONFIG_FILE:
         try:
           config = {}
-          for section in ["kafka", "confluent_cloud", "flink", "app"]:
+          for section in ["kafka", "confluent_cloud", "flink", "app", "registry"]:
             config[section] = {}
-          config= _apply_default_overrides(config)
+          config = _apply_default_overrides(config)
           with open(CONFIG_FILE) as f:
-            _config = yaml.load(f, Loader=yaml.FullLoader)
-            _merged_config = _merge_config(_config, config)
-            # Apply environment variable overrides for sensitive values
+            loaded = yaml.load(f, Loader=yaml.FullLoader)
+          if loaded is None:
+            print(f"Warning: Configuration file {CONFIG_FILE} is empty. Using defaults.")
+            _config = _apply_env_overrides(config)
+            validate_config(_config, minimal=True)
+          else:
+            _merged_config = _merge_config(loaded, config)
             _config = _apply_env_overrides(_merged_config)
             validate_config(_merged_config)
         except FileNotFoundError:
@@ -332,7 +351,7 @@ def get_config() -> dict[str,dict[str,str]]:
           }
           _config = _apply_default_overrides(_config)
           _config = _apply_env_overrides(_config)
-          validate_config(_config)
+          validate_config(_config, minimal=True)
 
   return _config
 
@@ -415,6 +434,7 @@ def _apply_default_overrides(config: Dict[str, Any]) -> Dict[str, Any]:
   config["kafka"]["cluster_type"]="dev"
   config["kafka"]["src_topic_prefix"]="clone"
   config["confluent_cloud"]["base_api"]="api.confluent.cloud/org/v2"
+  config["confluent_cloud"]["region"]="us-west-2"
   config["confluent_cloud"]["page_size"]=100
   config["confluent_cloud"]["glb_name"]="glb"
   config["confluent_cloud"]["url_scope"]="private"

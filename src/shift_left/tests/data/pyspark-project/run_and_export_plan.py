@@ -4,11 +4,14 @@ as JSON, and optionally run the FlinkSQLGenerator visitor to produce Flink SQL.
 
 Usage (from this directory):
   uv run python run_and_export_plan.py [--output catalyst_plan.json] [--flink]
+  uv run python run_and_export_plan.py --from-file filter.py [--output ...] [--flink]
+  uv run python run_and_export_plan.py --from-file joins_.py --flink
   uv run python run_and_export_plan.py --from-file filter.py --llm-extract [--output ...] [--flink]
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import sys
@@ -37,6 +40,29 @@ def build_pipeline(spark: SparkSession):
     from filter import run
 
     return run(spark)
+
+
+def build_pipeline_from_file(spark: SparkSession, file_path: str):
+    """
+    Load a PySpark pipeline module from file_path, call setup_views(spark) if present,
+    then run(spark) and return the resulting DataFrame.
+    """
+    path = os.path.abspath(file_path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Pipeline file not found: {path}")
+    script_dir = os.path.dirname(path)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    spec = importlib.util.spec_from_file_location("pipeline_module", path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"Could not load module from {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    if not hasattr(mod, "run"):
+        raise ValueError(f"Pipeline module must define run(spark); found in {path}")
+    if hasattr(mod, "setup_views"):
+        mod.setup_views(spark)
+    return mod.run(spark)
 
 
 def build_pipeline_from_llm_extract(spark: SparkSession, snippet: str, table_names: list[str]):
@@ -116,6 +142,8 @@ def main():
             snippet, table_names = extract_pipeline_from_pyspark(source)
             print(f"LLM extracted snippet ({len(snippet)} chars), tables: {table_names}", file=sys.stderr)
             result_df = build_pipeline_from_llm_extract(spark, snippet, table_names)
+        elif args.from_file:
+            result_df = build_pipeline_from_file(spark, args.from_file)
         else:
             result_df = build_pipeline(spark)
         plan_json_str = get_plan_json(result_df)

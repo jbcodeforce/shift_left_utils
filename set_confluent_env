@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Load ~/.confluent/.env and export all variables into the current shell.
+# Usage: source path/to/set_confluent_env   (or . path/to/set_confluent_env)
+CONFLUENT_ENV="${CONFLUENT_ENV:-$HOME/.confluent/.env}"
+if [[ -r "$CONFLUENT_ENV" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$CONFLUENT_ENV"
+  set +a
+  echo "Loaded env from $CONFLUENT_ENV"
+else
+  echo "Not found or not readable: $CONFLUENT_ENV" >&2
+  return 1 2>/dev/null || exit 1
+fi

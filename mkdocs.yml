@@ -25,6 +25,7 @@ nav:
       - Contributing: contributing.md
       - Code structure: coding/index.md
       - AI based migration: coding/llm_based_translation.md
+      - Cursor with local LLM (Osaurus): coding/cursor_local_llm.md
       - Feature Tracking: tracking.md
 theme:
   name: material
