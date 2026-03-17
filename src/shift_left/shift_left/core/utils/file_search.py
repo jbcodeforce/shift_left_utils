@@ -304,13 +304,13 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """
     Returns the name of the ddl or dml files
     """
-    ddl_file_name = None
-    dml_file_name = None
+    ddl_file_name = ""
+    dml_file_name = ""
     base_scripts=os.path.join(root, dir)
     for file in os.listdir(base_scripts):
         if file.startswith("ddl."):
             ddl_file_name=os.path.join(base_scripts,file)
-        if file.startswith('dml.'):
+        if file.startswith('dml.') and file.endswith('.sql'):
             dml_file_name=os.path.join(base_scripts,file)
     if ddl_file_name is None:
         logger.error(f"No DDL file found in the directory: {base_scripts}")
