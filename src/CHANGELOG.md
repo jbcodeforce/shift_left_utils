@@ -1,3 +1,16 @@
+## [0.1.49] - 2026-03-17
+
+### Changes:
+- 0079265 fix typo in project.md
+- 0755ad7 finish project tutorial
+- 39e6354 update to prompt and ai lab
+- 90bb0f7 add rag capability
+- f2954f1 update to mcp index and mcp server. Update data engineer tutorial
+- 9803f91 change to ksql migration
+- 2a56473 modify rag, and add docs
+- f649f7f fix potential issue with insert statements that are just json or xml string. Start to work on pyspark migration. Add principal as mandatory element in post statement
+- 88e2e27 fix an issue while building inventory with .properties file with name starting with dml.
+
 ## [0.1.48] - 2026-01-30
 
 ### Changes:
