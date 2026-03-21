@@ -132,7 +132,9 @@ def post_flink_statement(compute_pool_id: str,
                     logger.error(f"Error executing rest call: {response['errors']}")
                     if response.get("errors")[0].get("status") == "409":
                         delete_statement_if_exists(statement_name)
-                    return  "Exists but deleted so retry"
+                    if response.get("errors")[0].get("status") == "404":
+                        return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail="resource not found")])
+                    return  StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail="Exists but deleted so retry")])
                 #raise Exception(response['errors'][0]['detail'])
                 elif response["status"]["phase"] == "PENDING":
                     return client.wait_response(url, statement_name, start_time)
@@ -151,9 +153,14 @@ def delete_statement_if_exists(statement_name) -> str | None:
     client = ConfluentCloudClient(config)
     # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
     #  so return None
-    result=client.delete_flink_statement(statement_name)
-    if result == "deleted" and statement_name in statement_list:
-        statement_list.pop(statement_name)
+    result = "not found"
+    if statement_name in statement_list:
+        result=client.delete_flink_statement(statement_name)
+        if result == "deleted":
+            statement_list.pop(statement_name)
+            _save_statement_list(statement_list)
+    else:
+        logger.info(f"Statement {statement_name} not found in the statement list")
     return result
 
 def patch_statement_if_exists(statement_name: str, stopped: bool) -> str | None:

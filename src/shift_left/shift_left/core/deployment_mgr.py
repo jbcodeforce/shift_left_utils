@@ -1198,7 +1198,7 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | Statement
     Deploy the DDL and then the DML for the given table to process.
     """
 
-    logger.info(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement")
+    logger.info(f"{node_to_process.ddl_ref} to {node_to_process.compute_pool_id}, first delete dml statement to be able to drop table")
     statement_mgr.delete_statement_if_exists(node_to_process.dml_statement_name) # need this to be able to drop table
     statement_mgr.delete_statement_if_exists(node_to_process.ddl_statement_name)
     rep= statement_mgr.drop_table(node_to_process.table_name, node_to_process.compute_pool_id)
@@ -1214,6 +1214,9 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | Statement
             logger.info(f"DDL deployment status is: {statement.status.phase}")
             if statement.status.phase in ["FAILED"]:
                 raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
+    elif isinstance(statement, StatementError) and statement.errors[0].status == "FAILED" and statement.errors[0].detail == "resource not found":
+        logger.info(f"DDL statement {node_to_process.ddl_statement_name} not found, so no need to deploy")
+        return statement
     else:
         logger.error(f"DDL deployment failed for {node_to_process.table_name}")
         raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
