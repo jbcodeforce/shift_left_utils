@@ -131,7 +131,7 @@ def get_or_build_inventory(
         for dir in dirs:
             if SCRIPTS_DIR == dir:
                 ddl_file_name, dml_file_name = get_ddl_dml_from_folder(root, dir)
-                logger.debug(f"Processing file {dml_file_name}")
+                logger.info(f"Processing file {dml_file_name}")
                 count+=1
                 if not dml_file_name and not ddl_file_name:
                     continue
@@ -308,9 +308,9 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     dml_file_name = ""
     base_scripts=os.path.join(root, dir)
     for file in os.listdir(base_scripts):
-        if file.startswith("ddl."):
+        if file.startswith("ddl.") and not file.endswith('.properties') :
             ddl_file_name=os.path.join(base_scripts,file)
-        if file.startswith('dml.') and file.endswith('.sql'):
+        if file.startswith('dml.') and not file.endswith('.properties'):
             dml_file_name=os.path.join(base_scripts,file)
     if ddl_file_name is None:
         logger.error(f"No DDL file found in the directory: {base_scripts}")

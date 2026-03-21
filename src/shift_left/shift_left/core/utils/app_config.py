@@ -32,6 +32,16 @@ ENV_VAR_MAPPING = {
     # Flink API credentials
     "flink.api_key": "SL_FLINK_API_KEY",
     "flink.api_secret": "SL_FLINK_API_SECRET",
+    "flink.compute_pool_id": "FLINK_COMPUTE_POOL_ID",
+    "flink.catalog_name": "FLINK_ENV_NAME",
+    "flink.database_name": "FLINK_DATABASE_NAME",
+    # Cloud provider and region
+    "confluent_cloud.cloud_provider": "CLOUD_PROVIDER",
+    "confluent_cloud.cloud_region": "CLOUD_REGION",
+    "confluent_cloud.organization_id": "CLOUD_ORGANIZATION_ID",
+    "confluent_cloud.service_account_id": "CLOUD_SERVICE_ACCOUNT_ID",
+    "confluent_cloud.environment_id": "FLINK_ENV_ID",
+    "confluent_cloud.service_account_id": "SL_CONFLUENT_PRINCIPAL_ID",
 }
 
 
