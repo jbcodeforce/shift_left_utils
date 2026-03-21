@@ -1,6 +1,15 @@
 # CHANGELOG
 
+### v0.1.49 2026-03-21
+
 * Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.
+* Improve 404 resources not found on some POST
+* Add more environment variables to configure the cli
+* Avoid conflict with .properties name in metadata creation.
+* Improve documentation, finish project tutorial.
+* Work on AI processing: prompt, add rag capability, change to ksql migration
+* Update to mcp index and mcp server. 
+* Update data engineer tutorial
 
 ### v0.1.48  - 2026-01-30
 
