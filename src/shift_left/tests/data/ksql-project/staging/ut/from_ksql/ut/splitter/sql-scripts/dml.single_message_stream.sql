@@ -1,0 +1,1 @@
+INSERT INTO single_message_stream SELECT message FROM (SELECT message FROM multi_message_stream CROSS JOIN UNNEST(MESSAGES) AS u(message)) WHERE message IS NOT NULL;

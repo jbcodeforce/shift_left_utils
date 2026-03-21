@@ -1,5 +1,5 @@
 """
-Copyright 2024-2025 Confluent, Inc.
+Copyright 2024-2026 Confluent, Inc.
 """
 import unittest
 import pathlib

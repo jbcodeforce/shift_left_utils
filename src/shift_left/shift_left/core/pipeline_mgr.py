@@ -338,10 +338,10 @@ def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, 
             dml_file_name = ""
             ddl_file_name = ""
             for file_path in sql_scripts_path.iterdir(): #Iterate through the directory.
-                if file_path.is_file() and file_path.name.startswith("dml"):
+                if file_path.is_file() and file_path.name.startswith("dml") and not file_path.name.endswith(".properties"):
                     logger.debug(f"Process the dml {file_path}")
                     dml_file_name = str(file_path.resolve())
-                if file_path.is_file() and file_path.name.startswith("ddl"):
+                if file_path.is_file() and file_path.name.startswith("ddl") and not file_path.name.endswith(".properties"):
                     ddl_file_name = str(file_path.resolve())
             count += 1
             build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)

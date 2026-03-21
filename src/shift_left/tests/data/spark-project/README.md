@@ -1,13 +1,13 @@
 # Spark SQL Script Validation
 
-This directory contains Spark SQL test scripts and a validation tool to ensure they are syntactically correct and executable.
+This directory contains Spark SQL scripts and a validation tool to ensure they are syntactically correct and executable.
 
 ## Prerequisites
 
 Install PySpark:
 ```bash
 pip install -r requirements.txt
-or uv 
+or uv sync
 ```
 
 ## Directory Structure
@@ -47,7 +47,7 @@ The test scripts cover various Spark SQL features:
 
 ```bash
 cd shift_left_utils/src/shift_left/tests/data/spark-project
-python validate_spark_scripts.py
+uc run python validate_spark_scripts.py
 ```
 
 ### Expected Output

@@ -1,4 +1,4 @@
-# shift_left
+# Shift_left
 
 CLI to manage Flink projects and migrate batch SQL pipelines to real-time Apache Flink on Confluent Cloud. Supports KSQL, Spark SQL, and dbt as sources.
 

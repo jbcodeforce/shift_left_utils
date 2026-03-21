@@ -1,63 +1,59 @@
 # Lab: Project Management
 
-This lab focuses on starting a Confluent Flink project using best practices.
+This lab focuses on starting a Confluent Flink project at scale, using best practices gathered during different real-life projects.
 
-At the highest level the SDLC for flink project may include the following activities, as presented in this Lab:
+At the highest level, the SDLC for flink project, may include the following activities:
 
 <figure markdown='span'>
 ![](./images/flink_dev_flow.drawio.png)
 </figure>
 
+This labs introduces such activities.
 
-##  Prerequisite
+##  Prerequisites
 
-You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured and running. Ensure `CONFIG_FILE`, `PIPELINES`, are set as described there.
+You have followed [the setup lab](setup_lab.md) to get shift_left CLI configured and running. Ensure `CONFIG_FILE`, `PIPELINES`, are set as described.
 
-In this lab:
+In this lab, we are addressing the folling 
 
-- [Initialize a Project](#initialize-a-project)
-- [Add a source table](#add-a-source-table)
-- [Adding unit tests](#adding-unit-tests)
-- [Project Admin Work](#project-admin-work)
+- [Initialize a Project](#initialize-a-project) using infrastructure as code and CLI.
+- [Add tables](#add-a-source-table) to add source processing, or building dimensions and facts using a data product approach.
+- [Adding unit tests](#adding-unit-tests) to run on Confluent Cloud.
+- [Project Admin Work](#project-admin-work) like building a table inventory, managing table metadata,working on Flink statements, assess table or data product execution plans, find orphan tables. 
 
 ## Initialize a Project
 
-* Go to where you want to create the Flink project
+* Select a folder from where to create the Flink project
 * Execute the project init command:
 	```sh
 	shift_left project init <project_name> <project_path>
-	```
-
-* Example for a default Kimball project
-	```sh
+	# Example for a default Kimball project
 	shift_left project init dsp .
 	```
 
-
-
-The folder structure looks like:
-```sh
-dsp
-├── docs
-├── IaC
-│   └── environments
-│       ├── dev
-│       │   ├── confluent_tf_graph.md
-│       │   ├── confluent.tf
-│       │   ├── outputs.tf
-│       │   ├── providers.tf
-│       │   ├── terraform.tfvars.example
-│       │   └── variables.tf
-│       └── prod
-├── pipelines
-│   ├── common.mk
-│   ├── dimensions
-│   ├── facts
-│   ├── intermediates
-│   ├── sources
-│   └── views
-└── staging
-```
+* The created folder structure looks like:
+	```sh
+	dsp
+	├── docs
+	├── IaC
+	│   └── environments
+	│       ├── dev
+	│       │   ├── confluent_tf_graph.md
+	│       │   ├── confluent.tf
+	│       │   ├── outputs.tf
+	│       │   ├── providers.tf
+	│       │   ├── terraform.tfvars.example
+	│       │   └── variables.tf
+	│       └── prod
+	├── pipelines
+	│   ├── common.mk
+	│   ├── dimensions
+	│   ├── facts
+	│   ├── intermediates
+	│   ├── sources
+	│   └── views
+	└── staging
+	```
 
 ## Leveraging Infrastructure As Code
 
@@ -65,14 +61,22 @@ The approach is to use Terraform to create Confluent Cloud Environment,  Kafka C
 
 | File | Purpose |
 | --- | --- |
-| providers.tf | Terraform provider configuration (Confluent, etc.) |
-| confluent.tf | Confluent Cloud resources (environment, Kafka, Schema Registry, compute pool) |
-| variables.tf | Input variables (e.g. region, cluster name) |
-| outputs.tf | Output values (resource IDs, API keys) | 
+| **providers.tf** | Terraform provider configuration (Confluent, etc.) |
+| **confluent.tf** | Confluent Cloud resources (environment, Kafka, Schema Registry, compute pool) |
+| **variables.tf** | Input variables (e.g. region, cluster name) |
+| **outputs.tf** | Output values (resource IDs, API keys) | 
 
 To be able to run the terraform, a SRE needs to create, in the Confluent Console,  a service account, and the confluent cloud key and secrets for the terraform cli to use.
-`
+
 It is possible to reuse existing environment, schema registry and kafka cluster by setting their ids in the `terraform.tfvars` file.
+
+```sh
+existing_environment_id     	= "env-xxxxx"  # Leave null to create new environment
+existing_kafka_cluster_id   	= "lkc-xxxxx"  # Leave null to create new cluster
+existing_schema_registry_id 	= "lsrc-xxxxx"  # Leave null to use auto-provisioned Schema Registry
+existing_service_account_id 	= "sa-xxxxx"   # Leave null to create new service account
+existing_flink_compute_pool_id 	= "lfcp-xxxxx"  # Uncomment and set ID to reuse existing
+```
 
 The elements created are:
 
@@ -104,13 +108,13 @@ The elements created are:
 ```
 
 
-In most environment, it will be possible to get the production or staging real data set to the dev Kafka Cluster. Here is a typical architecture for development using [cluster](https://docs.confluent.io/cloud/current/clusters/index.html) and [schema linking](https://docs.confluent.io/cloud/current/sr/schema-linking.html).
+In most environment, it will be possible to get the production data to the dev Kafka Cluster. Below is a typical architecture for development using [cluster link](https://docs.confluent.io/cloud/current/clusters/index.html) and [schema linking](https://docs.confluent.io/cloud/current/sr/schema-linking.html).
 
 <figure markdown='span'>
 ![](./images/data_replic_env.drawio.png)
 </figure>
 
-This means testing Flink statements on real-life data, is very valuable to verify if the statement works, but also assess data quality and even data skew.
+This means testing Flink statements on real-life data, is very valuable to verify if the statement works, but also assess data quality and data skew.
 
 ## Add a source table
 
@@ -120,7 +124,7 @@ The goal for source tables, is to remove duplication, filter records, and maybe 
 ![](./images/raw_to_src.drawio.png)
 </figure>
 
-As an example, this tutorial creates some table for a data product for a customer 360 profiling. The final solution is in [this git repo](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing)
+As an example, this tutorial creates some table for a data product for a customer 360 profiling. The final solution is visible in [this git repo](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing)
 
 * As a Data Engineer the environment variables should be set to point to the created project
 	```sh
@@ -153,54 +157,56 @@ As an example, this tutorial creates some table for a data product for a custome
 │   │           └── tracking.md
 ```
 
-*The approach to have DDL and DML in different files, is to separate the table creation from the insertion logic to avoid droping the table each time there is a change to the logic during development*
+*The approach to have DDL and DML in different files, to separate the table creation from the insertion logic, is to avoid droping the table each time there is a change to the logic, which happen quite often during Flink SQL development.*
 
 
 ### Update the DDL content
 
 Change the DDL content in the file: `ddl.src_c360_customers.sql` to the following content:
-	```sql
-	CREATE TABLE IF NOT EXISTS src_c360_customers (
-		customer_id STRING,
-		first_name STRING,
-		last_name STRING,
-		email STRING,
-		phone STRING,
-		date_of_birth DATE,
-		gender STRING,
-		registration_date TIMESTAMP(3),
-		customer_segment STRING,
-		preferred_channel STRING,
-		address_line1 STRING,
-		city STRING,
-		state STRING,
-		zip_code STRING,
-		country STRING,
-		age_years BIGINT,
-		days_since_registration BIGINT,
-		generation_segment STRING,
-		missing_email_flag BIGINT,
-		missing_phone_flag BIGINT,
-	PRIMARY KEY(customer_id) NOT ENFORCED
-	) DISTRIBUTED BY HASH(customer_id) INTO 1 BUCKETS
-	WITH (
-	'changelog.mode' = 'upsert',
-	'key.avro-registry.schema-context' = '.flink-dev',
-	'value.avro-registry.schema-context' = '.flink-dev',
-	'key.format' = 'avro-registry',
-	'value.format' = 'avro-registry',
-	'kafka.retention.time' = '0',
-	'kafka.producer.compression.type' = 'snappy',
-	'scan.bounded.mode' = 'unbounded',
-	'scan.startup.mode' = 'earliest-offset',
-	'value.fields-include' = 'all'
-	);
-	```
 
-	The table is upsert changelog mode with a primary key, so records will be deduplicated automatically by the Flink engine. As multiple Kafka Clusters are defined in Confluent Cloud environment, and there is one schema registry in t he environement, this is good practices to isolate the schema-context in the schema registry. [See product schema-context documentation](https://docs.confluent.io/platform/current/schema-registry/schema-contexts-cp.html).
+```sql
+CREATE TABLE IF NOT EXISTS src_c360_customers (
+	customer_id STRING,
+	first_name STRING,
+	last_name STRING,
+	email STRING,
+	phone STRING,
+	date_of_birth DATE,
+	gender STRING,
+	registration_date TIMESTAMP(3),
+	customer_segment STRING,
+	preferred_channel STRING,
+	address_line1 STRING,
+	city STRING,
+	state STRING,
+	zip_code STRING,
+	country STRING,
+	age_years BIGINT,
+	days_since_registration BIGINT,
+	generation_segment STRING,
+	missing_email_flag BIGINT,
+	missing_phone_flag BIGINT,
+PRIMARY KEY(customer_id) NOT ENFORCED
+) DISTRIBUTED BY HASH(customer_id) INTO 1 BUCKETS
+WITH (
+'changelog.mode' = 'upsert',
+'key.avro-registry.schema-context' = '.flink-dev',
+'value.avro-registry.schema-context' = '.flink-dev',
+'key.format' = 'avro-registry',
+'value.format' = 'avro-registry',
+'kafka.retention.time' = '0',
+'kafka.producer.compression.type' = 'snappy',
+'scan.bounded.mode' = 'unbounded',
+'scan.startup.mode' = 'earliest-offset',
+'value.fields-include' = 'all'
+);
+```
+
+The table is upsert changelog mode with a primary key, so records will be deduplicated automatically by the Flink engine. As multiple Kafka Clusters are defined in Confluent Cloud environment, and there is one schema registry in the environement, this is good practice to isolate the schema-context in the schema registry. [See product schema-context documentation](https://docs.confluent.io/platform/current/schema-registry/schema-contexts-cp.html).
 
 
 ### Update the DML content
+
 Do the same for the `dml.src_c360_customers.sql`:
 
 ```sql
@@ -239,16 +245,16 @@ SELECT
 FROM customers_raw
 ```
 
-It is possible for a Data Engineer to use VsCode to develop those SQL statement and the [Confluent VScode extension](https://docs.confluent.io/cloud/current/client-apps/vs-code-extension.html) to deploy to Confluent Cloud. 
+It is possible for a Data Engineer to use VsCode to develop those SQL statements using the [Confluent VScode extension](https://docs.confluent.io/cloud/current/client-apps/vs-code-extension.html). 
 
-The natural way to develop DML is to use the Confluent Cloud Workspace and build the SQL iteratively, by looking at test data.
+The natural way to develop DML is to use the Confluent Cloud Workspace and build the SQL iteratively, by looking at data, build CTEs and then final `insert into`
 <figure markdown='span'>
 ![](./images/cc_wkspace.png)
 </figure>
 
-Copy/paste the above DML will not work as the customers_raw is not created. As seen in previous section, in real-life the Kafka dev cluster may have real data created by replicating source topics, like a `customers_raw`. In this tutorial we need to create the table, we will do that in few minutes.
+Copy/paste the above DML will fail as the `customers_raw` is not created. As seen in previous section, in real-life the Kafka dev cluster may have real data created by replicating source topics, like a `customers_raw` topic. In this tutorial we need to create the table, we will do that in next section.
 
-The `shift_left` tool has also created a Makefile for each table so Data engineer may use `make` to deploy DDL and DML. The makefile encapsulate `confluent cli` command to make common verbs to work on Flink statement:
+The `shift_left` tool has also created a Makefile for each table so Data engineer may use `make` to deploy DDL and DML. The makefile encapsulates the  `confluent cli` commands to simplify memorizing the commands with simple common verbs to work on Flink statement:
 
 ```sh
 make create_flink_ddl
@@ -263,9 +269,11 @@ make resume_flink_dml
 make drop_table
 ```
 
+Those verbs are the same for all tables.
+
 ## Adding unit tests
 
-Shift_left includes a test harness command to introspecte the SQL and to create synthetic data.
+`shift_left` includes a test harness command to introspecte the SQL and to create synthetic data.
 
 * The first thing to do is to get a table inventory up-to-date so the tool can search parent definition of the table under tests. 
 	```sh
@@ -345,6 +353,7 @@ To deploy DDL and DML to Confluent Cloud (create/run Flink statements), see [Pip
 
 ### Build table inventory
 
+The following command will create a json file under the $PIPELINES folder of all the tables defined in the repository.
 ```sh
 shift_left table build-inventory
 ```
@@ -359,18 +368,19 @@ shift_left project validate-config
 
 ### Build Table RelationShips
 
-For each table created by Flink statement it is easy by parsing the SQL statement to know the direct parents using the JOINS, FROM clauses. The following command creates a `pipeline_definition.json` file for each table that includes the parent list and also assess the complexity of the statement so we could compute the global complexity of a data product.
+For each table created by Flink statement, it is easy by parsing the SQL statement to know the direct parents using the JOINS, FROM clauses. The following command creates a `pipeline_definition.json` file for each table that includes the parent list and also assess the complexity of the statement so we could compute the global complexity of a data product.
 
 ```sh
 shift_left pipeline build-all-metadata
 ```
 
 When crawling the complete repository the tool updates each table's pipeline_definition.json children list when this table is parent of another. 
+
 This element is crucial to manage a end-to-end pipeline. The following example comes from this [repository with a customer 360 data analytics product](https://github.com/jbcodeforce/flink_project_demos/tree/main/customer_360/c360_flink_processing)
 
 ```json
 {
-   "table_name": "int_c360_customer_transactions",
+   "table_name": "dim_c360_customer_transactions",
    "product_name": "c360",
    "type": "intermediate",
    "dml_ref": "pipelines/intermediates/c360/int_customer_transactions/sql-scripts/dml.int_c360_customer_transactions.sql",
@@ -434,12 +444,16 @@ This element is crucial to manage a end-to-end pipeline. The following example c
 
 Here is a graph view for a view table of a data analytics product:
 
+<figure markdown='span'>
 ![](./images/graph_vire_flk_statements.png)
+</figure>
 
-This graph can be construct for any table using the command like:
+This graph can be built for any table using a command like:
 
 ```sh
-shift_left pipeline report 
+shift_left pipeline report <table_name>
+#
+shift_left pipeline report  customer_analysis_c360 --open
 ```
 
 ### Get Table Use Cross Data Product
@@ -458,12 +472,39 @@ Report tables that have exactly one child table. Useful for pipeline simplificat
 shift_left project list-tables-with-one-child
 ```
 
+Table with single descendant may be good candidate to become CTEs for the child table.
+
 ### Getting the list of compute pools
 
 Getting current CFU utilization and the list of all compute pools
 
 ```sh
 shift_left project list-compute-pools
+```
+
+The response looks like:
+```json
+ComputePoolList(
+    created_at=datetime.datetime(2026, 2, 2, 10, 52, 10, 327409),
+    pools=[
+        ComputePoolInfo(
+            id='lfcp-....',
+            name='dev-src-sdp-shipments',
+            env_id='env-....',
+            max_cfu=30,
+            region='us-west-2',
+            status_phase='PROVISIONED',
+            current_cfu=1
+        ),
+        ComputePoolInfo(
+            id='lfcp-....',
+            name='data-generation',
+            env_id='env-....',
+            max_cfu=50,
+            region='us-west-2',
+            status_phase='PROVISIONED',
+            current_cfu=0
+        )]
 ```
 
 ### Getting the list of statements running in a compute pool
@@ -511,6 +552,14 @@ shift_left project housekeep-statements
 
 # Delete COMPLETED statements named like "workspace*" older than 7 days
 shift_left project housekeep-statements --starts-with workspace --status COMPLETED --age 7
+```
+
+Here is an example of output:
+```sh
+20260202_10:56:43 Statement list has 90 statements
+20260202_10:56:43 Clean statements starting with [ workspace ] in ['COMPLETED'] state, with a age >= [ 0 ]
+20260202_10:56:43 delete workspace-2025-12-20-010600-83d7913f-0db7-4509-be27-9ed218b29687 COMPLETED
+20260202_10:56:43 delete workspace-2025-12-20-010600-a46b44d5-ed97-4b14-9228-f924a7a9c0d4 COMPLETED
 ```
 
 **Pool-specific actions (with `--compute-pool-id`):** Run an action on statements in a single compute pool. Requires `--action`. Do not use `--starts-with`, `--status`, or `--age` in this mode.
@@ -619,5 +668,12 @@ The full report includes an "Unused Tables" section (table name, type, product, 
 │ users_salted          │
 │ users_transform       │
 └───────────────────────┘
+```
 
+### Drop all tables from a list
+
+As a continuation of assessing orphans, user needs to validate false-positive and update the reported text file accordingly. Once done the following command will call drop table on each of those table
+
+```sh
+shift_left project delete-unused-tables toremove.txt
 ```

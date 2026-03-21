@@ -7,7 +7,7 @@ import os, pathlib
 #os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config
-
+import  shift_left.core.statement_mgr as sm
 class TestConfluentClient(unittest.TestCase):
 
     def test_get_environment_list(self):
@@ -20,7 +20,7 @@ class TestConfluentClient(unittest.TestCase):
         for e in environments['data']:
             print(e['display_name'])
             print(e['id'])
-  
+
 
     def test_get_compute_pool_list(self):
         print("#"*30 + "\ntest_get_compute_pool_list\n")
@@ -49,7 +49,7 @@ class TestConfluentClient(unittest.TestCase):
         client = ConfluentCloudClient(config)
         pool = client.create_compute_pool(spec)
         assert pool
-                                            
+
     def test_get_topic_list(self):
         print("#"*30 + "\ntest_get_topic_list\n")
         client = ConfluentCloudClient(get_config())
@@ -68,7 +68,10 @@ class TestConfluentClient(unittest.TestCase):
         properties = {'sql.current-catalog' : 'examples' , 'sql.current-database' : 'marketplace'}
         rep= client.delete_flink_statement(statement_name)
         try:
-            statement = client.post_flink_statement(config['flink']['compute_pool_id'], statement_name, sql_content, properties, False)
+            statement = sm.post_flink_statement(compute_pool_id=config['flink']['compute_pool_id'],
+                                statement_name=statement_name,
+                                sql_content=sql_content,
+                                stopped=False)
             print(f"\n\n---- {statement}")
             assert statement.result.results
             print( statement.result.results[0]['results']['data'][0]['row'])
@@ -76,7 +79,7 @@ class TestConfluentClient(unittest.TestCase):
             assert statement
             print(f"--- {statement}")
             print("#"*30 + "\n Verify get flink statement list\n")
-            statements = client.get_flink_statement_list()
+            statements = sm.get_statement_list()
             self.assertGreater(len(statements), 0)
             print(json.dumps(statements, indent=2))
         except Exception as e:
@@ -90,7 +93,7 @@ class TestConfluentClient(unittest.TestCase):
         topic_name = "src_aqem_tag_tag"
         message_count = client.get_topic_message_count(topic_name)
         print(f"Message count for {topic_name}: {message_count}")
-    
+
 
 
 if __name__ == '__main__':

@@ -72,9 +72,9 @@ def search_source_dependencies(table_sql_file_name: Annotated[str, typer.Argumen
 @app.command()
 def migrate(
         table_name: Annotated[str, typer.Argument(help= "the name of the table once migrated.")],
-        sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql script to migrate.")],
+        sql_src_file_name: Annotated[str, typer.Argument(help= "the source file name for the sql or pyspark script to migrate.")],
         target_path: Annotated[str, typer.Argument(envvar=["STAGING"], help ="the target path where to store the migrated content (default is $STAGING)")],
-        source_type: str = typer.Option(default="spark", help="the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc."),
+        source_type: str = typer.Option(default="spark", help="the type of the SQL source file to migrate. It can be ksql, dbt, spark, pyspark, etc."),
         validate: bool = typer.Option(False, "--validate", help="Validate the migrated sql using Confluent Cloud for Flink."),
         product_name: str = typer.Option(default="default", help="Product name to use for the table. If not provided, it will use the table_path last folder as product name"),
      ):
@@ -82,8 +82,14 @@ def migrate(
     Migrate a source SQL Table defined in a sql file with AI Agent to a Staging area to complete the work.
     The command uses the SRC_FOLDER to access to src_path folder.
     """
+    if not table_name:
+        print("[red]Error: table_name needs to be provided.[/red]")
+        exit(1)
+    if not sql_src_file_name:
+        print("[red]Error: src_file_name needs to be provided.[/red]")
+        exit(1)
     print("\n" + "#" * 30)
-    if not sql_src_file_name.endswith(".sql") and not sql_src_file_name.endswith(".ksql"):
+    if not sql_src_file_name.endswith(".sql") and not sql_src_file_name.endswith(".ksql") and not sql_src_file_name.endswith(".py"):
         print("[red]Error: the sql_src_file_name parameter needs to be a dml sql file or a ksql file[/red]")
         exit(1)
     if not target_path and not os.getenv("STAGING"):

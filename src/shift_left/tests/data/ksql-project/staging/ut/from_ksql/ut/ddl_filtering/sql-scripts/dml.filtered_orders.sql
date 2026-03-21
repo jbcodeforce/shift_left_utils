@@ -1,0 +1,1 @@
+INSERT INTO filtered_orders SELECT `order`, order_sum FROM orders WHERE order_sum > 100;

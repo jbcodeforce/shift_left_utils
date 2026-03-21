@@ -1,0 +1,212 @@
+[
+  {
+    "class": "org.apache.spark.sql.catalyst.plans.logical.Aggregate",
+    "num-children": 1,
+    "groupingExpressions": [
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+          "num-children": 0,
+          "name": "user_id",
+          "dataType": "string",
+          "nullable": true,
+          "metadata": {},
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 0,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": "[ecommerce_events]"
+        }
+      ]
+    ],
+    "aggregateExpressions": [
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+          "num-children": 0,
+          "name": "user_id",
+          "dataType": "string",
+          "nullable": true,
+          "metadata": {},
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 0,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": "[ecommerce_events]"
+        }
+      ],
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.Alias",
+          "num-children": 1,
+          "child": 0,
+          "name": "purchase_count",
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 2,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": [],
+          "nonInheritableMetadataKeys": "[__dataset_id, __col_position]"
+        },
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression",
+          "num-children": 1,
+          "aggregateFunction": 0,
+          "mode": {
+            "object": "org.apache.spark.sql.catalyst.expressions.aggregate.Complete$"
+          },
+          "isDistinct": false,
+          "resultId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 5,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          }
+        },
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.aggregate.Count",
+          "num-children": 1,
+          "children": [
+            0
+          ]
+        },
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.Literal",
+          "num-children": 0,
+          "value": "1",
+          "dataType": "integer"
+        }
+      ]
+    ],
+    "child": 0
+  },
+  {
+    "class": "org.apache.spark.sql.catalyst.plans.logical.Project",
+    "num-children": 1,
+    "projectList": [
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+          "num-children": 0,
+          "name": "user_id",
+          "dataType": "string",
+          "nullable": true,
+          "metadata": {},
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 0,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": []
+        }
+      ]
+    ],
+    "child": 0
+  },
+  {
+    "class": "org.apache.spark.sql.catalyst.plans.logical.Filter",
+    "num-children": 1,
+    "condition": [
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.And",
+        "num-children": 2,
+        "left": 0,
+        "right": 1
+      },
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.IsNotNull",
+        "num-children": 1,
+        "child": 0
+      },
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+        "num-children": 0,
+        "name": "event_name",
+        "dataType": "string",
+        "nullable": true,
+        "metadata": {},
+        "exprId": {
+          "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+          "id": 1,
+          "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+        },
+        "qualifier": "[ecommerce_events]"
+      },
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.EqualTo",
+        "num-children": 2,
+        "left": 0,
+        "right": 1
+      },
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+        "num-children": 0,
+        "name": "event_name",
+        "dataType": "string",
+        "nullable": true,
+        "metadata": {},
+        "exprId": {
+          "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+          "id": 1,
+          "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+        },
+        "qualifier": "[ecommerce_events]"
+      },
+      {
+        "class": "org.apache.spark.sql.catalyst.expressions.Literal",
+        "num-children": 0,
+        "value": "purchase",
+        "dataType": "string"
+      }
+    ],
+    "child": 0
+  },
+  {
+    "class": "org.apache.spark.sql.execution.LogicalRDD",
+    "num-children": 0,
+    "output": [
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+          "num-children": 0,
+          "name": "user_id",
+          "dataType": "string",
+          "nullable": true,
+          "metadata": {},
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 0,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": []
+        }
+      ],
+      [
+        {
+          "class": "org.apache.spark.sql.catalyst.expressions.AttributeReference",
+          "num-children": 0,
+          "name": "event_name",
+          "dataType": "string",
+          "nullable": true,
+          "metadata": {},
+          "exprId": {
+            "product-class": "org.apache.spark.sql.catalyst.expressions.ExprId",
+            "id": 1,
+            "jvmId": "04d300d9-91e1-4476-98e0-fe87cb869494"
+          },
+          "qualifier": []
+        }
+      ]
+    ],
+    "rdd": null,
+    "outputPartitioning": {
+      "product-class": "org.apache.spark.sql.catalyst.plans.physical.UnknownPartitioning",
+      "numPartitions": 0
+    },
+    "outputOrdering": [],
+    "isStreaming": false,
+    "session": null
+  }
+]

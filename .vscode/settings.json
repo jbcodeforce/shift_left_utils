@@ -1,4 +1,11 @@
 {
+  // --- Cursor: local LLM (Osaurus) for offline/airplane use ---
+  // Use Cursor Settings → Models → OpenAI API Keys → set Override Base URL to:
+  //   http://127.0.0.1:1337/v1
+  // and API key to any placeholder (e.g. not-needed). Then pick a model exposed by Osaurus.
+  // See docs/coding/cursor_local_llm.md for full steps.
+  "cursor.openai.baseUrl": "http://127.0.0.1:1337/v1",
+
   // Python-specific settings
   "python.analysis.extraPaths": [
     "src/shift_left"

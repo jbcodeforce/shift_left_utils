@@ -4,17 +4,18 @@ The current AI based migration implementation supported by this tool enables mig
 
 * dbt/Spark SQL to Flink SQL
 * ksqlDB to Flink SQL
+* PySpark to Flink SQL
 
 The approach uses LLM agents local or remote. After this lab you should be able to use the `shift_left` tool to partially automate your SQL migration to Flink SQL.
 
-The core idea is to leverage LLMs to understand the source SQL semantics and to translate them to Flink SQLs. 
+The core idea is to leverage LLMs and parser tools to understand the source SQL semantics and to translate them to Flink SQLs. 
 
 **This is github repositiory is not production ready, the LLM can generate hallucinations, and one to one mapping between source like ksqlDB or Spark to Flink is sometime not the best approach.** We expect that this agentic solution could be a strong foundation for better results, and can be enhanced over time.
 
 **Migration** is a one time shot, and should not be a practice to develop Flink solution.
 
 ???+ warning "Lab Environment"
-	The Lab was developed and tested on Mac. `shift_tool` runs on Mac, Linux and Windows WSL.
+	The Lab was developed and tested on Mac. `shift_left` runs on Mac, Linux and Windows WSL.
 
 ## Prerequisites
 
@@ -22,45 +23,75 @@ Be sure to have done the [Setup Lab](./setup_lab.md) to get shift_left cli opera
 For the AI based migration the following needs to be done:
 
 1. A computer with at least 20GB of Free RAM, with GPU - (All development was done on MAC M3 Pro 36GB )
-1. [Install Ollama](https://ollama.com/download/mac)
-	```sh
-	# Verify the ollama cli:
-	ollama list 
-	ollama --help
-	```
+1. Install one of the local LLM server. (On Mac, server needs to support MLX, so Osaurus or LMStudio are good candidates)
 
-1. Download the `qwen3-coder:30b` model:
-	```sh
-    ollama pull qwen3-coder:30b
-	```
+	=== "Osaurus"
+		[Osaurus](https://osaurus.ai/) is dedicate AI environment for Mac to leverage MLX capabilities, and is native Swift implementation with low memory footprint.
 
-1. Add or update the following environments variables in your `set_env_var`
-	```sh
-	export SL_LLM_BASE_URL=http://localhost:11434/v1
-	export SL_LLM_MODEL=qwen3-coder:30b
-	export SL_LLM_API_KEY=not_needed_key
-	# and the following variables will be use to control `confluent` cli during statement deployment
-	export CCLOUD_ENV_ID=env-
-	export CCLOUD_ENV_NAME=
-	export CCLOUD_KAFKA_CLUSTER=<name of the kafka cluster>
-	export CLOUD_REGION=us-west-2
-	export CLOUD_PROVIDER=aws
-	export CCLOUD_CONTEXT=login-<your email>-https://confluent.cloud
-	export CCLOUD_COMPUTE_POOL_ID=<compute pool id>
-	```
+		1. Install
+			```sh
+			brew install osaurus
+			```
 
-1. Start Ollama server:
-	```sh
-	ollama serve
-	```
+		2. Download model `qwen3-coder-30b-a3b-instruct-mlx-4bit`
+		1. Set env variables:
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:1334/v1
+			export SL_LLM_MODEL=qwen3-coder-30b-a3b-instruct-mlx
+			export SL_LLM_API_KEY=not_needed_key
+			```
+
+	=== "LMStudio"
+		1. [Install LMS cli or LMStudio](https://ollama.com/download/mac)
+			```sh
+			curl -fsSL https://lmstudio.ai/install.sh | bash
+
+			# Verify the lms cli:
+			lms ls
+			lms server start
+			```
+		1. Download the `qwen3-coder-30b-a3b-instruct` model:
+			```sh
+			lms get qwen3-coder-30b-a3b-instruct-mlx 
+			lms ls
+			```
+		1. Set env variables:
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:1234/v1
+			export SL_LLM_MODEL=qwen3-coder-30b-a3b-instruct-mlx
+			export SL_LLM_API_KEY=not_needed_key
+			```
+
+	=== "Ollama"
+		1. [Install Ollama](https://ollama.com/download/mac)
+			```sh
+			# Verify the ollama cli:
+			ollama list 
+			ollama --help
+			```
+		1. Download the `qwen3-coder:30b` model:
+			```sh
+			ollama pull qwen3-coder:30b
+			```
+		1. Start Ollama server:
+			```sh
+			ollama serve
+			```
+		1. Set environment variables
+			```sh
+			export SL_LLM_BASE_URL=http://localhost:11434/v1
+			export SL_LLM_MODEL=qwen3-coder:30b
+			export SL_LLM_API_KEY=not_needed_key
+			```
+
 
 ### Use Cloud SaaS
 
-If you are using a sevice like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai , AWS Bedrock, use their API key and change the environment variable to refect openAI end points and key. There is also , where you can define an API key: [https://openrouter.ai/](https://openrouter.ai/), to get access to larger models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
+If you are using a service like OpenAI, Anthropic, HuggingFace.hub, OpenRouter.ai, AWS Bedrock, use their API key and change the environment variable to reflect openAI endpoints and key. There is also [openrouter](https://openrouter.ai/) to get access to a set of models, like `qwen/qwen3-coder:free` which is free to use for few requests per day (pricing conditions may change).
 
 ### Use your own remote service
 
-Some users have deployed an inference server to their own VPC. The [IaC/tf_aws_c2 folder](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) includes the terraform manifests to deploy an EC2 with GPU and ollama as an inference engine. The security group for AWS EC2 firewall is set to use the user IP address so only this machine can interact with the EC2 machine.
+Some users have deployed an inference server to their own VPC. The [IaC/tf_aws_c2 folder](https://github.com/jbcodeforce/shift_left_utils/tree/main/IaC/tf_aws_ec2) includes the terraform manifests to deploy an EC2 with GPU and `ollama` as an inference engine server. The security group for AWS EC2 firewall is set to use the user IP address so only the user's machine can interact with the EC2 machine.
 
 To run the migration set the following environment variable:
 
@@ -122,7 +153,18 @@ While Spark SQL is primarily designed for batch processing, it can be migrated t
 
 ### ksqlDB to Flink SQL
 
-ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. 
+ksqlDB has SQL constructs to do stream processing, but this is not an ANSI SQL engine. It is highly integrated with Kafka and uses specific keywords to define such integration. LLM may have limited access to ksql code during the training, so results may not be optimal. A **RAG (Retrieval-Augmented Generation) system** is available: similar ksql + Flink SQL pairs are retrieved from a vector index and added as few-shot examples to the translator prompt.
+
+**RAG setup (optional):**
+
+1. Install optional RAG dependencies: `pip install -e ".[rag]"` (chromadb, sentence-transformers).
+2. Build the vector index from a ksql-project corpus (folder with `flink-references/` and `sources/`):
+   ```sh
+   shift_left rag build /path/to/ksql-project --index /path/to/rag_index
+   ```
+3. Enable RAG when migrating: set `SL_RAG_ENABLED=1` and `SL_RAG_INDEX_PATH=/path/to/rag_index`. Optionally set `SL_RAG_TOP_K=3` (number of similar examples to inject).
+
+You can add your own (ksql, Flink DDL/DML) solution pairs by following the same folder structure under your ksql-project and running `shift_left rag build` again to refresh the index.
 
 The migration and prompts need to support more examples outside of the classical SELECT and CREATE TABLE statements.
 
@@ -190,7 +232,7 @@ my-flink-demo
 
 ### 2. KSQL to Flink SQL Lab
 
-The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) 
+The following steps will help you migrate some of the ksql Tutorial queries, as introduced by [Confluent ksql Queries](https://developer.confluent.io/confluent-tutorials/splitting/ksql/) to Confluent Cloud Flink SQL. Those queries are defined as sources in the [Flink project demonstration git repository](https://github.com/jbcodeforce/flink_project_demos/tree/main/ksql_tutorial/README.md) under the `ksql_tutorial/sources` folder.
 
 #### 2.1 Migration Executions
 

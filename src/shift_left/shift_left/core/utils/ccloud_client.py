@@ -60,7 +60,11 @@ class ConfluentCloudClient:
         return f"Basic {encoded_credentials}"
     
     def make_request(self, method, url, auth_header=None, data=None) -> str:
-        """Make HTTP request to Confluent Cloud API"""
+        """Make HTTP request to Confluent Cloud API.
+        When data is provided, the body is serialized explicitly as JSON (utf-8)
+        so that statement strings containing quotes are never broken by
+        request-layer handling.
+        """
         version_str = VersionInfo.get_version()
         headers = {
             "Authorization": auth_header,
@@ -70,12 +74,20 @@ class ConfluentCloudClient:
         response = None
         logger.info(f">>> Make request {method} to {url} with headers: {headers} and data: {data}")
         try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                json=data
-            )
+            if data is not None:
+                body = json.dumps(data, ensure_ascii=False)
+                response = requests.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    data=body.encode("utf-8")
+                )
+            else:
+                response = requests.request(
+                    method=method,
+                    url=url,
+                    headers=headers
+                )
             response.raise_for_status()
             try:
                 if response.status_code == 202 and method == "DELETE":

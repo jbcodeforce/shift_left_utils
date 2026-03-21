@@ -1,6 +1,6 @@
 # Shift Left MCP Server Integration
 
-The `src/shift_left/shift_left_mcp` directory contains the MCP (Model Context Protocol) server integration for the `shift_left` CLI tool, enabling direct integration with any MCP client like Cursor AI .
+The `src/shift_left/shift_left_mcp` directory contains the MCP (Model Context Protocol) server integration for the `shift_left` CLI tool, enabling direct integration with any MCP client like Cursor AI, Claude Code, Gemini cli .
 
 ## What is MCP?
 
@@ -31,6 +31,8 @@ This is optional but helps to verify the MCP server will work in your environmen
 in shift_left_utils/src/shift_left
 uv run python -m shift_left_mcp.test_server
 ```
+
+
 ### Set environment variables
 
 Environment variables must be set **before** starting Cursor.

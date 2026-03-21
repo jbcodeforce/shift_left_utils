@@ -1,0 +1,1 @@
+INSERT INTO orders SELECT customer_id, SUM(order_amount) AS order_amount FROM daily_spend GROUP BY customer_id, window_start, window_end;

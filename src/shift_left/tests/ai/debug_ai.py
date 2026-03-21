@@ -15,12 +15,13 @@ from ai.utilities import compare_files_unordered
 class TestDebugIntegrationTests(unittest.TestCase):
 
 
-    def _test_ksql_migration(self):
+    def test_ksql_migration(self):
         os.environ["PIPELINES"] =  data_dir + "/ksql-project/flink-references"
         os.environ["STAGING"] =  data_dir + "/ksql-project/staging/ut"
         os.environ["SRC_FOLDER"] =  data_dir + "/ksql-project/sources"
         runner = CliRunner()
-        result = runner.invoke(app, ['table', 'migrate', 'splitter', os.getenv('SRC_FOLDER','.') + '/splitter.ksql', '--source-type', 'ksql', '--product-name', 'basic'])
+        # result = runner.invoke(app, ['table', 'migrate', 'acting_events', os.getenv('SRC_FOLDER','.') + '/splitting.ksql', '--source-type', 'ksql', '--product-name', 'basic'])
+        result = runner.invoke(app, ['table', 'migrate', 'daily_order_spent', os.getenv('SRC_FOLDER','.') + '/aggregation.ksql', '--source-type', 'ksql', '--product-name', 'from_ksql'])
         print(result.stdout)
 
     def _test_spark_migration(self):
