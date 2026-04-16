@@ -2,11 +2,9 @@ CREATE TABLE IF NOT EXISTS {{ table_name }} (
 
   {{ column_definitions }}
   PRIMARY KEY({{ default_PK }}) NOT ENFORCED
-) DISTRIBUTED BY HASH({{ default_PK }}) INTO 1 BUCKETS
+) DISTRIBUTED BY HASH({{ default_PK }}) INTO 6 BUCKETS
 WITH (
-  'changelog.mode' = 'upsert',
-  'key.avro-registry.schema-context' = '.flink-dev',
-  'value.avro-registry.schema-context' = '.flink-dev',
+  'changelog.mode' = 'append',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',

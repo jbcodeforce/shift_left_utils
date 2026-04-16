@@ -90,7 +90,7 @@ class TestExecutionPlan(BaseUT):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(
+        summary, execution_plan, _ = dm.build_deploy_pipeline_from_table(
             table_name="f",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -141,7 +141,7 @@ class TestExecutionPlan(BaseUT):
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
 
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="f",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -197,7 +197,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="f",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -250,7 +250,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="e",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -294,7 +294,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="z",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -342,7 +342,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="z",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -389,7 +389,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_status.side_effect = mock_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="z",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -435,7 +435,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
 
-        summary, report = dm.build_deploy_pipeline_from_table(
+        summary, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="e",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -485,7 +485,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
-        summary, report = dm.build_deploy_pipelines_from_product(
+        summary, report, _ = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -533,7 +533,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
-        summary, report = dm.build_deploy_pipelines_from_product(
+        summary, report, _ = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -584,7 +584,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
 
-        summary, report = dm.build_and_deploy_all_from_directory(
+        summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -638,7 +638,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
 
-        summary, report = dm.build_and_deploy_all_from_directory(
+        summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -688,7 +688,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_retention_size.return_value = 100000
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
-        summary, report = dm.build_and_deploy_all_from_directory(
+        summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -740,7 +740,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
         # intermediates/p2 contains z, x, y, a, b, d, c
-        summary, report = dm.build_and_deploy_all_from_directory(
+        summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/intermediates/p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -793,7 +793,7 @@ class TestExecutionPlan(BaseUT):
         mock_get_pending_records.return_value = 10000
         mock_get_num_records_out.return_value = 100000
 
-        summary, report = dm.build_and_deploy_all_from_directory(
+        summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/facts/p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,

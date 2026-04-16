@@ -20,9 +20,10 @@ from shift_left.core.pipeline_mgr import (
     _build_pipeline_definition
 )
 from shift_left.core.utils.file_search import (
+    EXTERNAL_KAFKA_TYPE,
     FlinkTableReference,
     FlinkTablePipelineDefinition,
-    PIPELINE_FOLDER_NAME
+    PIPELINE_FOLDER_NAME,
 )
 
 
@@ -57,6 +58,34 @@ class TestBuildPipelineDefinitionsFromSqlContent(unittest.TestCase):
                 "ddl_ref": "facts/fact_table/sql-scripts/ddl.fact_table.sql"
             }
         }
+
+    @patch("builtins.open")
+    def test_dml_dependency_on_seeds_external_kafka_inventory(self, mock_open_file):
+        """References declared via seeds/external_tables.json appear as external_kafka parents."""
+        inv = {
+            **self.table_inventory,
+            "ext_dim": {
+                "table_name": "ext_dim",
+                "type": EXTERNAL_KAFKA_TYPE,
+                "product_name": "common",
+                "dml_ref": "",
+                "ddl_ref": "",
+                "table_folder_name": "pipelines/seeds/ext_dim",
+                "kafka_topic": "k.t",
+            },
+        }
+        mock_open_file.return_value.__enter__.return_value.read.return_value = (
+            "INSERT INTO fact_table SELECT * FROM ext_dim"
+        )
+        result_table, result_deps, _ = _build_pipeline_definitions_from_sql_content(
+            "/path/to/dml.sql", None, inv
+        )
+        self.assertEqual(result_table, "fact_table")
+        names = {p.table_name for p in result_deps}
+        self.assertIn("ext_dim", names)
+        ext = next(p for p in result_deps if p.table_name == "ext_dim")
+        self.assertEqual(ext.type, EXTERNAL_KAFKA_TYPE)
+        self.assertEqual(ext.kafka_topic, "k.t")
 
     @patch('builtins.open')
     def test_successful_dml_processing_with_dependencies(self, mock_open_file):

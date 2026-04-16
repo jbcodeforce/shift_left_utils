@@ -6,7 +6,8 @@ import os
 import pathlib
 os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.file_search import (
-    get_or_build_source_file_inventory, 
+    EXTERNAL_KAFKA_TYPE,
+    get_or_build_source_file_inventory,
     build_inventory,
     get_table_ref_from_inventory,
     create_folder_if_not_exist,
@@ -334,6 +335,88 @@ class TestFileSearch(unittest.TestCase):
         for path, expected_product in test_cases:
             actual_product = extract_product_name(path)
             self.assertEqual(actual_product, expected_product)
+
+    def test_merge_seeds_external_tables_into_inventory(self):
+        import tempfile
+        import shutil
+
+        from shift_left.core.utils.file_search import merge_seeds_external_tables_into_inventory
+
+        td = tempfile.mkdtemp()
+        try:
+            seeds = os.path.join(td, "pipelines", "seeds")
+            os.makedirs(seeds)
+            with open(os.path.join(seeds, "external_tables.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "tables": [
+                            {
+                                "table_name": "ext_dim",
+                                "kafka_topic": "topic.a",
+                                "product_name": "ldg",
+                            }
+                        ]
+                    },
+                    f,
+                )
+            inv = {
+                "local_t": {
+                    "table_name": "local_t",
+                    "type": "source",
+                    "dml_ref": "x",
+                    "ddl_ref": "y",
+                    "table_folder_name": "f",
+                    "product_name": "p",
+                }
+            }
+            merge_seeds_external_tables_into_inventory(inv, os.path.join(td, "pipelines"))
+            self.assertIn("ext_dim", inv)
+            self.assertEqual(inv["ext_dim"]["type"], EXTERNAL_KAFKA_TYPE)
+            self.assertEqual(inv["ext_dim"]["kafka_topic"], "topic.a")
+            self.assertEqual(inv["ext_dim"]["dml_ref"], "")
+        finally:
+            shutil.rmtree(td)
+
+    def test_get_pipeline_definition_for_external_kafka_table(self):
+        from unittest.mock import patch
+
+        from shift_left.core import pipeline_mgr
+
+        ref = FlinkTableReference.model_validate(
+            {
+                "table_name": "ext_only",
+                "type": "external_kafka",
+                "product_name": "common",
+                "dml_ref": "",
+                "ddl_ref": "",
+                "table_folder_name": "pipelines/seeds/ext_only",
+                "kafka_topic": "t.ext",
+            }
+        )
+        inv = {"ext_only": ref.model_dump()}
+        with patch(
+            "shift_left.core.pipeline_mgr.get_or_build_inventory", return_value=inv
+        ), patch(
+            "shift_left.core.pipeline_mgr.get_table_ref_from_inventory", return_value=ref
+        ):
+            pd = pipeline_mgr.get_pipeline_definition_for_table("ext_only", "/fake")
+        self.assertEqual(pd.table_name, "ext_only")
+        self.assertEqual(pd.type, "external_kafka")
+        self.assertEqual(pd.kafka_topic, "t.ext")
+        self.assertEqual(pd.dml_ref, "")
+
+    def test_deploy_one_node_skips_external_kafka(self):
+        from shift_left.core.deployment_mgr import _deploy_one_node
+        from shift_left.core.models.flink_statement_model import FlinkStatementNode, StatementError
+
+        node = FlinkStatementNode(
+            table_name="ext_topic",
+            type=EXTERNAL_KAFKA_TYPE,
+            path="pipelines/seeds/ext_topic",
+            compute_pool_id="pool-1",
+        )
+        result = _deploy_one_node(node, accept_exceptions=True, compute_pool_id="pool-1")
+        self.assertIsInstance(result, StatementError)
 
 if __name__ == '__main__':
     unittest.main()

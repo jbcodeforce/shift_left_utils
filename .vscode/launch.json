@@ -5,9 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "python.defaultInterpreterPath": "${workspaceFolder}/src/shift_left/.venv/bin/python"
-        },
-        {
             "name": "SL Python Debugger: current file",
             "type": "debugpy",
             "request": "launch",
@@ -19,6 +16,25 @@
                 "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
+        },
+        {
+            "name": "SL Python Debugger: pytest current file",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-v",
+                "-s"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src/shift_left",
+            "justMyCode": false,
+            "env": {
+                "CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config.yaml",
+                "PYTHONPATH": "${workspaceFolder}/src/shift_left:${workspaceFolder}/src/shift_left/tests"
+            },
+            "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
         {
          "name": "SL Python IT Debugger: current file",

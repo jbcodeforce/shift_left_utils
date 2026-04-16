@@ -55,6 +55,9 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
     logger.info(f"{statement_name} with content: {flink_statement_file_path} deploy to {compute_pool_id}")
     full_file_path = from_pipeline_to_absolute(flink_statement_file_path)
     try:
+        properties = {'sql.current-catalog' : config['flink']['catalog_name'] ,
+                      'sql.current-database' : config['flink']['database_name']}
+        properties = _local_properties_loading(properties, flink_statement_file_path)
         with open(full_file_path, "r") as f:
             sql_content = f.read()
             column_to_search = config.get('app', {}).get('data_limit_column_name_to_select_from', None)
@@ -66,7 +69,8 @@ def build_and_deploy_flink_statement_from_sql_content(flinkStatement_to_process:
 
             statement= post_flink_statement(compute_pool_id,
                                             statement_name,
-                                            sql_out)
+                                            sql_out,
+                                            properties)
             logger.debug(f"Statement: {statement_name} -> {statement}")
             if statement and isinstance(statement, Statement) and statement.status:
                 logger.info(f"Statement: {statement_name} status is: {statement.status.phase}")
@@ -101,12 +105,15 @@ def get_statement(statement_name: str) -> Statement | StatementError:
 def post_flink_statement(compute_pool_id: str,
                              statement_name: str,
                              sql_content: str,
+                             properties: dict,
                              stopped: bool = False) -> Statement | StatementError:
         """
         POST to the statements API to execute a SQL statement.
         """
         config = get_config()
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
+        if len(properties) == 0:
+            properties = {'sql.current-catalog' : config['flink']['catalog_name'] ,
+                          'sql.current-database' : config['flink']['database_name']}
         client = ConfluentCloudClient(config)
         url, auth_header = client.build_flink_url_and_auth_header()
         statement_data = {
@@ -158,7 +165,8 @@ def delete_statement_if_exists(statement_name) -> str | None:
         result=client.delete_flink_statement(statement_name)
         if result == "deleted":
             statement_list.pop(statement_name)
-            _save_statement_list(statement_list)
+            if _statement_list_cache is not None:
+                _save_statement_list(_statement_list_cache)
     else:
         logger.info(f"Statement {statement_name} not found in the statement list")
     return result
@@ -323,7 +331,7 @@ def show_flink_table_structure(table_name: str, compute_pool_id: Optional[str] =
     sql_content = f"show create table `{table_name}`;"
     delete_statement_if_exists(statement_name)
     try:
-        statement = post_flink_statement(compute_pool_id, statement_name, sql_content)
+        statement = post_flink_statement(compute_pool_id, statement_name, sql_content, {})
         if statement and isinstance(statement, Statement) and statement.status.phase in ("RUNNING", "COMPLETED"):
             get_statement_list()[statement_name] = map_to_statement_info(statement)
             statement_result = get_statement_results(statement_name)
@@ -365,7 +373,8 @@ def drop_table(table_name: str, compute_pool_id: Optional[str] = None):
         delete_statement_if_exists(drop_statement_name)
         result= post_flink_statement(compute_pool_id,
                                             drop_statement_name,
-                                            sql_content)
+                                            sql_content,
+                                            {})
         if result and isinstance(result, Statement) and result.status.phase not in ("COMPLETED", "FAILED"):
             while result.status.phase not in ["COMPLETED", "FAILED"]:
                 time.sleep(1)
@@ -436,16 +445,57 @@ def map_to_statement_info(info: Statement) -> StatementInfo:
         raise Exception(f"Invalid statement info: {info}")
 
 # ------------- private methods -------------
-def _save_statement_list(statement_list: dict[str, StatementInfo]):
+def _parse_java_properties_content(content: str) -> dict[str, str]:
     """
-    Save the statement list to the cache file
+    Parse Java-style .properties text into str->str. Skips blank lines and # / ! comments.
+    """
+    result: dict[str, str] = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line[0] in "#!":
+            continue
+        if "=" not in line:
+            logger.debug("Skipping properties line without '=': %s", raw_line[:80])
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key:
+            result[key] = value
+    return result
+
+
+def _local_properties_loading(properties: dict, flink_statement_file_path: str) -> dict:
+    """
+    If a sibling ``<stem>.properties`` exists next to the SQL file, load and merge entries
+    (str keys and str values) into ``properties``; file values override defaults.
+    """
+    if not flink_statement_file_path:
+        return properties
+    abs_sql = from_pipeline_to_absolute(flink_statement_file_path)
+    if not abs_sql.lower().endswith(".sql"):
+        return properties
+    props_path = abs_sql[:-4] + ".properties"
+    if not os.path.isfile(props_path):
+        return properties
+    merged = dict(properties)
+    try:
+        with open(props_path, encoding="utf-8-sig") as f:
+            merged.update(_parse_java_properties_content(f.read()))
+    except OSError as e:
+        logger.warning("Could not read properties file %s: %s", props_path, e)
+    return merged
+
+def _save_statement_list(cache: StatementListCache):
+    """
+    Save the statement list cache (metadata plus statement map) to the cache file.
     """
 
     # Write to temporary file first, then atomic rename
     temp_file = STATEMENT_LIST_FILE + ".tmp"
     try:
         with open(temp_file, "w") as f:
-            f.write(statement_list.model_dump_json(indent=2, warnings=False))
+            f.write(cache.model_dump_json(indent=2, warnings=False))
             f.flush()  # Ensure data is written
             os.fsync(f.fileno())  # Force write to disk
 

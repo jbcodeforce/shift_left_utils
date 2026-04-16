@@ -16,7 +16,7 @@ We assume you have a Confluent Cloud account, an environment sets up, a Kafka Cl
 
 * On Windows - [enable WSL2](https://learn.microsoft.com/en-us/windows/wsl/install). The shift_left tool was developed on Mac and tested on Linux. Windows WSL should work. Powershell will not work as of now (11/2025).
 * All Platforms - [install git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-* `make` is used to encapsulate the confluent cli, to make it easier for Data Engineers to deploy Flink statement during development: It is not used by `shift_left` tool, but `shift_left` creates the Makefile with the `shift_left table init` command (see [the recipe section](./recipes.md/#table-related-tasks)). 
+* `make` is used to encapsulate the confluent cli, to make it easier for Data Engineers to deploy Flink statement during development: It is not used by `shift_left` tool, but `shift_left` creates the Makefile with the `shift_left table init` command (see [the recipe section](../recipes.md/#table-related-tasks)). 
     * [install make for windows](https://gnuwin32.sourceforge.net/packages/make.htm)
     * Mac OS: ```brew install make``` 
     * Linux: ```sudo apt-get install build-essential```

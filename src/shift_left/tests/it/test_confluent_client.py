@@ -71,6 +71,7 @@ class TestConfluentClient(unittest.TestCase):
             statement = sm.post_flink_statement(compute_pool_id=config['flink']['compute_pool_id'],
                                 statement_name=statement_name,
                                 sql_content=sql_content,
+                                properties={},
                                 stopped=False)
             print(f"\n\n---- {statement}")
             assert statement.result.results

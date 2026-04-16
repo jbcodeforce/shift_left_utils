@@ -505,7 +505,7 @@ class TranslatorToFlinkSqlAgent():
         if sql_to_validate:
             statement_name = "syntax-check"
             delete_statement_if_exists(statement_name)
-            statement = post_flink_statement(compute_pool_id, statement_name, sql_to_validate)
+            statement = post_flink_statement(compute_pool_id, statement_name, sql_to_validate, {})
             print(f"CC Flink Statement: {statement}", flush=True)
             logger.info(f"CC Flink Statement: {statement}")
             if statement and statement.status:

@@ -51,7 +51,7 @@ class TestDeploymentManager(unittest.TestCase):
         """
         inventory_path = os.getenv("PIPELINES")
         table_name = "src_table_1"
-        summary,execution_plan = dm.build_deploy_pipeline_from_table(table_name=table_name, 
+        summary, execution_plan, _ = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=None, 
                                                dml_only=False, 
@@ -73,7 +73,7 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="p1_fct_order"
         inventory_path= os.getenv("PIPELINES")
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name=table_name, 
+        summary, execution_plan, _ = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=False, 
@@ -94,7 +94,7 @@ class TestDeploymentManager(unittest.TestCase):
         config = get_config()
         table_name="int_p1_table_1"
         inventory_path= os.getenv("PIPELINES")
-        summary, execution_plan = dm.build_deploy_pipeline_from_table(table_name=table_name, 
+        summary, execution_plan, _ = dm.build_deploy_pipeline_from_table(table_name=table_name, 
                                                inventory_path=inventory_path, 
                                                compute_pool_id=config['flink']['compute_pool_id'], 
                                                dml_only=False, 
@@ -122,7 +122,7 @@ class TestDeploymentManager(unittest.TestCase):
             except Exception as e:
                 print(e)
 
-        summary, execution_plan = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/sources/p2",
+        summary, execution_plan, _ = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/sources/p2",
                                                inventory_path=os.getenv("PIPELINES"), 
                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
                                                dml_only=False, 
@@ -142,7 +142,7 @@ class TestDeploymentManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
         config = get_config()
         
-        summary, execution_plan = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/intermediates/p2",
+        summary, execution_plan, _ = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/intermediates/p2",
                                                inventory_path=os.getenv("PIPELINES"), 
                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
                                                dml_only=False, 
@@ -159,7 +159,7 @@ class TestDeploymentManager(unittest.TestCase):
         """
         os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
         config = get_config()
-        summary, execution_plan = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/facts/p2",
+        summary, execution_plan, _ = dm.build_and_deploy_all_from_directory( directory=os.getenv("PIPELINES") + "/facts/p2",
                                                inventory_path=os.getenv("PIPELINES"), 
                                                compute_pool_id=config.get('flink').get('compute_pool_id'), 
                                                dml_only=False, 

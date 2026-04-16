@@ -74,7 +74,7 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
 
-        result, report = dm.build_deploy_pipelines_from_product(
+        result, report, _ = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -111,7 +111,7 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
 
-        result, report = dm.build_deploy_pipeline_from_table(
+        result, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="z",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -131,7 +131,7 @@ class TestDeploymentManager(BaseUT):
                 assert table.to_restart is False and table.to_run is False
 
         # another table, but a leaf:
-        result, report = dm.build_deploy_pipeline_from_table(
+        result, report, _ = dm.build_deploy_pipeline_from_table(
             table_name="f",
             inventory_path=self.inventory_path,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -171,7 +171,7 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
 
-        result, report = dm.build_and_deploy_all_from_table_list(
+        result, report, _ = dm.build_and_deploy_all_from_table_list(
                     include_table_names=["z", "d", "f", "p", "c", "e"],
                     inventory_path=self.inventory_path,
                     compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
@@ -213,7 +213,7 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
         # intermediates/p2 contains a, b, c, d, z, x, y, z
-        result, report = dm.build_and_deploy_all_from_directory(
+        result, report, _ = dm.build_and_deploy_all_from_directory(
                     directory=self.inventory_path + "/intermediates/p2",
                     inventory_path=self.inventory_path,
                     compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,

@@ -84,7 +84,7 @@ class TestExecutionOrderSolutions(BaseUT):
         execution_plan = self._create_mock_execution_plan([node1, node2, node3])
         
         with patch('shift_left.core.deployment_mgr._deploy_one_node', side_effect=mock_deploy_with_delay):
-            result = _execute_plan(
+            _, _ = _execute_plan(
                 execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,
@@ -119,7 +119,7 @@ class TestExecutionOrderSolutions(BaseUT):
         execution_plan = self._create_mock_execution_plan([node1, node2, node3])
         
         with patch('shift_left.core.deployment_mgr._deploy_one_node', side_effect=mock_deploy_with_delay):
-            result = _execute_plan(
+            _, _ = _execute_plan(
                 execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,
@@ -196,7 +196,7 @@ class TestExecutionOrderSolutions(BaseUT):
         
         # Test the current parallel execution
         with patch('shift_left.core.deployment_mgr._deploy_one_node', side_effect=mock_deploy):
-            result = _execute_plan(
+            _, _ = _execute_plan(
                 execution_plan=execution_plan,
                 compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                 accept_exceptions=False,

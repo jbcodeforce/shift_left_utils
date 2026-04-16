@@ -120,6 +120,80 @@ class TestSQLParser(unittest.TestCase):
         print(rep)
         assert "Stateless" in parser.extract_upgrade_mode(query, "")
 
+    def test_extract_table_references_from_table_tumble_table(self):
+        parser = SQLparser()
+        query = """
+        INSERT INTO fct_nb_act_per_pgm
+        SELECT
+          window_start,
+          window_end,
+          COALESCE(program_name, 'UNKNOWN') AS program_name,
+          COUNT(DISTINCT activity_id) AS nb_activities
+        FROM TABLE(
+          TUMBLE(
+            TABLE dim_activities,
+            DESCRIPTOR(activity_ts),
+            INTERVAL '4' HOURS
+          )
+        )
+        GROUP BY
+          window_start,
+          window_end,
+          COALESCE(program_name, 'UNKNOWN');
+        """
+        rep = parser.extract_table_references(query)
+        assert "dim_activities" in rep
+        assert "fct_nb_act_per_pgm" in rep
+        assert "TABLE" not in rep
+
+    def test_extract_table_references_one_line_tumble_daily_spend(self):
+        parser = SQLparser()
+        query = (
+            "INSERT INTO orders "
+            "SELECT window_start, window_end, customer_id, SUM(order_amount) "
+            "FROM TABLE(TUMBLE(TABLE daily_spend, DESCRIPTOR($rowtime), INTERVAL '86400' SECOND)) "
+            "WHERE order_amount > 0 "
+            "GROUP BY customer_id, window_start, window_end"
+        )
+        rep = parser.extract_table_references(query)
+        assert "daily_spend" in rep
+        assert "orders" in rep
+        assert "TABLE" not in rep
+
+    def test_upgrade_mode_stateful_table_tumble_table_syntax(self):
+        parser = SQLparser()
+        dml = """
+        INSERT INTO fct_nb_act_per_pgm
+        SELECT
+          window_start,
+          window_end,
+          COALESCE(program_name, 'UNKNOWN') AS program_name,
+          COUNT(DISTINCT activity_id) AS nb_activities
+        FROM TABLE(
+          TUMBLE(
+            TABLE dim_activities,
+            DESCRIPTOR(activity_ts),
+            INTERVAL '4' HOURS
+          )
+        )
+        GROUP BY
+          window_start,
+          window_end,
+          COALESCE(program_name, 'UNKNOWN');
+        """
+        assert parser.extract_upgrade_mode(dml, "") == "Stateful"
+
+    def test_upgrade_mode_stateful_tumble_paren_only_line(self):
+        """TUMBLE( on a line must be detected without trailing space after TUMBLE."""
+        parser = SQLparser()
+        dml = "SELECT * FROM TABLE( TUMBLE( TABLE src, DESCRIPTOR(ts), INTERVAL '1' HOUR ) )"
+        assert parser.extract_upgrade_mode(dml, "") == "Stateful"
+
+    def test_upgrade_mode_stateful_group_by_only_line(self):
+        parser = SQLparser()
+        dml = "SELECT a FROM t\nGROUP BY\n  a"
+        assert parser.extract_upgrade_mode(dml, "") == "Stateful"
+
 
     def test_upgrade_mode_sql_content_order(self):
         fname = os.getenv("PIPELINES") + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"

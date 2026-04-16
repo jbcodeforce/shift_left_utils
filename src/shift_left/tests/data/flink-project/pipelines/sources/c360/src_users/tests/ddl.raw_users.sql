@@ -9,8 +9,6 @@ create table if not exists raw_users (
 ) distributed by hash(user_id) into 1 buckets
 with (
     'changelog.mode' = 'append',
-    'key.avro-registry.schema-context' = '.flink-dev',
-    'value.avro-registry.schema-context' = '.flink-dev',
     'key.format' = 'avro-registry',
     'value.format' = 'avro-registry',
     'kafka.retention.time' = '0',

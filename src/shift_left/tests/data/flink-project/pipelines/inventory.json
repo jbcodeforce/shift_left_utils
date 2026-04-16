@@ -5,7 +5,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/a/sql-scripts/dml.a.sql",
         "ddl_ref": "pipelines/intermediates/p2/a/sql-scripts/ddl.a.sql",
-        "table_folder_name": "pipelines/intermediates/p2/a"
+        "table_folder_name": "pipelines/intermediates/p2/a",
+        "kafka_topic": null
     },
     "b": {
         "table_name": "b",
@@ -13,7 +14,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
         "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
-        "table_folder_name": "pipelines/intermediates/p2/b"
+        "table_folder_name": "pipelines/intermediates/p2/b",
+        "kafka_topic": null
     },
     "c": {
         "table_name": "c",
@@ -21,7 +23,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/c/sql-scripts/dml.c.sql",
         "ddl_ref": "pipelines/intermediates/p2/c/sql-scripts/ddl.c.sql",
-        "table_folder_name": "pipelines/intermediates/p2/c"
+        "table_folder_name": "pipelines/intermediates/p2/c",
+        "kafka_topic": null
     },
     "c360_dim_groups": {
         "table_name": "c360_dim_groups",
@@ -29,15 +32,17 @@
         "type": "dimension",
         "dml_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/dml.c360_dim_groups.sql",
         "ddl_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/ddl.c360_dim_groups.sql",
-        "table_folder_name": "pipelines/dimensions/c360/dim_groups"
+        "table_folder_name": "pipelines/dimensions/c360/dim_groups",
+        "kafka_topic": null
     },
     "c360_dim_users": {
         "table_name": "c360_dim_users",
         "product_name": "c360",
         "type": "dimension",
-        "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_user.sql",
-        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_user.sql",
-        "table_folder_name": "pipelines/dimensions/c360/dim_users"
+        "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_users.sql",
+        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users_dlq.sql",
+        "table_folder_name": "pipelines/dimensions/c360/dim_users",
+        "kafka_topic": null
     },
     "d": {
         "table_name": "d",
@@ -45,7 +50,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/d/sql-scripts/dml.d.sql",
         "ddl_ref": "pipelines/intermediates/p2/d/sql-scripts/ddl.d.sql",
-        "table_folder_name": "pipelines/intermediates/p2/d"
+        "table_folder_name": "pipelines/intermediates/p2/d",
+        "kafka_topic": null
     },
     "e": {
         "table_name": "e",
@@ -53,7 +59,8 @@
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/e/sql-scripts/dml.e.sql",
         "ddl_ref": "pipelines/facts/p2/e/sql-scripts/ddl.e.sql",
-        "table_folder_name": "pipelines/facts/p2/e"
+        "table_folder_name": "pipelines/facts/p2/e",
+        "kafka_topic": null
     },
     "f": {
         "table_name": "f",
@@ -61,7 +68,8 @@
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/f/sql-scripts/dml.f.sql",
         "ddl_ref": "pipelines/facts/p2/f/sql-scripts/ddl.f.sql",
-        "table_folder_name": "pipelines/facts/p2/f"
+        "table_folder_name": "pipelines/facts/p2/f",
+        "kafka_topic": null
     },
     "fct_user_per_group": {
         "table_name": "fct_user_per_group",
@@ -69,7 +77,8 @@
         "type": "fact",
         "dml_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql",
         "ddl_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql",
-        "table_folder_name": "pipelines/facts/c360/fct_user_per_group"
+        "table_folder_name": "pipelines/facts/c360/fct_user_per_group",
+        "kafka_topic": null
     },
     "int_common_tenant": {
         "table_name": "int_common_tenant",
@@ -77,7 +86,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/common/int_tenant/sql-scripts/dml.int_common_tenant.sql",
         "ddl_ref": "pipelines/intermediates/common/int_tenant/sql-scripts/ddl.int_common_tenant.sql",
-        "table_folder_name": "pipelines/intermediates/common/int_tenant"
+        "table_folder_name": "pipelines/intermediates/common/int_tenant",
+        "kafka_topic": null
     },
     "int_p1_table_1": {
         "table_name": "int_p1_table_1",
@@ -85,7 +95,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/dml.int_p1_table_1.sql",
         "ddl_ref": "pipelines/intermediates/p1/int_table_1/sql-scripts/ddl.int_p1_table_1.sql",
-        "table_folder_name": "pipelines/intermediates/p1/int_table_1"
+        "table_folder_name": "pipelines/intermediates/p1/int_table_1",
+        "kafka_topic": null
     },
     "int_p1_table_2": {
         "table_name": "int_p1_table_2",
@@ -93,7 +104,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/dml.int_p1_table_2.sql",
         "ddl_ref": "pipelines/intermediates/p1/int_table_2/sql-scripts/ddl.int_p1_table_2.sql",
-        "table_folder_name": "pipelines/intermediates/p1/int_table_2"
+        "table_folder_name": "pipelines/intermediates/p1/int_table_2",
+        "kafka_topic": null
     },
     "int_p3_it2": {
         "table_name": "int_p3_it2",
@@ -101,7 +113,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p3/it2/sql-scripts/dml.int_p3_it2.sql",
         "ddl_ref": "pipelines/intermediates/p3/it2/sql-scripts/ddl.int_p3_it2.sql",
-        "table_folder_name": "pipelines/intermediates/p3/it2"
+        "table_folder_name": "pipelines/intermediates/p3/it2",
+        "kafka_topic": null
     },
     "int_p3_user_role": {
         "table_name": "int_p3_user_role",
@@ -109,7 +122,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p3/user_role/sql-scripts/dml.int_p3_user_role.sql",
         "ddl_ref": "pipelines/intermediates/p3/user_role/sql-scripts/ddl.int_p3_user_role.sql",
-        "table_folder_name": "pipelines/intermediates/p3/user_role"
+        "table_folder_name": "pipelines/intermediates/p3/user_role",
+        "kafka_topic": null
     },
     "int_tag": {
         "table_name": "int_tag",
@@ -117,7 +131,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p1/int_test/sql-scripts/dml.int_tag.sql",
         "ddl_ref": "pipelines/intermediates/p1/int_test/sql-scripts/ddl.test.sql",
-        "table_folder_name": "pipelines/intermediates/p1/int_test"
+        "table_folder_name": "pipelines/intermediates/p1/int_test",
+        "kafka_topic": null
     },
     "p": {
         "table_name": "p",
@@ -125,7 +140,8 @@
         "type": "fact",
         "dml_ref": "pipelines/facts/p2/p/sql-scripts/dml.p.sql",
         "ddl_ref": "pipelines/facts/p2/p/sql-scripts/ddl.p.sql",
-        "table_folder_name": "pipelines/facts/p2/p"
+        "table_folder_name": "pipelines/facts/p2/p",
+        "kafka_topic": null
     },
     "p1_fct_order": {
         "table_name": "p1_fct_order",
@@ -133,7 +149,17 @@
         "type": "fact",
         "dml_ref": "pipelines/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql",
         "ddl_ref": "pipelines/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql",
-        "table_folder_name": "pipelines/facts/p1/fct_order"
+        "table_folder_name": "pipelines/facts/p1/fct_order",
+        "kafka_topic": null
+    },
+    "raw_users": {
+        "table_name": "raw_users",
+        "product_name": "c360",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/c360/raw_users/sql-scripts/dml.raw_users.sql",
+        "ddl_ref": "pipelines/seeds/c360/raw_users/sql-scripts/ddl.raw_users.sql",
+        "table_folder_name": "pipelines/seeds/c360/raw_users",
+        "kafka_topic": null
     },
     "src_a": {
         "table_name": "src_a",
@@ -141,7 +167,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_a/sql-scripts/dml.src_a.sql",
         "ddl_ref": "pipelines/sources/p2/src_a/sql-scripts/ddl.src_a.sql",
-        "table_folder_name": "pipelines/sources/p2/src_a"
+        "table_folder_name": "pipelines/sources/p2/src_a",
+        "kafka_topic": null
     },
     "src_b": {
         "table_name": "src_b",
@@ -149,7 +176,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
         "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
-        "table_folder_name": "pipelines/sources/p2/src_b"
+        "table_folder_name": "pipelines/sources/p2/src_b",
+        "kafka_topic": null
     },
     "src_c360_groups": {
         "table_name": "src_c360_groups",
@@ -157,7 +185,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
         "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-        "table_folder_name": "pipelines/sources/c360/src_groups"
+        "table_folder_name": "pipelines/sources/c360/src_groups",
+        "kafka_topic": null
     },
     "src_c360_users": {
         "table_name": "src_c360_users",
@@ -165,7 +194,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
         "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360users.sql",
-        "table_folder_name": "pipelines/sources/c360/src_users"
+        "table_folder_name": "pipelines/sources/c360/src_users",
+        "kafka_topic": null
     },
     "src_common_tenant": {
         "table_name": "src_common_tenant",
@@ -173,7 +203,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
         "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
-        "table_folder_name": "pipelines/sources/common/src_tenant"
+        "table_folder_name": "pipelines/sources/common/src_tenant",
+        "kafka_topic": null
     },
     "src_p1_table_2": {
         "table_name": "src_p1_table_2",
@@ -181,7 +212,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p1/src_table_2/sql-scripts/dml.src_p1_table_2.sql",
         "ddl_ref": "pipelines/sources/p1/src_table_2/sql-scripts/ddl.src_p1_table_2.sql",
-        "table_folder_name": "pipelines/sources/p1/src_table_2"
+        "table_folder_name": "pipelines/sources/p1/src_table_2",
+        "kafka_topic": null
     },
     "src_p1_table_3": {
         "table_name": "src_p1_table_3",
@@ -189,7 +221,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p1/src_table_3/sql-scripts/dml.src_p1_table_3.sql",
         "ddl_ref": "pipelines/sources/p1/src_table_3/sql-scripts/ddl.src_p1_table_3.sql",
-        "table_folder_name": "pipelines/sources/p1/src_table_3"
+        "table_folder_name": "pipelines/sources/p1/src_table_3",
+        "kafka_topic": null
     },
     "src_p3_roles": {
         "table_name": "src_p3_roles",
@@ -197,7 +230,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p3/src_roles/sql-scripts/dml.src_p3_roles.sql",
         "ddl_ref": "pipelines/sources/p3/src_roles/sql-scripts/ddl.src_p3_roles.sql",
-        "table_folder_name": "pipelines/sources/p3/src_roles"
+        "table_folder_name": "pipelines/sources/p3/src_roles",
+        "kafka_topic": null
     },
     "src_p3_tenants": {
         "table_name": "src_p3_tenants",
@@ -205,7 +239,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p3/src_tenants/sql-scripts/dml.src_p3_tenants.sql",
         "ddl_ref": "pipelines/sources/p3/src_tenants/sql-scripts/ddl.src_p3_tenants.sql",
-        "table_folder_name": "pipelines/sources/p3/src_tenants"
+        "table_folder_name": "pipelines/sources/p3/src_tenants",
+        "kafka_topic": null
     },
     "src_p3_users": {
         "table_name": "src_p3_users",
@@ -213,7 +248,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p3/src_users/sql-scripts/dml.src_p3_users.sql",
         "ddl_ref": "pipelines/sources/p3/src_users/sql-scripts/ddl.src_p3_users.sql",
-        "table_folder_name": "pipelines/sources/p3/src_users"
+        "table_folder_name": "pipelines/sources/p3/src_users",
+        "kafka_topic": null
     },
     "src_table_1": {
         "table_name": "src_table_1",
@@ -221,7 +257,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/common/src_table_1/sql-scripts/dml.src_table_1.sql",
         "ddl_ref": "pipelines/sources/common/src_table_1/sql-scripts/ddl.src_table_1.sql",
-        "table_folder_name": "pipelines/sources/common/src_table_1"
+        "table_folder_name": "pipelines/sources/common/src_table_1",
+        "kafka_topic": null
     },
     "src_x": {
         "table_name": "src_x",
@@ -229,7 +266,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_x/sql-scripts/dml.src_x.sql",
         "ddl_ref": "pipelines/sources/p2/src_x/sql-scripts/ddl.src_x.sql",
-        "table_folder_name": "pipelines/sources/p2/src_x"
+        "table_folder_name": "pipelines/sources/p2/src_x",
+        "kafka_topic": null
     },
     "src_y": {
         "table_name": "src_y",
@@ -237,7 +275,8 @@
         "type": "source",
         "dml_ref": "pipelines/sources/p2/src_y/sql-scripts/dml.src_y.sql",
         "ddl_ref": "pipelines/sources/p2/src_y/sql-scripts/ddl.src_y.sql",
-        "table_folder_name": "pipelines/sources/p2/src_y"
+        "table_folder_name": "pipelines/sources/p2/src_y",
+        "kafka_topic": null
     },
     "x": {
         "table_name": "x",
@@ -245,7 +284,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/x/sql-scripts/dml.x.sql",
         "ddl_ref": "pipelines/intermediates/p2/x/sql-scripts/ddl.x.sql",
-        "table_folder_name": "pipelines/intermediates/p2/x"
+        "table_folder_name": "pipelines/intermediates/p2/x",
+        "kafka_topic": null
     },
     "y": {
         "table_name": "y",
@@ -253,7 +293,8 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/y/sql-scripts/dml.y.sql",
         "ddl_ref": "pipelines/intermediates/p2/y/sql-scripts/ddl.y.sql",
-        "table_folder_name": "pipelines/intermediates/p2/y"
+        "table_folder_name": "pipelines/intermediates/p2/y",
+        "kafka_topic": null
     },
     "z": {
         "table_name": "z",
@@ -261,6 +302,7 @@
         "type": "intermediate",
         "dml_ref": "pipelines/intermediates/p2/z/sql-scripts/dml.z.sql",
         "ddl_ref": "pipelines/intermediates/p2/z/sql-scripts/ddl.z.sql",
-        "table_folder_name": "pipelines/intermediates/p2/z"
+        "table_folder_name": "pipelines/intermediates/p2/z",
+        "kafka_topic": null
     }
 }

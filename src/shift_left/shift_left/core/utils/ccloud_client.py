@@ -58,7 +58,7 @@ class ConfluentCloudClient:
         credentials = f"{api_key}:{api_secret}"
         encoded_credentials = b64encode(credentials.encode('utf-8')).decode('utf-8')
         return f"Basic {encoded_credentials}"
-    
+
     def make_request(self, method, url, auth_header=None, data=None) -> str:
         """Make HTTP request to Confluent Cloud API.
         When data is provided, the body is serialized explicitly as JSON (utf-8)
@@ -114,7 +114,7 @@ class ConfluentCloudClient:
             else:
                 logger.error(f">>>> Response to {method} at {url} has reported error: {e}")
                 raise e
-    
+
     # ------------- CCloud related methods ----
     def get_environment_list(self):
         """Get the list of environments"""
@@ -127,7 +127,7 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
             return None
-    
+
     def get_compute_pool_list(self, env_id: str, region: str) -> ComputePoolListResponse:
         """Get the list of compute pools"""
         if not env_id:
@@ -164,7 +164,7 @@ class ConfluentCloudClient:
                 logger.error(f"Response: {resp}")
                 break
         return compute_pool_list
-        
+
 
     def get_compute_pool_info(self, compute_pool_id: str, env_id: str = None):
         """Get the info of a compute pool"""
@@ -216,40 +216,40 @@ class ConfluentCloudClient:
                     timer+= 10
                     print(f"Wait {statement_name} deployment, increase wait response timer to {timer} seconds")
                 if pending_counter >= 23:
-                    logger.error(f"Too long waiting with response= {statement.model_dump_json(indent=3)}") 
+                    logger.error(f"Too long waiting with response= {statement.model_dump_json(indent=3)}")
                     execution_time = time.perf_counter() - start_time
-                    error_statement = Statement.model_validate({"name": statement_name, 
+                    error_statement = Statement.model_validate({"name": statement_name,
                                                                 "spec": statement.spec,
                                                                 "status": {"phase": "FAILED", "detail": "Done waiting with response"},
-                                                                "loop_counter": pending_counter, 
-                                                                "execution_time": execution_time, 
+                                                                "loop_counter": pending_counter,
+                                                                "execution_time": execution_time,
                                                                 "result" : statement.result})
-                    raise Exception(f"Too long waiting with response= {error_statement.model_dump_json(indent=3)}")   
+                    raise Exception(f"Too long waiting with response= {error_statement.model_dump_json(indent=3)}")
             else:
                 execution_time = time.perf_counter() - start_time
                 statement.loop_counter= pending_counter
                 statement.execution_time= execution_time
-                logger.info(f"Done waiting, got {statement.status.phase} with response= {statement.model_dump_json(indent=3)}") 
-                return statement    
+                logger.info(f"Done waiting, got {statement.status.phase} with response= {statement.model_dump_json(indent=3)}")
+                return statement
 
-                
+
     def _extract_cluster_info_from_bootstrap(self, bootstrap_servers):
             """
             Extract cluster_id and base_url from bootstrap.servers value.
-            
+
             Args:
                 bootstrap_servers (str): Bootstrap servers string like 'lkc-7...g3p-dm8me7.us-west-2.aws.glb.confluent.cloud:9092'
                                       or 'pkc-n9..pk.us-west-2.aws.confluent.cloud:9092'
-            
+
             Returns:
                 dict: Contains 'cluster_id', 'base_url'
             """
             if not bootstrap_servers:
                 bootstrap_servers = self.config["kafka"]["bootstrap.servers"]
-            
+
             # Remove port if present
             server_without_port = bootstrap_servers.split(':')[0]
-            
+
             # Extract cluster_id and base_url
             if server_without_port.startswith('lkc-') or server_without_port.startswith('pkc-'):
                 # Handle format like: lkc-7..p-..us-west-2.aws.glb.confluent.cloud
@@ -258,7 +258,7 @@ class ConfluentCloudClient:
                     parts = server_without_port.split('-', 2)  # Split into at most 3 parts
                     cluster_id = f"{parts[0]}-{parts[1]}"  # e.g., 'lkc-79kg3p'
                     base_url = parts[2]  # e.g., 'dm8me7.us-west-2.aws.glb.confluent.cloud'
-                # Handle format like: pkc-n9..n.us-west-2.aws.confluent.cloud  
+                # Handle format like: pkc-n9..n.us-west-2.aws.confluent.cloud
                 else:
                     # Find the first dot to separate cluster from domain
                     dot_index = server_without_port.find('.')
@@ -268,23 +268,23 @@ class ConfluentCloudClient:
                         cluster_id = cluster_part
                     else:
                         return {"cluster_id": None, "base_url": None}
-                
+
                 return {
                     "cluster_id": cluster_id,
                     "base_url": base_url,
                 }
-            
+
             return {"cluster_id": None, "base_url": None}
 
     # ---- Topic related methods ----
- 
+
     def get_topic_message_count(self, topic_name: str) -> int:
         """
         Get the number of messages in a Kafka topic.
-        
+
         Args:
             topic_name (str): The name of the topic to get message count for
-            
+
         Returns:
             int: The total number of messages in the topic
         """
@@ -300,13 +300,13 @@ class ConfluentCloudClient:
             url = f"{url}/{partition_id}"
             response = self.make_request(method="GET", url=url, auth_header=auth_header)
             logger.debug(response)
-            
+
         return total_messages
 
     def list_topics(self) -> dict | None:
-        """List the topics in the environment 
+        """List the topics in the environment
         example of url https://lkc-23456-doqmp5.us-west-2.aws.confluent.cloud/kafka/v3/clusters/lkc-23456/topics \
- 
+
         """
         url=self._build_confluent_cloud_kafka_url()
         logger.info(f"List topic from {url}")
@@ -318,7 +318,7 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             logger.error(e)
             return None
-        
+
 
     # ---- Flink related methods ----
     def build_flink_url_and_auth_header(self) -> Tuple[str, str]:
@@ -332,7 +332,7 @@ class ConfluentCloudClient:
         else:
             url=f"https://flink.{self.base_url}/sql/v1/organizations/{organization_id}/environments/{env_id}"
         return url, auth_header
-    
+
     def get_flink_statement(self, statement_name: str)-> Statement | None:
         url, auth_header = self.build_flink_url_and_auth_header()
         try:
@@ -340,12 +340,12 @@ class ConfluentCloudClient:
             if resp and not resp.get("errors"):
                 try:
                     s: Statement = Statement.model_validate(resp)
-                    return s 
+                    return s
                 except Exception as e:
                     logger.error(f"Error parsing statement response: {resp} with error {e}")
                     return None
             elif resp and resp.get("errors") and resp.get("errors")[0].get("status") == "404":
-                logger.warning(f"Statement {statement_name} not found") 
+                logger.warning(f"Statement {statement_name} not found")
                 return None
             else:
                 logger.error(f"Error getting statement {statement_name}: {resp}")
@@ -363,7 +363,9 @@ class ConfluentCloudClient:
                 logger.info(f"Statement {statement_name} not found")
                 return "deleted"
             if resp == '' or resp == 'deleted':
+                logger.info(f"response to delete {statement_name} is {resp}, returning deleted")
                 return "deleted"
+            logger.info(f"response to delete {statement_name} is {resp}, not clear so wait for statement to be deleted")
             counter=0
             while True:
                 statement = self.get_flink_statement(statement_name)
@@ -383,7 +385,7 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing delete statement call for {statement_name}: {e}")
             return "unknown - mostly not removed"
-        
+
     def update_flink_statement(self, statement_name: str,  statement: Statement, stopped: bool):
         url, auth_header = self.build_flink_url_and_auth_header()
         try:
@@ -447,7 +449,7 @@ class ConfluentCloudClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error executing rest call: {e}")
             logger.error(f"Response: {response.text}")
-            return None    
+            return None
 
 
 
@@ -460,7 +462,7 @@ class ConfluentCloudClient:
             cluster_id = config_cluster_id
         else:
             cluster_id = cluster_url_id
-        
+
         # For lkc- format with multiple components, use dash; for pkc- format, use dot
         # lkc-7...3p-dm8me7.us-west-2.aws  -> cluster_id is lkc-7...3p and base_url is dm8me7.us-west-2.aws
         # pkc-n9..k.us-west-2.aws  -> cluster_id is pkc-n9..k and base_url is us-west-2.aws
@@ -469,4 +471,4 @@ class ConfluentCloudClient:
         else:
             url=f"https://{cluster_url_id}.{base_url}/kafka/v3/clusters/{cluster_id}/topics"
         return url
-    
+
