@@ -1,179 +1,183 @@
 """
 Copyright 2024-2025 Confluent, Inc.
+
+Integration tests for the table Typer CLI.
+
+For commands that need your real Confluent/demo project, run from `src/shift_left` after:
+
+  source set_demo_env
+
+`set_demo_env` sets SL_CONFIG_FILE, PIPELINES, STAGING, SRC_FOLDER, and API credentials.
+Local CI uses tests/config.yaml + dummy env from tests/it/conftest.py when demo env is not loaded.
 """
-import unittest
-import pathlib
 import os
 import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from shift_left.cli_commands.table import app
-from shift_left.core.utils.app_config import shift_left_dir
+
+_TESTS_ROOT = Path(__file__).resolve().parent.parent.parent
+_DEFAULT_PIPELINES = _TESTS_ROOT / "data" / "flink-project" / "pipelines"
+_DEFAULT_SRC = _TESTS_ROOT / "data" / "spark-project"
+_DEFAULT_STAGING = _TESTS_ROOT / "data" / "flink-project" / "staging"
+
+# True after `source set_demo_env` (export added there)
+_DEMO_IT = os.environ.get("SHIFT_LEFT_IT_USE_DEMO_ENV", "").lower() in ("1", "true", "yes")
+
 
 class TestTableCLI(unittest.TestCase):
+    """Table CLI: inventory, makefiles, search-deps, update-tables; optional demo-only commands."""
 
     @classmethod
     def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent.parent.parent / "data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
-        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
-        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/it-config.yaml"
+        os.environ.setdefault("PIPELINES", str(_DEFAULT_PIPELINES))
+        os.environ.setdefault("SRC_FOLDER", str(_DEFAULT_SRC))
+        os.environ.setdefault("STAGING", str(_DEFAULT_STAGING))
 
     @classmethod
     def tearDownClass(cls):
-        temp_dir = os.getenv("STAGING") + "/data_product_1"
+        staging = os.environ.get("STAGING", str(_DEFAULT_STAGING))
+        temp_dir = os.path.join(staging, "data_product_1")
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
     def test_init_table(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["init", "src_table_5", os.getenv("STAGING") + "/data_product_1/sources"])
-        assert result.exit_code == 0
-        assert "table_5" in result.stdout
-        assert os.path.exists( os.getenv("STAGING") + "/data_product_1/sources/src_table_5")
-        assert os.path.exists( os.getenv("STAGING") + "/data_product_1/sources/src_table_5/Makefile")
-
+        staging = os.environ.get("STAGING", str(_DEFAULT_STAGING))
+        target = os.path.join(staging, "data_product_1", "sources")
+        os.makedirs(target, exist_ok=True)
+        result = runner.invoke(app, ["init", "src_table_5", target])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("table_5", result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(target, "src_table_5")))
+        self.assertTrue(os.path.exists(os.path.join(target, "src_table_5", "Makefile")))
 
     def test_build_inventory(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["build-inventory", os.getenv("PIPELINES")])
-        assert result.exit_code == 0
-        assert os.path.exists(os.getenv("PIPELINES") + "/inventory.json")
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(app, ["build-inventory", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(pl, "inventory.json")))
 
     def test_search_parents_of_table(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["search-source-dependencies", os.getenv("SRC_FOLDER") + "/facts/p5/fct_users.sql", os.getenv("SRC_FOLDER")])
-        assert result.exit_code == 0
-        print(result)
+        src = Path(os.environ.get("SRC_FOLDER", str(_DEFAULT_SRC)))
+        sql_file = src / "facts" / "users" / "fct_users.sql"
+        self.assertTrue(sql_file.is_file(), f"Missing fixture: {sql_file}")
+        result = runner.invoke(
+            app,
+            ["search-source-dependencies", str(sql_file), str(src)],
+        )
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("fct_users", result.stdout)
 
     def test_update_makefile(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["update-makefile", "src_p2_a", os.getenv("PIPELINES")])
-        assert result.exit_code == 0
-        assert os.path.exists(os.getenv("PIPELINES") + "/sources/p2/src_a/Makefile")
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        # Inventory key is src_a under p2 (not src_p2_a)
+        result = runner.invoke(app, ["update-makefile", "src_a", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        mk = os.path.join(pl, "sources", "p2", "src_a", "Makefile")
+        self.assertTrue(os.path.exists(mk), f"Expected Makefile at {mk}")
 
-
-    # !!!Test Mamagement of Unit Tests and Integration Tests are done in separate tests. see it/ folder.
-    
-
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
     def test_migrate_command(self):
-        """Test migrate command with basic parameters"""
+        """migrate uses the AI stack; run only with demo env."""
         runner = CliRunner()
-        
-        # Create a temporary SQL file for testing migration
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("SELECT * FROM test_table;\n")
-            temp_sql_file = f.name
-        
+            path = f.name
         try:
-            result = runner.invoke(app, [
-                "migrate", 
-                "test_migrated_table", 
-                temp_sql_file, 
-                os.getenv("STAGING")
-            ])
-            # This command depends on AI integration, so we just test basic execution
-            print(result.stdout)
+            staging = os.environ.get("STAGING", str(_DEFAULT_STAGING))
+            result = runner.invoke(
+                app,
+                ["migrate", "test_migrated_table", path, staging],
+            )
+            self.assertEqual(result.exit_code, 0, msg=result.stdout)
         finally:
-            os.unlink(temp_sql_file)
+            os.unlink(path)
 
     def test_update_all_makefiles_command(self):
-        """Test update-all-makefiles command"""
         runner = CliRunner()
-        
-        result = runner.invoke(app, ["update-all-makefiles", os.getenv("PIPELINES")])
-        assert result.exit_code == 0
-        assert "Updated" in result.stdout
-        assert "Makefiles" in result.stdout
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(app, ["update-all-makefiles", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Updated", result.stdout)
+        self.assertIn("Makefiles", result.stdout)
 
     def test_validate_table_names_command(self):
-        """Test validate-table-names command"""
         runner = CliRunner()
-        
-        result = runner.invoke(app, ["validate-table-names", os.getenv("PIPELINES")])
-        assert result.exit_code == 0
-        print(result.stdout)
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(app, ["validate-table-names", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
     def test_update_tables_command_basic(self):
-        """Test update-tables command with basic parameters"""
         runner = CliRunner()
-        
-        result = runner.invoke(app, [
-            "update-tables", 
-            os.getenv("PIPELINES"),
-            "--string-to-change-from", "test_old",
-            "--string-to-change-to", "test_new"
-        ])
-        assert result.exit_code == 0
-        assert "Done: processed:" in result.stdout
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(
+            app,
+            [
+                "update-tables",
+                pl,
+                "--string-to-change-from",
+                "test_old",
+                "--string-to-change-to",
+                "test_new",
+            ],
+        )
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Done: processed:", result.stdout)
 
     def test_update_tables_command_ddl_only(self):
-        """Test update-tables command with DDL only option"""
         runner = CliRunner()
-        
-        result = runner.invoke(app, [
-            "update-tables", 
-            os.getenv("PIPELINES"),
-            "--ddl"
-        ])
-        assert result.exit_code == 0
-        assert "Done: processed:" in result.stdout
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(app, ["update-tables", pl, "--ddl"])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Done: processed:", result.stdout)
 
     def test_update_tables_command_both_ddl_dml(self):
-        """Test update-tables command with both DDL and DML option"""
         runner = CliRunner()
-        
-        result = runner.invoke(app, [
-            "update-tables", 
-            os.getenv("PIPELINES"),
-            "--both-ddl-dml"
-        ])
-        assert result.exit_code == 0
-        assert "Done: processed:" in result.stdout
+        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
+        result = runner.invoke(app, ["update-tables", pl, "--both-ddl-dml"])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Done: processed:", result.stdout)
 
-
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_table_name(self):
-        """Test explain command with table name"""
         runner = CliRunner()
-        
         result = runner.invoke(app, ["explain", "--table-name", "p1_fct_order"])
-        # This command depends on actual Flink infrastructure
-        print(result.stdout)
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_product_name(self):
-        """Test explain command with product name"""
         runner = CliRunner()
-        
         result = runner.invoke(app, ["explain", "--product-name", "p1"])
-        # This command depends on actual Flink infrastructure
-        print(result.stdout)
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
     def test_explain_command_error_no_params(self):
-        """Test explain command error when no parameters provided"""
         runner = CliRunner()
-        
         result = runner.invoke(app, ["explain"])
-        assert result.exit_code == 1
-        assert "Error: table or dir needs to be provided" in result.stdout
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("Error: table or dir needs to be provided", result.stdout)
 
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_table_list_file(self):
-        """Test explain command with table list file"""
         runner = CliRunner()
-        
-        # Create a temporary table list file
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("p1_fct_order\n")
-            temp_file = f.name
-        
+            path = f.name
         try:
-            result = runner.invoke(app, ["explain", "--table-list-file-name", temp_file])
-            # This command depends on actual Flink infrastructure
-            print(result.stdout)
+            result = runner.invoke(
+                app, ["explain", "--table-list-file-name", path]
+            )
+            self.assertEqual(result.exit_code, 0, msg=result.stdout)
         finally:
-            os.unlink(temp_file)
+            os.unlink(path)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

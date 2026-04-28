@@ -21,6 +21,8 @@ INVENTORY_FILE_NAME: Final[str] = "inventory.json"
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = os.path.basename(os.getenv("PIPELINES", "pipelines"))
 PIPELINE_JSON_FILE_NAME: Final[str] = "pipeline_definition.json"
+EXTERNAL_KAFKA_TYPE: Final[str] = "external_kafka"
+EXTERNAL_TABLES_JSON: Final[str] = "external_tables.json"
 
 # ------ Public APIs ------
 
@@ -34,6 +36,10 @@ class InfoNode(BaseModel):
 class FlinkTableReference(InfoNode):
     """Reference to a Flink table including its metadata and location information."""
     table_folder_name: str = Field(default="", description="table_folder_name")
+    kafka_topic: Optional[str] = Field(
+        default=None,
+        description="Kafka topic name when type is external_kafka (pre-provisioned, not deployed from this repo).",
+    )
 
     def __hash__(self) -> int:
         return hash(self.table_name)
@@ -52,6 +58,10 @@ class FlinkTablePipelineDefinition(InfoNode):
     For sink tables, children will be empty.
     """
     path: str = Field(default="", description="path to the table")
+    kafka_topic: Optional[str] = Field(
+        default=None,
+        description="Kafka topic when type is external_kafka (optional metadata for lineage/UI).",
+    )
     complexity: Optional[FlinkStatementComplexity] = Field(default=FlinkStatementComplexity(), description="Complexity of the statement")
     parents: Set['FlinkTablePipelineDefinition'] = Field(default=set(), description="parents of this flink dml")
     children: Set['FlinkTablePipelineDefinition'] = Field(default=set(), description="users of the table created by this flink dml")
@@ -99,6 +109,68 @@ def build_inventory(pipeline_folder: str) -> Dict:
     """
     return get_or_build_inventory(pipeline_folder, pipeline_folder, True)
 
+
+def _collect_seeds_external_tables(pipeline_folder: str) -> Dict[str, Dict[str, Any]]:
+    """Load external Kafka-backed table names from ``**/seeds/external_tables.json``.
+
+    Each manifest may contain: ``{"tables": [{"table_name": "...", "kafka_topic": "...", "product_name": "..."}]}``.
+    """
+    out: Dict[str, Dict[str, Any]] = {}
+    if not pipeline_folder or not os.path.isdir(pipeline_folder):
+        return out
+    for root, _, _ in os.walk(pipeline_folder):
+        manifest = os.path.join(root, "seeds", EXTERNAL_TABLES_JSON)
+        if not os.path.isfile(manifest):
+            continue
+        try:
+            with open(manifest, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Could not read %s: %s", manifest, e)
+            continue
+        tables = data.get("tables") or []
+        if not isinstance(tables, list):
+            continue
+        for row in tables:
+            if not isinstance(row, dict):
+                continue
+            tname = row.get("table_name")
+            if not tname or not isinstance(tname, str):
+                continue
+            if tname in out:
+                logger.warning("Duplicate external table %s in seeds manifests; keeping first", tname)
+                continue
+            topic = row.get("kafka_topic")
+            if topic is not None and not isinstance(topic, str):
+                topic = str(topic)
+            prod = row.get("product_name")
+            if prod is not None and not isinstance(prod, str):
+                prod = str(prod)
+            product_name = prod or "common"
+            folder = f"{PIPELINE_FOLDER_NAME}/seeds/{tname}"
+            out[tname] = {
+                "table_name": tname,
+                "type": EXTERNAL_KAFKA_TYPE,
+                "product_name": product_name,
+                "ddl_ref": "",
+                "dml_ref": "",
+                "table_folder_name": folder,
+                "kafka_topic": topic,
+            }
+    return out
+
+
+def merge_seeds_external_tables_into_inventory(inventory: Dict[str, Any], pipeline_folder: str) -> None:
+    """Merge seeds ``external_tables.json`` entries into ``inventory`` in place (skip name clashes)."""
+    for name, ref_dict in _collect_seeds_external_tables(pipeline_folder).items():
+        if name in inventory:
+            logger.warning(
+                "Skipping seeds external table %s: already present in inventory", name
+            )
+            continue
+        inventory[name] = ref_dict
+
+
 def get_or_build_inventory(
     pipeline_folder: str,
     target_path: str,
@@ -121,8 +193,9 @@ def get_or_build_inventory(
 
     if not recreate and os.path.exists(inventory_path):
         with open(inventory_path, "r") as f:
-            inventory= json.load(f)
-            return inventory
+            inventory = json.load(f)
+        merge_seeds_external_tables_into_inventory(inventory, pipeline_folder)
+        return inventory
 
     inventory = {}
     parser = SQLparser()
@@ -174,6 +247,7 @@ def get_or_build_inventory(
                 if ref.table_name in inventory:
                     logger.error(f"duplicate name {ref.table_name} dml = {dml_file_name}")
                 inventory[ref.table_name] = ref.model_dump()
+    merge_seeds_external_tables_into_inventory(inventory, pipeline_folder)
     logger.info(f"processed {count} files and got {len(inventory)} entries")
     sorted_inventory_keys = sorted(inventory.keys())
     sorted_inventory = {k: inventory[k] for k in sorted_inventory_keys}
@@ -304,8 +378,8 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     """
     Returns the name of the ddl or dml files
     """
-    ddl_file_name = ""
-    dml_file_name = ""
+    ddl_file_name = None
+    dml_file_name = None
     base_scripts=os.path.join(root, dir)
     for file in os.listdir(base_scripts):
         if file.startswith("ddl.") and not file.endswith('.properties') :

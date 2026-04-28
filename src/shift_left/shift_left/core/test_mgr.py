@@ -319,10 +319,10 @@ def _execute_flink_test_statement(
             _, sql_out= transformer.update_sql_content(sql_content, column_name_to_select_from, product_name)
             logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
             print(f"Execute statement {statement_name}  on: {compute_pool_id}")
-            post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
+            post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out, {})
             if "Exists but deleted so retry" in post_statement:
                 logger.info(f"Statement {statement_name} exists but deleted so retry")
-                post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out)
+                post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out, {})
             return post_statement, is_new  # Return new statement
         except Exception as e:
             logger.error(e)

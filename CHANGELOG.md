@@ -11,6 +11,22 @@
 * Update to mcp index and mcp server. 
 * Update data engineer tutorial
 
+### [0.1.50] - 2026
+* Support tumble window to extract dependencies
+* Mark mode to be stateful when using tumble window
+* Support loading properties file into the post statement as properties of the spec
+* Enhance environment variables support in configuration
+* Support external topics as sources: DML can legally reference Flink tables backed by existing Kafka topics that are not under **/sql-scripts/ (demo / controlled pipelines). Those names should remain as parents with explicit metadata. The seeds folder can be used to create raw topics for lower environments like dev or staging.
+* Better error reporting when a statement fails.
+
+### [0.1.49] - 2026-03-17
+- Finish project tutorial
+- update to prompt and ai lab
+- update to mcp index and mcp server. Update data engineer tutorial
+- change to ksql migration
+- fix potential issue with insert statements that are just json or xml string. Add principal as mandatory element in post statement
+- fix an issue while building inventory with .properties file with name starting with dml.
+
 ### v0.1.48  - 2026-01-30
 
 * Add graph view for pipeline relationships

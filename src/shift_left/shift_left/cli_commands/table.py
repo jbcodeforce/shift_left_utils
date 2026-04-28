@@ -137,7 +137,12 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
                   both_ddl_dml: bool = typer.Option(False, "--both-ddl-dml", help="Run both DDL and DML sql files"),
                   string_to_change_from: str = typer.Option(None, "--string-to-change-from", help="String to change in the SQL content"),
                   string_to_change_to: str = typer.Option(None, "--string-to-change-to", help="String to change in the SQL content"),
-                  class_to_use = Annotated[str, typer.Argument(help= "The class to use to do the Statement processing", default="shift_left.core.utils.table_worker.ChangeLocalTimeZone")]):
+                  class_to_use: Annotated[
+                      str,
+                      typer.Argument(
+                          help="The class to use to do the Statement processing",
+                      ),
+                  ] = "shift_left.core.utils.table_worker.TableWorker"):
     """
     Update the tables with SQL code changes defined in external python callback. It will read dml or ddl and apply the updates.
     """
@@ -152,12 +157,12 @@ def update_tables(folder_to_work_from: Annotated[str, typer.Argument(help="Folde
         for file in files:
             if file.startswith("dml"):
                 files_to_process.append(files[file])
+    count = 0
+    processed = 0
     if class_to_use:
         module_path, class_name = class_to_use.rsplit('.',1)
         mod = import_module(module_path)
         runner_class = getattr(mod, class_name)
-        count=0
-        processed=0
         for file in files_to_process:
             print(f"Assessing file {file}")
             updated=update_sql_content_for_file(file, runner_class(), string_to_change_from, string_to_change_to)

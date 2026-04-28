@@ -15,7 +15,7 @@ from .error_sanitizer import sanitize_error_message
 _config: dict[str, dict[str,str]] = {}
 
 BASE_CC_API = "api.confluent.cloud/org/v2"
-__version__ = "0.1.49"
+__version__ = "0.1.50"
 
 # Environment variable mapping for sensitive values
 ENV_VAR_MAPPING = {
@@ -24,6 +24,7 @@ ENV_VAR_MAPPING = {
     "kafka.api_secret": "SL_KAFKA_API_SECRET",
     "kafka.sasl.username": "SL_KAFKA_API_KEY",
     "kafka.sasl.password": "SL_KAFKA_API_SECRET",
+    "kafka.cluster_id": "SL_CCLOUD_KAFKA_CLUSTER_ID",
 
     # Confluent Cloud API credentials
     "confluent_cloud.api_key": "SL_CONFLUENT_CLOUD_API_KEY",
@@ -32,15 +33,14 @@ ENV_VAR_MAPPING = {
     # Flink API credentials
     "flink.api_key": "SL_FLINK_API_KEY",
     "flink.api_secret": "SL_FLINK_API_SECRET",
-    "flink.compute_pool_id": "FLINK_COMPUTE_POOL_ID",
-    "flink.catalog_name": "FLINK_ENV_NAME",
-    "flink.database_name": "FLINK_DATABASE_NAME",
+    "flink.compute_pool_id": "SL_FLINK_COMPUTE_POOL_ID",
+    "flink.catalog_name": "SL_FLINK_ENV_NAME",
+    "flink.database_name": "SL_FLINK_DATABASE_NAME",
     # Cloud provider and region
     "confluent_cloud.cloud_provider": "CLOUD_PROVIDER",
     "confluent_cloud.cloud_region": "CLOUD_REGION",
     "confluent_cloud.organization_id": "CLOUD_ORGANIZATION_ID",
-    "confluent_cloud.service_account_id": "CLOUD_SERVICE_ACCOUNT_ID",
-    "confluent_cloud.environment_id": "FLINK_ENV_ID",
+    "confluent_cloud.environment_id": "SL_FLINK_ENV_ID",
     "confluent_cloud.service_account_id": "SL_CONFLUENT_PRINCIPAL_ID",
 }
 
@@ -84,7 +84,7 @@ def get_missing_env_vars(config: Dict[str, Any]) -> set[str]:
         value=config.get(section, {}).get(field)
         if (not value or value in ["", "<TO_FILL>", "<kafka-api-key>", "<kafka-api-key_secret>", "<no-api-key>", "<no-key"]) and not os.getenv(env_var_name):
             missing_env_vars.add(env_var_name)
-
+    logger.info(f"missing_env_vars: {missing_env_vars}")
     return missing_env_vars
 
 
@@ -120,7 +120,7 @@ def print_env_var_help():
     print("  export SL_CONFLUENT_CLOUD_API_SECRET='your-confluent-cloud-api-secret'")
     print("  export SL_FLINK_API_KEY='your-flink-api-key'")
     print("  export SL_FLINK_API_SECRET='your-flink-api-secret'")
-    print("  export SL_SERVICE_ACCOUNT_ID='your-service-account-id'")
+    print("  export SL_CONFLUENT_PRINCIPAL_ID='your-service-account-id'")
     print("\nNOTE: Environment variables take precedence over config.yaml values")
     print("="*80 + "\n")
 
@@ -175,7 +175,7 @@ file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
 logger.addHandler(file_handler)
 print("-" * 40 + " SHIFT_LEFT " + __version__ + " " + "-" * 40)
-header_line=f"""| CONFIG_FILE     : {os.getenv('CONFIG_FILE')}
+header_line=f"""| CONFIG_FILE     : {os.getenv('SL_CONFIG_FILE',os.getenv('CONFIG_FILE', './config.yaml'))}
 | LOGS folder     : {session_log_dir}
 | Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
 print(header_line)
@@ -295,6 +295,7 @@ def validate_config(config: dict[str,dict[str,str]], minimal: bool = False) -> N
   missing_env_vars = get_missing_env_vars(config)
   if missing_env_vars:
     errors.append(f"Missing environment variables for API keys/secrets: {', '.join(sorted(missing_env_vars))}. Please set these environment variables or update the config file with actual values.")
+    print_env_var_help()
 
   # If there are any errors, raise them all at once
   if len(errors) > 0:
@@ -331,7 +332,7 @@ def get_config() -> dict[str,dict[str,str]]:
   """
   global _config
   if _config.__len__() == 0:
-      CONFIG_FILE = os.getenv("CONFIG_FILE",  "./config.yaml")
+      CONFIG_FILE = os.getenv("SL_CONFIG_FILE", os.getenv("CONFIG_FILE",  "./config.yaml"))
       if CONFIG_FILE:
         try:
           config = {}

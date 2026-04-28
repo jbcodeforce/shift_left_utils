@@ -101,13 +101,13 @@ class TestDeploymentManager(BaseUT):
 
         node_map["e"] = FlinkStatementNode(table_name="e", parents=[node_map["c"]])
         node_map["f"] = FlinkStatementNode(table_name="f", parents=[node_map["d"]])
-
-        ancestors = dm._build_topological_sorted_graph([node_map["z"]], node_map)
-        assert ancestors[0].table_name == "src_x" or ancestors[0].table_name == "src_y"
-        assert ancestors[1].table_name == "src_x" or ancestors[1].table_name == "src_y"
-        assert ancestors[2].table_name == "x" or ancestors[2].table_name == "y"
-        assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
-        assert ancestors[4].table_name == "z"
+        with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
+            ancestors = dm._build_topological_sorted_graph([node_map["z"]], node_map)
+            assert ancestors[0].table_name == "src_x" or ancestors[0].table_name == "src_y"
+            assert ancestors[1].table_name == "src_x" or ancestors[1].table_name == "src_y"
+            assert ancestors[2].table_name == "x" or ancestors[2].table_name == "y"
+            assert ancestors[3].table_name == "x" or ancestors[3].table_name == "y"
+            assert ancestors[4].table_name == "z"
 
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
@@ -237,7 +237,7 @@ class TestDeploymentManager(BaseUT):
             time.sleep(1)
             return "deleted"
 
-        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
+        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str, properties={}) -> Statement:
             print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
             time.sleep(1)
             if statement_name in ["dev-usw2-p2-dml-z", "dev-usw2-p2-dml-y", "dev-usw2-p2-dml-src-y", "dev-usw2-p2-dml-src-x", "dev-usw2-p2-dml-x","dev-usw2-p2-dml-d"]:
@@ -268,7 +268,7 @@ class TestDeploymentManager(BaseUT):
         # Avoid remote call via statement_mgr.get_statement_list() inside build_and_deploy_flink_statement_from_sql_content
         mock_get_statement_list.return_value = {}
         mock_build_simple_report.return_value = "mock_build_simple_report"
-        summary, report = dm.build_deploy_pipeline_from_table(table_name="d",
+        summary, report, _ = dm.build_deploy_pipeline_from_table(table_name="d",
                                     inventory_path=self.inventory_path,
                                     compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
                                     dml_only=False,
@@ -372,7 +372,7 @@ class TestDeploymentManager(BaseUT):
         Test the prepare table
         """
 
-        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+        def mock_post_statement(compute_pool_id, statement_name, sql_content, properties={}):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
             status = Status(

@@ -10,7 +10,7 @@
   "python.analysis.extraPaths": [
     "src/shift_left"
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.defaultInterpreterPath": "${workspaceFolder}/src/shift_left/.venv/bin/python",
 
   // Editor settings to prevent tab/space issues
   "editor.insertSpaces": false,

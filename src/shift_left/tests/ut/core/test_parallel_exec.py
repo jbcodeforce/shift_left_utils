@@ -140,7 +140,7 @@ class TestParallelExecutePlan(BaseUT):
 
         mock_deploy.side_effect = _mock_deploy
 
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
@@ -148,7 +148,8 @@ class TestParallelExecutePlan(BaseUT):
             max_thread=4
         )
 
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(statements), 3)
+        self.assertTrue(deploy_ok)
         self.assertEqual(mock_deploy.call_count, 3)
 
         # All nodes should be processed since they're autonomous
@@ -173,7 +174,7 @@ class TestParallelExecutePlan(BaseUT):
 
         mock_deploy.side_effect = _mock_deploy
 
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
@@ -181,7 +182,8 @@ class TestParallelExecutePlan(BaseUT):
             max_thread=4
         )
 
-        self.assertEqual(len(result), 4)
+        self.assertEqual(len(statements), 4)
+        self.assertTrue(deploy_ok)
         self.assertEqual(mock_deploy.call_count, 4)
 
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
@@ -200,7 +202,7 @@ class TestParallelExecutePlan(BaseUT):
         mock_deploy.side_effect = _mock_deploy
 
         # Act
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
@@ -209,7 +211,8 @@ class TestParallelExecutePlan(BaseUT):
         )
 
         # Assert
-        self.assertEqual(len(result), 2)  # Only node2 and node3 should be executed
+        self.assertEqual(len(statements), 2)  # Only node2 and node3 should be executed
+        self.assertTrue(deploy_ok)
         self.assertEqual(mock_deploy.call_count, 2)
 
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
@@ -225,16 +228,17 @@ class TestParallelExecutePlan(BaseUT):
         mock_deploy.side_effect = [Exception("Deployment failed"), self._create_mock_statement()]
 
         # Act
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=True,
             sequential=False,
             max_thread=4
         )
-        print(result)
+        print(statements)
         # Assert
-        self.assertEqual(len(result), 1)  # Only successful deployment returns a statement
+        self.assertEqual(len(statements), 1)  # Only successful deployment returns a statement
+        self.assertFalse(deploy_ok)
         self.assertEqual(mock_deploy.call_count, 2)
 
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
@@ -348,7 +352,7 @@ class TestParallelExecutePlan(BaseUT):
         execution_plan = self._create_mock_execution_plan([])
 
         # Act
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
@@ -357,7 +361,8 @@ class TestParallelExecutePlan(BaseUT):
         )
 
         # Assert
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(statements), 0)
+        self.assertTrue(deploy_ok)
         mock_deploy.assert_not_called()
 
     @patch('shift_left.core.deployment_mgr._deploy_one_node')
@@ -370,7 +375,7 @@ class TestParallelExecutePlan(BaseUT):
         mock_deploy.return_value = None
 
         # Act
-        result = dm._execute_plan(
+        statements, deploy_ok = dm._execute_plan(
             execution_plan=execution_plan,
             compute_pool_id=self.TEST_COMPUTE_POOL_ID_1,
             accept_exceptions=False,
@@ -379,7 +384,8 @@ class TestParallelExecutePlan(BaseUT):
         )
 
         # Assert
-        self.assertEqual(len(result), 0)  # None results are not added to the list
+        self.assertEqual(len(statements), 0)  # None results are not added to the list
+        self.assertFalse(deploy_ok)
         self.assertEqual(mock_deploy.call_count, 1)
 
 if __name__ == '__main__':

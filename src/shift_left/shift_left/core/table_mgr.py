@@ -316,6 +316,7 @@ def _get_flink_execution_plan_explanation(table_ref: FlinkTableReference, comput
     statement_mgr.delete_statement_if_exists(statement_name)
     result = statement_mgr.post_flink_statement(sql_content=sql_out,
                                           statement_name=statement_name,
+                                          properties={},
                                           compute_pool_id=compute_pool_id)
     explain_report= {'table_name': table_ref.table_name, 'trace': ''}
     if result and isinstance(result, Statement):

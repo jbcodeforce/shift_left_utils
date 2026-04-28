@@ -117,9 +117,9 @@ class TestPrepareTablesFromSqlFile(BaseUT):
 
         # Verify expected statement names
         expected_calls = [
-            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-0", "CREATE TABLE test_table (id INT);"),
-            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-1", "ALTER TABLE test_table ADD COLUMN name STRING;"),
-            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-2", "DROP TABLE old_table;")
+            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-0", "CREATE TABLE test_table (id INT);",{}),
+            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-1", "ALTER TABLE test_table ADD COLUMN name STRING;",{}),
+            call(COMPUTE_POOL_ID, "prepare-table-20240420101502-2", "DROP TABLE old_table;",{})
         ]
         mock_post_statement.assert_has_calls(expected_calls)
 

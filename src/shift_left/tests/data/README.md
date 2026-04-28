@@ -1,23 +1,24 @@
 # Test data for Unit and Integration tests
 
-The flink-rpojecct/pipelines folder includes the definition of Flink statement relationships to validate the shift_left tool capabilities, both for unit tests and integration tests.
+The flink-project/pipelines folder includes the definition of Flink statement relationships to validate the shift_left tool capabilities, both for unit tests and integration tests.
 
 
 ## Flink project
 
-flink-project folder is where all the Flink examples are defined. It was created with `shift_left project init` and tables added over time with `shift_left table init`
+* `flink-project` folder is where all the Flink examples are defined. It was created with `shift_left project init` and tables added over time with `shift_left table init`
 
-There are only 4 groups for each data products: Sources, intermediates, facts and dimensions.
+* There are only 4 groups for each data products: Seeds, sources, facts and dimensions.
+* There are 2 data products: c360 and p1
+	* The p1 data product contains all the flink statements to demonstrate the relationship as presented in the following figure:
+	![](./docs/flink_pipeline_for_test.drawio.png)
 
-The p1 data product contains all the flink statements to demonstrate the relationship as presented in this  figure:
+## Set environment variables
 
-![](./docs/flink_pipeline_for_test.drawio.png)
+Recent shift_left version supports defining environment variables. So config file should be minimum.
 
-The users data product is simpler and here for unit tests the test manager.
+## Config file
 
-### User data product
-
-THe quick test deploy a user dimension that joins user per group and count the number of user per group as a fact.
+The quick test deploy a user dimension that joins user per group and count the number of user per group as a fact.
 
 * Set a config file like:
     ```yaml
@@ -52,8 +53,3 @@ THe quick test deploy a user dimension that joins user per group and count the n
 * Build table medatada
 * Deploy in one command: shift_left pipeline deploy --product-name users
 
-## Spark project
-
-This is a simple project to includes spark SQL statements to be used for batch processing. The use case is around a case management application from which the batch jobs are gathering data for users, workflows, tasks, enterprises and then compute some analytic aggregates and metrics.
-
-The p7 folder includes the 'data_product' p7 with a set of table to create information about users.

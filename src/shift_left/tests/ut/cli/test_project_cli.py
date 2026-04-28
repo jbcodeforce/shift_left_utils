@@ -8,8 +8,29 @@ import shutil
 import tempfile
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-from shift_left.core.utils.app_config import shift_left_dir
+
+_TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+# Dummy credentials so get_config()/validate_config succeed when pytest imports CLI modules
+# (integration_test_mgr and others call get_config() at import time).
+if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
+    os.environ.setdefault("SL_KAFKA_API_KEY", "test")
+    os.environ.setdefault("SL_KAFKA_API_SECRET", "test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_KEY", "test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_SECRET", "test")
+    os.environ.setdefault("SL_FLINK_API_KEY", "test")
+    os.environ.setdefault("SL_FLINK_API_SECRET", "test")
+    os.environ.setdefault("SL_CCLOUD_KAFKA_CLUSTER_ID", "lkc-test")
+    os.environ.setdefault("CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
+    os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
+    os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")
+    os.environ.setdefault("SL_FLINK_ENV_NAME", "j9r-env")
+    os.environ.setdefault("SL_FLINK_DATABASE_NAME", "j9r-kafka")
+
+from shift_left.core.utils.app_config import get_config
 from shift_left.cli_commands.project import app
 import shift_left.core.pipeline_mgr as pm
 import subprocess
@@ -61,6 +82,7 @@ class TestProjectCLI(unittest.TestCase):
                 "region": "us-west-2",
                 "provider": "aws",
                 "organization_id": "org-123",
+                "service_account_id": "sa-123",
                 "api_key": "test_key",
                 "api_secret": "test_secret",
                 "url_scope": "test_scope"
@@ -264,7 +286,10 @@ class TestProjectCLI(unittest.TestCase):
                 old_home = os.environ.get("HOME")
                 try:
                     os.environ["HOME"] = output_tmp
-                    output_txt = out_shift_left / "modified_flink_files.txt"
+                    _modified_log = get_config().get("app", {}).get(
+                        "modified_flink_files_file_name", "modified_flink_files.txt"
+                    )
+                    output_txt = out_shift_left / _modified_log
 
                     # Mock git (no real git calls)
                     mock_subprocess_run.side_effect = [
@@ -319,7 +344,10 @@ class TestProjectCLI(unittest.TestCase):
             old_home = os.environ.get("HOME")
             try:
                 os.environ["HOME"] = output_tmp
-                output_txt = out_shift_left / "modified_flink_files.txt"
+                _modified_log = get_config().get("app", {}).get(
+                    "modified_flink_files_file_name", "modified_flink_files.txt"
+                )
+                output_txt = out_shift_left / _modified_log
 
                 # Mock git log output: no .sql under pipelines
                 mock_subprocess_run.side_effect = [

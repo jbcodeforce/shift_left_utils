@@ -22,6 +22,7 @@ from shift_left.core.utils.app_config import logger
 from shift_left.core.utils.file_search import (
     PIPELINE_JSON_FILE_NAME,
     PIPELINE_FOLDER_NAME,
+    EXTERNAL_KAFKA_TYPE,
     from_absolute_to_pipeline,
     FlinkTableReference,
     FlinkTablePipelineDefinition,
@@ -33,13 +34,16 @@ from shift_left.core.utils.file_search import (
     get_table_type_from_file_path,
     create_folder_if_not_exist,
     read_pipeline_definition_from_file,
-    get_ddl_dml_names_from_pipe_def
+    get_ddl_dml_names_from_pipe_def,
 )
 
 
 # Constants
 
 ERROR_TABLE_NAME = "error_table"
+# When true (1/true/yes), SQL references missing from inventory are modeled as external_kafka parents.
+# Avoids calling get_config() here (validation can exit in partial test / CI environments).
+_SYNTHETIC_EXTERNAL_KAFKA_ENV = "SHIFT_LEFT_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA"
 # Global queues for processing
 files_to_process: deque = deque()  # Files to process when parsing SQL dependencies
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
@@ -128,10 +132,48 @@ class PipelineStatusTree:
                 self.summary[product_name][status_phase][s_dml_n] = 1
         return self.summary
 
+def pipeline_definition_from_external_ref(table_ref: FlinkTableReference) -> FlinkTablePipelineDefinition:
+    """Minimal pipeline node for pre-provisioned Kafka-backed tables (no local pipeline_definition.json)."""
+    return FlinkTablePipelineDefinition.model_validate(
+        {
+            "table_name": table_ref.table_name,
+            "product_name": table_ref.product_name or "common",
+            "complexity": FlinkStatementComplexity(state_form="Stateless"),
+            "type": EXTERNAL_KAFKA_TYPE,
+            "path": table_ref.table_folder_name,
+            "ddl_ref": "",
+            "dml_ref": "",
+            "kafka_topic": table_ref.kafka_topic,
+            "parents": set(),
+            "children": set(),
+        }
+    )
+
+
+def _synthetic_external_kafka_table_ref(table_name: str) -> FlinkTableReference:
+    """Inventory-shaped ref when SHIFT_LEFT_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA is set (1/true/yes)."""
+    folder = f"{PIPELINE_FOLDER_NAME}/seeds/{table_name}"
+    return FlinkTableReference.model_validate(
+        {
+            "table_name": table_name,
+            "type": EXTERNAL_KAFKA_TYPE,
+            "product_name": "common",
+            "ddl_ref": "",
+            "dml_ref": "",
+            "table_folder_name": folder,
+            "kafka_topic": None,
+        }
+    )
+
+
 def get_pipeline_definition_for_table(table_name: str, inventory_path: str) -> FlinkTablePipelineDefinition:
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
-    return read_pipeline_definition_from_file(table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME)
+    if table_ref.type == EXTERNAL_KAFKA_TYPE:
+        return pipeline_definition_from_external_ref(table_ref)
+    return read_pipeline_definition_from_file(
+        table_ref.table_folder_name + "/" + PIPELINE_JSON_FILE_NAME
+    )
 
 
 def build_pipeline_definition_from_ddl_dml_content(
@@ -292,12 +334,15 @@ def _build_pipeline_definitions_from_sql_content(
                 referenced_table_names.remove(current_table_name)
             for table_name in referenced_table_names:
                 # strangely it is possible that the tablename was a field name because of SQL code like TRIM(BOTH '" ' FROM
-                try:
-                    table_ref_dict= table_inventory[table_name]
-                except Exception as e:
-                    logger.warning(f"{table_name} is most likely not a known table name")
-                    continue
-                table_ref: FlinkTableReference= FlinkTableReference.model_validate(table_ref_dict)
+                table_ref_dict = table_inventory.get(table_name)
+                if table_ref_dict is None:
+                    logger.warning("%s is most likely not a known table name", table_name)
+                    if os.getenv(_SYNTHETIC_EXTERNAL_KAFKA_ENV, "yes").lower() in ("1", "true", "yes"):
+                        table_ref = _synthetic_external_kafka_table_ref(table_name)
+                    else:
+                        continue
+                else:
+                    table_ref = FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
                 dep_complexity = FlinkStatementComplexity(state_form=state_form)
                 if table_ref.dml_ref and table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
@@ -320,7 +365,8 @@ def _build_pipeline_definitions_from_sql_content(
                     table_ref.dml_ref,
                     table_ref.ddl_ref,
                     set(),
-                    set()
+                    set(),
+                    kafka_topic=table_ref.kafka_topic,
                 )
                 dependencies.add(bpd)
         else:
@@ -356,7 +402,8 @@ def _build_pipeline_definition(
             dml_file_name: str,
             ddl_file_name: str,
             parents: Optional[Set[FlinkTablePipelineDefinition]],
-            children: Optional[Set[FlinkTablePipelineDefinition]]
+            children: Optional[Set[FlinkTablePipelineDefinition]],
+            kafka_topic: Optional[str] = None,
             ) -> FlinkTablePipelineDefinition:
     """Create hierarchy node with table information.
 
@@ -387,6 +434,7 @@ def _build_pipeline_definition(
         "ddl_ref": ddl_file_name,
         #"dml_ref": base_path + "/" + SCRIPTS_DIR + "/" + dml_file_name.split("/")[-1],
         "dml_ref" : dml_file_name,
+        "kafka_topic": kafka_topic,
         "parents": parents,
         "children": children
     })
@@ -426,6 +474,9 @@ def _create_or_merge_pipeline_definition(current: FlinkTablePipelineDefinition):
     """
     If the pipeline definition exists we may need to merge the parents and children
     """
+    if current.type == EXTERNAL_KAFKA_TYPE:
+        return
+
     def merge_table_sets(old_set, new_set):
         """Merge sets, with new items overriding old ones by table_name"""
         # Convert to dict by table_name for easy merging
@@ -463,6 +514,8 @@ def _get_statement_hierarchy_from_table_ref(access_info: FlinkTablePipelineDefin
     Given a table reference, get the associated FlinkTablePipelineDefinition by reading the pipeline definition file.
     This function is used to navigate through the hierarchy
     """
+    if access_info.type == EXTERNAL_KAFKA_TYPE:
+        return access_info
     if access_info.path:
         return read_pipeline_definition_from_file(access_info.path+ "/" + PIPELINE_JSON_FILE_NAME)
 

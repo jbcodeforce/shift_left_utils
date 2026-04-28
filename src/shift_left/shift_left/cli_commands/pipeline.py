@@ -416,7 +416,7 @@ def deploy(
         builtins.print(f"| {str(bool(may_start_descendants)):>21} | {str(bool(force_ancestors)):>15} | {str(bool(cross_product_deployment)):>24} | {str(bool(pool_creation)):>13} | {str(bool(parallel)):>8} | {str(max_thread):>7} |")
     builtins.print(f"----------------------------------------------------------------------------------------------------------")
 
-    _build_deploy_pipeline(
+    ok = _build_deploy_pipeline(
         table_name=table_name,
         product_name=product_name,
         dir=dir,
@@ -434,7 +434,11 @@ def deploy(
         pool_creation=pool_creation,
         version=version)
 
-    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline DEPLOYED")
+    if ok:
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline DEPLOYED")
+    else:
+        print(f"[red]{time.strftime('%Y%m%d_%H:%M:%S')} Pipeline deployment completed with errors[/red]")
+        raise typer.Exit(1)
 
 @app.command()
 def build_execution_plan(
@@ -572,8 +576,9 @@ def _build_deploy_pipeline(
         max_thread: int = 4,
         execute_plan: bool=False,
         pool_creation: bool = False,
-        version: str = ""):
+        version: str = "") -> bool:
     summary="Nothing done"
+    deployment_succeeded = True
     try:
         report=None
         if exclude_table_file_name:
@@ -587,7 +592,7 @@ def _build_deploy_pipeline(
         if table_name:
             table_name = table_name.lower()
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for table {table_name}")
-            summary,report=deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
+            summary, report, deployment_succeeded = deployment_mgr.build_deploy_pipeline_from_table(table_name=table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
@@ -609,7 +614,7 @@ def _build_deploy_pipeline(
         elif product_name:
             product_name = product_name.lower()
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for product {product_name}")
-            summary,report=deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
+            summary, report, deployment_succeeded = deployment_mgr.build_deploy_pipelines_from_product(product_name=product_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=compute_pool_id,
                                                         dml_only=dml_only,
@@ -625,7 +630,7 @@ def _build_deploy_pipeline(
 
         elif dir:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')}Build an execution plan for directory {dir}")
-            summary, report=deployment_mgr.build_and_deploy_all_from_directory(directory=dir,
+            summary, report, deployment_succeeded = deployment_mgr.build_and_deploy_all_from_directory(directory=dir,
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
                                                                     dml_only=dml_only,
@@ -639,7 +644,7 @@ def _build_deploy_pipeline(
                                                                     pool_creation=pool_creation)
         elif table_list_file_name:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build an execution plan for tables in {table_list_file_name}")
-            summary, report=deployment_mgr.build_and_deploy_all_from_table_list(include_table_names=table_names,
+            summary, report, deployment_succeeded = deployment_mgr.build_and_deploy_all_from_table_list(include_table_names=table_names,
                                                                     inventory_path=inventory_path,
                                                                     compute_pool_id=compute_pool_id,
                                                                     dml_only=dml_only,
@@ -665,6 +670,8 @@ def _build_deploy_pipeline(
             for table_info in report.tables:
                 builtins.print(f"{table_info.table_name:<55} | {table_info.status:<10} | {table_info.pending_records:>15,} | {table_info.num_records_out:>15,}")
             builtins.print("-"*104)
+
+        return deployment_succeeded if execute_plan else True
 
     except Exception as e:
         sanitized_error = safe_error_display(e)

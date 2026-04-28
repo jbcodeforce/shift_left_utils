@@ -1,0 +1,95 @@
+# Healthcare Shift-Left Demo - Terraform Configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+# ============================================================================
+# REQUIRED: Confluent Cloud API Credentials
+# ============================================================================
+# Get these from: Confluent Cloud UI → Cloud API Keys → Create Key
+# Requires: OrganizationAdmin or EnvironmentAdmin role
+
+confluent_cloud_api_key    = "REPLACE_WITH_YOUR_CLOUD_API_KEY"
+confluent_cloud_api_secret = "REPLACE_WITH_YOUR_CLOUD_API_SECRET"
+
+# ============================================================================
+# OPTION 1: Use Existing Infrastructure (Recommended)
+# ============================================================================
+# If you already have a Confluent Cloud environment and Kafka cluster,
+# provide their IDs here. Terraform will use them instead of creating new ones.
+
+# Existing Environment ID (e.g., env-xxxxx)
+# Get from: Confluent Cloud UI → Environments
+environment_id = "env-xxxxx"  # REPLACE with your environment ID
+
+# Existing Kafka Cluster ID (e.g., lkc-xxxxx)
+# Get from: Confluent Cloud UI → Environment → Clusters
+kafka_cluster_id = "lkc-xxxxx"  # REPLACE with your cluster ID
+
+# Optional: Existing Service Account (e.g., sa-xxxxx)
+# Get from: Confluent Cloud UI → Accounts & Access → Service Accounts
+# Leave commented to create new service account
+# service_account_id = "sa-xxxxx"
+
+# Optional: Existing API Keys (if you want to reuse)
+# Get from: Confluent Cloud UI → API Keys
+# Leave commented to create new keys
+# kafka_api_key_id     = "YOUR_KAFKA_KEY"
+# kafka_api_key_secret = "YOUR_KAFKA_SECRET"
+
+# ============================================================================
+# OPTION 2: Create New Infrastructure (Alternative)
+# ============================================================================
+# If you want Terraform to create new environment and cluster, comment out
+# the environment_id and kafka_cluster_id above, and configure these instead:
+
+# Uncomment these if creating new infrastructure:
+# cloud_provider = "AWS"
+# cloud_region   = "us-east-2"
+# prefix         = "healthcare-demo"
+
+# ============================================================================
+# Cloud Configuration (Required if using existing infrastructure)
+# ============================================================================
+# MUST match your existing Kafka cluster's cloud provider and region
+
+cloud_provider = "AWS"       # Must match your cluster (AWS, GCP, or AZURE)
+cloud_region   = "us-east-2" # Must match your cluster region
+
+# Resource naming prefix
+prefix = "health"
+
+# ============================================================================
+# Flink Configuration
+# ============================================================================
+# Flink compute pool settings (Terraform will create this)
+
+flink_compute_pool_name    = "healthcare-demo-pool"
+flink_compute_pool_max_cfu = 5  # Max Confluent Flink Units (5-100)
+
+# Optional: Use existing Flink compute pool
+# Uncomment if you already have a pool:
+# flink_compute_pool_id = "lfcp-xxxxx"
+
+
+# ============================================================================
+# Quick Reference
+# ============================================================================
+#
+# Minimum Required Fields:
+#   1. confluent_cloud_api_key
+#   2. confluent_cloud_api_secret
+#   3. environment_id (or create new)
+#   4. kafka_cluster_id (or create new)
+#   5. cloud_provider
+#   6. cloud_region#
+
+#
+# ============================================================================
+# Next Steps After Creating This File
+# ============================================================================
+#
+# 1. Save this file as: terraform.tfvars (remove .template extension)
+# 2. Verify values: terraform validate
+# 3. Plan deployment: terraform plan
+# 4. Deploy: terraform apply
+#
+# ============================================================================

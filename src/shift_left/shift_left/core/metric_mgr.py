@@ -74,7 +74,7 @@ def get_total_amount_of_messages(table_name: str, compute_pool_id: str= None, fr
     statement = f"SELECT COUNT(*) as nb_records FROM {table_name}"
     statement_name = f"cnt-rcds-{table_name.replace('_', '-')}"
     statement_mgr.delete_statement_if_exists(statement_name)
-    statement = statement_mgr.post_flink_statement(compute_pool_id=compute_pool_id, statement_name=statement_name, sql_content=statement)
+    statement = statement_mgr.post_flink_statement(compute_pool_id=compute_pool_id, statement_name=statement_name, sql_content=statement, properties={})
     if statement and statement.status.phase == "RUNNING":
         statement_result = statement_mgr.get_statement_results(statement_name)
         if statement_result and isinstance(statement_result, StatementResult):

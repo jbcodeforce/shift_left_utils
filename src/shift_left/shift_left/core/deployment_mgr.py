@@ -36,15 +36,30 @@ import shift_left.core.utils.report_mgr as report_mgr
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
 from shift_left.core.utils.file_search import (
     PIPELINE_JSON_FILE_NAME,
+    EXTERNAL_KAFKA_TYPE,
     FlinkTableReference,
     FlinkTablePipelineDefinition,
     get_ddl_dml_names_from_pipe_def,
     read_pipeline_definition_from_file,
-    get_or_build_inventory
+    get_or_build_inventory,
 )
 
 # Constants
 MAX_CFU_INCREMENT: Final[int] = 20
+
+
+def _deployment_step_succeeded(result: Statement | StatementError | None) -> bool:
+    """True when a deploy step is an expected success (including external_kafka SKIPPED)."""
+    if result is None:
+        return False
+    if isinstance(result, Statement):
+        phase = result.status.phase if result.status else None
+        return phase in ("COMPLETED", "RUNNING")
+    if isinstance(result, StatementError):
+        if not result.errors:
+            return False
+        return all(getattr(e, "status", None) == "SKIPPED" for e in result.errors)
+    return False
 
 
 def build_deploy_pipeline_from_table(
@@ -60,7 +75,7 @@ def build_deploy_pipeline_from_table(
     pool_creation: bool = True,
     exclude_table_names: List[str] = [],
     max_thread: int = 1
-) -> Tuple[str, TableReport]:
+) -> Tuple[str, TableReport, bool]:
     """
     Build an execution plan from the static relationship between Flink Statements.
     Deploy a pipeline starting from a given table.
@@ -74,7 +89,8 @@ def build_deploy_pipeline_from_table(
         force_ancestors: Whether to force source table deployment
 
     Returns:
-        Tuple containing the deployment report and summary
+        Tuple of (summary, table_report, deployment_succeeded). Third element is True when
+        execute_plan is False, or when all executed steps succeeded.
 
     Raises:
         ValueError: If the not able to process the execution plan
@@ -116,7 +132,7 @@ def build_deploy_pipeline_from_table(
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         logger.info(f"Execute the plan before deployment: {summary}")
         if execute_plan:
-            statements = _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
+            statements, deployment_succeeded = _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=False, sequential=sequential, max_thread=max_thread)
             result = report_mgr.build_deployment_report(table_name, pipeline_def.dml_ref, may_start_descendants, statements)
 
             result.execution_time = int(time.perf_counter() - start_time)
@@ -128,8 +144,13 @@ def build_deploy_pipeline_from_table(
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done in {result.execution_time} seconds to deploy pipeline from table {table_name}")
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
             #logger.info(f"Execute the plan after deployment: {simple_report}")
-            summary+="\n"+f"#"*40 + f" Deployed {len(table_report.tables)} tables " + "#"*40 + "\n"
-        return summary, table_report
+            if deployment_succeeded:
+                summary+="\n"+f"#"*40 + f" Deployed {len(table_report.tables)} tables " + "#"*40 + "\n"
+            else:
+                summary+="\n"+f"#"*40 + f" Processed {len(table_report.tables)} tables " + "#"*40 + "\n"
+                summary+="One or more statements failed.\n"
+            return summary, table_report, deployment_succeeded
+        return summary, table_report, True
     except Exception as e:
         logger.error(f"Failed to deploy pipeline from table {table_name} error is: {str(e)}")
         raise
@@ -147,7 +168,7 @@ def build_deploy_pipelines_from_product(
     pool_creation: bool = True,
     exclude_table_names: List[str] = [],
     max_thread: int = 1
-) -> Tuple[str, TableReport]:
+) -> Tuple[str, TableReport, bool]:
     """Deploy the pipelines for a given product. Will process all the views, then facts then dimensions.
     As each statement deployment is creating an execution plan, previously started statements will not be restarted.
     """
@@ -198,19 +219,27 @@ def build_deploy_pipelines_from_product(
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
+        deployment_succeeded = True
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan summary: {summary}")
             start_time = time.perf_counter()
-            _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=True, sequential=sequential, max_thread=max_thread)
+            _, deployment_succeeded = _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=True, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\n{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds"
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Build table report now")
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
-        summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
-        return summary, table_report
+        if execute_plan:
+            if deployment_succeeded:
+                summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+            else:
+                summary+="\n"+f"#"*40 + f" Processed {count} tables " + "#"*40 + "\n"
+                summary+="One or more statements failed.\n"
+        else:
+            summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+        return summary, table_report, deployment_succeeded if execute_plan else True
     else:
-        return "Nothing run.", TableReport()
+        return "Nothing run.", TableReport(), True
 
 def build_and_deploy_all_from_directory(
     directory: str,
@@ -225,7 +254,7 @@ def build_and_deploy_all_from_directory(
     pool_creation: bool = True,
     exclude_table_names: List[str] = [],
     max_thread: int = 1
-) -> Tuple[str, TableReport]:
+) -> Tuple[str, TableReport, bool]:
     """
     Deploy all the pipelines within a directory tree. The approach is
     to define a combined execution plan for all tables in the directory as it is important
@@ -264,18 +293,24 @@ def build_and_deploy_all_from_directory(
         compute_pool_list = compute_pool_mgr.get_compute_pool_list()
         summary = report_mgr.build_summary_from_execution_plan(execution_plan, compute_pool_list)
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
+        deployment_succeeded = True
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
-            accept_exceptions= [True if "sources" in directory else False]
-            _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=accept_exceptions, sequential=sequential, max_thread=max_thread)
+            accept_exceptions = "sources" in directory
+            _, deployment_succeeded = _execute_plan(execution_plan=execution_plan, compute_pool_id=compute_pool_id, accept_exceptions=accept_exceptions, sequential=sequential, max_thread=max_thread)
             execution_time = int(time.perf_counter() - start_time)
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
-            summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
-        return summary, table_report
+            if deployment_succeeded:
+                summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+            else:
+                summary+="\n"+f"#"*40 + f" Processed {count} tables " + "#"*40 + "\n"
+                summary+="One or more statements failed.\n"
+            return summary, table_report, deployment_succeeded
+        return summary, table_report, True
     else:
-        return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
+        return "Nothing run. Do you have a pipeline_definition.json files", TableReport(), True
 
 
 def build_and_deploy_all_from_table_list(
@@ -292,7 +327,7 @@ def build_and_deploy_all_from_table_list(
     exclude_table_names: List[str] = [],
     max_thread: int = 1,
     version: str = ""
-) -> Tuple[str, TableReport]:
+) -> Tuple[str, TableReport, bool]:
     """
     Deploy all the pipelines in the table list file.
     """
@@ -333,7 +368,7 @@ def build_and_deploy_all_from_table_list(
         table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=False)
         if execute_plan:
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Executing plan: {summary}")
-            _execute_plan(execution_plan=execution_plan,
+            _, deployment_succeeded = _execute_plan(execution_plan=execution_plan,
                          compute_pool_id=compute_pool_id,
                          accept_exceptions=False,
                          sequential=sequential,
@@ -342,10 +377,15 @@ def build_and_deploy_all_from_table_list(
             print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execution time: {execution_time} seconds")
             summary+=f"\nExecution time: {execution_time} seconds"
             table_report = report_mgr.build_TableReport(start_node.product_name, execution_plan.nodes, from_date="", get_metrics=True)
-            summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
-        return summary, table_report
+            if deployment_succeeded:
+                summary+="\n"+f"#"*40 + f" Deployed {count} tables " + "#"*40 + "\n"
+            else:
+                summary+="\n"+f"#"*40 + f" Processed {count} tables " + "#"*40 + "\n"
+                summary+="One or more statements failed.\n"
+            return summary, table_report, deployment_succeeded
+        return summary, table_report, True
     else:
-        return "Nothing run. Do you have a pipeline_definition.json files", TableReport()
+        return "Nothing run. Do you have a pipeline_definition.json files", TableReport(), True
 
 def report_running_flink_statements_for_a_table(
     table_name: str,
@@ -356,7 +396,7 @@ def report_running_flink_statements_for_a_table(
     Report running flink statements for a table execution plan
     """
     config = get_config()
-    _, report = build_deploy_pipeline_from_table(table_name,
+    _, report, _ = build_deploy_pipeline_from_table(table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
@@ -469,7 +509,7 @@ def full_pipeline_undeploy_from_table(
     start_time = time.perf_counter()
     table_pipeline_def: FlinkTablePipelineDefinition = pipeline_mgr.get_pipeline_definition_for_table(table_name, inventory_path)
     config = get_config()
-    summary, report = build_deploy_pipeline_from_table(table_name=table_pipeline_def.table_name,
+    summary, report, _ = build_deploy_pipeline_from_table(table_name=table_pipeline_def.table_name,
                                                         inventory_path=inventory_path,
                                                         compute_pool_id=config['flink']['compute_pool_id'],
                                                         dml_only=False,
@@ -574,7 +614,8 @@ def full_pipeline_undeploy_from_product(product_name: str,
 def prepare_tables_from_sql_file(sql_file_name: str,
                                  compute_pool_id: str):
     """
-    Execute the content of the sql file, line by line as separate Flink statement. It is used to alter table. for deployment by adding the necessary comments and metadata.
+    Execute the content of the sql file, line by line as separate Flink statement.
+    It is used to alter tables. For deployment by adding the necessary comments and metadata.
     """
     config = get_config()
     compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
@@ -592,7 +633,8 @@ def prepare_tables_from_sql_file(sql_file_name: str,
             statement_name = f"prepare-table-{stmnt_suffix}-{idx}"
             statement = statement_mgr.post_flink_statement(compute_pool_id,
                                                            statement_name,
-                                                           sql_out)
+                                                           sql_out,
+                                                            {})
             while statement.status.phase not in ["COMPLETED", "FAILED"]:
                 time.sleep(2)
                 statement = statement_mgr.get_statement(statement_name)
@@ -714,7 +756,10 @@ def _process_ancestors(ancestors: List[FlinkStatementNode],
     If force_ancestors is True, all ancestors will be started.
     """
     for node in ancestors:
-        if force_ancestors and not node.to_restart:
+        if getattr(node, "type", None) == EXTERNAL_KAFKA_TYPE:
+            node.to_run = False
+            node.to_restart = False
+        elif force_ancestors and not node.to_restart:
             node.to_run = True
         else:
             node = _get_and_update_statement_info_compute_pool_id_for_node(node)
@@ -999,7 +1044,7 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                   compute_pool_id: str,
                   accept_exceptions: bool = False,
                   sequential: bool = True,
-                  max_thread: int = 1) -> List[Statement]:
+                  max_thread: int = 1) -> Tuple[List[Statement], bool]:
     """Execute statements in the execution plan.
     It enables parallel deployment of Flink statements that
     have no dependencies (autonomous nodes), significantly
@@ -1010,21 +1055,23 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
         compute_pool_id: ID of the compute pool to use
 
     Returns:
-        List of deployed statements
+        Tuple of (deployed statements, deployment_succeeded). When accept_exceptions is True,
+        deployment_succeeded is False if any step failed.
 
     Raises:
         RuntimeError: If statement execution fails
     """
     logger.info(f"--- Execute Plan for {execution_plan.start_table_name} started ---")
-    statements = []
+    statements: List[Statement] = []
     autonomous_nodes=[]
     started_nodes = []
     nodes_to_execute = _get_nodes_to_execute(execution_plan.nodes)
+    deployment_succeeded = True
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Execute for {execution_plan.start_table_name} started. {len(nodes_to_execute)} statements to execute")
     while len(nodes_to_execute) > 0:
         if not sequential:
-            # for parallel execution split the statements to execute into buckets for the one with no parent
-            # or all parents are running and not to be restarted.
+            # for parallel execution split the statements to execute into buckets using the ones with no parent
+            # or with parents already running or not to be restarted.
             if max_thread == 1:
                 max_thread = multiprocessing.cpu_count()
             if max_thread > 10:
@@ -1039,18 +1086,24 @@ def _execute_plan(execution_plan: FlinkStatementExecutionPlan,
                     to_process = [] # need to use a separate list as we can have more elements in autonomous_nodes than max_workers
                     for _ in range(_max_workers):
                         to_process.append(autonomous_nodes.pop(0))
-                    started_nodes, statements= _execute_statements_in_parallel(to_process, _max_workers, accept_exceptions, compute_pool_id, started_nodes, statements)
+                    started_nodes, statements, step_ok = _execute_statements_in_parallel(
+                        to_process, _max_workers, accept_exceptions, compute_pool_id, started_nodes, statements)
+                    deployment_succeeded = deployment_succeeded and step_ok
             else:
                 # no parallel execution possible, so execute sequentially
-                started_nodes, statements= _execute_statements_in_sequence(nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
+                started_nodes, statements, step_ok = _execute_statements_in_sequence(
+                    nodes_to_execute, accept_exceptions, compute_pool_id, started_nodes, statements)
+                deployment_succeeded = deployment_succeeded and step_ok
         else:
-            started_nodes, statements= _execute_statements_in_sequence(nodes_to_execute,
-                                            accept_exceptions,
-                                            compute_pool_id,
-                                            started_nodes,
-                                            statements)
+            started_nodes, statements, step_ok = _execute_statements_in_sequence(
+                nodes_to_execute,
+                accept_exceptions,
+                compute_pool_id,
+                started_nodes,
+                statements)
+            deployment_succeeded = deployment_succeeded and step_ok
         nodes_to_execute = _get_nodes_to_execute(execution_plan.nodes)
-    return statements
+    return statements, deployment_succeeded
 
 def _get_nodes_to_execute(nodes: List[FlinkStatementNode]) -> List[FlinkStatementNode]:
     """
@@ -1067,10 +1120,12 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                                     accept_exceptions: bool = False,
                                     compute_pool_id: str = "",
                                     started_nodes: List[FlinkStatementNode] = [],
-                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement]]:
+                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement], bool]:
     """
     Execute statements in parallel.
+    Returns (started_nodes, statements, batch_succeeded).
     """
+    batch_succeeded = True
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(_deploy_one_node, node, accept_exceptions, compute_pool_id) for node in to_process]
         for future in as_completed(futures):
@@ -1083,30 +1138,35 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Statement {result.name} failed, move to next node")
                         logger.error(f"Statement {result.name} failed, move to next node")
                         nodes_to_execute = _modify_impacted_nodes(result, nodes_to_execute)
-                        pass
+                        batch_succeeded = False
                 else:
                     logger.warning(f"Result from future is StatementError")
+                    if not _deployment_step_succeeded(result):
+                        batch_succeeded = False
             except Exception as e:
                 logger.error(f"Failed to get result from future: {str(e)}")
+                batch_succeeded = False
                 if not accept_exceptions:
                     raise
         for node in to_process: # need this to avoid re-running the same node
             node.to_run = False
             node.to_restart = False
             started_nodes.append(node)
-    return started_nodes, statements
+    return started_nodes, statements, batch_succeeded
 
 def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
                                     accept_exceptions: bool = False,
                                     compute_pool_id: str = "",
                                     started_nodes: List[FlinkStatementNode] = [],
-                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement]]:
+                                    statements: List[Statement] = []) -> Tuple[List[FlinkStatementNode], List[Statement], bool]:
     """
     Execute statements in sequence.
+    Returns (started_nodes, statements, step_succeeded).
     """
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Still {len(nodes_to_execute)} statements to execute")
     node = nodes_to_execute.pop(0)
     statement = _deploy_one_node(node, accept_exceptions, compute_pool_id)
+    step_succeeded = _deployment_step_succeeded(statement)
     if isinstance(statement, Statement):
         statements.append(statement)
     else:
@@ -1114,7 +1174,7 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     node.to_run = False
     node.to_restart = False
     started_nodes.append(node)
-    return started_nodes, statements
+    return started_nodes, statements, step_succeeded
 
 def _build_autonomous_nodes(
         nodes_to_execute: List[FlinkStatementNode],
@@ -1171,6 +1231,17 @@ def _deploy_one_node(node: FlinkStatementNode,
     """
     Deploy one Statement as described in the FlinkStatementNode. Keep the node concept as it is part of the execution plan graph.
     """
+    if getattr(node, "type", None) == EXTERNAL_KAFKA_TYPE:
+        logger.info("Skipping deploy for external_kafka table %s (pre-provisioned)", node.table_name)
+        return StatementError(
+            errors=[
+                ErrorData(
+                    id=node.table_name,
+                    status="SKIPPED",
+                    detail="external_kafka: not deployed from this repository",
+                )
+            ]
+        )
     if not node.compute_pool_id:
             node.compute_pool_id = compute_pool_id
     logger.info(f"Deploy table: {node.table_name}'")
@@ -1247,6 +1318,8 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
 
 def _delete_not_shared_parent(current_node: FlinkStatementNode, trace:str, config ) -> str:
     for parent in current_node.parents:
+        if getattr(parent, "type", None) == EXTERNAL_KAFKA_TYPE:
+            continue
         if len(parent.children) == 1:
             # as the parent is not shared it can be deleted
             statement_mgr.delete_statement_if_exists(parent.ddl_statement_name)
@@ -1306,13 +1379,23 @@ def _build_statement_node_map(current_node: FlinkStatementNode,
             for p in current.parents:
                 if p not in visited_nodes:
                     # this is needed to get the up to date metadata for the parent
-                    pipe_def = read_pipeline_definition_from_file( p.path + "/" + PIPELINE_JSON_FILE_NAME)
-                    if pipe_def:
-                        node_p = pipe_def.to_node()
-                        _search_parent_from_current_update_node_map(node_map, node_p, visited_nodes)
-                        queue.append(node_p)  # Add new nodes to the queue for processing
+                    if getattr(p, "type", None) == EXTERNAL_KAFKA_TYPE:
+                        node_p = p
                     else:
-                        logger.error(f"Data consistency issue for {p.path}: no pipeline definition found or wrong reference in {current.table_name}. The execution plan may not deploy successfully")
+                        pipe_def = read_pipeline_definition_from_file(
+                            p.path + "/" + PIPELINE_JSON_FILE_NAME
+                        )
+                        if pipe_def:
+                            node_p = pipe_def.to_node()
+                        else:
+                            logger.error(
+                                "Data consistency issue for %s: no pipeline definition found or wrong reference in %s. The execution plan may not deploy successfully",
+                                p.path,
+                                current.table_name,
+                            )
+                            continue
+                    _search_parent_from_current_update_node_map(node_map, node_p, visited_nodes)
+                    queue.append(node_p)  # Add new nodes to the queue for processing
 
 
     def _search_children_from_current(node_map: dict[str, FlinkStatementNode],
@@ -1326,16 +1409,24 @@ def _build_statement_node_map(current_node: FlinkStatementNode,
         for c in current.children:
             if c.table_name not in node_map:
                 # a child may have been a parent of another node so do not need to process it
-                pipe_def = read_pipeline_definition_from_file( c.path + "/" + PIPELINE_JSON_FILE_NAME)
-                if not pipe_def:
-                    logger.error(f"Data consistency issue for {c.path}: no pipeline definition found or wrong reference in {c.table_name}. The execution plan may not deploy successfully")
-                    continue
+                if getattr(c, "type", None) == EXTERNAL_KAFKA_TYPE:
+                    node_c = c
                 else:
+                    pipe_def = read_pipeline_definition_from_file(
+                        c.path + "/" + PIPELINE_JSON_FILE_NAME
+                    )
+                    if not pipe_def:
+                        logger.error(
+                            "Data consistency issue for %s: no pipeline definition found or wrong reference in %s. The execution plan may not deploy successfully",
+                            c.path,
+                            c.table_name,
+                        )
+                        continue
                     node_c = pipe_def.to_node()
-                    if node_c not in visited_nodes:
-                        # process the child's parents to be sure they are considered before the child
-                        _search_parent_from_current_update_node_map(node_map, node_c, visited_nodes)
-                        queue.append(node_c)
+                if node_c not in visited_nodes:
+                    # process the child's parents to be sure they are considered before the child
+                    _search_parent_from_current_update_node_map(node_map, node_c, visited_nodes)
+                    queue.append(node_c)
 
     _search_parent_from_current_update_node_map(node_map, current_node, visited_nodes)
     queue.append(current_node)  # need to process children of current node

@@ -14,6 +14,11 @@ class SQLparser:
         # extract table name declared after FROM, JOIN, INNER JOIN, LEFT JOIN, CREATE TABLE IF NOT EXISTS, INSERT INTO
         # Updated to support table names with hyphens (e.g., clone.dev.ap-record-execution-dev.state.record)
         self.table_pattern = r'\b(\s*FROM|JOIN|LEFT JOIN|INNER JOIN|CREATE TABLE IF NOT EXISTS|INSERT INTO)\s+(\s*`?([a-zA-Z_][a-zA-Z0-9_-]*\.)*[a-zA-Z_][a-zA-Z0-9_-]*`?)'
+        # Flink window TVFs: TUMBLE(TABLE source, ...) — source is not after FROM
+        self.window_tvf_table_pattern = (
+            r'\b(?:TUMBLE|HOP|SESSION|CUMULATE)\s*\(\s*TABLE\s+'
+            r'(\s*`?(?:[a-zA-Z_][a-zA-Z0-9_-]*\.)*[a-zA-Z_][a-zA-Z0-9_-]*`?)'
+        )
         self.cte_pattern_1 = r'(?i)\bWITH\s+(\w+)\s+AS\s*\('
         self.cte_pattern_2 = r'(?i),\s*(\w+)\s+AS\s*\('
         # Pattern to identify the start of WITH clause for CTE removal
@@ -47,15 +52,23 @@ class SQLparser:
             # look a Flink SQL references table name after from or join
             tables = re.findall(self.table_pattern, sql_content_filtered, re.IGNORECASE)
             ctes = self._extract_cte_names(sql_content_filtered)
-            matches_set=set[str]()
+            matches_set = set[str]()
             for table in tables:
                 logger.debug(table)
                 if 'REPLACE' in table[1].upper():
                     continue
-                retrieved_table=table[1].replace('`','')
+                retrieved_table = table[1].replace('`', '')
+                if retrieved_table.upper() == 'TABLE':
+                    continue
                 if not keep_topic_name and retrieved_table.count('.') > 1:  # this may not be the best way to remove topic
                     continue
-                if not retrieved_table in ctes:
+                if retrieved_table not in ctes:
+                    matches_set.add(retrieved_table)
+            for window_table in re.findall(self.window_tvf_table_pattern, sql_content_filtered, re.IGNORECASE):
+                retrieved_table = window_table.replace('`', '')
+                if not keep_topic_name and retrieved_table.count('.') > 1:
+                    continue
+                if retrieved_table not in ctes:
                     matches_set.add(retrieved_table)
             return matches_set
         return set(matches)
@@ -122,8 +135,21 @@ class SQLparser:
             if not normalized_line:
                 continue
 
-            # Check for other stateful operations
-            if re.search(r'\b(JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|GROUP BY|TUMBLE|OVER|MATCH_RECOGNIZE)\s+', normalized_line, re.IGNORECASE):
+            # Stateful: joins (need table after JOIN); GROUP BY on its own line; window TVFs TUMBLE(…);
+            # OVER( / MATCH_RECOGNIZE( — not TUMBLE\s+ which misses TUMBLE(
+            stateful_ops = re.search(
+                r'(?:'
+                r'\b(?:LEFT|RIGHT|FULL|INNER)\s+JOIN\s+'
+                r'|\bJOIN\s+'
+                r'|\bGROUP\s+BY\b'
+                r'|\b(?:TUMBLE|HOP|SESSION|CUMULATE)\s*\('
+                r'|\bOVER\s*\('
+                r'|\bMATCH_RECOGNIZE\s*\('
+                r')',
+                normalized_line,
+                re.IGNORECASE,
+            )
+            if stateful_ops:
                 if not re.search(r'\bCROSS\s+JOIN\s+(?:UNNEST|LATERAL)\b', normalized_line, re.IGNORECASE):
                     # Check for CROSS JOIN UNNEST or CROSS JOIN LATERAL
                     has_stateful_operation = True

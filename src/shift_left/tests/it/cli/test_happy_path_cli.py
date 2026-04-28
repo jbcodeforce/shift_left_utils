@@ -1,5 +1,5 @@
 """
-Copyright 2024-2025 Confluent, Inc.
+Copyright 2024-2026 Confluent, Inc.
 """
 from time import sleep
 import unittest
@@ -13,11 +13,17 @@ from shift_left.core.utils.file_search import INVENTORY_FILE_NAME, PIPELINE_JSON
 
 
 class TestHappyPathCLI(unittest.TestCase):
+    """
+    Using the flink statements for testing, deploy a fact tables and its ancestors
+    """
 
     @classmethod
     def setUpClass(cls):
         data_dir = Path(__file__).parent.parent.parent / "data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
+        inventory_path = Path(os.getenv("PIPELINES")) / INVENTORY_FILE_NAME
+        if inventory_path.exists():
+            inventory_path.unlink()
 
     def test_happy_path(self):
         runner = CliRunner()
@@ -26,10 +32,11 @@ class TestHappyPathCLI(unittest.TestCase):
         assert result.exit_code == 0
         assert 'shift-left CLI version' in result.stdout
         print(f"Validate config is read and loaded: {result.stdout}")
+
         # 2 verify table inventory creation
         result = runner.invoke(app, ['table', 'build-inventory', os.getenv("PIPELINES")])
         assert result.exit_code == 0
-        assert 'Table inventory created' in result.stdout 
+        assert 'Table inventory created' in result.stdout
         print(f"Validate table inventory creation")
         inventory_path = Path(os.getenv("PIPELINES")) / INVENTORY_FILE_NAME
         assert inventory_path.exists(), f"{INVENTORY_FILE_NAME} not found in {os.getenv('PIPELINES')}"
@@ -48,28 +55,30 @@ class TestHappyPathCLI(unittest.TestCase):
         assert pipeline_path.exists(), f"{PIPELINE_JSON_FILE_NAME} found in {pipeline_path}"
         # 6 verify build execution plan pipeline
         compute_pool_id = get_config()["flink"]["compute_pool_id"]
-       
+
         result = runner.invoke(app, ['pipeline', 'build-execution-plan', os.getenv("PIPELINES"), '--table-name', 'fct_user_per_group', '--compute-pool-id', compute_pool_id])
         assert result.exit_code == 0
         print(f"{result.stdout}")
         # 7 verify deploy pipeline
         compute_pool_id = get_config()["flink"]["compute_pool_id"]
-       
+
         result = runner.invoke(app, ['pipeline', 'deploy', os.getenv("PIPELINES"), '--table-name', 'fct_user_per_group', '--compute-pool-id', compute_pool_id])
         assert result.exit_code == 0
-        assert 'Deploy pipeline for table' in result.stdout
+        print(f"{result.stdout}")
+        assert 'Deploying pipeline' in result.stdout
         # 8 verify undeploy pipeline
-        print("Waiting 5 seconds to ensure the pipeline is deployed")
-        sleep(5)
+        print("Go to Confluent cloud console to assess progress")
+        input("Press Enter to continue")
         result = runner.invoke(app, ['pipeline', 'undeploy', os.getenv("PIPELINES"), '--table-name', 'fct_user_per_group', '--no-ack'])
         assert result.exit_code == 0
-        assert 'Undeploy pipeline for table' in result.stdout
+        assert 'Undeploying pipeline' in result.stdout
         print(f"{result.stdout}")
         # 9 verify report running statements
         result = runner.invoke(app, ['pipeline', 'report-running-statements', os.getenv("PIPELINES"), '--table-name', 'fct_user_per_group'])
         assert result.exit_code == 0
+        print(f"{result.stdout}")
         assert 'Report running statements for table' in result.stdout
-        print(f"{result.stdout}")   
-        
+        print(f"{result.stdout}")
+
 if __name__ == '__main__':
     unittest.main()
