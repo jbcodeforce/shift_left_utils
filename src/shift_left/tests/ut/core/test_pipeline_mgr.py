@@ -35,7 +35,7 @@ class TestPipelineManager(unittest.TestCase):
         result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
         assert result.table_name == "src_c360_groups"
-        assert len(result.parents) == 0
+        assert len(result.parents) == 1 # 04/2026: unknown_table are referenced but not in the inventory. This is for seed and consuming from exiting topics.
         assert len(result.children) == 0
         assert "source" == result.type
         print(result.model_dump_json(indent=3))

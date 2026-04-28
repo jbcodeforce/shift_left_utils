@@ -261,9 +261,10 @@ class TestStatementManager(BaseUT):
 
         _table_name = "test_table"
         _statement_name = f"show-{_table_name.replace('_', '-')}"
-        def mock_post_statement(compute_pool_id, statement_name, sql_content):
+        def mock_post_statement(compute_pool_id, statement_name, sql_content, properties=None):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
+            print(f"properties: {properties}")
             status = Status(
                 phase= "RUNNING",
                 detail= ""

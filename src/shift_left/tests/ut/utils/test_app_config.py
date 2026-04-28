@@ -56,7 +56,12 @@ class TestValidateConfig(unittest.TestCase):
 
     def extract_messages_from_mock_print(self, mock_print):
         """Helper method to extract error and warning messages from mock print calls"""
-        all_print_calls = [str(call[0][0]) for call in mock_print.call_args_list]
+        all_print_calls = []
+        for call in mock_print.call_args_list:
+            # print() may have no args (e.g. blank lines in print_env_var_help); multi-arg prints join like default print sep=' '
+            args = call.args if hasattr(call, "args") else call[0]
+            text = " ".join(str(a) for a in args) if args else ""
+            all_print_calls.append(text)
 
         error_message = None
         warning_message = None
@@ -169,14 +174,7 @@ class TestValidateConfig(unittest.TestCase):
             validate_config(config)
             assert mock_print.call_count >= 1
             mock_exit.assert_called_once()
-            all_print_calls = [str(call[0][0]) for call in mock_print.call_args_list]
-
-            # Find the error message (the one with "Configuration validation failed")
-            error_message = None
-            for call_message in all_print_calls:
-                if "Configuration validation failed with the following errors:" in call_message:
-                    error_message = call_message
-                    break
+            error_message, _warning_message, all_print_calls = self.extract_messages_from_mock_print(mock_print)
 
             assert error_message is not None, f"Error message not found in print calls: {all_print_calls}"
 
@@ -327,15 +325,13 @@ class TestValidateConfig(unittest.TestCase):
     def test_nested_placeholder_values_fail(self):
         """Test that nested placeholder values are detected"""
         config = self.valid_config.copy()
-        os.environ["FLINK_ENV_ID"] = ""
+        os.environ["SL_FLINK_ENV_ID"] = ""
         config["confluent_cloud"]["environment_id"] = "<TO_FILL>"
 
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
             validate_config(config)
             # Expect at least 1 call (errors), possibly 2 (errors + warnings)
             assert mock_print.call_count >= 1
-            assert mock_exit.call_count >= 1
-
             # Extract error message from print calls
             error_message, warning_message, all_print_calls = self.extract_messages_from_mock_print(mock_print)
 

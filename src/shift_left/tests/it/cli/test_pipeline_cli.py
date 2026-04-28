@@ -1,117 +1,117 @@
 """
 Copyright 2024-2025 Confluent, Inc.
+
+Integration tests for the pipeline Typer app (local data under tests/data/flink-project).
+
+Commands that call Confluent/Flink APIs (prepare, analyze-pool-usage) are skipped
+unless SHIFT_LEFT_RUN_CLOUD_IT is set to 1/true/yes and you use a real config/credentials.
 """
-import unittest
-from typer.testing import CliRunner
 import os
+import tempfile
+import unittest
 from pathlib import Path
-os.environ["CONFIG_FILE"] = str(Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-os.environ["PIPELINES"] = str(Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-from shift_left.core.utils.app_config import shift_left_dir
+
+from typer.testing import CliRunner
+
 from shift_left.cli_commands.pipeline import app
-import shift_left.core.table_mgr as table_mgr
+
+_TESTS_ROOT = Path(__file__).resolve().parent.parent.parent
+_PIPELINES = Path(os.environ.get("PIPELINES", str(_TESTS_ROOT / "data/flink-project/pipelines")))
+
+_CLOUD_IT = os.environ.get("SHIFT_LEFT_RUN_CLOUD_IT", "").lower() in ("1", "true", "yes")
+
+_DML_P1_FCT = _PIPELINES / "facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
+
 
 class TestPipelineCLI(unittest.TestCase):
+    """Pipeline CLI: report, build-metadata, report-running-statements, optional cloud commands."""
 
     @classmethod
     def setUpClass(cls):
-        data_dir = Path(__file__).parent.parent.parent / "data"  # Path to the data directory
-
-
+        data_dir = _TESTS_ROOT / "data"
+        os.environ.setdefault("PIPELINES", str(data_dir / "flink-project/pipelines"))
 
     def test_report_command_success(self):
-        """Test successful execution of the report command"""
-       
+        """Report command prints hierarchy for a known table."""
         runner = CliRunner()
-        result = runner.invoke(app, ['report', 'p1_fct_order'])
-        assert result.exit_code == 0
-        assert "p1_fct_order" in result.stdout
-        assert "int_p1_table_1" in result.stdout
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["report", "p1_fct_order", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("p1_fct_order", result.stdout)
+        self.assertIn("int_p1_table_1", result.stdout)
 
     def test_report_command_error(self):
-        """Test error handling when pipeline data cannot be retrieved"""
-
+        """Report exits with error when table is not in inventory."""
         runner = CliRunner()
-        result = runner.invoke(app, ['report', 'non_existent_table'])
-        assert result.exit_code == 1
-        assert "Table not found" in result.stdout
-
-
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["report", "non_existent_table", pl])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("Table not found", result.stdout)
 
     def test_build_metadata_command_success(self):
-        """Test successful execution of the build-metadata command"""
-        
+        """build-metadata runs against the bundled p1 fct_order DML."""
         runner = CliRunner()
-        # Using a test data directory path for DML file
-        data_dir = Path(__file__).parent.parent.parent / "data"
-        test_dml_file = str(os.getenv("PIPELINES") + "/facts/p1/p1_fct_order/sql-scripts/dml.p1_fct_order.sql")
-        
-        result = runner.invoke(app, ['build-metadata', test_dml_file, os.getenv("PIPELINES")])
-        assert result.exit_code == 0
-        assert "Pipeline built from" in result.stdout
+        dml = str(_DML_P1_FCT)
+        pl = str(_PIPELINES)
+        self.assertTrue(Path(dml).is_file(), f"Missing test fixture: {dml}")
+        result = runner.invoke(app, ["build-metadata", dml, pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Pipeline built from", result.stdout)
 
     def test_build_metadata_command_error_invalid_file(self):
-        """Test error handling when invalid file is provided to build-metadata"""
-        
+        """build-metadata requires a .sql file as first argument."""
         runner = CliRunner()
-        result = runner.invoke(app, ['build-metadata', 'invalid_file.txt', os.getenv("PIPELINES")])
-        assert result.exit_code == 1
-        assert "Error: the first parameter needs to be a dml sql file" in result.stdout
-
-   
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["build-metadata", "invalid_file.txt", pl])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("the first parameter needs to be a dml sql file", result.stdout)
 
     def test_report_running_statements_command_error_no_params(self):
-        """Test error handling when no parameters provided to report-running-statements"""
-        
+        """report-running-statements requires table, product, or dir."""
         runner = CliRunner()
-        result = runner.invoke(app, ['report-running-statements', os.getenv("PIPELINES")])
-        assert result.exit_code == 1
-        assert "Error: either table-name, product-name or dir must be provided" in result.stdout
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["report-running-statements", pl])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("either table-name, product-name or dir must be provided", result.stdout)
 
+    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_prepare_command_with_sql_file(self):
-        """Test prepare command with SQL file"""
-        
+        """prepare runs SQL via Confluent Flink API (opt-in)."""
         runner = CliRunner()
-        # Create a temporary SQL file for testing
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
-            f.write("-- Test SQL content\nSELECT 1;\n")
-            temp_sql_file = f.name
-        
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
+            f.write("-- test\nSELECT 1;\n")
+            path = f.name
         try:
-            result = runner.invoke(app, ['prepare', temp_sql_file])
-            # This command depends on actual Flink infrastructure, so we just test basic execution
-            print(result.stdout)
+            result = runner.invoke(app, ["prepare", path])
+            self.assertEqual(result.exit_code, 0, msg=result.stdout)
+            self.assertIn(path, result.stdout)
         finally:
-            os.unlink(temp_sql_file)
+            os.unlink(path)
 
+    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command(self):
-        """Test successful execution of the analyze-pool-usage command"""
-        
+        """analyze-pool-usage calls Confluent APIs (opt-in)."""
         runner = CliRunner()
-        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES")])
-        # This command depends on actual Flink infrastructure, so we just test basic execution
-        print(result.stdout)
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["analyze-pool-usage", pl])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        self.assertIn("Analyzing compute pool usage", result.stdout)
 
+    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command_with_product(self):
-        """Test analyze-pool-usage command with product filter"""
-        
         runner = CliRunner()
-        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES"), '--product-name', 'p1'])
-        # This command depends on actual Flink infrastructure, so we just test basic execution  
-        print(result.stdout)
+        pl = str(_PIPELINES)
+        result = runner.invoke(app, ["analyze-pool-usage", pl, "--product-name", "p1"])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
+    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command_with_directory(self):
-        """Test analyze-pool-usage command with directory filter"""
-        
         runner = CliRunner()
-        data_dir = Path(__file__).parent.parent.parent / "data"
-        test_dir = str(data_dir / "flink-project/pipelines/facts")
-        
-        result = runner.invoke(app, ['analyze-pool-usage', os.getenv("PIPELINES"), '--directory', test_dir])
-        # This command depends on actual Flink infrastructure, so we just test basic execution
-        print(result.stdout)
+        pl = str(_PIPELINES)
+        test_dir = str(_TESTS_ROOT / "data/flink-project/pipelines/facts")
+        result = runner.invoke(app, ["analyze-pool-usage", pl, "--directory", test_dir])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

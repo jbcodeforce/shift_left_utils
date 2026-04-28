@@ -1,3 +1,10 @@
+## [0.1.50] - 2026-04-27
+
+### Changes:
+- d5fb6cf Merge branch 'v0.1.49' into develop
+- a545156 improve statement deployment, properties support and others
+- bb496ae remove tfvars
+
 ## [0.1.49] - 2026-03-17
 
 ### Changes:
