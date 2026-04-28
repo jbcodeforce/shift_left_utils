@@ -3,12 +3,30 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import os
 import pathlib
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 import unittest
 from unittest.mock import patch, ANY
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
-os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
+_TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
+os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault("PIPELINES", str(_TESTS_ROOT / "data/flink-project/pipelines"))
+# Dummy credentials so get_config()/validate_config succeed when running pytest without sourcing set_test_env.
+if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
+    os.environ.setdefault("SL_KAFKA_API_KEY", "test")
+    os.environ.setdefault("SL_KAFKA_API_SECRET", "test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_KEY", "test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_SECRET", "test")
+    os.environ.setdefault("SL_FLINK_API_KEY", "test")
+    os.environ.setdefault("SL_FLINK_API_SECRET", "test")
+    os.environ.setdefault("SL_CCLOUD_KAFKA_CLUSTER_ID", "lkc-test")
+    os.environ.setdefault("CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
+    os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
+    os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")
+    os.environ.setdefault("SL_FLINK_ENV_NAME", "j9r-env")
+    os.environ.setdefault("SL_FLINK_DATABASE_NAME", "j9r-kafka")
 
 from shift_left.core.models.flink_statement_model import (
     Statement, 
@@ -52,7 +70,14 @@ class TestTestManager(unittest.TestCase):
         print(f"mock_get_statement: {statement_name} returns None")  
         return None
     
-    def _mock_post_ddl_statement(self, compute_pool_id, statement_name, sql_content):
+    def _mock_post_ddl_statement(
+        self,
+        compute_pool_id: Any,
+        statement_name: str,
+        sql_content: str,
+        properties: Optional[dict] = None,
+        stopped: bool = False,
+    ):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
             if "ddl" in statement_name:
@@ -60,7 +85,14 @@ class TestTestManager(unittest.TestCase):
             else:
                 return Statement(name=statement_name, status={"phase": "RUNNING"})
 
-    def _mock_post_dml_statement(self, compute_pool_id, statement_name, sql_content):
+    def _mock_post_dml_statement(
+        self,
+        compute_pool_id: Any,
+        statement_name: str,
+        sql_content: str,
+        properties: Optional[dict] = None,
+        stopped: bool = False,
+    ):
             print(f"mock_post_statement: {statement_name}")
             print(f"sql_content: {sql_content}")
             self._sql_content = sql_content
@@ -522,28 +554,27 @@ class TestTestManager(unittest.TestCase):
                                                          mock_transformer, 
                                                          mock_post_statement, 
                                                          mock_get_statement):
-        """Test _execute_flink_test_statement when statement doesn't exist."""
-        from shift_left.core.models.flink_statement_model import StatementError
-        
-        # Mock that statement doesn't exist
-        mock_get_statement.return_value = StatementError(message="Not found")
-        
-        # Mock transformer
+        """Test _execute_flink_test_statement when API returns 404 StatementError (recreate as new)."""
+        from shift_left.core.models.flink_statement_model import StatementError, ErrorData
+
+        mock_get_statement.return_value = StatementError(
+            errors=[ErrorData(status="404", detail="Not found")]
+        )
+
         mock_transformer_instance = mock_transformer.return_value
         mock_transformer_instance.update_sql_content.return_value = ("", "transformed_sql")
-        
-        # Mock post statement success
+
         expected_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
         mock_post_statement.return_value = expected_statement
-        
+
         result, is_new = test_mgr._execute_flink_test_statement(
             sql_content="SELECT * FROM test",
             statement_name="test_statement",
             compute_pool_id="test_pool"
         )
-        
+
         self.assertEqual(result, expected_statement)
-        self.assertFalse(is_new)  # Should be not new as there is an error in the statement
+        self.assertTrue(is_new)
         mock_post_statement.assert_called_once()
         mock_transformer_instance.update_sql_content.assert_called_once()
 
@@ -567,21 +598,14 @@ class TestTestManager(unittest.TestCase):
         """Test execute_one_or_all_tests function error handling."""
         with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
             mock_init.side_effect = Exception("Foundation error")
-            
+
             with self.assertRaises(Exception) as context:
-                test_mgr.execute_one_or_all_tests("nonexistent_table", "test_case")
-            
+                test_mgr.execute_one_or_all_tests("nonexistent_table", test_case_name="test_case")
             self.assertIn("Foundation error", str(context.exception))
 
-    def test_execute_one_or_all_tests_error_handling(self):
-        """Test execute_one_or_all_tests function error handling."""
-        with patch('shift_left.core.test_mgr._init_test_foundations') as mock_init:
-            mock_init.side_effect = Exception("Foundation error")
-            
-            with self.assertRaises(Exception) as context:
+            with self.assertRaises(Exception) as context2:
                 test_mgr.execute_one_or_all_tests("nonexistent_table")
-            
-            self.assertIn("Foundation error", str(context.exception))
+            self.assertIn("Foundation error", str(context2.exception))
 
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr._read_and_treat_sql_content_for_ut')
@@ -646,7 +670,9 @@ class TestTestManager(unittest.TestCase):
             print(f"mock_get_statement: {statement_name}")
             return None
         
-        def _mock_post_statement(compute_pool_id, statement_name, sql_content):
+        def _mock_post_statement(
+            compute_pool_id, statement_name, sql_content, properties=None, stopped=False
+        ):
             if "ddl" in statement_name or "ins" in statement_name:
                 return Statement(name=statement_name, status={"phase": "COMPLETED"})
             elif "dml" in statement_name:
@@ -664,7 +690,9 @@ class TestTestManager(unittest.TestCase):
         mock_delete_statement.return_value = "deleted"  # Mock delete operation
 
         table_name = "p1_fct_order"
-        test_suite_result = test_mgr.execute_one_or_all_tests(table_name, "test_case_1", run_validation=True)
+        test_suite_result = test_mgr.execute_one_or_all_tests(
+            table_name, test_case_name="test_case_1", run_validation=True
+        )
         assert test_suite_result
         print(test_suite_result.model_dump_json(indent=2))
         assert len(test_suite_result.test_results) == 1

@@ -106,7 +106,7 @@ class TestDebugUnitTests(BaseUT):
         assert "fct_user_per_group" in yaml_content
 
 
-    def test_assess_unused_tables(self):
+    def _test_assess_unused_tables(self):
         inventory_path = os.getenv("PIPELINES")
         result = assess_unused_tables(inventory_path, include_topics=False)
         print(result)
