@@ -24,7 +24,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
     if not env_id:
         env_id = config['confluent_cloud']['environment_id']
     if not region:
-        region = config['confluent_cloud']['region']
+        region = config['confluent_cloud']['cloud_region']
     if not _compute_pool_list:
         reload = True
         if os.path.exists(COMPUTE_POOL_LIST_FILE):
@@ -230,8 +230,8 @@ def _save_compute_pool_list(compute_pool_list: ComputePoolList):
 def _build_compute_pool_spec(table_name: str, config: dict) -> dict:
     spec = {}
     spec['display_name'] = _get_compute_pool_name_modifier().build_compute_pool_name_from_table(table_name)
-    spec['cloud'] = config['confluent_cloud']['provider']
-    spec['region'] = config['confluent_cloud']['region']
+    spec['cloud'] = config['confluent_cloud']['cloud_provider']
+    spec['region'] = config['confluent_cloud']['cloud_region']
     spec['max_cfu'] =  config['flink']['max_cfu']
     spec['environment'] = { 'id': config['confluent_cloud']['environment_id']}
     return spec

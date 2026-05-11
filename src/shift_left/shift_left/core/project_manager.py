@@ -65,7 +65,6 @@ def build_project_structure(project_name: str,
     project_folder=os.path.join(project_path, project_name)
     create_folder_if_not_exist(project_folder)
     create_folder_if_not_exist(os.path.join(project_folder, "pipelines"))
-    create_folder_if_not_exist(os.path.join(project_folder, "staging"))
     create_folder_if_not_exist(os.path.join(project_folder, "docs"))
     if project_type == DATA_PRODUCT_PROJECT_TYPE:
         _define_dp_structure(os.path.join(project_folder, "pipelines"))
@@ -494,9 +493,8 @@ def _create_terraform_skeleton(project_folder: str):
     logger.info(f"create_terraform_skeleton({project_folder})")
     iac_folder = os.path.join(project_folder, "IaC")
     create_folder_if_not_exist(iac_folder)
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments"))
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "dev"))
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "prod"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "dev"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "prod"))
     project_name = Path(project_folder).name
     env = Environment(loader=PackageLoader("shift_left.core", "templates"))
     tf_provider_tmpl = env.get_template("tf_provider.jinja")
@@ -504,7 +502,7 @@ def _create_terraform_skeleton(project_folder: str):
         "project_name": project_name,
         "environment": "demo",
     }
-    dev_folder = os.path.join(iac_folder, "environments", "dev")
+    dev_folder = os.path.join(iac_folder, "dev")
     providers_tf = os.path.join(dev_folder, "providers.tf")
     with open(providers_tf, "w") as f:
         f.write(tf_provider_tmpl.render(context))
@@ -564,12 +562,11 @@ def _initialize_git_repo(project_folder: str):
 def _define_dp_structure(pipeline_folder: str):
     data_folder=pipeline_folder + "/data_product_1"
     create_folder_if_not_exist(data_folder)
-    create_folder_if_not_exist(data_folder + "/intermediates")
-    create_folder_if_not_exist(data_folder + "/facts")
-    create_folder_if_not_exist(data_folder + "/sources")
+    _define_kimball_structure(data_folder)
+
 
 def _define_kimball_structure(pipeline_folder: str):
-    create_folder_if_not_exist(pipeline_folder + "/intermediates")
+    create_folder_if_not_exist(pipeline_folder + "/seeds")
     create_folder_if_not_exist(pipeline_folder + "/facts")
     create_folder_if_not_exist(pipeline_folder + "/dimensions")
     create_folder_if_not_exist(pipeline_folder + "/sources")
@@ -581,9 +578,9 @@ def _add_important_files(project_folder: str):
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
         shutil.copyfile(template_path, os.path.join(project_folder, "pipelines", file))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath(".env_tmpl")
-    shutil.copyfile(template_path, os.path.join(project_folder, ".env"))
+    shutil.copyfile(template_path, os.path.join(project_folder, "set_env"))
     # Update FLINK_PROJECT in .env file with project folder path
-    env_file = os.path.join(project_folder, ".env")
+    env_file = os.path.join(project_folder, "set_env")
     with open(env_file, 'r') as f:
         env_content = f.read()
     env_content = env_content.replace("FLINK_PROJECT=", f"FLINK_PROJECT={project_folder}")
@@ -592,7 +589,7 @@ def _add_important_files(project_folder: str):
     template_path = importlib.resources.files("shift_left.core.templates").joinpath(".gitignore_tmpl")
     shutil.copyfile(template_path, os.path.join(project_folder, ".gitignore"))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath("config_tmpl.yaml")
-    shutil.copyfile(template_path, os.path.join(shift_left_dir, "config.yaml"))
+    shutil.copyfile(template_path, os.path.join(project_folder, "config.yaml"))
 
 
 def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: str) -> Tuple[bool, bool]:

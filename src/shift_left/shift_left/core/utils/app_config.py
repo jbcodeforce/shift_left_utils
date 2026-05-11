@@ -227,7 +227,7 @@ def validate_config(config: dict[str,dict[str,str]], minimal: bool = False) -> N
 
     # Validate confluent_cloud section
     if config.get("confluent_cloud"):
-      cc_required = ["environment_id", "region", "provider", "organization_id", "service_account_id"]
+      cc_required = ["environment_id", "cloud_region", "cloud_provider", "organization_id", "service_account_id"]
       for field in cc_required:
         if not config["confluent_cloud"].get(field):
           errors.append(f"Configuration is missing confluent_cloud.{field}")

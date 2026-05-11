@@ -76,7 +76,7 @@ def build_folder_structure_for_table(table_folder_name: str,
     _create_ddl_skeleton(internal_table_name, table_folder)
     _create_dml_skeleton(internal_table_name, table_folder)
     _create_dml_properties_skeleton(internal_table_name, table_folder)
-    logger.debug(f"Created folder {table_folder} for the table {table_folder_name}")
+    logger.info(f"Created folder {table_folder} for the table {table_folder_name}")
     return table_folder, internal_table_name
 
 def search_source_dependencies_for_dbt_table(sql_file_name: str, src_project_folder: str) -> str:
