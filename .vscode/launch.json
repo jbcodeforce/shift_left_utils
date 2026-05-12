@@ -32,31 +32,50 @@
             "cwd": "${workspaceFolder}/src/shift_left",
             "justMyCode": false,
             "env": {
-                "CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config.yaml",
+                "SL_CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config.yaml",
                 "PYTHONPATH": "${workspaceFolder}/src/shift_left:${workspaceFolder}/src/shift_left/tests"
             },
             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
+        // IT env mirrors src/shift_left/set_demo_env (VS Code envFile does not parse `export KEY=...` shell syntax).
+        // Confluent/Kafka/Flink secrets use ${env:...}; export the same names from set_demo_env before starting Cursor from that shell, or set them in the OS environment.
         {
-         "name": "SL Python IT Debugger: current file",
+            "name": "SL Python IT Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "cwd": "${fileDirname}",
-            "preLaunchTask": "verify_env_file",
-            "envFile": "${workspaceFolder}/../flink_project_demos/customer_360/c360_flink_processing/.env",
+            "cwd": "${workspaceFolder}/src/shift_left",
             "env": {
-                // Note: Variables from envFile are loaded first, then these override/add to them
-                // The Python script also loads .env at module level to ensure variables are available
-                "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests",
-				"SL_LLM_BASE_URL" : "http://localhost:1337/v1",
-				"SL_LLM_MODEL" : "qwen3-coder-30b-a3b-instruct-mlx-4bit",
-				"SL_LLM_API_KEY" : "llm_test_key",
-				"SL_RAG_ENABLED" : "1",
-				"SL_RAG_INDEX_PATH" : "${workspaceFolder}/../flink_project_demos/ksql_tutorial/rag_index"
-              },
-               "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
+                "PYTHONPATH": "${workspaceFolder}/src/shift_left:${workspaceFolder}/src/shift_left/tests",
+                "FLINK_PROJECT": "${workspaceFolder}/src/shift_left/tests/data/flink-project",
+                "PIPELINES": "${workspaceFolder}/src/shift_left/tests/data/flink-project/pipelines",
+                "STAGING": "${workspaceFolder}/src/shift_left/tests/data/flink-project/staging",
+                "SRC_FOLDER": "${workspaceFolder}/src/shift_left/tests/data/spark-project",
+                "KSQL_SRC_FOLDER": "${workspaceFolder}/src/shift_left/tests/data/ksql-project/sources",
+                "SL_CLOUD_PROVIDER": "aws",
+                "SL_CLOUD_REGION": "us-west-2",
+                "SL_CLOUD_ORGANIZATION_ID": "49cee212-6346-438a-a1fa-d1b1cbd90d44",
+                "TOPIC_LIST_FILE": "${workspaceFolder}/src/shift_left/tests/data/flink-project/src_topic_list.txt",
+                "SL_CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
+                "SL_KAFKA_API_KEY": "${env:SL_KAFKA_API_KEY}",
+                "SL_KAFKA_API_SECRET": "${env:SL_KAFKA_API_SECRET}",
+                "SL_CONFLUENT_CLOUD_API_KEY": "${env:SL_CONFLUENT_CLOUD_API_KEY}",
+                "SL_CONFLUENT_CLOUD_API_SECRET": "${env:SL_CONFLUENT_CLOUD_API_SECRET}",
+                "SL_FLINK_API_KEY": "${env:SL_FLINK_API_KEY}",
+                "SL_FLINK_API_SECRET": "${env:SL_FLINK_API_SECRET}",
+                "SL_FLINK_COMPUTE_POOL_ID": "lfcp-11p88z",
+                "SL_FLINK_ENV_ID": "env-yk3jm6",
+                "SL_FLINK_ENV_NAME": "j9r-env",
+                "SL_FLINK_DATABASE_NAME": "j9r-kafka",
+                "SL_CONFLUENT_PRINCIPAL_ID": "sa-111z1z",
+                "SL_LLM_BASE_URL": "http://localhost:1337/v1",
+                "SL_LLM_MODEL": "qwen3-coder-30b-a3b-instruct-mlx-4bit",
+                "SL_LLM_API_KEY": "not_api_key_needed",
+                "SL_RAG_INDEX_PATH": "${workspaceFolder}/src/shift_left/tests/data/ksql-project/rag_index",
+                "SHIFT_LEFT_IT_USE_DEMO_ENV": "1"
+            },
+            "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
     ]
 }

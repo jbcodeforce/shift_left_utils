@@ -84,6 +84,7 @@ def get_topic_list(file_name: str) -> list[dict]:
     """
     ccloud = ConfluentCloudClient(get_config())
     topics = ccloud.list_topics()
+    logger.info(f"get_topic_list: {topics}")
     if topics and topics.get('data'):
         with open(file_name, "w") as f:
             for topic in topics["data"]:
