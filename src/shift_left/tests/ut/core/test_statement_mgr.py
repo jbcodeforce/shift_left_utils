@@ -32,7 +32,7 @@ class TestStatementManager(BaseUT):
     """
     def setUp(self):
         # Reset any cached data in the statement manager
-        statement_mgr._statement_list_cache = None
+        statement_mgr.reset_statement_list()
         statement_mgr._statement_compute_pool_map = None
 
     _statement_list = { # mockup of the statement list
@@ -61,8 +61,8 @@ class TestStatementManager(BaseUT):
     }
 
 
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_1_get_statement_list_with_mock(self, MockConfluentCloudClient):
+    @patch("shift_left.core.statement_mgr.list_statements_first_page_json")
+    def test_1_get_statement_list_with_mock(self, mock_list_first):
         """Test successful retrieval of statement list with mocked ConfluentClient"""
         # Setup mock response data
         mock_response = {
@@ -111,36 +111,26 @@ class TestStatementManager(BaseUT):
             }
         }
 
-        # Setup mock client: 1/ instance of the client, 2/ mock the make_request and build_flink_url_and_auth_header methods
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.make_request.return_value = mock_response
-        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
+        mock_list_first.return_value = mock_response
 
-        # Call the function
         result = statement_mgr.get_statement_list()
 
-        # Verify results
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 2)
 
-        # Verify first statement
         self.assertIn("test-statement-1", result)
         stmt1 = result["test-statement-1"]
         self.assertEqual(stmt1.name, "test-statement-1")
         self.assertEqual(stmt1.status_phase, "RUNNING")
         self.assertEqual(stmt1.compute_pool_id, "test-pool-1")
 
-        # Verify second statement
         self.assertIn("test-statement-2", result)
         stmt2 = result["test-statement-2"]
         self.assertEqual(stmt2.name, "test-statement-2")
         self.assertEqual(stmt2.status_phase, "COMPLETED")
         self.assertEqual(stmt2.compute_pool_id, "test-pool-2")
 
-        # Verify client was called correctly
-        MockConfluentCloudClient.assert_called_once()
-        mock_client_instance.make_request.assert_called_once()
-        mock_client_instance.build_flink_url_and_auth_header.assert_called_once()
+        mock_list_first.assert_called_once()
 
 
 
@@ -165,61 +155,60 @@ class TestStatementManager(BaseUT):
         self.assertEqual(statement_info.status_phase, "UNKNOWN")
 
 
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_post_flink_statement(self, MockConfluentCloudClient):
-        # Setup test data
+    @patch("shift_left.core.statement_mgr.driver_submit_flink_statement")
+    def test_post_flink_statement(self, mock_driver_submit):
         compute_pool_id = "test-pool"
         statement_name = "test-statement"
         sql_content = "SELECT * FROM test_table"
 
-        # Configure mock
-        mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = ("http://test-url", "test-auth-header")
-
-        # Mock successful response
-        mock_response = {
-            "name": statement_name,
-            "status": {"phase": "RUNNING"},
-            "spec": {
-                "statement": sql_content,
-                "compute_pool_id": compute_pool_id,
-                "properties": {"sql.current-catalog": "default", "sql.current-database": "default"},
-                "stopped": False,
-                "principal": "principal_sa"
-            }
-        }
-        mock_client.make_request.return_value = mock_response
+        mock_driver_submit.return_value = Statement(
+            name=statement_name,
+            status=Status(phase="RUNNING", detail=""),
+            spec=Spec(
+                statement=sql_content,
+                compute_pool_id=compute_pool_id,
+                properties={"sql.current-catalog": "default", "sql.current-database": "default"},
+                stopped=False,
+                principal="principal_sa",
+            ),
+            metadata=Metadata(
+                created_at="2025-04-20T10:15:02.853006",
+                labels={},
+                resource_version="1",
+                self="https://test-url",
+                uid="test-uid",
+                updated_at="2025-04-20T10:15:02.853006",
+            ),
+        )
 
         result = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_content, {})
 
-        # Verify results
         assert result.name == statement_name
         assert result.status.phase == "RUNNING"
         assert result.spec.statement == sql_content
         assert result.spec.compute_pool_id == compute_pool_id
 
-        # Verify mock calls
-        mock_client.make_request.assert_called_once()
-        mock_client.build_flink_url_and_auth_header.assert_called_once()
+        mock_driver_submit.assert_called_once()
 
 
 
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.statement_mgr.get_statement_list')
-    def test_delete_flink_statement(self, mock_get_statement_list, MockConfluentCloudClient):
+    @patch("shift_left.core.statement_mgr.driver_delete_flink_statement")
+    @patch("shift_left.core.statement_mgr.get_statement_list")
+    def test_delete_flink_statement(self, mock_get_statement_list, mock_driver_delete):
         sname = "statement_name"
-        mock_get_statement_list.return_value = { sname: Statement(name= sname), "other" : Statement(name = "other")}
+        mock_get_statement_list.return_value = {
+            sname: Statement(name=sname),
+            "other": Statement(name="other"),
+        }
 
-        mock_client_instance = MockConfluentCloudClient.return_value
-        mock_client_instance.delete_flink_statement.return_value = "deleted"
-        print(f"MockConfluentCloudClient: {MockConfluentCloudClient}")
-        print(f"MockConfluentCloudClient.return_value: {MockConfluentCloudClient.return_value}")
+        mock_driver_delete.return_value = "deleted"
+
         result = statement_mgr.delete_statement_if_exists(sname)
 
         self.assertEqual(result, "deleted")
         mock_get_statement_list.assert_called_once()
-        MockConfluentCloudClient.assert_called_once()
-        mock_client_instance.delete_flink_statement.assert_called_once_with(sname)
+        mock_driver_delete.assert_called_once()
+        self.assertEqual(mock_driver_delete.call_args[0][1], sname)
 
 
 
@@ -311,44 +300,31 @@ class TestStatementManager(BaseUT):
         mock_delete_statement.assert_called_with(_statement_name)
 
 
-    @patch('shift_left.core.statement_mgr.delete_statement_if_exists')
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.statement_mgr.get_statement')
-    def test_drop_table(self,
-                        mock_get_statement,
-                        MockConfluentCloudClient,
-                        mock_delete_statement_if_exists):
-        print(f"test_drop_table should send drop table statement")
+    @patch("shift_left.core.statement_mgr.delete_statement_if_exists")
+    @patch("shift_left.core.statement_mgr.driver_submit_flink_statement")
+    @patch("shift_left.core.statement_mgr.get_statement")
+    def test_drop_table(
+        self,
+        mock_get_statement,
+        mock_driver_submit,
+        mock_delete_statement_if_exists,
+    ):
         table_name = "fct_order"
 
-        mock_get_statement.side_effect = self._create_mock_statement(name= "drop-fct-order", status_phase= "COMPLETED")
+        mock_get_statement.side_effect = self._create_mock_statement(
+            name="drop-fct-order", status_phase="COMPLETED"
+        )
         mock_delete_statement_if_exists.return_value = "deleted"
-        mock_client_instance = MockConfluentCloudClient.return_value
 
-        # Mock the client methods that will be called by post_flink_statement
-        mock_client_instance.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
-        mock_client_instance.make_request.return_value = {
-            "name": "drop-fct-order",
-            "status": {"phase": "COMPLETED"},
-            "spec": {
-                "statement": f"drop table if exists {table_name};",
-                "compute_pool_id": "test-pool",
-                "properties": {"sql.current-catalog": "default", "sql.current-database": "default"},
-                "stopped": False,
-                "principal": "test-principal"
-            }
-        }
+        stmt = self._create_mock_statement(name="drop-fct-order", status_phase="COMPLETED")
+        stmt.spec.statement = f"drop table if exists {table_name};"
+        mock_driver_submit.return_value = stmt
 
         result = statement_mgr.drop_table(table_name=table_name)
 
         self.assertEqual(result, "fct_order dropped")
 
-        MockConfluentCloudClient.assert_called_once()
-        config = get_config()
-        cpi= config['flink']['compute_pool_id']
-        properties = {'sql.current-catalog' : config['flink']['catalog_name'] , 'sql.current-database' : config['flink']['database_name']}
-
-        mock_client_instance.make_request.assert_called_once()
+        mock_driver_submit.assert_called_once()
         mock_delete_statement_if_exists.assert_called_with("drop-fct-order")
 
 
@@ -482,25 +458,19 @@ class TestStatementManager(BaseUT):
         assert "'key.avro-registry.schema-context' = '.flink-stage'," in statement.spec.statement
         mock_post_flink_statement.assert_called_once()
 
-    @patch('shift_left.core.statement_mgr.os.path.exists')
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_cache_none_no_file_exists(self, MockConfluentCloudClient, mock_exists):
+    @patch("shift_left.core.statement_mgr.list_statements_first_page_json")
+    @patch("shift_left.core.statement_mgr.os.path.exists")
+    def test_cache_none_no_file_exists(self, mock_exists, mock_list_first):
         """Test cache is None and no cache file exists - should reload from API"""
-        # Setup
         mock_exists.return_value = False
-        mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
-        mock_client.make_request.return_value = {
+        mock_list_first.return_value = {
             "data": [],
-            "metadata": {"next": None}
+            "metadata": {"next": None},
         }
 
-        # Call function
         result = statement_mgr.get_statement_list()
 
-        # Verify API was called
-        MockConfluentCloudClient.assert_called_once()
-        mock_client.make_request.assert_called_once()
+        mock_list_first.assert_called_once()
 
     @patch('shift_left.core.statement_mgr.datetime')
     @patch('shift_left.core.statement_mgr.os.path.exists')
@@ -526,15 +496,20 @@ class TestStatementManager(BaseUT):
             # Should load from cache, not make API call
             mock_open_file.assert_called_once()
 
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    @patch('shift_left.core.statement_mgr.datetime')
-    @patch('shift_left.core.statement_mgr.os.path.exists')
-    @patch('builtins.open')
-    def test_cache_file_exists_but_ttl_is_expired(self,
-                mock_open_file, mock_exists, mock_datetime,
-                MockConfluentCloudClient):
+    @patch("shift_left.core.statement_mgr.list_statements_follow_page_json")
+    @patch("shift_left.core.statement_mgr.list_statements_first_page_json")
+    @patch("shift_left.core.statement_mgr.datetime")
+    @patch("shift_left.core.statement_mgr.os.path.exists")
+    @patch("builtins.open")
+    def test_cache_file_exists_but_ttl_is_expired(
+        self,
+        mock_open_file,
+        mock_exists,
+        mock_datetime,
+        mock_list_first,
+        mock_list_follow,
+    ):
         """Test cache is None, file exists with cache above TTL - should reload from API"""
-        # Setup - cache file exists and is valid
         mock_exists.return_value = True
         current_time = datetime(2024, 1, 1, 12, 0, 0)
         cache_time = datetime(2024, 1, 1, 11, 0, 0)  # 1 hour ago
@@ -543,76 +518,142 @@ class TestStatementManager(BaseUT):
 
         cache_data = {
             "created_at": "2024-01-01 11:00:00",
-            "statement_list": {}
+            "statement_list": {},
         }
         mock_open_file.return_value.__enter__.return_value.read.return_value = json.dumps(cache_data)
-        mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
 
-        # Setup pagination responses
         responses = [
             {
-                "data": [{"name": "stmt1", "spec": {}, "status": {}, "metadata": {
-                     "created_at": "2025-04-20T10:15:02.853006"
-                }}],
-                "metadata": {"next": "page2-token"}
+                "data": [
+                    {
+                        "name": "stmt1",
+                        "spec": {},
+                        "status": {},
+                        "metadata": {"created_at": "2025-04-20T10:15:02.853006"},
+                    }
+                ],
+                "metadata": {"next": "page2-token"},
             },
             {
-                "data": [{"name": "stmt2", "spec": {}, "status": {}, "metadata": {
-                     "created_at": "2025-04-20T10:15:02.853006"
-                }}],
-                "metadata": {"next": None}
-            }
+                "data": [
+                    {
+                        "name": "stmt2",
+                        "spec": {},
+                        "status": {},
+                        "metadata": {"created_at": "2025-04-20T10:15:02.853006"},
+                    }
+                ],
+                "metadata": {"next": None},
+            },
         ]
-        mock_client.make_request.side_effect = responses
-        with patch('shift_left.core.statement_mgr.get_config') as mock_config:
+        mock_list_first.return_value = responses[0]
+        mock_list_follow.return_value = responses[1]
+
+        with patch("shift_left.core.statement_mgr.get_config") as mock_config:
             mock_config.return_value = {
-                'confluent_cloud': {'page_size': 100, 'organization_id': 'id-org-test'},
-                'app': {'cache_ttl': 60}
-            }  # 1 minute
+                "confluent_cloud": {"page_size": 100, "organization_id": "id-org-test"},
+                "app": {"cache_ttl": 60},
+            }
             result = statement_mgr.get_statement_list()
 
-            # Should load from cache, not make API call
             self.assertEqual(mock_open_file.call_count, 2)
-            self.assertEqual(mock_client.make_request.call_count, 2)
+            mock_list_first.assert_called_once()
+            mock_list_follow.assert_called_once()
             self.assertEqual(len(result), 2)
 
-    @patch('shift_left.core.statement_mgr.ConfluentCloudClient')
-    def test_api_pagination_multiple_pages(self, MockConfluentCloudClient):
+    @patch("shift_left.core.statement_mgr.list_statements_follow_page_json")
+    @patch("shift_left.core.statement_mgr.list_statements_first_page_json")
+    def test_api_pagination_multiple_pages(self, mock_list_first, mock_list_follow):
         """Test API pagination with multiple pages of results"""
-        mock_client = MockConfluentCloudClient.return_value
-        mock_client.build_flink_url_and_auth_header.return_value = ("https://test-url", "test-auth-header")
-
-        # Setup pagination responses
         responses = [
             {
-                "data": [{"name": "stmt1",
-                    "spec": {"statement": "CREATE TABLE test_table_1"},
-                    "status": {"phase": "RUNNING"},
-                    "metadata": {
-                        "created_at": "2025-04-20T10:15:02.853006"
+                "data": [
+                    {
+                        "name": "stmt1",
+                        "spec": {"statement": "CREATE TABLE test_table_1"},
+                        "status": {"phase": "RUNNING"},
+                        "metadata": {"created_at": "2025-04-20T10:15:02.853006"},
                     }
-                    }],
-                "metadata": {"next": "page2-token"}
+                ],
+                "metadata": {"next": "page2-token"},
             },
             {
-                "data": [{"name": "stmt2",
-                    "spec": {"statement": "CREATE TABLE test_table_2"},
-                    "status": {"phase": "RUNNING"},
-                    "metadata": {
-                        "created_at": "2025-04-20T10:15:02.853006"
+                "data": [
+                    {
+                        "name": "stmt2",
+                        "spec": {"statement": "CREATE TABLE test_table_2"},
+                        "status": {"phase": "RUNNING"},
+                        "metadata": {"created_at": "2025-04-20T10:15:02.853006"},
                     }
-                }],
-                "metadata": {"next": None}
-            }
+                ],
+                "metadata": {"next": None},
+            },
         ]
-        mock_client.make_request.side_effect = responses
+        mock_list_first.return_value = responses[0]
+        mock_list_follow.return_value = responses[1]
 
         result = statement_mgr.get_statement_list()
 
-        # Should make 2 API calls for pagination
-        self.assertEqual(mock_client.make_request.call_count, 2)
+        mock_list_first.assert_called_once()
+        mock_list_follow.assert_called_once()
         self.assertEqual(len(result), 2)
+
+
+    @patch("shift_left.core.statement_mgr.list_statements_first_page_json")
+    def test_get_statement_list_with_compute_pool_id(self, mock_list_first):
+        """
+        Test the get_statement_list function with a compute pool id
+        """
+        mock_response = {
+            "data": [
+                {
+                    "name": "test-statement-1",
+                    "spec": {
+                        "properties": {
+                            "sql.current-catalog": "default",
+                            "sql.current-database": "default"
+                        },
+                        "statement": "CREATE TABLE test_table_1",
+                        "compute_pool_id": self.TEST_COMPUTE_POOL_ID_1,
+                        "principal": "test-principal"
+                    },
+                    "status": {
+                        "phase": "RUNNING",
+                        "detail": ""
+                    },
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
+                    }
+                },
+                {
+                    "name": "test-statement-2",
+                    "spec": {
+                        "properties": {
+                            "sql.current-catalog": "default",
+                            "sql.current-database": "default"
+                        },
+                        "statement": "CREATE TABLE test_table_2",
+                        "compute_pool_id": self.TEST_COMPUTE_POOL_ID_2,
+                        "principal": "test-principal"
+                    },
+                    "status": {
+                        "phase": "RUNNING",
+                        "detail": ""
+                    },
+                    "metadata": {
+                        "created_at": "2025-04-20T10:15:02.853006"
+                    }
+                }
+            ],
+            "metadata": {"next": None},
+        }
+        mock_list_first.return_value = mock_response
+
+        statement_list = statement_mgr.get_statement_list(self.TEST_COMPUTE_POOL_ID_1)
+        assert "test-statement-1" in statement_list
+        assert len(statement_list) == 1
+        print(f"statement_list: {statement_list}")
+        assert statement_list['test-statement-1'].compute_pool_id == self.TEST_COMPUTE_POOL_ID_1
 
 if __name__ == '__main__':
     unittest.main()

@@ -10,7 +10,7 @@ import uuid
 from typing import Tuple
 import time
 TEST_PIPELINES_DIR = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 
 import shift_left.core.pipeline_mgr as pm
@@ -282,6 +282,7 @@ class TestDeploymentManager(BaseUT):
         print(f"summary: {summary}")
         print(f"report: {report.model_dump_json(indent=3)}")
 
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
     @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
@@ -290,7 +291,8 @@ class TestDeploymentManager(BaseUT):
                                            mock_delete,
                                            mock_drop,
                                            mock_post,
-                                           mock_assign_compute_pool_id):
+                                           mock_assign_compute_pool_id,
+                                           mock_get_statement_list):
         """
         Deploying a product p1 in parallel should deploy all the tables in parallel.
         """
@@ -315,6 +317,7 @@ class TestDeploymentManager(BaseUT):
         mock_drop.side_effect = _drop_table
         mock_post.side_effect = _post_flink_statement
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
+        mock_get_statement_list.return_value = {}
         dm.build_deploy_pipelines_from_product(product_name="p1",
                                                 inventory_path=self.inventory_path,
                                                 execute_plan=True,

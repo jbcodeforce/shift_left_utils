@@ -11,8 +11,18 @@ import threading
 import shutil
 from datetime import datetime
 from importlib import import_module
-from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, session_log_dir, shift_left_dir
+from shift_left.core.utils.flink_sql_adapter import (
+    delete_flink_statement as driver_delete_flink_statement,
+    fetch_statement_results_terminal_json,
+    get_flink_statement_optional,
+    get_statement_api_json,
+    get_statement_results_by_url_json,
+    list_statements_first_page_json,
+    list_statements_follow_page_json,
+    patch_statement_stopped_using_rest,
+    submit_flink_statement as driver_submit_flink_statement,
+)
 from shift_left.core.pipeline_mgr import (
     FlinkTablePipelineDefinition,
     get_or_build_inventory,
@@ -95,74 +105,47 @@ def get_statement_status_with_cache(statement_name: str) -> StatementInfo:
 
 def get_statement(statement_name: str) -> Statement | StatementError:
     config = get_config()
-    client = ConfluentCloudClient(config)
-    url, auth_header = client.build_flink_url_and_auth_header()
-    response = client.make_request(method="GET", url=url + "/statements/" + statement_name, auth_header=auth_header)
-    if response and response.get('errors'):
+    response = get_statement_api_json(config, statement_name)
+    if response and response.get("errors"):
         return StatementError(**response)
     return Statement(**response)
 
-def post_flink_statement(compute_pool_id: str,
-                             statement_name: str,
-                             sql_content: str,
-                             properties: dict,
-                             stopped: bool = False) -> Statement | StatementError:
-        """
-        POST to the statements API to execute a SQL statement.
-        """
-        config = get_config()
-        if len(properties) == 0:
-            properties = {'sql.current-catalog' : config['flink']['catalog_name'] ,
-                          'sql.current-database' : config['flink']['database_name']}
-        client = ConfluentCloudClient(config)
-        url, auth_header = client.build_flink_url_and_auth_header()
-        statement_data = {
-                "name": statement_name,
-                "organization_id": config["confluent_cloud"]["organization_id"],
-                "environment_id": config["confluent_cloud"]["environment_id"],
-                "spec": {
-                    "statement": sql_content,
-                    "properties": properties,
-                    "principal": config["confluent_cloud"]["service_account_id"],
-                    "compute_pool_id": compute_pool_id,
-                    "stopped": stopped
-                }
-            }
-        try:
-            logger.debug(f"> Send POST request to Flink statement api with {statement_data}")
-            start_time = time.perf_counter()
-            auth_header = client._get_flink_auth()
-            response = client.make_request(method="POST", url=f"{url}/statements", data=statement_data, auth_header=auth_header)
-            logger.info(f"> POST response= {response}")
-            if isinstance(response, dict):
-                if response.get('errors'):
-                    logger.error(f"Error executing rest call: {response['errors']}")
-                    if response.get("errors")[0].get("status") == "409":
-                        delete_statement_if_exists(statement_name)
-                    if response.get("errors")[0].get("status") == "404":
-                        return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail="resource not found")])
-                    return  StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail="Exists but deleted so retry")])
-                #raise Exception(response['errors'][0]['detail'])
-                elif response["status"]["phase"] == "PENDING":
-                    return client.wait_response(url, statement_name, start_time)
-                return  Statement(**response)
-            else:
-                return StatementError(errors=[ErrorData(id=statement_name, status="FAILED", detail=str(response))])
-        except Exception as e:
-            logger.error(f"Error executing rest call: {e}")
-            raise e
+def post_flink_statement(
+    compute_pool_id: str,
+    statement_name: str,
+    sql_content: str,
+    properties: dict,
+    stopped: bool = False,
+) -> Statement | StatementError:
+    """
+
+    Submit a Flink SQL statement using the confluent-sql driver."""
+
+    config = get_config()
+    if len(properties) == 0:
+        properties = {
+            "sql.current-catalog": config["flink"]["catalog_name"],
+            "sql.current-database": config["flink"]["database_name"],
+        }
+    return driver_submit_flink_statement(
+        config,
+        compute_pool_id=compute_pool_id,
+        statement_name=statement_name,
+        sql_content=sql_content,
+        properties=dict(properties),
+        stopped=stopped,
+    )
 
 
 def delete_statement_if_exists(statement_name) -> str | None:
     logger.info(f"Enter with {statement_name}")
     statement_list = get_statement_list()
     config = get_config()
-    client = ConfluentCloudClient(config)
     # 05/27 the following call is not really needed as there is most likely no creation of the same statement outside of the tool.
     #  so return None
     result = "not found"
     if statement_name in statement_list:
-        result=client.delete_flink_statement(statement_name)
+        result = driver_delete_flink_statement(config, statement_name)
         if result == "deleted":
             statement_list.pop(statement_name)
             if _statement_list_cache is not None:
@@ -174,9 +157,7 @@ def delete_statement_if_exists(statement_name) -> str | None:
 def patch_statement_if_exists(statement_name: str, stopped: bool) -> str | None:
     logger.info(f"Enter with {statement_name}")
     config = get_config()
-    client = ConfluentCloudClient(config)
-    result=client.patch_flink_statement(statement_name, stopped)
-    return result
+    return patch_statement_stopped_using_rest(config, statement_name, stopped)
 
 def get_statement_info(statement_name: str) -> None | StatementInfo:
     """
@@ -185,8 +166,7 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
     logger.info(f"Verify {statement_name} statement's status")
     if statement_name in get_statement_list():
         return get_statement_list()[statement_name]
-    client = ConfluentCloudClient(get_config())
-    statement = client.get_flink_statement(statement_name)
+    statement = get_flink_statement_optional(get_config(), statement_name)
     if statement and isinstance(statement, Statement):
         statement_info = map_to_statement_info(statement)
         get_statement_list()[statement_name] = statement_info
@@ -195,35 +175,17 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
 
 
 def get_statement_results(statement_name: str)-> StatementResult:
-        client = ConfluentCloudClient(get_config())
-        url, auth_header = client.build_flink_url_and_auth_header()
-        try:
-            next_page_token = None
-            previous_step = None
-            while True:
-                if next_page_token and previous_step != next_page_token:
-                    logger.info(f"Get next page token: {next_page_token} for {statement_name}")
-                    resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
-                else:
-                    logger.info(f"Get results from {url}/statements/{statement_name}/results")
-                    resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
-                logger.info(f"response: {resp} same tokens: {previous_step == next_page_token}")
-                if (resp and "metadata" in resp and "next" in resp["metadata"] and resp["metadata"]["next"]):
-                    previous_step = next_page_token
-                    next_page_token = resp["metadata"]["next"]
-                else:
-                    logger.info(f"Data received for {statement_name}: data: {resp.get("results").get("data")}")
-                    break
+    try:
+        resp = fetch_statement_results_terminal_json(get_config(), statement_name)
+        if isinstance(resp, dict):
             return StatementResult(**resp)
-        except Exception as e:
-            logger.error(f"Error executing GET statement call for {statement_name}: {e}")
-            return None
+        return None
+    except Exception as e:
+        logger.error(f"Error executing GET statement call for {statement_name}: {e}")
+        return None
 
 def get_next_statement_results(next_token_page: str) -> StatementResult:
-    config = get_config()
-    client = ConfluentCloudClient(config)
-    auth_header = client._get_flink_auth()
-    resp=client.make_request(method="GET", url=next_token_page, auth_header=auth_header)
+    resp = get_statement_results_by_url_json(get_config(), next_token_page)
     return StatementResult(**resp)
 
 _cache_lock = threading.RLock()
@@ -253,15 +215,12 @@ def get_statement_list(compute_pool_id: Optional[str] = None) -> dict[str, State
                 print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Load current flink statements using REST API {config['confluent_cloud']['organization_id']}")
                 start_time = time.perf_counter()
                 page_size = config["confluent_cloud"].get("page_size", 100)
-                client = ConfluentCloudClient(config)
-                url, auth_header = client.build_flink_url_and_auth_header()
-                url=url+"/statements?page_size="+str(page_size)
                 next_page_token = None
                 while True:
                     if next_page_token:
-                        resp=client.make_request(method="GET", url=next_page_token, auth_header=auth_header)
+                        resp = list_statements_follow_page_json(config, next_page_token)
                     else:
-                        resp=client.make_request(method="GET", url=url, auth_header=auth_header)
+                        resp = list_statements_first_page_json(config, page_size)
                     logger.debug("Statement execution result:", resp)
                     if resp and 'data' in resp:
                         for info in resp.get('data'):

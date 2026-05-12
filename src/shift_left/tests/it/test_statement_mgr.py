@@ -3,28 +3,28 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
-import json 
+import json
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
 
-import  shift_left.core.statement_mgr as sm 
+import  shift_left.core.statement_mgr as sm
 from shift_left.core.models.flink_statement_model import FlinkStatementNode, StatementInfo
 from shift_left.core.utils.app_config import get_config
 
 class TestStatementManager(unittest.TestCase):
-    
+
     data_dir = None
-    
+
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         # Remove cached statement list file if it exists
         if os.path.exists(sm.STATEMENT_LIST_FILE):
             os.remove(sm.STATEMENT_LIST_FILE)
-        
-    
-    # ---- Statement public apis related tests ------------------- 
+
+
+    # ---- Statement public apis related tests -------------------
     def test_1_create_src_table(self):
         config = get_config()
         flink_statement_file_path = os.getenv("PIPELINES") + "/sources/p2/src_a/sql-scripts/ddl.src_p2_a.sql"

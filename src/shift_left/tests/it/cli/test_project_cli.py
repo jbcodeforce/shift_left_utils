@@ -5,14 +5,13 @@ import unittest
 import pathlib
 import os
 import shutil
-import tempfile
-from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
-from shift_left.core.utils.app_config import shift_left_dir
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.cli_commands.project import app
-import subprocess
+from it.BaseIT import _run_integration_tests, _SKIP_MSG
 
+_RUN_IT = _run_integration_tests()
+@unittest.skipUnless(_RUN_IT, _SKIP_MSG)
 class TestProjectCLI(unittest.TestCase):
 
     @classmethod
@@ -39,40 +38,43 @@ class TestProjectCLI(unittest.TestCase):
         assert os.path.exists(temp_dir / "project_test_via_cli")
         assert os.path.exists(temp_dir / "project_test_via_cli/pipelines")
 
+    def test_validate_config(self):
+        runner = CliRunner()
+        result = runner.invoke(app, [ "validate-config"])
+        print(result.stdout)
+        assert result.exit_code == 0
+        assert "config-ccloud.yaml validated" in result.stdout
+
     def test_list_topics(self):
         runner = CliRunner()
         temp_dir = pathlib.Path(__file__).parent /  "../tmp"
         result = runner.invoke(app, [ "list-topics", str(temp_dir)])
         print(result.stdout)
+        assert result.exit_code == 0
 
-    def test_compute_pool_list(self):
+    def test_list_environments(self):
         runner = CliRunner()
-        result = runner.invoke(app, [ "list-compute-pools"])
+        result = runner.invoke(app, [ "list-environments"])
+        print(result.stdout)
+        assert result.exit_code == 0
+
+    def test__list_compute_pools(self):
+        print("test_5: using cli project list-compute-pools")
+        runner = CliRunner()
+        result = runner.invoke(app, ["list-compute-pools"])
+        print(result)
+        assert result.exit_code == 0
         print(result.stdout)
 
     def test_clean_completed_failed_statements(self):
-        original_config = os.environ.get("CONFIG_FILE")
-        os.environ["CONFIG_FILE"] =  shift_left_dir +  "/config-stage-flink.yaml"
         runner = CliRunner()
         try:
             result = runner.invoke(app, [ "housekeep-statements"])
             print(result)
             assert "Clean statements starting" in result.stdout
-        finally:
-            if original_config:
-                os.environ["CONFIG_FILE"] = original_config
+        except Exception as e:
+            self.fail(f"should not have execption: {e}")
 
-    def test_delete_all_compute_pools_command(self):
-        """Test delete-all-compute-pools command"""
-        runner = CliRunner()
-
-        # This command requires actual Confluent Cloud access
-        # We test the command parsing but expect it might fail due to infrastructure
-        result = runner.invoke(app, ["delete-all-compute-pools", "test_product"])
-
-        # The command should parse correctly even if it fails due to missing infrastructure
-        print(result.stdout)
-        # We don't assert exit_code here since it depends on actual cloud connectivity
 
     def test_list_modified_files(self):
         runner = CliRunner()

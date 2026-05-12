@@ -11,7 +11,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from rich import print
 from shift_left.core.utils.app_config import get_config, shift_left_dir, validate_config as validate_config_impl
-from shift_left.core.compute_pool_mgr import get_compute_pool_list
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.project_manager as project_manager
@@ -25,6 +24,7 @@ from shift_left.core import table_analyzer
 from typing_extensions import Annotated
 from rich.console import Console
 from rich.table import Table
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 
 """
@@ -77,7 +77,7 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
         if not region:
-               region = get_config().get('confluent_cloud').get('region')
+               region = get_config().get('confluent_cloud').get('cloud_region')
         print("#" * 30 + f" List compute pools for environment {environment_id} - in region {region}")
         list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
@@ -228,10 +228,10 @@ def validate_config():
         """
         Validate the config.yaml file
         """
-        print(f"#" * 30 + f" Validate {os.getenv('CONFIG_FILE')}")
+        print(f"#" * 30 + f" Validate {os.getenv('SL_CONFIG_FILE')}")
         config = get_config()
         validate_config_impl(config)
-        print("Config.yaml validated")
+        print(f"{os.getenv('SL_CONFIG_FILE')} validated")
 
 @app.command()
 def report_table_cross_products():
@@ -249,6 +249,15 @@ def report_table_cross_products():
         else:
             print(f"No table cross products found")
 
+
+@app.command()
+def list_environments():
+        """
+        List the environments
+        """
+        print("#" * 30 + f" List environments")
+        result = ConfluentCloudClient(get_config()).get_environment_list()
+        print(result)
 
 @app.command()
 def list_tables_with_one_child():

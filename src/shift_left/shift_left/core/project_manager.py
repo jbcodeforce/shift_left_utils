@@ -577,7 +577,7 @@ def _add_important_files(project_folder: str):
     for file in ["common.mk"]:
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
         shutil.copyfile(template_path, os.path.join(project_folder, "pipelines", file))
-    template_path = importlib.resources.files("shift_left.core.templates").joinpath(".env_tmpl")
+    template_path = importlib.resources.files("shift_left.core.templates").joinpath("set_env_temp")
     shutil.copyfile(template_path, os.path.join(project_folder, "set_env"))
     # Update FLINK_PROJECT in .env file with project folder path
     env_file = os.path.join(project_folder, "set_env")

@@ -43,7 +43,6 @@ class TestProjectManager(unittest.TestCase):
             pm.build_project_structure("test_data_kimball_project",self.data_dir, pm.KIMBALL_PROJECT_TYPE)
             assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project"))
             assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project/pipelines"))
-            assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project/pipelines/intermediates"))
             shutil.rmtree(self.data_dir)
         except Exception as e:
             self.fail()

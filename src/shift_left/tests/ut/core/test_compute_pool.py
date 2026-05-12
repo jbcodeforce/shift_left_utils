@@ -20,9 +20,9 @@ from shift_left.core.models.flink_compute_pool_model import (
     ComputePoolResponse,
     ComputePoolList,
     ComputePoolInfo,
-    Metadata,
-    Spec,
-    Environment,
+    ComputePoolMetadata,
+    ComputePoolSpec,
+    ComputePoolEnvironment,
     Status,
     ComputePoolListResponse
 )
@@ -42,17 +42,18 @@ class TestComputePoolMgr(unittest.TestCase):
                     max_cfu=50,
                     region="us-west-2",
                     status_phase="PROVISIONED",
-                    current_cfu=1
+                    current_cfu=1,
+                    cloud="AWS"
                 )
-            compute_pool_list.pools.append(cpi)         
+            compute_pool_list.pools.append(cpi)
         return compute_pool_list
 
     def _pool_info_to_pool_response(self, pool_info: ComputePoolInfo) -> ComputePoolResponse:
         return ComputePoolResponse(
             id=pool_info.id,
-            spec={"display_name": pool_info.name, 
-                "max_cfu": pool_info.max_cfu, 
-                    "region": pool_info.region,
+            spec={"display_name": pool_info.name,
+                "max_cfu": pool_info.max_cfu,
+                "region": pool_info.region,
                 "environment": {"id": pool_info.env_id, "resource_name": "crn://confluent.cloud/organization=5xxx6/environment=env-xxx"}},
             status={"current_cfu": pool_info.current_cfu, "phase": pool_info.status_phase},
             metadata={},
@@ -122,23 +123,18 @@ class TestComputePoolMgr(unittest.TestCase):
         compute_pool.api_version = "fcpm/v2"
         compute_pool.id = "lfcp-3gw3go"
         compute_pool.kind = "ComputePool"
-        compute_pool.metadata = Metadata(
+        compute_pool.metadata = ComputePoolMetadata(
             created_at="2025-04-15T15:40:31.84352Z",
             resource_name="crn://confluent.cloud/organization=5..96/environment=env-xxx/flink-region=aws.us-west-2/compute-pool=lfcp-xxxx",
             self="https://api.confluent.cloud/fcpm/v2/compute-pools/lfcp-xxxx",
             updated_at="2025-04-15T15:53:32.133555Z"
         )
-        compute_pool.spec = Spec(
+        compute_pool.spec = ComputePoolSpec(
             cloud="AWS",
             display_name="dev-mv-config",
             enable_ai=False,
-            environment=Environment(
-                id="env-xxx",
-                related="https://api.confluent.cloud/fcpm/v2/compute-pools/lfcp-xxxx",
-                resource_name="crn://confluent.cloud/organization=5xxx-6/environment=env-xxx"
-            ),
             max_cfu=50,
-            region="us-west-2"
+
         )
         compute_pool.status = Status(
             current_cfu=1,
@@ -182,7 +178,7 @@ class TestComputePoolMgr(unittest.TestCase):
                 },
                 {
                     "api_version": "fcpm/v2",
-                    "id": "lfcp-xvrvmz", 
+                    "id": "lfcp-xvrvmz",
                     "kind": "ComputePool",
                     "metadata": {
                         "created_at": "2025-02-01T00:38:35.534374Z",
@@ -227,10 +223,10 @@ class TestComputePoolMgr(unittest.TestCase):
         compute_pool_list = self._get_compute_pool_list()
         mock_get_compute_pool_list.return_value = compute_pool_list
         self.assertEqual(len(compute_pool_list.pools), 40)
-        
+
         matching_pools = cpm.search_for_matching_compute_pools("mv-config-3")
         self.assertIsNotNone(matching_pools)
-        self.assertGreaterEqual(len(matching_pools), 1)            
+        self.assertGreaterEqual(len(matching_pools), 1)
         specific_pool = cpm.get_compute_pool_with_id(compute_pool_list, "lfcp-ab3")
         self.assertIsNotNone(specific_pool)
         self.assertEqual(specific_pool.id, "lfcp-ab3")
@@ -244,7 +240,7 @@ class TestComputePoolMgr(unittest.TestCase):
         mock_confluent_cloud_client.return_value = MagicMock()
         list_a = [self._pool_info_to_pool_response(pool) for pool in mock_compute_pool_list.pools]
         response = ComputePoolListResponse(data=list_a, kind="ComputePoolList", metadata={})
-        mock_confluent_cloud_client.return_value.get_compute_pool_list.return_value = response
+        mock_confluent_cloud_client.return_value.make_request.return_value = response
         cpm.reset_compute_list()
         cpm._save_compute_pool_list(mock_compute_pool_list)
         compute_pool_list = cpm.get_compute_pool_list()
@@ -252,7 +248,7 @@ class TestComputePoolMgr(unittest.TestCase):
         # set the cache to be expired
         mock_compute_pool_list.created_at = datetime(2025,4,15,15,20,0)
         cpm._save_compute_pool_list(mock_compute_pool_list)
-        cpm.reset_compute_list()    
+        cpm.reset_compute_list()
         compute_pool_list = cpm.get_compute_pool_list()
         self.assertEqual(len(compute_pool_list.pools), 3)
         self.assertNotEqual(mock_compute_pool_list.created_at,compute_pool_list.created_at)
@@ -263,13 +259,16 @@ class TestComputePoolMgr(unittest.TestCase):
         """Test delete compute pool."""
         mock_compute_pool_list = self._get_compute_pool_list(5)
         cpm._save_compute_pool_list(mock_compute_pool_list)
-
+        cpm.reset_compute_list()
         mock_confluent_cloud_client.return_value = MagicMock()
-        mock_confluent_cloud_client.return_value.delete_compute_pool.return_value = "Deleted"
+        mock_confluent_cloud_client.return_value.make_request.return_value = "Deleted"
         cpm.delete_compute_pool("lfcp-ab2")
+        mock_confluent_cloud_client.return_value.make_request.return_value = {}
         compute_pool_list = cpm.get_compute_pool_list()
         self.assertEqual(len(compute_pool_list.pools), 4)
-        self.assertIsNone(cpm.get_compute_pool_with_id(compute_pool_list, "lfcp-ab2"))
+        print(compute_pool_list.model_dump_json(indent=3))
+        for pool in compute_pool_list.pools:
+            assert pool.id in ["lfcp-ab0", "lfcp-ab1", "lfcp-ab3", "lfcp-ab4"]
 
     @patch('shift_left.core.compute_pool_mgr.ConfluentCloudClient')
     def test_create_compute_pool(self, mock_confluent_cloud_client) -> None:
@@ -278,9 +277,8 @@ class TestComputePoolMgr(unittest.TestCase):
         cpm._save_compute_pool_list(mock_compute_pool_list)
 
         mock_confluent_cloud_client.return_value = MagicMock()
-        result = {"id": "lfcp-ab8", "spec": {"display_name": "lfcp-ab8", "max_cfu": 50, "region": "us-west-2"}, "status": {"current_cfu": 0, "phase": "PROVISIONED"}}
-        mock_confluent_cloud_client.return_value.create_compute_pool.return_value = result
-        mock_confluent_cloud_client.return_value.get_compute_pool_info.return_value = result
+        result = {"id": "lfcp-ab8", "spec": {"display_name": "lfcp-ab8", "max_cfu": 50, "region": "us-west-2", "cloud": "AWS", "environment": {"id": "env-xxx"}}, "status": {"current_cfu": 0, "phase": "PROVISIONED"}}
+        mock_confluent_cloud_client.return_value.make_request.return_value = result
         cpm.create_compute_pool("lfcp-ab8")
         compute_pool_list = cpm.get_compute_pool_list()
         self.assertEqual(len(compute_pool_list.pools), 5)
@@ -298,7 +296,7 @@ class TestComputePoolMgr(unittest.TestCase):
         cpm.delete_all_compute_pools_of_product("mv")
         compute_pool_list = cpm.get_compute_pool_list()
         self.assertEqual(len(compute_pool_list.pools), 0)
-       
+
 
 
 if __name__ == '__main__':

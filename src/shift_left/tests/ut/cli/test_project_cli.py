@@ -21,9 +21,9 @@ if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
     os.environ.setdefault("SL_FLINK_API_KEY", "test")
     os.environ.setdefault("SL_FLINK_API_SECRET", "test")
     os.environ.setdefault("SL_CCLOUD_KAFKA_CLUSTER_ID", "lkc-test")
-    os.environ.setdefault("CLOUD_PROVIDER", "aws")
-    os.environ.setdefault("CLOUD_REGION", "us-west-2")
-    os.environ.setdefault("CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("SL_CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("SL_CLOUD_ORGANIZATION_ID", "id-org-test")
     os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
     os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
     os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")
@@ -79,8 +79,8 @@ class TestProjectCLI(unittest.TestCase):
             "confluent_cloud": {
                 "base_api": "https://api.confluent.cloud",
                 "environment_id": "env-123",
-                "region": "us-west-2",
-                "provider": "aws",
+                "cloud_region": "us-west-2",
+                "cloud_provider": "aws",
                 "organization_id": "org-123",
                 "service_account_id": "sa-123",
                 "api_key": "test_key",

@@ -212,6 +212,18 @@ wheels = [
 ]
 
 [[package]]
+name = "confluent-sql"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/80/f2482406c87fb325546c38cabca9bc32ee26a03bc41b58b3ac8aa0cd6b73/confluent_sql-0.3.0.tar.gz", hash = "sha256:9791ad7b66d43b2d4cbb8a13d4d45c4cb44e645818d051aa7a8d493a216974f7", size = 188089, upload-time = "2026-04-09T14:33:59.469Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/66/92/df5f3daa8eb7ca73a2ceb70baccf90c97e3fd12e70aa24a6f7fc52ef42b3/confluent_sql-0.3.0-py3-none-any.whl", hash = "sha256:e591a6f1433d2ac6650dc4835b429cf4a69048a31fcde12be6fd00e724eb662c", size = 73519, upload-time = "2026-04-09T14:33:58.363Z" },
+]
+
+[[package]]
 name = "contourpy"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1718,6 +1730,7 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "confluent-kafka" },
+    { name = "confluent-sql" },
     { name = "jinja2" },
     { name = "matplotlib" },
     { name = "mcp" },
@@ -1749,6 +1762,7 @@ requires-dist = [
     { name = "chromadb", marker = "extra == 'rag'", specifier = ">=0.4.0" },
     { name = "click", specifier = "<8.2.0" },
     { name = "confluent-kafka", specifier = ">=2.10.0" },
+    { name = "confluent-sql", specifier = "~=0.3.0" },
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "matplotlib", specifier = ">=3.10.1" },
     { name = "mcp", specifier = ">=1.16.0" },

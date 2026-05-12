@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "env": {
-                "CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
+                "SL_CONFIG_FILE": "${fileWorkspaceFolder}/src/shift_left/tests/config.yaml",
                 "PYTHONPATH": "${fileWorkspaceFolder}/src/shift_left:${fileWorkspaceFolder}/src/shift_left/tests"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
@@ -32,7 +32,7 @@
             "cwd": "${workspaceFolder}/src/shift_left",
             "justMyCode": false,
             "env": {
-                "CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config.yaml",
+                "SL_CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config.yaml",
                 "PYTHONPATH": "${workspaceFolder}/src/shift_left:${workspaceFolder}/src/shift_left/tests"
             },
             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
@@ -45,7 +45,7 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "preLaunchTask": "verify_env_file",
-            "envFile": "${workspaceFolder}/../flink_project_demos/customer_360/c360_flink_processing/.env",
+            "envFile": "${workspaceFolder}/src/shift_left/set_demo_env",
             "env": {
                 // Note: Variables from envFile are loaded first, then these override/add to them
                 // The Python script also loads .env at module level to ensure variables are available
@@ -54,6 +54,8 @@
 				"SL_LLM_MODEL" : "qwen3-coder-30b-a3b-instruct-mlx-4bit",
 				"SL_LLM_API_KEY" : "llm_test_key",
 				"SL_RAG_ENABLED" : "1",
+				"SL_CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
+				"SHIFT_LEFT_RUN_CLOUD_IT" : "1",
 				"SL_RAG_INDEX_PATH" : "${workspaceFolder}/../flink_project_demos/ksql_tutorial/rag_index"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"

@@ -15,12 +15,12 @@ from typer.testing import CliRunner
 from shift_left.cli import app
 
 
-import  shift_left.core.test_mgr as test_mgr 
+import  shift_left.core.test_mgr as test_mgr
 
 
 class IntegrationTestTestManager(unittest.TestCase):
-    
-    def _test_init_unit_tests(self):
+
+    def test_init_unit_tests(self):
         """
         Test creating tests files for a table using the init unit tests command
         """
@@ -45,8 +45,8 @@ class IntegrationTestTestManager(unittest.TestCase):
         table_name= "c360_dim_users"
         compute_pool_id = get_config()["flink"]["compute_pool_id"]
         test_case_name = "test_c360_dim_users_1"
-        result = test_mgr.execute_one_or_all_tests(table_name=table_name, 
-                                                test_case_name=test_case_name, 
+        result = test_mgr.execute_one_or_all_tests(table_name=table_name,
+                                                test_case_name=test_case_name,
                                                 compute_pool_id=compute_pool_id,
                                                 run_validation=False)
         assert result
@@ -55,8 +55,8 @@ class IntegrationTestTestManager(unittest.TestCase):
         assert len(result.foundation_statements) == 4  #( 3 DDLs + DML)
         test_result = result.test_results[test_case_name]
         assert test_result
-     
-        assert len(test_result.statements) == 2   # the inserts. 
+
+        assert len(test_result.statements) == 2   # the inserts.
         assert test_result.result == "insertion done"
 
 
@@ -91,8 +91,8 @@ class IntegrationTestTestManager(unittest.TestCase):
         config = get_config()
         table_name = "c360_dim_users"
         compute_pool_id = config["flink"]["compute_pool_id"]
-        test_mgr.delete_test_artifacts(table_name=table_name, 
+        test_mgr.delete_test_artifacts(table_name=table_name,
                                        compute_pool_id=compute_pool_id)
-        
+
 if __name__ == '__main__':
     unittest.main()
