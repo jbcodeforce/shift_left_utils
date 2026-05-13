@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS raw_groups (
+CREATE TABLE IF NOT EXISTS sl_raw_groups (
   group_id STRING,
   tenant_id STRING,
   group_name STRING,

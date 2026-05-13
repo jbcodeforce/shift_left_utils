@@ -1,6 +1,6 @@
 execute statement SET
 begin
-insert into raw_tenants (key, source, op, ts_ms, after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
      cast('tenant_id_001' as  bytes),  -- key
     ROW(
         'v1',                          -- version
@@ -19,7 +19,7 @@ insert into raw_tenants (key, source, op, ts_ms, after, before) values (
             tenant_created_at STRING,
             tenant_updated_at STRING>)  -- before
 );
-insert into raw_tenants (key, source, op, ts_ms,  after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms,  after, before) values (
      cast('tenant_id_002' as  bytes),  -- key
         ROW(
         'v1',                          -- version
@@ -38,7 +38,7 @@ insert into raw_tenants (key, source, op, ts_ms,  after, before) values (
             tenant_created_at STRING,
             tenant_updated_at STRING>)
 );
-insert into raw_tenants (key, source, op, ts_ms,  after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms,  after, before) values (
      cast('tenant_id_003' as  bytes),  -- key
         ROW(
         'v1',                          -- version
@@ -57,7 +57,7 @@ insert into raw_tenants (key, source, op, ts_ms,  after, before) values (
             tenant_created_at STRING,
             tenant_updated_at STRING>)  -- before
 );
-insert into raw_tenants (key, source, op, ts_ms, after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
      cast('tenant_id_002' as  bytes),  -- key
            ROW(
         'v1',                          -- version
@@ -72,7 +72,7 @@ insert into raw_tenants (key, source, op, ts_ms, after, before) values (
     ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:00.123', '2024-02-01T10:00:00.123')  -- beforeData
 );
 -- duplicate update
-insert into raw_tenants (key, source, op, ts_ms, after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
      cast('tenant_id_002' as  bytes),  -- key
            ROW(
         'v1',                          -- version
@@ -86,7 +86,7 @@ insert into raw_tenants (key, source, op, ts_ms, after, before) values (
     ROW('tenant_id_002', 'tenant_Bic', 'tenant of the company Bic', 'Active', '2024-02-01T10:00:00.123', '2024-03-02T10:00:00.123'),  -- data
     ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:00.123', '2024-02-01T10:00:00.123')  -- beforeData
 );
-insert into raw_tenants (key, source, op, ts_ms, after, before) values (
+insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
      cast('tenant_id_001' as  bytes),  -- key
     ROW(
         'v1',                          -- version

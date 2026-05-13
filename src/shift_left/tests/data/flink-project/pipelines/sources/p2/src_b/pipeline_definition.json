@@ -1,10 +1,10 @@
 {
-   "table_name": "sl_raw_groups",
-   "product_name": "c360",
-   "type": "seed",
-   "dml_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/dml.raw_groups.sql",
-   "ddl_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
-   "path": "pipelines/seeds/c360/raw_groups",
+   "table_name": "src_b",
+   "product_name": "p2",
+   "type": "source",
+   "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
+   "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
+   "path": "pipelines/sources/p2/src_b",
    "kafka_topic": null,
    "complexity": {
       "number_of_regular_joins": 0,
@@ -18,12 +18,12 @@
    "parents": [],
    "children": [
       {
-         "table_name": "sl_c360_src_groups",
-         "product_name": "c360",
-         "type": "source",
-         "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
-         "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-         "path": "pipelines/sources/c360/src_groups",
+         "table_name": "b",
+         "product_name": "p2",
+         "type": "intermediate",
+         "dml_ref": "pipelines/intermediates/p2/b/sql-scripts/dml.b.sql",
+         "ddl_ref": "pipelines/intermediates/p2/b/sql-scripts/ddl.b.sql",
+         "path": "pipelines/intermediates/p2/b",
          "kafka_topic": null,
          "complexity": {
             "number_of_regular_joins": 0,

@@ -1,7 +1,7 @@
 -- Insert test groups into raw_groups table
 -- These groups correspond to the group_id values used in the users table
 
-INSERT INTO raw_groups (group_id, tenant_id, group_name, group_type, created_date, is_active) VALUES
+INSERT INTO sl_raw_groups (group_id, tenant_id, group_name, group_type, created_date, is_active) VALUES
 -- Group 1: Administrator group
 ('admin', 'tenant_id_001', 'Administrators', 'system', '2023-01-01', true),
 

@@ -1,4 +1,4 @@
-create table if not exists raw_users (
+create table if not exists sl_raw_users (
     user_id STRING,
     user_name STRING,
     user_email STRING,

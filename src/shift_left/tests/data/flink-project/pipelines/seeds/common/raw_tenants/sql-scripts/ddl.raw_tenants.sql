@@ -1,4 +1,4 @@
-create table if not exists raw_tenants (
+create table if not exists sl_raw_tenants (
      `key` bytes,
      `source` ROW<
         version STRING,

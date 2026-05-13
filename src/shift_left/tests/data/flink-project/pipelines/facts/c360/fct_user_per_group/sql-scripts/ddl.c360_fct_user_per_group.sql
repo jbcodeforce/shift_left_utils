@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS fct_user_per_group (
+CREATE TABLE IF NOT EXISTS sl_c360_fct_user_per_group (
   group_id STRING NOT NULL,
   group_name STRING,
   group_type STRING,

@@ -1,5 +1,5 @@
-INSERT INTO c360_dim_groups
-SELECT 
+INSERT INTO sl_c360_dim_groups
+SELECT
   group_id,
   tenant_id,
   group_name,
@@ -8,6 +8,6 @@ SELECT
   created_date,
   is_active,
   updated_at
-FROM src_c360_groups g
-join src_common_tenant tenant
-on g.tenant_id = tenant.tenant_id
+FROM sl_c360_src_groups g
+join sl_cmn_src_tenants tenant
+on g.tenant_id = sl_tenant.tenant_id

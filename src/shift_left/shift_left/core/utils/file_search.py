@@ -233,6 +233,7 @@ def get_or_build_inventory(
                     with open(ddl_file_name, "r") as f:
                         ddl_sql_content = f.read()
                         table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
+                    dml_file_name = "" # no dml file for pure DDL file like CTAS or fakers
 
                 product_name = extract_product_name(table_folder)
                 ref = FlinkTableReference.model_validate({

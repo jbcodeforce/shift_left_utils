@@ -1,10 +1,10 @@
 {
-   "table_name": "sl_raw_groups",
+   "table_name": "sl_raw_users",
    "product_name": "c360",
    "type": "seed",
-   "dml_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/dml.raw_groups.sql",
-   "ddl_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
-   "path": "pipelines/seeds/c360/raw_groups",
+   "dml_ref": "pipelines/seeds/c360/raw_users/sql-scripts/dml.raw_users.sql",
+   "ddl_ref": "pipelines/seeds/c360/raw_users/sql-scripts/ddl.raw_users.sql",
+   "path": "pipelines/seeds/c360/raw_users",
    "kafka_topic": null,
    "complexity": {
       "number_of_regular_joins": 0,
@@ -18,12 +18,12 @@
    "parents": [],
    "children": [
       {
-         "table_name": "sl_c360_src_groups",
+         "table_name": "sl_c360_src_users",
          "product_name": "c360",
          "type": "source",
-         "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
-         "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-         "path": "pipelines/sources/c360/src_groups",
+         "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
+         "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360_users.sql",
+         "path": "pipelines/sources/c360/src_users",
          "kafka_topic": null,
          "complexity": {
             "number_of_regular_joins": 0,
