@@ -11,7 +11,7 @@ def isolate_pipelines(tmp_path_factory):
 
     - Copy test pipelines into a unique temp dir
     - Point PIPELINES to that dir
-    - Ensure CONFIG_FILE is set
+    - Ensure SL_CONFIG_FILE is set
     - Reset caches and (re)build inventory and pipeline definitions
     """
     here = Path(__file__).resolve()
@@ -28,11 +28,11 @@ def isolate_pipelines(tmp_path_factory):
 
     # Set environment for the code under test (manage env manually due to module scope)
     prev_pipelines = os.environ.get("PIPELINES")
-    prev_config = os.environ.get("CONFIG_FILE")
+    prev_config = os.environ.get("SL_CONFIG_FILE")
     os.environ["PIPELINES"] = str(tmp_pipelines)
     default_config = tests_root / "config.yaml"
     if default_config.exists():
-        os.environ["CONFIG_FILE"] = str(default_config)
+        os.environ["SL_CONFIG_FILE"] = str(default_config)
 
     # Import after env is set so modules pick up correct settings
     from shift_left.core.utils.app_config import reset_all_caches
@@ -58,7 +58,7 @@ def isolate_pipelines(tmp_path_factory):
         else:
             os.environ["PIPELINES"] = prev_pipelines
         if prev_config is None:
-            os.environ.pop("CONFIG_FILE", None)
+            os.environ.pop("SL_CONFIG_FILE", None)
         else:
-            os.environ["CONFIG_FILE"] = prev_config
+            os.environ["SL_CONFIG_FILE"] = prev_config
 

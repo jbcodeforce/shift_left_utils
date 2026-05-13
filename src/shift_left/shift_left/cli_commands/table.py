@@ -30,14 +30,16 @@ Manage the table entities.
 app = create_secure_typer_app(pretty_exceptions_show_locals=False)
 
 @app.command()
-def init(table_name: Annotated[str, typer.Argument(help="Table name to build")],
-         table_path: Annotated[str, typer.Argument(help="Folder Path in which the table folder structure will be created.")],
+def init(table_name: Annotated[str, typer.Argument(help="Table name to build")]= "test_table_1",
+         table_path: Annotated[str, typer.Argument(help="Folder Path in which the table folder structure will be created from $PIPELINES folder.")]= "sources",
          product_name: str = typer.Option(default=None, help="Product name to use for the table. If not provided, it will use the table_path last folder as product name")):
     """
     Build a new table structure under the specified path. For example to add a source table structure use for example the command:
     `shift_left table init src_table_1 $PIPELINES/sources/p1`
     """
     print("#" * 30 + f" Build Table in {table_path}")
+    if not table_path.startswith(os.getenv("PIPELINES")):
+        table_path = os.path.join(os.getenv("PIPELINES"), table_path)
     table_folder, table_name= table_mgr.build_folder_structure_for_table(table_name, table_path, product_name)
     print(f"Created folder {table_folder} for the table {table_name}")
 

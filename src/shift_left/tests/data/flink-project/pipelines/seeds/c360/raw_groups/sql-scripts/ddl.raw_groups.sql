@@ -8,8 +8,6 @@ CREATE TABLE IF NOT EXISTS raw_groups (
 ) DISTRIBUTED BY HASH(group_id) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'append',
-  'key.avro-registry.schema-context' = '.flink-dev',
-  'value.avro-registry.schema-context' = '.flink-dev',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',

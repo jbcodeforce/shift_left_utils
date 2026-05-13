@@ -5,7 +5,7 @@ INSERT INTO raw_groups (group_id, tenant_id, group_name, group_type, created_dat
 -- Group 1: Administrator group
 ('admin', 'tenant_id_001', 'Administrators', 'system', '2023-01-01', true),
 
--- Group 2: Regular user group  
+-- Group 2: Regular user group
 ('user', 'tenant_id_001', 'Regular Users', 'standard', '2023-01-01', true),
 
 -- Group 3: Manager group

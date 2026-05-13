@@ -1,11 +1,11 @@
 create table if not exists raw_tenants (
      `key` bytes,
      `source` ROW<
-        version STRING,                   
-        name STRING,     
-        server_id INT,   
-        db STRING,      
-        `table` STRING,    
+        version STRING,
+        name STRING,
+        server_id INT,
+        db STRING,
+        `table` STRING,
         snapshot BOOLEAN
     >,
     op STRING,

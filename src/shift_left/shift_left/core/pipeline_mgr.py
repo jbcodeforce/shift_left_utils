@@ -289,6 +289,26 @@ def _process_table_for_integration_test(table_def: FlinkTablePipelineDefinition,
             _process_table_for_integration_test(parent, where_to_save_test_files)
 
 
+def _assess_state_and_complexity(dml_file_name: str,
+    ddl_file_name: str,) -> Tuple[str, FlinkStatementComplexity, str, str]:
+    ddl_sql_content = ""
+    dml_sql_content = ""
+    if  ddl_file_name:
+        if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
+            ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
+        with open(ddl_file_name) as f:
+            ddl_sql_content = f.read()
+
+    if dml_file_name:
+        if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
+            dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
+        with open(dml_file_name) as f:
+            dml_sql_content = f.read()
+    parser = SQLparser()
+    state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
+    complexity = parser.extract_statement_complexity(dml_sql_content,state_form)
+    return state_form, complexity, ddl_sql_content, dml_sql_content
+
 def _build_pipeline_definitions_from_sql_content(
     dml_file_name: str,
     ddl_file_name: str,
@@ -310,25 +330,11 @@ def _build_pipeline_definitions_from_sql_content(
         ddl_sql_content = ""
         referenced_table_names = set()
         parser = SQLparser()
-        current_table_name = None
-        complexity = FlinkStatementComplexity()
-        if dml_file_name:
-            if dml_file_name.startswith(PIPELINE_FOLDER_NAME):
-                dml_file_name = os.path.join(os.getenv("PIPELINES"), "..", dml_file_name)
-            with open(dml_file_name) as f:
-                dml_sql_content = f.read()
-            current_table_name = parser.extract_table_name_from_insert_into_statement(dml_sql_content)
-            referenced_table_names = parser.extract_table_references(dml_sql_content)
-
-        if  not current_table_name and ddl_file_name:
-            if ddl_file_name.startswith(PIPELINE_FOLDER_NAME):
-                ddl_file_name = os.path.join(os.getenv("PIPELINES"), "..", ddl_file_name)
-            with open(ddl_file_name) as f:
-                ddl_sql_content = f.read()
-            current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
+        current_table_name = ""
+        state_form, complexity, ddl_sql_content, dml_sql_content = _assess_state_and_complexity(dml_file_name, ddl_file_name)
+        current_table_name = parser.extract_table_name_from_create_statement(ddl_sql_content)
+        referenced_table_names = parser.extract_table_references(dml_sql_content)
         dependencies = set()
-        state_form = parser.extract_upgrade_mode(dml_sql_content, ddl_sql_content)
-        complexity = parser.extract_statement_complexity(dml_sql_content,state_form)
         if referenced_table_names:
             if current_table_name in referenced_table_names:
                 referenced_table_names.remove(current_table_name)
@@ -344,18 +350,7 @@ def _build_pipeline_definitions_from_sql_content(
                 else:
                     table_ref = FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
-                dep_complexity = FlinkStatementComplexity(state_form=state_form)
-                if table_ref.dml_ref and table_ref.dml_ref.startswith(PIPELINE_FOLDER_NAME):
-                    table_dml_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.dml_ref)
-                    _dml_sql_content=""
-                    _ddl_sql_content=""
-                    with open(table_dml_ref, "r") as g:
-                        _dml_sql_content = g.read()
-                    table_ddl_ref = os.path.join(os.getenv("PIPELINES"), "..", table_ref.ddl_ref)
-                    with open(table_ddl_ref, "r") as g:
-                        _ddl_sql_content = g.read()
-                    dependent_state_form = parser.extract_upgrade_mode(_dml_sql_content, _ddl_sql_content)
-                    dep_complexity = parser.extract_statement_complexity(_dml_sql_content, dependent_state_form)
+                dependent_state_form, dep_complexity, dep_ddl_sql_content, dep_dml_sql_content = _assess_state_and_complexity(table_ref.dml_ref, table_ref.ddl_ref)
                 logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}")
                 bpd = _build_pipeline_definition(
                     table_name,
@@ -387,7 +382,8 @@ def _process_table_folder_build_pipeline_def(parent_folder_path, pipeline_path, 
                 if file_path.is_file() and file_path.name.startswith("dml") and not file_path.name.endswith(".properties"):
                     logger.debug(f"Process the dml {file_path}")
                     dml_file_name = str(file_path.resolve())
-                if file_path.is_file() and file_path.name.startswith("ddl") and not file_path.name.endswith(".properties"):
+                # THE FOLLOWING IS A HACK TO AVOID PROCESSING THE DLQ FILES -> need to design a better solution
+                if file_path.is_file() and file_path.name.startswith("ddl") and not "dlq" in file_path.name and not file_path.name.endswith(".properties"):
                     ddl_file_name = str(file_path.resolve())
             count += 1
             build_pipeline_definition_from_ddl_dml_content(dml_file_name, ddl_file_name, pipeline_path)

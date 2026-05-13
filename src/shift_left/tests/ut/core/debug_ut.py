@@ -111,5 +111,14 @@ class TestDebugUnitTests(BaseUT):
         result = assess_unused_tables(inventory_path, include_topics=False)
         print(result)
 
+    def test_build_pipeline_definition_from_ddl_dml_content(self):
+        path= os.getenv("PIPELINES")
+        dml_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql"
+        ddl_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql"
+        os.remove(path + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME)
+        result = pipeline_mgr.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
+        assert result
+        print(result.model_dump_json(indent=3))
+
 if __name__ == '__main__':
     unittest.main()

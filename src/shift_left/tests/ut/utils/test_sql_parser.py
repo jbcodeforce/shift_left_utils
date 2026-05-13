@@ -1529,5 +1529,32 @@ WHERE row_num = 1
         self.assertEqual(shipment_edges[0]["source_table"], "src_sdp_shipments")
         self.assertEqual(shipment_edges[0]["source_column"], "shipment_id")
 
+    def test__extract_table_definition_from_ddl_with_intermediate_parenthesis(self):
+        parser = SQLparser()
+        ddl = """
+       CREATE TABLE IF NOT EXISTS some_table_ut (
+            col1             STRING NOT NULL,
+            col2             STRING,
+            col3             TIMESTAMP_LTZ(3),
+            col4             STRING NOT NULL,
+            PRIMARY KEY(col1) NOT ENFORCED
+            ) DISTRIBUTED BY HASH(col1) INTO 6 BUCKETS WITH (
+            'changelog.mode' = 'upsert',
+            'kafka.cleanup-policy' = 'delete',
+            'kafka.producer.compression.type' = 'snappy',
+            'kafka.retention.time' = '0',
+            'key.avro-registry.schema-context' = '.flink-dev',
+            'key.format' = 'avro-registry',
+            'scan.bounded.mode' = 'unbounded',
+            'scan.startup.mode' = 'earliest-offset',
+            'value.avro-registry.schema-context' = '.flink-dev',
+            'value.fields-include' = 'all',
+            'value.format' = 'avro-registry'
+        )
+        """
+        table_definition = parser._extract_create_table_columns_section(ddl)
+        assert("col3             TIMESTAMP_LTZ(3)" in table_definition)
+        assert("PRIMARY KEY(col1) NOT ENFORCED" in table_definition)
+
 if __name__ == '__main__':
     unittest.main()

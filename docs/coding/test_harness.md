@@ -2,16 +2,17 @@
 
 ???- info "Version"
     Created March 21 - 2025 
-    Updated Sept 24 -2025
+    Updated May - 2026
 
-The goals of this chapter is to present the requirements, design and how to use the shift_left test harness commands for Flink statement validation in the context of Confluent Cloud Flink. The tool is packaged as a command in the `shift-left` CLI.
+The goals of this chapter is to present the requirements, design and how to use the shift_left test harness commands for Flink statement validation in the context of Confluent Cloud Flink. The tool is packaged as a set of commands in the `shift-left` CLI.
 
 ```sh
 shift_left table --help
 
-# three features are available:
+# four features are available:
 init-unit-tests   Initialize the unit test folder and template files for a given table. It will parse the SQL statements to create the insert statements for the unit tests. It is using the table inventory to find the table folder for the given table name.
 run-unit-tests    Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+run-validation-tests         Run only the validation tests (1 to n validation tests) for a given table.  
 delete-unit-tests      Delete the Flink statements and kafka topics used for unit tests for a given table.
 ```
 
@@ -23,7 +24,7 @@ We should differentiate two types of testing: Flink statement developer's tests,
 
 The objectives of a test harness for developers and system testers, is to validate the quality of a new Flink SQL statement deployed on Confluent Cloud for Flink and therefore address the following needs:
 
-1. be able to deploy a unique flink statement under test (the ones we want to focus on are DMLs, or CTAS)
+1. be able to deploy a unique flink statement under test (the ones we want to focus on are DML, or CTAS statements)
 1. be able to generate test data from the table definition and DML script content - with the developers being able to tune generated test data for each test cases.
 1. produce synthetic test data for the n source tables using SQL insert statements or via csv files.
 
@@ -40,7 +41,7 @@ The objectives of a test harness for developers and system testers, is to valida
   SELECT CASE WHEN count(*)=1 THEN 'PASS' ELSE 'FAIL' END from result_table;
   ```
 
-1. the flow of defining input data and validation scripts is a test case. The following Yaml definition, define one test with input and output SQL references:
+1. the flow of defining input data and validation scripts is a test case. The following Yaml definition, defines one test with input and output SQL references:
   ```yaml
   - name: test_p5_dim_event_element_1
     inputs:
@@ -76,8 +77,8 @@ The following diagram illustrates the global infrastructure deployment context:
 
 * One the left, the developer's computer is used to run the test harness tool and send Flink statements to Confluent Cloud environment/ compute pool using the REST API. The Flink API key and secrets are used. 
 * The Flink statement under test is the same as the one going to production, except the tool may change the name of the source tables to use the specified postfix. The postfix is defined in the config.yaml file as `app.post_fix_unit_test` parameter.
-* The green cylenders represent Kafka Topics which are mapped to Flink source and sink tables. They are defined specifically by the tool.
-* As any tables created view Flink on Confluent Cloud have schema defined in schema registry, then schema context is used to avoid conflict within the same cluster. 
+* The green cylenders represent Kafka Topics which are mapped to Flink source and sink table of the statement under test. They are defined specifically by the tool.
+* As any tables created in Confluent Cloud for Flink have schema defined in schema registry, then schema context is used to avoid conflict within the same cluster. 
 
 The following diagram illustrates the target unit testing environment:
 
@@ -103,15 +104,13 @@ The following diagram illustrates the target unit testing environment:
       ON  u.tenant_id = g.tenant_id and u.group_id = g.group_id
   ```
 
-* Verify the ddl and dml files for the selected table are defined under `sql-scripts`, verify the table inventory exists and is up-to-date, if not run `shift_left table build-inventory $PIPELINES`
+* Verify the ddl and dml files for the selected table are defined under `sql-scripts` folder, then verify the table inventory exists and is up-to-date, if not run `shift_left table build-inventory $PIPELINES`
 * Initialize the test code by running the following command: Do not create a lot of test cases upfront, you can add more tests later.
   ```sh
   shift_left table init-unit-tests <table_name> --nb-test-cases 1 
   # example with the user_role (using the naming convention)
   shift_left table init-unit-tests c360_dim_users --nb-test-cases 1
   ```
-
-  To make it simple, it is recommended to define only one test case.
 
 * For each input table, of the dml under test, there will be ddl and dml script files created with the numbered postfix to match the unit test, it supports. For example for the test case with id = 1 the name of the sql is:  `insert_c360_dim_groups_1.sql`) for inserting records to the table `c360_dim_groups`.  For each of those input tables, a foundation ddl is created to create the table with "_ut" postfix, this is used for test isolation: `ddl_c360_dim_groups.sql`, `ddl_src_c360_users.sql`
   ```sh
@@ -162,6 +161,8 @@ The two test cases use different approaches to define the data: SQL and CSV file
 * Data engineers **update the content** of the insert statements and **the validation statements** to reflect business requirements. Once done, try unit testing with the command:
   ```sh
   shift_left table  run-unit-tests <table_name> --test-case-name test_<table_name>_1 
+  # for example
+
   ```
 
 A test execution may take some time as it performs the following steps:
@@ -234,6 +235,16 @@ The second test case created by the `shift_left table init-unit-tests ` command 
 In the future it could direcly write to a Kafka topics that are the input tables for the dml under test.
 
 Data engineers may use the csv format to create a lot of records. Now the challenge will be to define the validation SQL script, but this is another story.
+
+### Updating after schema changes
+
+Sometime source tables got their schema modified this will impact the ddl and dml scripts used for testing. An upstream schema change is typically adding a new field. Whenever this occurs, somebody has to decide whether this is a column that needs to be propagated through various pipelines.
+
+The two extremes are:
+
+1. Simple new column that doesn't have to be propagated. Action: update all test ddls for this table to add the field and do nothing else
+1. New column that we do want to propagate. Action do #1 above and update any downstream tables/statements and their test suites.
+
 
 ### Unit Test Harness FAQ
 

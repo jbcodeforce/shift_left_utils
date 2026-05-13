@@ -128,6 +128,9 @@ class SQLparser:
         has_stateful_operation = False
 
         for line in lines:
+            if has_stateful_operation:
+                break
+
             # Normalize the current line
             normalized_line = self._normalize_sql(line)
 

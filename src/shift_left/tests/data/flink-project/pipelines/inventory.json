@@ -40,7 +40,7 @@
         "product_name": "c360",
         "type": "dimension",
         "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_users.sql",
-        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users_dlq.sql",
+        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users.sql",
         "table_folder_name": "pipelines/dimensions/c360/dim_users",
         "kafka_topic": null
     },
@@ -152,6 +152,15 @@
         "table_folder_name": "pipelines/facts/p1/fct_order",
         "kafka_topic": null
     },
+    "raw_groups": {
+        "table_name": "raw_groups",
+        "product_name": "c360",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/dml.raw_groups.sql",
+        "ddl_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
+        "table_folder_name": "pipelines/seeds/c360/raw_groups",
+        "kafka_topic": null
+    },
     "raw_users": {
         "table_name": "raw_users",
         "product_name": "c360",
@@ -193,7 +202,7 @@
         "product_name": "c360",
         "type": "source",
         "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
-        "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360users.sql",
+        "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360_users.sql",
         "table_folder_name": "pipelines/sources/c360/src_users",
         "kafka_topic": null
     },

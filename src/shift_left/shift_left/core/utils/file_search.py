@@ -382,7 +382,7 @@ def get_ddl_dml_from_folder(root, dir) -> Tuple[str, str]:
     dml_file_name = None
     base_scripts=os.path.join(root, dir)
     for file in os.listdir(base_scripts):
-        if file.startswith("ddl.") and not file.endswith('.properties') :
+        if file.startswith("ddl.") and not "dlq" in file and not file.endswith('.properties') :
             ddl_file_name=os.path.join(base_scripts,file)
         if file.startswith('dml.') and not file.endswith('.properties'):
             dml_file_name=os.path.join(base_scripts,file)
