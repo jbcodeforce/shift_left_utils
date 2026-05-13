@@ -6,7 +6,7 @@ unit test confluent client methods not need integration with confluent cloud.
 import os
 from base64 import b64encode
 import pathlib
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 

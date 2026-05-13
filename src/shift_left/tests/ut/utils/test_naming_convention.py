@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import pathlib
 import os
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.naming_convention import DmlNameModifier, ComputePoolNameModifier
 from shift_left.core.models.flink_statement_model import FlinkStatementNode
 

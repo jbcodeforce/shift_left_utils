@@ -9,7 +9,7 @@ import os
 import shutil
 from unittest.mock import ANY
 from shift_left.core.utils.app_config import get_config
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent / "data/flink-project/pipelines")
 from typer.testing import CliRunner
 from shift_left.cli import app

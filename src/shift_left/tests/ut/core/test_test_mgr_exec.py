@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch, ANY
 
 _TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault("SL_CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
 os.environ.setdefault("PIPELINES", str(_TESTS_ROOT / "data/flink-project/pipelines"))
 # Dummy credentials so get_config()/validate_config succeed when running pytest without sourcing set_test_env.
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):

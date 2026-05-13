@@ -9,7 +9,7 @@ import os, pathlib
 import tempfile
 from typing import List
 
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
 os.environ["PIPELINES"] =  str(pathlib.Path(__file__).parent.parent /  "data/flink-project/pipelines")
 
 # need to be before the import of migrate_one_file

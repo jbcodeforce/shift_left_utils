@@ -10,7 +10,7 @@ import pytest
 import pathlib
 from datetime import datetime
 import json
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config-ccloud.yaml")
 os.environ["PIPELINES"] =  str(pathlib.Path(__file__).parent.parent.parent /  "data/flink-project/pipelines")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import build_inventory

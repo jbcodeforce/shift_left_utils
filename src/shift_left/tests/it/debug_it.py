@@ -80,13 +80,13 @@ if not _env_loaded:
 # Debug: Print key environment variables to verify they're loaded
 if __name__ == '__main__' or True:  # Always print when debugging
     print("\n=== Environment Variables at Module Load ===")
-    key_vars = ['FLINK_PROJECT', 'CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
+    key_vars = ['FLINK_PROJECT', 'SL_CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
     for var in key_vars:
         value = os.environ.get(var, 'NOT SET')
         print(f"{var}: {value}")
     print("=" * 50 + "\n")
 
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
+#os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 #data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
 #os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 #os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
@@ -117,7 +117,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         env = get_env_for_cli()
 
         # Verify key environment variables are set
-        key_vars = ['FLINK_PROJECT', 'CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
+        key_vars = ['FLINK_PROJECT', 'SL_CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
         print("\n=== Environment Variables Check ===")
         for var in key_vars:
             value = env.get(var, 'NOT SET')

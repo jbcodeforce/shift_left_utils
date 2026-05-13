@@ -11,7 +11,7 @@ from unittest.mock import patch, mock_open, MagicMock, call
 from datetime import datetime, timezone, timedelta
 import subprocess
 TEST_PIPELINES_DIR = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 from shift_left.core.utils.app_config import get_config
 import shift_left.core.project_manager as pm

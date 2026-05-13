@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
 
 _TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault("SL_CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
 # Dummy credentials so get_config()/validate_config succeed when pytest imports CLI modules
 # (integration_test_mgr and others call get_config() at import time).
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):

@@ -12,7 +12,7 @@ from shift_left.core.utils.file_search import (
     get_or_build_inventory
 )
 # Set up environment variables before importing the module under test
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+#os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.integration_test_mgr import (
@@ -136,8 +136,8 @@ WITH (
     def test_init_integration_tests_no_project_path_or_env(self):
         """Test error when no project path provided and no PIPELINES env var."""
         with patch.dict(os.environ, {}, clear=True):
-            # Restore CONFIG_FILE for the test
-            os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+            # Restore SL_CONFIG_FILE for the test
+            os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
             
             with self.assertRaises(ValueError) as context:
                 init_integration_tests(self.test_sink_table)

@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import os
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm

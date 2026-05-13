@@ -6,7 +6,7 @@ import unittest
 from typer.testing import CliRunner
 import os
 from pathlib import Path
-os.environ["CONFIG_FILE"] = str(Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import shift_left_dir, get_config
 from shift_left.cli import app
 from shift_left.core.utils.file_search import INVENTORY_FILE_NAME, PIPELINE_JSON_FILE_NAME

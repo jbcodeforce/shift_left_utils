@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 import pathlib
 
-os.environ["CONFIG_FILE"] =   str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] =   str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 import shift_left.core.table_mgr as table_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr

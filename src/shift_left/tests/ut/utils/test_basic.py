@@ -12,7 +12,7 @@ import shift_left.core.table_mgr as table_mgr
 import shift_left.core.pipeline_mgr as pipeline_mgr
 from shift_left.core.utils.file_search import from_pipeline_to_absolute
 import pathlib
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.table_worker import ReplaceEnvInSqlContent
 import json

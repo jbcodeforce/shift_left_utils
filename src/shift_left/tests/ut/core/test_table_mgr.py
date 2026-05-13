@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import os
 import pathlib
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 import shift_left.core.table_mgr as tm

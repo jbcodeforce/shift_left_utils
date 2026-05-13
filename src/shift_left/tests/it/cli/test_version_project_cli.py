@@ -8,7 +8,7 @@ import shutil
 import tempfile
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.project import app
 import subprocess

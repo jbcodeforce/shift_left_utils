@@ -5,7 +5,7 @@ import unittest
 import pathlib
 from typing import Tuple
 import os
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config.yaml")
       
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.table_worker import TableWorker

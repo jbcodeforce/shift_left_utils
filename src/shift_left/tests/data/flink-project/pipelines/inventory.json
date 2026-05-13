@@ -161,6 +161,15 @@
         "table_folder_name": "pipelines/seeds/c360/raw_groups",
         "kafka_topic": null
     },
+    "raw_tenants": {
+        "table_name": "raw_tenants",
+        "product_name": "common",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/dml.raw_tenants.sql",
+        "ddl_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/ddl.raw_tenants.sql",
+        "table_folder_name": "pipelines/seeds/common/raw_tenants",
+        "kafka_topic": null
+    },
     "raw_users": {
         "table_name": "raw_users",
         "product_name": "c360",

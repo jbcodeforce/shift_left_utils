@@ -11,9 +11,7 @@ _IT_DIR = Path(__file__).resolve().parent
 _TESTS_ROOT = _IT_DIR.parent
 
 _default_cfg = str(_TESTS_ROOT / "config.yaml")
-os.environ.setdefault("CONFIG_FILE", _default_cfg)
-# Prefer SL_CONFIG_FILE when set (e.g. after: source set_demo_env); else align with CONFIG_FILE.
-os.environ.setdefault("SL_CONFIG_FILE", os.environ.get("CONFIG_FILE", _default_cfg))
+os.environ.setdefault("SL_CONFIG_FILE", _default_cfg)
 os.environ.setdefault("PIPELINES", str(_TESTS_ROOT / "data" / "flink-project" / "pipelines"))
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
     os.environ.setdefault("SL_KAFKA_API_KEY", "test")

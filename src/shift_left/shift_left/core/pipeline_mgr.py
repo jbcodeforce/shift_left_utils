@@ -43,7 +43,7 @@ from shift_left.core.utils.file_search import (
 ERROR_TABLE_NAME = "error_table"
 # When true (1/true/yes), SQL references missing from inventory are modeled as external_kafka parents.
 # Avoids calling get_config() here (validation can exit in partial test / CI environments).
-_SYNTHETIC_EXTERNAL_KAFKA_ENV = "SHIFT_LEFT_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA"
+_SYNTHETIC_EXTERNAL_KAFKA_ENV = "SL_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA"
 # Global queues for processing
 files_to_process: deque = deque()  # Files to process when parsing SQL dependencies
 node_to_process: deque = deque()   # Nodes to process in pipeline hierarchy
@@ -151,7 +151,7 @@ def pipeline_definition_from_external_ref(table_ref: FlinkTableReference) -> Fli
 
 
 def _synthetic_external_kafka_table_ref(table_name: str) -> FlinkTableReference:
-    """Inventory-shaped ref when SHIFT_LEFT_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA is set (1/true/yes)."""
+    """Inventory-shaped ref when SL_KEEP_UNKNOWN_SQL_REFS_AS_EXTERNAL_KAFKA is set (1/true/yes)."""
     folder = f"{PIPELINE_FOLDER_NAME}/seeds/{table_name}"
     return FlinkTableReference.model_validate(
         {
@@ -161,7 +161,7 @@ def _synthetic_external_kafka_table_ref(table_name: str) -> FlinkTableReference:
             "ddl_ref": "",
             "dml_ref": "",
             "table_folder_name": folder,
-            "kafka_topic": None,
+            "kafka_topic": table_name,
         }
     )
 
@@ -189,10 +189,9 @@ def build_pipeline_definition_from_ddl_dml_content(
         dml_file_name: Path to DML file for root table
         pipeline_path: Root pipeline folder path
 
-    Returns: FlinkTablePipelineDefinition
+    Returns:
         FlinkTablePipelineDefinition for the table and its dependencies
     """
-    #dml_file_name = from_absolute_to_pipeline(dml_file_name)
     table_inventory = get_or_build_inventory(pipeline_path, pipeline_path, False)
 
     table_name, parent_references, complexity = _build_pipeline_definitions_from_sql_content(dml_file_name, ddl_file_name, table_inventory)
@@ -350,7 +349,7 @@ def _build_pipeline_definitions_from_sql_content(
                 else:
                     table_ref = FlinkTableReference.model_validate(table_ref_dict)
                 dependent_state_form = state_form
-                dependent_state_form, dep_complexity, dep_ddl_sql_content, dep_dml_sql_content = _assess_state_and_complexity(table_ref.dml_ref, table_ref.ddl_ref)
+                dependent_state_form, dep_complexity, _, _ = _assess_state_and_complexity(table_ref.dml_ref, table_ref.ddl_ref)
                 logger.debug(f"{current_table_name} - depends on: {table_name} which is : {dependent_state_form}")
                 bpd = _build_pipeline_definition(
                     table_name,

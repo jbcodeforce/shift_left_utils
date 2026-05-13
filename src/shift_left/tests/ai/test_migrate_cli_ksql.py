@@ -19,7 +19,7 @@ class TestKsqlMigration(unittest.TestCase):
         data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
         os.environ["SRC_FOLDER"] = str(data_dir / "ksql-project/sources")
         os.environ["STAGING"] = str(data_dir / "flink-project/staging/ut")
-        os.environ["CONFIG_FILE"] =  str(data_dir / "config-ccloud.yaml")
+        os.environ["SL_CONFIG_FILE"] =  str(data_dir / "config-ccloud.yaml")
 
     def test_migrate_basic_table(self):
         runner = CliRunner()

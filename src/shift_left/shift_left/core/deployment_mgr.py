@@ -1007,7 +1007,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     # get the list of compute pools available that match the table name
     pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
     # If we don't have any matching compute pool, we need to find a pool to use
-    if  not pools or len(pools) == 0:
+    if  len(pools) == 0:
         logger.info(f"No matching compute pool found for {node.table_name}")
         # assess user's parameter for compute pool id
         if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):

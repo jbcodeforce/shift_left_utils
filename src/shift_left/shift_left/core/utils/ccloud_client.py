@@ -39,29 +39,29 @@ class ConfluentCloudClient:
         self.cluster_id=cluster_info["cluster_id"]
         self.base_url=cluster_info["base_url"]
 
-    def get_ccloud_auth(self):
+    def get_ccloud_auth(self) ->str:
         api_key = os.getenv("SL_CONFLUENT_CLOUD_API_KEY") or self.config["confluent_cloud"]["api_key"]
         api_secret = os.getenv("SL_CONFLUENT_CLOUD_API_SECRET") or self.config["confluent_cloud"]["api_secret"]
         self.cloud_api_endpoint = BASE_CC_API
         return  self._generate_auth_header(api_key, api_secret)
 
-    def _get_kafka_auth(self):
+    def _get_kafka_auth(self) -> str:
         api_key = os.getenv("SL_KAFKA_API_KEY") or self.config["kafka"]["api_key"]
         api_secret = os.getenv("SL_KAFKA_API_SECRET") or self.config["kafka"]["api_secret"]
         return self._generate_auth_header(api_key, api_secret)
 
-    def _get_flink_auth(self):
+    def _get_flink_auth(self) -> str:
         api_key = os.getenv("SL_FLINK_API_KEY") or self.config["flink"]["api_key"]
         api_secret = os.getenv("SL_FLINK_API_SECRET") or self.config["flink"]["api_secret"]
         return self._generate_auth_header(api_key, api_secret)
 
-    def _generate_auth_header(self, api_key, api_secret):
+    def _generate_auth_header(self, api_key, api_secret) -> str:
         """Generate the Basic Auth header using API key and secret"""
         credentials = f"{api_key}:{api_secret}"
         encoded_credentials = b64encode(credentials.encode('utf-8')).decode('utf-8')
         return f"Basic {encoded_credentials}"
 
-    def make_request(self, method, url, auth_header=None, data=None) -> str:
+    def make_request(self, method, url, auth_header=None, data=None):
         """Make HTTP request to Confluent Cloud API.
         When data is provided, the body is serialized explicitly as JSON (utf-8)
         so that statement strings containing quotes are never broken by

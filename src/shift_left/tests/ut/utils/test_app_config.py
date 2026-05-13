@@ -469,7 +469,7 @@ class TestValidateConfig(unittest.TestCase):
         with patch('builtins.print') as mock_print, patch('builtins.exit') as mock_exit:
             validate_config(bad_config)
             # Should have both errors and warnings - expect 2 calls
-            assert mock_print.call_count >= 40
+            assert mock_print.call_count >= 2
 
             # Extract messages using helper method
             error_message, warning_message, all_print_calls = self.extract_messages_from_mock_print(mock_print)
@@ -591,7 +591,7 @@ class TestValidateConfig(unittest.TestCase):
     def test_overide_priority(self):
         """Test that the priority order is correct"""
         # Ensure we're using the correct config file (fix for uv run pytest env differences)
-        os.environ["CONFIG_FILE"] = expected_config_file
+        os.environ["SL_CONFIG_FILE"] = expected_config_file
         reset_config_cache()
 
         # environment variables before config file

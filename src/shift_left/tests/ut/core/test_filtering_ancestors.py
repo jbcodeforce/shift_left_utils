@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List
 
 # Set up environment for testing
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.deployment_mgr import _filtering_out_descendant_nodes, FlinkStatementNode

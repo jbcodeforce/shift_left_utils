@@ -12,7 +12,7 @@ import pathlib
 from typing import List, Dict, Any
 from unittest.mock import patch, MagicMock
 # Order of the following code is important to make the tests working
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 module_path = "./utils"
 sys.path.append(os.path.abspath(module_path))
 

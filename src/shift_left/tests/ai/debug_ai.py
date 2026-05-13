@@ -6,7 +6,7 @@ import pathlib
 import json
 
 data_dir=os.path.join(os.path.dirname(__file__),'..','data')
-os.environ["CONFIG_FILE"] =  os.path.dirname(__file__) + "/../config-ccloud.yaml"
+os.environ["SL_CONFIG_FILE"] =  os.path.dirname(__file__) + "/../config-ccloud.yaml"
 
 from shift_left.core.utils.app_config import get_config
 from typer.testing import CliRunner

@@ -163,7 +163,8 @@ def is_pool_valid(compute_pool_id) -> bool:
         ratio = get_pool_usage_from_pool_info(pool)
         logger.info(f"Validate the {pool} exists and  {ratio} % resources")
         if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
-            raise Exception(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
+            logger.error(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
+            return False
         return  pool.status_phase == "PROVISIONED"
     else:
         return False

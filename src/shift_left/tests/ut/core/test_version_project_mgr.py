@@ -15,7 +15,7 @@ import subprocess
 from shift_left.core.utils.file_search import FlinkTablePipelineDefinition
 data_dir = str(Path(__file__).parent.parent.parent / "data")  # Path to the data directory
 TEST_PIPELINES_DIR = data_dir + "/tmp"
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 
 import shift_left.core.project_manager as pm

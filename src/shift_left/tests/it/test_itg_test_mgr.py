@@ -14,7 +14,7 @@ from shift_left.core.utils.file_search import (
     from_pipeline_to_absolute,
 )
 # Set up environment variables before importing the module under test
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+#os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.integration_test_mgr import (

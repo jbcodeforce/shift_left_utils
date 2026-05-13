@@ -11,7 +11,7 @@ from datetime import datetime
 import pathlib
 
 # Set environment variables before importing
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.deployment_mgr import prepare_tables_from_sql_file
