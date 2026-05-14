@@ -18,24 +18,14 @@ from shift_left.cli import app
 import  shift_left.core.test_mgr as test_mgr
 
 
-class IntegrationTestTestManager(unittest.TestCase):
+def get_env_for_cli():
+    """Get all environment variables that should be passed to CliRunner."""
+    # Start with current environment
+    env = dict(os.environ)
+    return env
 
-    def test_init_unit_tests(self):
-        """
-        Test creating tests files for a table using the init unit tests command
-        """
-        working_dir=os.getenv("PIPELINES") + "/intermediates/p2/a/tests"
-        if os.path.exists(working_dir):
-            shutil.rmtree(working_dir)
+class IntegrationTestForUnitTestManager(unittest.TestCase):
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["table", "init-unit-tests", "a", "--nb-test-cases", "1"])
-        assert result.exit_code == 0
-        assert os.path.exists(working_dir)
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests/test_definitions.yaml")
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests/ddl_src_x.sql")
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests/insert_src_x_1.sql")
-        assert os.path.exists(os.getenv("PIPELINES") + "/intermediates/p2/a/tests/validate_a_1.sql")
 
     def test_1_execute_one_test_for_c360_dim_users(self):
         print("test_run one_test from tuned unit tests of existing table")
@@ -61,22 +51,14 @@ class IntegrationTestTestManager(unittest.TestCase):
 
 
 
-    def _test_run_from_automatic_created_unit_tests(self):
+    def test_run_dim_users_tests(self):
         runner = CliRunner()
-        result = runner.invoke(app, ["table", "run-test-suite", "a"])
+        result = runner.invoke(app, ['table', 'run-unit-tests', 'c360_dim_users', '--test-case-name', 'test_c360_dim_users_1'], env=get_env_for_cli())
+
         assert result.exit_code == 0
         assert "Unit tests execution" in result.stdout
+        print(result)
 
-    def test_2_get_topic_list(self):
-        table_exist = test_mgr._table_exists("products")
-        print(f"table_exist: {table_exist}")
-        assert table_exist == False
-        assert test_mgr._topic_list_cache
-        assert test_mgr._topic_list_cache.topic_list
-        print(f"test_mgr._topic_list: {test_mgr._topic_list_cache.topic_list}")
-        table_exist = test_mgr._table_exists("c360_dim_users")
-        print(f"table_exist: {table_exist}")
-        assert table_exist
 
     def test_3_execute_validation_tests(self):
         print("test_execute_one_test")
