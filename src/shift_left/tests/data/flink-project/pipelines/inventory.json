@@ -40,7 +40,7 @@
         "product_name": "c360",
         "type": "dimension",
         "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_users.sql",
-        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users_dlq.sql",
+        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users.sql",
         "table_folder_name": "pipelines/dimensions/c360/dim_users",
         "kafka_topic": null
     },

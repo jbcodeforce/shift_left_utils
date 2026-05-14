@@ -1,5 +1,3 @@
-EXECUTE STATEMENT SET
-BEGIN
 INSERT INTO c360_dim_users
 with valid_users as (
   SELECT * FROM src_c360_users
@@ -18,18 +16,6 @@ with valid_users as (
     u.is_active
   FROM valid_users u
   LEFT JOIN c360_dim_groups g
-  ON  u.tenant_id = g.tenant_id and u.group_id = g.group_id;
-INSERT INTO c360_dim_user_dql
-SELECT
-  user_id,
-  user_name,
-  user_email,
-  group_id,
-  tenant_id,
-  tenant_name,
-  group_name,
-  group_type,
-  created_date,
-  is_active
-FROM c360_dim_users where user_id is NULL or tenant_id is NULL or group_id is NULL;
-END;
+  ON  u.tenant_id = g.tenant_id and u.group_id = g.group_id
+  where g.tenant_id is not null and g.group_id is not null;
+

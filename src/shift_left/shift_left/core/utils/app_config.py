@@ -24,7 +24,7 @@ ENV_VAR_MAPPING = {
     "kafka.api_secret": "SL_KAFKA_API_SECRET",
     "kafka.sasl.username": "SL_KAFKA_API_KEY",
     "kafka.sasl.password": "SL_KAFKA_API_SECRET",
-    "kafka.cluster_id": "SL_CCLOUD_KAFKA_CLUSTER_ID",
+    "kafka.cluster_id": "SL_KAFKA_CLUSTER_ID",
 
     # Confluent Cloud API credentials
     "confluent_cloud.api_key": "SL_CONFLUENT_CLOUD_API_KEY",

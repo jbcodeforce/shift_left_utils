@@ -195,11 +195,16 @@ def get_statement_info(statement_name: str) -> None | StatementInfo:
 
 
 def get_statement_results(statement_name: str)-> StatementResult:
+        """
+        Get the statement results from the CC API taking into account the pagination via next page token
+        """
         client = ConfluentCloudClient(get_config())
         url, auth_header = client.build_flink_url_and_auth_header()
         try:
             next_page_token = None
             previous_step = None
+            data = None
+            saved_resp = None
             while True:
                 if next_page_token and previous_step != next_page_token:
                     logger.info(f"Get next page token: {next_page_token} for {statement_name}")
@@ -208,13 +213,19 @@ def get_statement_results(statement_name: str)-> StatementResult:
                     logger.info(f"Get results from {url}/statements/{statement_name}/results")
                     resp=client.make_request(method="GET", url=f"{url}/statements/{statement_name}/results", auth_header=auth_header)
                 logger.info(f"response: {resp} same tokens: {previous_step == next_page_token}")
+                if (resp and resp.get("results") and resp.get("results").get("data")):
+                    data = resp.get("results").get("data")
+                    saved_resp = resp
                 if (resp and "metadata" in resp and "next" in resp["metadata"] and resp["metadata"]["next"]):
                     previous_step = next_page_token
                     next_page_token = resp["metadata"]["next"]
+                    if previous_step == next_page_token:
+                        logger.info(f"Same token and Data received for {statement_name}: data: {data}")
+                        break
                 else:
-                    logger.info(f"Data received for {statement_name}: data: {resp.get("results").get("data")}")
+                    logger.info(f"Data received for {statement_name}: data: {data}")
                     break
-            return StatementResult(**resp)
+            return StatementResult(**saved_resp)
         except Exception as e:
             logger.error(f"Error executing GET statement call for {statement_name}: {e}")
             return None
