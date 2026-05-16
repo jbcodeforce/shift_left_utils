@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS sl_cmn_src_tenants (
   PRIMARY KEY(tenant_id) NOT ENFORCED
 ) DISTRIBUTED BY HASH(tenant_id) INTO 1 BUCKETS
 WITH (
-  'changelog.mode' = 'append',
+  'changelog.mode' = 'upsert',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',

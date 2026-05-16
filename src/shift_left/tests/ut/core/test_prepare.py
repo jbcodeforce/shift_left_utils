@@ -89,15 +89,14 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         ]
         mock_get_transformer.return_value = mock_transformer
 
-        # Mock file content
+        # Mock file content (full read; comments stripped before line split)
         sql_lines = [
             "CREATE TABLE test_table (id INT);\n",
             "ALTER TABLE test_table ADD COLUMN name STRING;\n",
             "-- This is a comment\n",
             "DROP TABLE old_table;\n"
         ]
-        mock_file_open.return_value.readlines = MagicMock(return_value=sql_lines)
-        mock_file_open.return_value.__iter__ = MagicMock(return_value=iter(sql_lines))
+        mock_file_open.return_value.read.return_value = "".join(sql_lines)
 
         # Mock statements that complete immediately
         completed_statement = self._create_mock_statement_with_status("COMPLETED")
@@ -168,8 +167,7 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         mock_transformer.update_sql_content.return_value = ("", "CREATE TABLE test (id INT);")
         mock_get_transformer.return_value = mock_transformer
 
-        sql_lines = ["CREATE TABLE test (id INT);\n"]
-        mock_file_open.return_value.__iter__ = MagicMock(return_value=iter(sql_lines))
+        mock_file_open.return_value.read.return_value = "CREATE TABLE test (id INT);\n"
 
         # Mock statement that starts running, then completes
         pending_statement = self._create_mock_statement_with_status("PENDING")
@@ -226,8 +224,7 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         mock_transformer.update_sql_content.return_value = ("", "INVALID SQL STATEMENT;")
         mock_get_transformer.return_value = mock_transformer
 
-        sql_lines = ["INVALID SQL STATEMENT;\n"]
-        mock_file_open.return_value.__iter__ = MagicMock(return_value=iter(sql_lines))
+        mock_file_open.return_value.read.return_value = "INVALID SQL STATEMENT;\n"
 
         # Mock statement that fails
         failed_statement = self._create_mock_statement_with_status("FAILED")
@@ -264,9 +261,7 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         mock_transformer = MagicMock()
         mock_get_transformer.return_value = mock_transformer
 
-        # Empty file
-        sql_lines = []
-        mock_file_open.return_value.__iter__ = MagicMock(return_value=iter(sql_lines))
+        mock_file_open.return_value.read.return_value = ""
 
         # Execute the function
         prepare_tables_from_sql_file("test.sql", COMPUTE_POOL_ID)
@@ -310,20 +305,19 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         mock_transformer = MagicMock()
         mock_transformer.update_sql_content.side_effect = [
             ("", "CREATE TABLE table1 (id INT);"),
-            ("", ""),  # Empty line produces empty SQL
-            ("", "CREATE TABLE table2 (name STRING);")
+            ("", "CREATE TABLE table2 (name STRING);"),
         ]
         mock_get_transformer.return_value = mock_transformer
 
-        # Mixed content: SQL, comment, empty line, SQL, comment
-        sql_lines = [
-            "CREATE TABLE table1 (id INT);\n",
-            "-- Comment about table1\n",
-            "\n",  # Empty line
-            "CREATE TABLE table2 (name STRING);\n",
+        # Mixed content: SQL, comment, empty line, SQL, trailing comment line
+        sql_text = (
+            "CREATE TABLE table1 (id INT);\n"
+            "-- Comment about table1\n"
+            "\n"
+            "CREATE TABLE table2 (name STRING);\n"
             "   -- Another comment\n"
-        ]
-        mock_file_open.return_value.__iter__ = MagicMock(return_value=iter(sql_lines))
+        )
+        mock_file_open.return_value.read.return_value = sql_text
 
         completed_statement = self._create_mock_statement_with_status("COMPLETED")
         mock_post_statement.return_value = completed_statement
@@ -331,13 +325,9 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         # Execute the function
         prepare_tables_from_sql_file("test.sql", COMPUTE_POOL_ID)
 
-        # Should process 3 lines: 2 SQL statements + 1 empty line
-        # (empty line will be passed to transformer but comments are skipped)
-        self.assertEqual(mock_transformer.update_sql_content.call_count, 3)
-
-        # Should post 3 statements (including empty SQL from empty line)
-        # The function posts whatever the transformer returns, even if it's empty
-        self.assertEqual(mock_post_statement.call_count, 3)
+        # Comments removed file-wide; blank lines skipped: two statements only
+        self.assertEqual(mock_transformer.update_sql_content.call_count, 2)
+        self.assertEqual(mock_post_statement.call_count, 2)
 
     @patch('shift_left.core.deployment_mgr.get_config')
     def test_prepare_tables_no_compute_pool_config(self, mock_get_config):

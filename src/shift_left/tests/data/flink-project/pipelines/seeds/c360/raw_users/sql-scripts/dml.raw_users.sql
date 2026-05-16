@@ -36,4 +36,14 @@ INSERT INTO sl_raw_users (user_id, user_name, user_email, group_id, tenant_id, c
 ('user_009', 'Ivy Anderson', 'ivy.anderson@example.com', 'developer', 'tenant_id_001', '2023-09-30', true),
 
 -- User 10: QA role
-('user_010', 'Jack Thomas', 'jack.thomas@example.com', 'qa', 'tenant_id_001', '2023-10-15', false);
+('user_010', 'Jack Thomas', 'jack.thomas@example.com', 'qa', 'tenant_id_001', '2023-10-15', false),
+('user_011', 'Katherine White', 'katherine.white@example.com', 'qa', 'tenant_id_002', '2024-01-15', true),
+('user_012', 'Liam Brown', 'liam.brown@example.com', 'qa', 'tenant_id_003', '2024-02-20', false),
+('user_013', 'Mia Green', 'mia.green@example.com', 'qa', 'tenant_id_001', '2024-03-25', true),
+('user_014', 'Noah Hall', 'noah.hall@example.com', 'qa', 'tenant_id_002', '2024-04-30', false),
+('user_015', 'Olivia Johnson', 'olivia.johnson@example.com', 'qa', 'tenant_id_003', '2024-05-05', true),
+('user_016', 'Paul Smith', 'paul.smith@example.com', 'qa', 'tenant_id_001', '2024-06-10', false),
+('user_017', 'Quincy Williams', 'quincy.williams@example.com', 'qa', 'tenant_id_002', '2024-07-15', true),
+('user_018', 'Rose Davis', 'rose.davis@example.com', 'qa', 'tenant_id_003', '2024-08-20', false),
+('user_019', 'Samuel Wilson', 'samuel.wilson@example.com', 'qa', 'tenant_id_001', '2024-09-25', true),
+('user_020', 'Taylor Brown', 'taylor.brown@example.com', 'qa', 'tenant_id_002', '2024-10-30', false);

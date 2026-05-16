@@ -24,13 +24,12 @@ from shift_left.core.models.flink_statement_model import (
     StatementInfo,
     Status,
     Spec,
-    Metadata
+    Metadata,
 )
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode
 )
 
-from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from ut.core.BaseUT import BaseUT
 
 class TestDeploymentManager(BaseUT):
@@ -725,7 +724,6 @@ class TestDeploymentManager(BaseUT):
         self.assertIsInstance(result, str)
         self.assertIn("Full pipeline delete from product test_product", result)
         self.assertIn("Failed to process table1: Connection failed", result)
-
 
 
 if __name__ == '__main__':

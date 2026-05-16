@@ -10,8 +10,8 @@ insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
         'tenants',
         true),
     'c',
-    to_timestamp('2024-01-01T10:00:00.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
-    ROW('tenant_id_001', 'tenant_A', 'tenant of the company A', 'Active', '2024-01-01T10:00:00.123', '2024-01-01T10:00:00.123'),  -- after
+    to_timestamp('2024-01-01T10:00:01.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
+    ROW('tenant_id_001', 'tenant_A', 'tenant of the company A', 'Active', '2024-01-01T10:00:01.123', '2024-01-01T10:00:01.123'),  -- after
     CAST(NULL AS ROW<tenant_id STRING,
             tenant_name STRING,
             tenant_description STRING,
@@ -29,8 +29,8 @@ insert into sl_raw_tenants (key, source, op, ts_ms,  after, before) values (
         'tenants',
         false),
     'c',
-    to_timestamp('2024-01-01T10:00:00.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
-    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:00.123', '2024-02-01T10:00:00.123'),  -- data
+    to_timestamp('2024-01-01T10:00:02.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
+    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:02.123', '2024-02-01T10:00:02.123'),  -- data
     CAST(NULL AS ROW<tenant_id STRING,
             tenant_name STRING,
             tenant_description STRING,
@@ -48,8 +48,8 @@ insert into sl_raw_tenants (key, source, op, ts_ms,  after, before) values (
         'tenants',
         false),
     'c',
-    to_timestamp('2024-01-01T10:00:00.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
-    ROW('tenant_id_003', 'tenant_C', 'tenant of the company C', 'Active', '2024-03-01T10:00:00.123', '2024-03-01T10:00:00.123'),  -- data
+    to_timestamp('2024-01-01T10:00:03.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
+    ROW('tenant_id_003', 'tenant_C', 'tenant of the company C', 'Active', '2024-03-01T10:00:03.123', '2024-03-01T10:00:03.123'),  -- data
     CAST(NULL AS ROW<tenant_id STRING,
             tenant_name STRING,
             tenant_description STRING,
@@ -67,9 +67,9 @@ insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
         'tenants',
         false),
     'u',
-    to_timestamp('2024-03-02T10:00:00.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
-    ROW('tenant_id_002', 'tenant_Bic', 'tenant of the company Bic', 'Active', '2024-02-01T10:00:00.123', '2024-03-02T10:00:00.123'),  -- data
-    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:00.123', '2024-02-01T10:00:00.123')  -- beforeData
+    to_timestamp('2024-03-02T11:00:02.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
+    ROW('tenant_id_002', 'tenant_Bic', 'tenant of the company Bic', 'Active', '2024-02-01T11:00:02.123', '2024-03-02T11:00:02.123'),  -- data
+    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:02.123', '2024-02-01T10:00:02.123')  -- beforeData
 );
 -- duplicate update
 insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
@@ -82,12 +82,12 @@ insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
         'tenants',
         false),
     'u',
-    to_timestamp('2024-03-02T10:00:00.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
-    ROW('tenant_id_002', 'tenant_Bic', 'tenant of the company Bic', 'Active', '2024-02-01T10:00:00.123', '2024-03-02T10:00:00.123'),  -- data
-    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:00.123', '2024-02-01T10:00:00.123')  -- beforeData
+    to_timestamp('2024-03-02T11:00:02.123','yyyy-MM-dd''T''HH:mm:ss.SSS'),
+    ROW('tenant_id_002', 'tenant_Bic', 'tenant of the company Bic', 'Active', '2024-02-01T11:00:02.123', '2024-03-02T11:00:02.123'),  -- data
+    ROW('tenant_id_002', 'tenant_B', 'tenant of the company B', 'Active', '2024-02-01T10:00:02.123', '2024-02-01T10:00:02.123')  -- beforeData
 );
 insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
-     cast('tenant_id_001' as  bytes),  -- key
+     cast('tenant_id_003' as  bytes),  -- key
     ROW(
         'v1',                          -- version
         'app_1',                      -- name
@@ -103,7 +103,7 @@ insert into sl_raw_tenants (key, source, op, ts_ms, after, before) values (
             tenant_status STRING,
             tenant_created_at STRING,
             tenant_updated_at STRING>),  -- after
-     ROW('tenant_id_001', 'tenant_A', 'tenant of the company A', 'Active', '2024-01-01T10:00:00.123', '2024-01-01T10:00:00.123') -- beore
+     ROW('tenant_id_003', 'tenant_C', 'tenant of the company C', 'Active', '2024-03-01T10:00:03.123', '2024-03-01T10:00:03.123') -- before
 
 );
 

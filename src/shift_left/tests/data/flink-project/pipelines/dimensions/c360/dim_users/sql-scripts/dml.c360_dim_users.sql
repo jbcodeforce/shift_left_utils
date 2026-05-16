@@ -18,5 +18,5 @@ with valid_users as (
   FROM valid_users u
   LEFT JOIN sl_c360_dim_groups g
   ON  u.tenant_id = g.tenant_id and u.group_id = g.group_id
-  WHERE g.tenant_id is not null and g.group_id is not null;
+  WHERE g.tenant_id is not null and u.group_id is not null;
 

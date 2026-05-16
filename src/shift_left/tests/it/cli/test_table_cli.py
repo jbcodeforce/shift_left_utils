@@ -26,7 +26,7 @@ _DEFAULT_SRC = _TESTS_ROOT / "data" / "spark-project"
 _DEFAULT_STAGING = _TESTS_ROOT / "data" / "flink-project" / "staging"
 
 # True after `source set_demo_env` (export added there)
-_DEMO_IT = os.environ.get("SHIFT_LEFT_IT_USE_DEMO_ENV", "").lower() in ("1", "true", "yes")
+_DEMO_IT = os.environ.get("SL_IT_USE_DEMO_ENV", "").lower() in ("1", "true", "yes")
 
 
 class TestTableCLI(unittest.TestCase):
@@ -84,7 +84,7 @@ class TestTableCLI(unittest.TestCase):
         mk = os.path.join(pl, "sources", "p2", "src_a", "Makefile")
         self.assertTrue(os.path.exists(mk), f"Expected Makefile at {mk}")
 
-    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SL_IT_USE_DEMO_ENV=1)")
     def test_migrate_command(self):
         """migrate uses the AI stack; run only with demo env."""
         runner = CliRunner()
@@ -146,13 +146,13 @@ class TestTableCLI(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         self.assertIn("Done: processed:", result.stdout)
 
-    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SL_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_table_name(self):
         runner = CliRunner()
         result = runner.invoke(app, ["explain", "--table-name", "p1_fct_order"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
-    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SL_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_product_name(self):
         runner = CliRunner()
         result = runner.invoke(app, ["explain", "--product-name", "p1"])
@@ -164,7 +164,7 @@ class TestTableCLI(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Error: table or dir needs to be provided", result.stdout)
 
-    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SHIFT_LEFT_IT_USE_DEMO_ENV=1)")
+    @unittest.skipUnless(_DEMO_IT, "Requires: source set_demo_env (sets SL_IT_USE_DEMO_ENV=1)")
     def test_explain_command_with_table_list_file(self):
         runner = CliRunner()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:

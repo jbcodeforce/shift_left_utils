@@ -107,6 +107,15 @@
         "table_folder_name": "pipelines/intermediates/p1/int_test",
         "kafka_topic": null
     },
+    "orphan": {
+        "table_name": "orphan",
+        "product_name": "common",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/common/orphan/sql-scripts/dml.orphan.sql",
+        "ddl_ref": "pipelines/seeds/common/orphan/sql-scripts/ddl.orphan.sql",
+        "table_folder_name": "pipelines/seeds/common/orphan",
+        "kafka_topic": null
+    },
     "p": {
         "table_name": "p",
         "product_name": "p2",

@@ -9,7 +9,7 @@ SELECT
   to_timestamp(coalesce(if(op = 'd', before.tenant_updated_at, after.tenant_updated_at), '2025-09-10T12:00:00.000'), 'yyyy-MM-dd''T''HH:mm:ss.SSS') as tenant_updated_at,
   op,
   ts_ms
-FROM sl_raw_tenants where not (before is null and after is null)
+FROM sl_raw_tenants
 ),
 final as (select *
         FROM  (select *,  ROW_NUMBER() OVER (
@@ -26,4 +26,4 @@ SELECT
     tenant_status,
     tenant_created_at,
     tenant_updated_at
-FROM final;
+FROM final WHERE op <> 'd';

@@ -244,10 +244,10 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 
     The Flink, and Confluent Cloud api keys and secrets are different.
 
-* Set the CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
+* Set the SL_CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
 
 ```sh
-export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
+export SL_CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
 ```
 
 * **Install shift_left Tool**:

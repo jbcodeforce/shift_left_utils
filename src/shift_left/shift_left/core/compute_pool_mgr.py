@@ -114,10 +114,12 @@ def search_for_matching_compute_pools(table_name: str) -> List[ComputePoolInfo]:
     return matching_pools
 
 def get_compute_pool_with_id(compute_pool_list: ComputePoolList, compute_pool_id: str) -> ComputePoolInfo:
-    for pool in compute_pool_list.pools:
-        if pool.id == compute_pool_id:
-            return pool
-    return get_compute_pool(compute_pool_id)
+    if compute_pool_id:
+        for pool in compute_pool_list.pools:
+            if pool.id == compute_pool_id:
+                return pool
+        return get_compute_pool(compute_pool_id)
+    return None
 
 def get_compute_pool(id: str) -> ComputePoolInfo:
     client = ConfluentCloudClient(get_config())
@@ -161,7 +163,7 @@ def is_pool_valid(compute_pool_id) -> bool:
     pool = get_compute_pool_with_id(compute_pool_list,compute_pool_id)
     if pool:
         ratio = get_pool_usage_from_pool_info(pool)
-        logger.info(f"Validate the {pool} exists and  {ratio} % resources")
+        logger.info(f"Validate the {pool} exists and uses {ratio} % resources")
         if ratio >= config['flink'].get('max_cfu_percent_before_allocation', .7):
             logger.error(f"The CFU usage at {ratio} % is too high for {compute_pool_id}")
             return False

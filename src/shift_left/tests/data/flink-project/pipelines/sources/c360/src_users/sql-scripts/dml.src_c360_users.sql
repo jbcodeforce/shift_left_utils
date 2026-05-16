@@ -30,7 +30,6 @@ WITH deduplicated_users AS (
   WHERE
     user_id IS NOT NULL  -- Ensure we have valid user_id
     AND user_email IS NOT NULL  -- Ensure we have valid email
-    AND is_active
 )
 SELECT
   user_id,

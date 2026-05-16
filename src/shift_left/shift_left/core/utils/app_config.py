@@ -1,6 +1,8 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+import copy
+import json
 import yaml
 import os
 from functools import lru_cache
@@ -368,6 +370,52 @@ def get_config() -> dict[str,dict[str,str]]:
           validate_config(_config, minimal=True)
 
   return _config
+
+
+_DEBUG_SENSITIVE_KEY_MARKERS = (
+    "secret",
+    "password",
+    "api_key",
+    "api_secret",
+    "token",
+    "authorization",
+    "bearer",
+)
+
+
+def _is_sensitive_config_key(key: str) -> bool:
+    k = key.lower()
+    return any(marker in k for marker in _DEBUG_SENSITIVE_KEY_MARKERS)
+
+
+def _redact_config_for_debug(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            sk = str(k)
+            if _is_sensitive_config_key(sk):
+                if isinstance(v, str):
+                    out[sk] = v[:5] + "*****MASKED*****"
+                else:
+                    out[sk] = "***MASKED***"
+
+            else:
+                out[sk] = _redact_config_for_debug(v)
+        return out
+    if isinstance(obj, list):
+        return [_redact_config_for_debug(i) for i in obj]
+    return obj
+
+
+def format_config_for_debug(indent: int = 2) -> str:
+    """
+    Return a JSON string of the effective ``get_config()`` with sensitive values
+    replaced by ``***MASKED***`` (key-name heuristic). For support / IT debugging only.
+    """
+    config_path = os.getenv("SL_CONFIG_FILE", os.getenv("CONFIG_FILE", "./config.yaml"))
+    redacted = _redact_config_for_debug(copy.deepcopy(get_config()))
+    body = json.dumps(redacted, indent=indent, default=str)
+    return f"CONFIG_FILE (effective): {config_path}\n{body}"
 
 
 def reset_config_cache():

@@ -175,6 +175,14 @@ def wait_until_statement_not_pending_via_driver(
             raise Exception(err.model_dump_json(indent=3))
 
 
+def _operational_error_detail(exc: OperationalError) -> str:
+    """Stable user-facing text for confluent-sql OperationalError (message + HTTP code when set)."""
+    msg = str(exc)
+    if exc.http_status_code is not None:
+        return f"{msg} (HTTP {exc.http_status_code})"
+    return msg
+
+
 def _submit_inner(
     conn,
     config: dict,
@@ -286,13 +294,18 @@ def submit_flink_statement(
                 except OperationalError as e2:
                     return StatementError(
                         errors=[
-                            ErrorData(id=statement_name, status="FAILED", detail=str(e2)),
+                            ErrorData(
+                                id=statement_name,
+                                status="FAILED",
+                                detail=_operational_error_detail(e2),
+                            ),
                         ],
                     )
 
-            logger.error(f"OperationalError submitting {statement_name}: {e}")
+            detail = _operational_error_detail(e)
+            logger.error(f"OperationalError submitting {statement_name}: {detail}")
             return StatementError(
-                errors=[ErrorData(id=statement_name, status="FAILED", detail=str(e))],
+                errors=[ErrorData(id=statement_name, status="FAILED", detail=detail)],
             )
         except Exception as e:
             logger.error(f"Error submitting statement {statement_name}: {e}")

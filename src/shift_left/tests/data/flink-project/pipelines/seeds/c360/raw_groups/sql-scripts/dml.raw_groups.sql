@@ -20,4 +20,7 @@ INSERT INTO sl_raw_groups (group_id, tenant_id, group_name, group_type, created_
 -- Group 5: Developer group
 ('developer', 'tenant_id_001', 'Developers', 'technical', '2023-01-15', true),
 ('analyst', 'tenant_id_001', 'Analysts', 'technical', '2023-01-15', true),
-('admin', 'tenant_id_002', 'Administrators', 'system', '2023-02-01', true);
+('admin', 'tenant_id_002', 'Administrators', 'system', '2023-02-01', true),
+('qa', 'tenant_id_001', 'QA Team', 'technical', '2023-02-01', true),
+('qa', 'tenant_id_002', 'QA Team', 'technical', '2024-02-01', true),
+('qa', 'tenant_id_003', 'QA Team', 'technical', '2024-02-01', true);

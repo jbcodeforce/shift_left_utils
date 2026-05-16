@@ -98,6 +98,7 @@ def _process_results(statement_result: StatementResult, result: int) -> int:
         result = previous_result
     return result
 
+
 def get_pending_records(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
     """
     Get the pending records for a statement using the REST API metrics endpoint.
@@ -107,12 +108,22 @@ def get_pending_records(compute_pool_ids: list[str], from_date: str) -> dict[str
 
 
 def get_num_records_out(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
+    """
+    return a dictionary with the statement name as the key and the metric value as the value.
+    """
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_out", from_date)
 
 def get_num_records_in(compute_pool_ids: list[str], from_date: str) -> dict[str,int]:
+    """
+    return a dictionary with the statement name as the key and the metric value as the value.
+    """
     return _get_int_metric(compute_pool_ids, "io.confluent.flink/num_records_in", from_date)
 
 def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: str) -> dict[str,int]:
+    """
+    Get the metrics for each compute pool in the list.
+    return a dictionary with the statement name as the key and the metric value as the value.
+    """
     config = get_config()
     ccloud_client = ConfluentCloudClient(config)
     dataset="cloud"
@@ -150,7 +161,6 @@ def _get_int_metric(compute_pool_ids: list[str], metric_name: str, from_date: st
         logger.debug(f"-> metrics: {metrics}")
         results = {}
         for metric in metrics.get("data", []):
-            # Changing the variable name from sum to metrics_sum
             metrics_sum= 0
             if "points" in metric:
                 for point in metric.get("points", []):
