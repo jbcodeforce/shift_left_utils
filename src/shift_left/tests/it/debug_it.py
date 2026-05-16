@@ -117,7 +117,8 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--directory', os.getenv('PIPELINES') + '/sources'], env=env)
         #result = runner.invoke(app, ['pipeline', 'report', 'customer_analytics_c360'], env=env)
         # result = runner.invoke(app, ['pipeline', 'report-running-statements', '--table-name', 'sl_c360_fct_user_per_group'], env=env)
-        result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/test_prepare_tables_integration.sql', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
+        #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/test_prepare_tables_integration.sql', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
+        result = runner.invoke(app, ['project', 'list-modified-files', 'develop', '--project-path', os.getenv('PIPELINES') + "/../../../../../../", '--file-filter', '.sql', '--since', '2026-05-01'], env=env)
         print(result.stdout)
 
 

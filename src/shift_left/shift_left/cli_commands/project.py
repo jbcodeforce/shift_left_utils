@@ -285,6 +285,7 @@ def list_modified_files(
 ):
     """
     Get the list of files modified in the current git branch compared to the specified branch.
+    project list-modified-files cc-client --project-path ../.. --file-filter .sql --since 2026-05-01
     Filters for Flink-related files (by default SQL files) and saves the list to a text file.
     This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
     """

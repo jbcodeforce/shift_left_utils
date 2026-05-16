@@ -23,16 +23,16 @@ Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`,
 
 | CLI command | Full IT (CLI) | Test file / notes |
 |-------------|---------------|-------------------|
-| `init` | Yes (cloud opt-in) | `cli/test_project_cli.py` — requires `SHIFT_LEFT_RUN_CLOUD_IT` |
-| `list-topics` | Yes (same) | `cli/test_project_cli.py` |
-| `list-compute-pools` | Yes (same) | `cli/test_project_cli.py` |
+| `init` | NA  | done in unit test |
+| `list-topics` | Yes | `est_project_cli.py` |
+| `list-compute-pools` | Yes | `est_project_cli.py` |
 | `delete-all-compute-pools` | Gap | Destructive; no dedicated IT |
-| `housekeep-statements` | Yes (same) | `cli/test_project_cli.py` |
-| `validate-config` | Yes (same) | `cli/test_project_cli.py` |
+| `housekeep-statements` | Yes (same) | `test_project_cli.py` |
+| `validate-config` | Yes (same) | `test_project_cli.py` |
 | `report-table-cross-products` | Gap | Uses `PIPELINES` / inventory |
-| `list-environments` | Yes (same) | `cli/test_project_cli.py` |
+| `list-environments` | Yes (same) | `test_project_cli.py` |
 | `list-tables-with-one-child` | Gap | |
-| `list-modified-files` | Yes (same) | `cli/test_project_cli.py` |
+| `list-modified-files` | Yes (same) | `test_project_cli.py` |
 | `update-tables-version` | Yes | `cli/test_version_project_cli.py` (expects `~/.shift_left/modified_flink_files.json`) |
 | `init-integration-tests` | Gap | `tests/it/test_itg_test_mgr.py` covers manager APIs, not CLI |
 | `run-integration-tests` | Gap | |

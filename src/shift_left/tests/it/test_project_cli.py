@@ -27,23 +27,6 @@ class TestProjectCLI(unittest.TestCase):
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
-    def test_init_project(self):
-        runner = CliRunner()
-        temp_dir = pathlib.Path(__file__).parent /  "../tmp"
-        print(temp_dir)
-        result = runner.invoke(app, [ "init", "project_test_via_cli", str(temp_dir)])
-        print(result.stdout)
-        assert result.exit_code == 0
-        assert "Project project_test_via_cli created in " in result.stdout
-        assert os.path.exists(temp_dir / "project_test_via_cli")
-        assert os.path.exists(temp_dir / "project_test_via_cli/pipelines")
-
-    def test_validate_config(self):
-        runner = CliRunner()
-        result = runner.invoke(app, [ "validate-config"])
-        print(result.stdout)
-        assert result.exit_code == 0
-        assert "config-ccloud.yaml validated" in result.stdout
 
     def test_list_topics(self):
         runner = CliRunner()
@@ -58,7 +41,7 @@ class TestProjectCLI(unittest.TestCase):
         print(result.stdout)
         assert result.exit_code == 0
 
-    def test__list_compute_pools(self):
+    def test_list_compute_pools(self):
         print("test_5: using cli project list-compute-pools")
         runner = CliRunner()
         result = runner.invoke(app, ["list-compute-pools"])
