@@ -387,14 +387,21 @@ def fetch_statement_results_terminal_json(config: dict, statement_name: str) -> 
         while True:
             if next_page_token and previous_step != next_page_token:
                 logger.info("Get next page token: %s for %s", next_page_token, statement_name)
-                r = conn._request("GET", next_page_token, raise_for_status=False)  # noqa: SLF001
+                r = conn._request(  # noqa: SLF001
+                    next_page_token,
+                    method="GET",
+                    raise_for_status=False,
+                )
                 status = getattr(r, "status_code", 200)
                 if isinstance(status, int) and status >= 400:
                     break
                 resp = r.json()
             else:
                 logger.info("Get results from /statements/%s/results", statement_name)
-                r = conn._request("GET", f"/statements/{statement_name}/results")  # noqa: SLF001
+                r = conn._request(  # noqa: SLF001
+                    f"/statements/{statement_name}/results",
+                    method="GET",
+                )
                 resp = r.json()
 
             if not isinstance(resp, dict):
@@ -420,7 +427,7 @@ def get_statement_results_by_url_json(config: dict, absolute_url: str) -> dict |
     """Fetch one GET given a pagination URL (typically absolute)."""
 
     with flink_connection(config) as conn:
-        resp = conn._request("GET", absolute_url)  # noqa: SLF001
+        resp = conn._request(absolute_url, method="GET")  # noqa: SLF001
         return resp.json()
 
 
@@ -439,7 +446,7 @@ def list_statements_follow_page_json(config: dict, next_url_full: str) -> dict |
     Paginate statements where metadata.next holds a fully-qualified HTTP URL."""
 
     with flink_connection(config) as conn:
-        resp = conn._request("GET", next_url_full)  # noqa: SLF001
+        resp = conn._request(next_url_full, method="GET")  # noqa: SLF001
         return resp.json()
 
 

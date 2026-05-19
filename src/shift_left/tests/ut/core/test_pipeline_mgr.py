@@ -34,7 +34,7 @@ class TestPipelineManager(unittest.TestCase):
         ddl_table_path=path + "/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql"
         result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
-        assert result.table_name == "src_c360_groups"
+        assert result.table_name == "sl_c360_src_groups"
         assert len(result.parents) == 1 # 04/2026: unknown_table are referenced but not in the inventory. This is for seed and consuming from exiting topics.
         assert len(result.children) == 0
         assert "source" == result.type

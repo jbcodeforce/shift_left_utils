@@ -4,6 +4,31 @@ from pathlib import Path
 
 import pytest
 
+# Load before test modules: some imports call get_config() at module level.
+# Mirror set_test_env / tests/it/conftest.py so pytest works without sourcing set_test_env.
+_TESTS_ROOT = Path(__file__).resolve().parents[2]
+os.environ.setdefault("SL_CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault(
+    "PIPELINES",
+    str(_TESTS_ROOT / "data" / "flink-project" / "pipelines"),
+)
+if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
+    os.environ.setdefault("SL_KAFKA_API_KEY", "test")
+    os.environ.setdefault("SL_KAFKA_API_SECRET", "test")
+    os.environ.setdefault("SL_KAFKA_CLUSTER_ID", "lkc-test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_KEY", "test")
+    os.environ.setdefault("SL_CONFLUENT_CLOUD_API_SECRET", "test")
+    os.environ.setdefault("SL_FLINK_API_KEY", "test")
+    os.environ.setdefault("SL_FLINK_API_SECRET", "test")
+    os.environ.setdefault("SL_CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("SL_CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("SL_CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
+    os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
+    os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")
+    os.environ.setdefault("SL_FLINK_ENV_NAME", "j9r-env")
+    os.environ.setdefault("SL_FLINK_DATABASE_NAME", "j9r-kafka")
+
 
 @pytest.fixture(autouse=True, scope="module")
 def isolate_pipelines(tmp_path_factory):

@@ -120,7 +120,7 @@ class TestProjectCLI(unittest.TestCase):
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert result.exit_code == 0
-        assert "Config.yaml validated" in result.stdout
+        assert "config.yaml validated" in result.stdout
 
     @patch('shift_left.cli_commands.project.get_config')
     def test_validate_config_missing_sections(self, mock_get_config):

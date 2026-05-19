@@ -56,7 +56,7 @@ class TestProjectManager(unittest.TestCase):
         assert result
         assert len(result) == 2
         assert "src_table_1" in result
-        assert "src_common_tenant" in result
+        assert "sl_cmn_src_tenants" in result
 
     @patch('builtins.open', new_callable=mock_open)
     @patch('shift_left.core.project_manager.subprocess.run')
@@ -445,9 +445,9 @@ class TestProjectManager(unittest.TestCase):
         """Test _assess_flink_statement_state function with mocked statement_mgr.get_statement"""
 
         # Setup mock data
-        table_name = "fct_user_per_group"
-        file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.fct_user_per_group.sql"
-        sql_content = "INSERT INTO fct_user_per_group SELECT * FROM source_table;"
+        table_name = "sl_c360_fct_user_per_group"
+        file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql"
+        sql_content = "INSERT INTO sl_c360_fct_user_per_group SELECT * FROM source_table;"
 
         # Test Case 1: Statement found and running
         mock_statement = MagicMock(spec=Statement)
@@ -462,7 +462,7 @@ class TestProjectManager(unittest.TestCase):
         # Verify the result
         self.assertTrue(same_sql, "SQL content should match")
         self.assertTrue(running, "Statement should be running")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
         # Test Case 2: Statement found but not running and different SQL
         mock_get_statement.reset_mock()
@@ -473,7 +473,7 @@ class TestProjectManager(unittest.TestCase):
 
         self.assertFalse(same_sql, "SQL content should not match")
         self.assertFalse(running, "Statement should not be running")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
         # Test Case 3: Statement not found
         mock_get_statement.reset_mock()
@@ -483,7 +483,7 @@ class TestProjectManager(unittest.TestCase):
 
         self.assertTrue(same_sql, "Should return True when statement not found")
         self.assertFalse(running, "Should return False when statement not found")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
 
     def test_isolate_data_product(self):

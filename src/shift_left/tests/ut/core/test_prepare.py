@@ -60,10 +60,8 @@ class TestPrepareTablesFromSqlFile(BaseUT):
     @patch('shift_left.core.deployment_mgr.get_config')
     @patch('shift_left.core.deployment_mgr.datetime')
     @patch('builtins.open', new_callable=mock_open)
-    @patch('builtins.print')
     def test_prepare_tables_basic_functionality(
         self,
-        mock_print,
         mock_file_open,
         mock_datetime,
         mock_get_config,
@@ -131,8 +129,11 @@ class TestPrepareTablesFromSqlFile(BaseUT):
         ]
         mock_delete_statement.assert_has_calls(delete_calls)
 
-        # Verify print was called for transformed SQL
-        self.assertEqual(mock_print.call_count, 3)
+        # Transformed SQL is logged (comments stripped; blank lines skipped)
+        self.assertEqual(mock_logger.info.call_count, 3)
+        mock_logger.info.assert_any_call("CREATE TABLE test_table (id INT);")
+        mock_logger.info.assert_any_call("ALTER TABLE test_table ADD COLUMN name STRING;")
+        mock_logger.info.assert_any_call("DROP TABLE old_table;")
 
 
     @patch('shift_left.core.deployment_mgr.logger')

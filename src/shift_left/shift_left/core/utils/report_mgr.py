@@ -100,12 +100,16 @@ def build_TableReport(report_name: str,
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes from now")
     if get_metrics:
         compute_pool_ids = [node.compute_pool_id for node in nodes if node.compute_pool_id is not None and node.compute_pool_id != "None"]
+        pending_by_statement = metrics_mgr.get_pending_records(compute_pool_ids, from_date)
+        num_records_out_by_statement = metrics_mgr.get_num_records_out(compute_pool_ids, from_date)
+        num_records_in_by_statement = metrics_mgr.get_num_records_in(compute_pool_ids, from_date)
         for node in nodes:
             table_info = build_TableInfo(node,get_metrics=get_metrics)
             if node.existing_statement_info:
-                table_info.pending_records =  metrics_mgr.get_pending_records(compute_pool_ids, node.existing_statement_info.name, from_date=from_date)
-                table_info.num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids, node.existing_statement_info.name, from_date=from_date)
-                table_info.num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids, node.existing_statement_info.name, from_date=from_date)
+                stmt_name = node.existing_statement_info.name
+                table_info.pending_records = pending_by_statement.get(stmt_name, 0)
+                table_info.num_records_out = num_records_out_by_statement.get(stmt_name, 0)
+                table_info.num_records_in = num_records_in_by_statement.get(stmt_name, 0)
             else:
                 logger.error(f"Node {node.table_name} has no existing statement info")
                 table_info.pending_records = 0

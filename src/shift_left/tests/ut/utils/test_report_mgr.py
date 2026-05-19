@@ -140,14 +140,7 @@ class TestReportMgr(unittest.TestCase):
         assert "test_compute_pool" in summary
         assert "test_compute_pool_2" in summary
 
-    def test_build_simple_report(self):
-        print(f"test_build_simple_report")
-        report = build_simple_report(self.execution_plan)
-        print(f"\n\n{report}\n\n")
-        assert "test_table" in report
-        assert "test_statement" in report
-        assert "running" in report
-        assert "test_compute_p" in report
+
 
     def test_pad_or_truncate_string_truncate(self):
         """Test pad_or_truncate with string input that needs truncation."""
@@ -393,38 +386,6 @@ class TestReportMgr(unittest.TestCase):
         self.assertEqual(result.retention_size, 0)  # Should not call metrics when get_metrics=False
         mock_metrics.get_retention_size.assert_not_called()
 
-    @patch('shift_left.core.utils.report_mgr.metrics_mgr')
-    def test_build_simple_report_with_no_existing_statement(self, mock_metrics):
-        """Test build_simple_report with nodes that have no existing_statement_info."""
-        # Setup mocks
-        mock_metrics.get_pending_records.return_value = {}
-        mock_metrics.get_num_records_out.return_value = {}
-        mock_metrics.get_num_records_in.return_value = {}
-
-        # Create node without existing statement info
-        node = FlinkStatementNode(
-            table_name="test_table",
-            dml_statement_name="test_statement",
-            compute_pool_id="test_pool",
-            existing_statement_info=None
-        )
-
-        execution_plan = FlinkStatementExecutionPlan(
-            start_table_name="test_table",
-            environment_id="test_env",
-            nodes=[node]
-        )
-
-        result = build_simple_report(execution_plan)
-
-        # Should contain headers but no node data (since node has no existing_statement_info)
-        self.assertIn("Ancestor Table Name", result)
-        self.assertIn("Statement Name", result)
-        self.assertIn("Status", result)
-        self.assertIn("Compute Pool", result)
-        # Since node has no existing_statement_info, it won't be included in the report body
-        lines = result.split('\n')
-        self.assertEqual(len([line for line in lines if line.strip() and not line.startswith('-') and 'Ancestor Table Name' not in line]), 0)
 
     @patch('shift_left.core.utils.report_mgr.shift_left_dir', '/tmp')
     @patch('shift_left.core.utils.report_mgr.compute_pool_mgr')
@@ -807,6 +768,115 @@ class TestReportMgr(unittest.TestCase):
         self.assertEqual(result.name, "test_statement")
         self.assertEqual(result.status, "UNKNOWN")  # Should be "UNKNOWN" when no status
         self.assertEqual(result.status_details, "")  # Should be empty string when no status
+
+    @patch('shift_left.core.utils.report_mgr.metrics_mgr')
+    def test_build_simple_report(self, mock_metrics):
+        """Test build_simple_report metric lookup, missing keys, and missing statement/pool."""
+        mock_metrics.get_pending_records.return_value = {"stmt_with_metrics": 10}
+        mock_metrics.get_num_records_out.return_value = {"stmt_with_metrics": 20}
+        mock_metrics.get_num_records_in.return_value = {"stmt_with_metrics": 30}
+
+        created = datetime(2024, 1, 1, 12, 0, 0)
+        table_report = TableReport(
+            tables=[
+                TableInfo(
+                    table_name="table_with_metrics",
+                    statement_name="stmt_with_metrics",
+                    compute_pool_id="pool_1",
+                    status="RUNNING",
+                    created_at=created,
+                ),
+                TableInfo(
+                    table_name="table_no_statement",
+                    statement_name="",
+                    compute_pool_id="",
+                    status="STOPPED",
+                    created_at=created,
+                ),
+                TableInfo(
+                    table_name="table_missing_metric_keys",
+                    statement_name="stmt_missing_keys",
+                    compute_pool_id="pool_1",
+                    status="RUNNING",
+                    created_at=created,
+                ),
+            ]
+        )
+
+        result = build_simple_report(table_report, from_date="2024-01-01")
+
+        self.assertIn("Ancestor Table Name", result)
+        self.assertIn("-" * 165, result)
+        self.assertIn("table_with_metrics", result)
+        self.assertIn("table_no_statement", result)
+        self.assertIn("table_missing_metric_keys", result)
+        # Row with metrics in dict
+        self.assertIn("10", result)
+        self.assertIn("20", result)
+        self.assertIn("30", result)
+        mock_metrics.get_pending_records.assert_called_once()
+        mock_metrics.get_num_records_out.assert_called_once()
+        mock_metrics.get_num_records_in.assert_called_once()
+
+        lines = result.strip().split("\n")
+        data_lines = [line for line in lines if line.startswith("table_")]
+        self.assertEqual(len(data_lines), 3)
+        # Missing statement/pool row uses zero metrics
+        self.assertIn("0", data_lines[1])
+        # Statement present but absent from metric dicts defaults to 0
+        missing_keys_line = data_lines[2]
+        self.assertIn("stmt_missing_keys", missing_keys_line)
+        parts = missing_keys_line.split()
+        self.assertEqual(parts[-3:], ["0", "0", "0"])
+
+    @patch('shift_left.core.utils.report_mgr.shift_left_dir', '/tmp')
+    def test_build_summary_with_missing_compute_pool_id(self):
+        """Test build_summary_from_execution_plan when compute_pool_id is the literal 'None'."""
+        node = FlinkStatementNode(
+            table_name="orphan_table",
+            dml_statement_name="orphan_statement",
+            compute_pool_id="None",
+            to_run=True,
+            to_restart=False,
+            existing_statement_info=StatementInfo(status_phase="RUNNING"),
+        )
+        execution_plan = FlinkStatementExecutionPlan(
+            start_table_name="orphan_table",
+            environment_id="test_env",
+            nodes=[node],
+        )
+
+        result = build_summary_from_execution_plan(execution_plan, self.compute_pool_list)
+
+        self.assertIn("orphan_table", result)
+        self.assertIn("Matching compute pools:", result)
+        # Pool-matching section uses UNKNOWN when compute_pool_id is falsy
+        pool_section = result.split("Matching compute pools:")[1]
+        self.assertIn("UNKNOWN", pool_section)
+        self.assertIn("orphan_statement", pool_section)
+
+    @patch('shift_left.core.utils.report_mgr.compute_pool_mgr')
+    @patch('shift_left.core.utils.report_mgr.metrics_mgr')
+    def test_build_table_info_non_running_skips_retention(self, mock_metrics, mock_compute_pool):
+        """Test build_TableInfo does not fetch retention when status is not RUNNING."""
+        mock_compute_pool.get_compute_pool_list.return_value = self.compute_pool_list
+        mock_compute_pool.get_compute_pool_with_id.return_value = self.compute_pool_list.pools[0]
+
+        existing_statement = StatementInfo(
+            name="test_statement",
+            status_phase="STOPPED",
+            compute_pool_id="test_compute_pool",
+        )
+        node = FlinkStatementNode(
+            table_name="test_table",
+            existing_statement_info=existing_statement,
+        )
+
+        result = build_TableInfo(node, get_metrics=True)
+
+        self.assertEqual(result.status, "STOPPED")
+        self.assertEqual(result.retention_size, 0)
+        mock_metrics.get_retention_size.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()
