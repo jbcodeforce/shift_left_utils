@@ -158,7 +158,7 @@ The test cases are created as you can see in the `test_definitions.yaml`
 
 The two test cases use different approaches to define the data: SQL and CSV files. This is a more flexible solution, so the tool can inject data, as csv rows. The csv data may come from an extract of the kafka topic records.
 
-* Data engineers **update the content** of the insert statements and **the validation statements** to reflect business requirements. Once done, try unit testing with the command:
+* Data engineers update the content of the insert statements and the validation statements to reflect business requirements. Once done, try unit testing with the command:
   ```sh
   shift_left table  run-unit-tests <table_name> --test-case-name test_<table_name>_1 
   # for example
@@ -238,13 +238,43 @@ Data engineers may use the csv format to create a lot of records. Now the challe
 
 ### Updating after schema changes
 
-Sometime source tables got their schema modified this will impact the ddl and dml scripts used for testing. An upstream schema change is typically adding a new field. Whenever this occurs, somebody has to decide whether this is a column that needs to be propagated through various pipelines.
+Sometime source tables got their schema modified this will impact the ddl and dml scripts used for testing. An upstream schema change is typically adding new fields. Whenever this occurs, somebody has to decide whether the new columns need to be propagated through various pipelines.
 
 The two extremes are:
 
 1. Simple new column that doesn't have to be propagated. Action: update all test ddls for this table to add the field and do nothing else
 1. New column that we do want to propagate. Action do #1 above and update any downstream tables/statements and their test suites.
 
+The process looks like:
+
+1. Assess the modified SQL from a give date:
+	```sh
+	shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 main
+	```
+
+	This will build a json file `$HOME/.shift_left/modified_flink_files.json` with all the SQL modified.
+
+1. Assess all the impacted tables from the DDLs modified
+	```sh
+	shift_left project  list-impacted-tables
+	# ---- which is the same as:
+	shift_left project  list-impacted-tables
+	 --modified-files-path ~/.shift_left/modified_flink_files.json 
+	# ---- OR:
+	shift_left project  list-impacted-tables
+	 --modified-files-path ~/.shift_left/modified_flink_files.json --project-path $PIPELINES 
+	# ---- OR:
+	shift_left project  list-impacted-tables
+	 --modified-files-path ~/.shift_left/modified_flink_files.json --project-path $PIPELINES --output-file ~/.shift_left/impacted_tables.json 
+	```
+
+	it will produce a file named: `$HOME/.shift_left/impacted_tables.json`
+
+1. [Optional] Data engineer modify this file to remove any tables they do not want to modify.
+1. [Optional] Run the modify Unit test DDLs for the foundation tables
+	```sh
+	shift_left project modify-unit-test-foundation-tables  ~/.shift_left/impacted_tables.json
+	```
 
 ### Unit Test Harness FAQ
 

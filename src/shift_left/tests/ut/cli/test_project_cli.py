@@ -6,6 +6,7 @@ import pathlib
 import os
 import shutil
 import tempfile
+import json
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
 
@@ -390,6 +391,64 @@ class TestProjectCLI(unittest.TestCase):
 
         assert result.exit_code == 1
         assert "Git command failed" in result.stdout
+
+    @patch("shift_left.cli_commands.project.project_manager.impacted_tables_by_modifications")
+    def test_list_impacted_tables_writes_json(self, mock_impacted):
+        """Test list_impacted_tables writes impacted_tables.json under shift_left_dir."""
+        from shift_left.core.project_manager import ImpactedTablesByModificationsResult
+
+        runner = CliRunner()
+        mock_impacted.return_value = ImpactedTablesByModificationsResult(
+            ddl_modified_tables=["sl_raw_groups"],
+            tables=["sl_c360_src_groups"],
+            production_ddl_paths=["/tmp/ddl.src_c360_groups.sql"],
+            unit_test_ddl_paths=["/tmp/tests/ddl_src_c360_groups.sql"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            modified_json = pathlib.Path(tmp) / "modified_flink_files.json"
+            modified_json.write_text(
+                json.dumps(
+                    {
+                        "description": "test",
+                        "file_list": [
+                            {
+                                "table_name": "sl_raw_groups",
+                                "file_modified_url": "/pipelines/seeds/ddl.raw_groups.sql",
+                                "same_sql_content": False,
+                                "running": False,
+                                "new_table_name": "sl_raw_groups",
+                            }
+                        ],
+                    }
+                )
+            )
+            out_shift_left = pathlib.Path(tmp) / ".shift_left"
+            out_shift_left.mkdir()
+            output_json = out_shift_left / "impacted_tables.json"
+
+            with patch(
+                "shift_left.cli_commands.project.shift_left_dir", str(out_shift_left)
+            ):
+                result = runner.invoke(
+                    app,
+                    [
+                        "list-impacted-tables",
+                        "--modified-files-path",
+                        str(modified_json),
+                        "--project-path",
+                        str(pathlib.Path(tmp) / "pipelines"),
+                        "--output-file",
+                        str(output_json),
+                    ],
+                )
+
+            assert result.exit_code == 0, result.stdout
+            assert output_json.exists()
+            payload = json.loads(output_json.read_text())
+            assert payload["tables"] == ["sl_c360_src_groups"]
+            assert "Impacted tables saved to" in result.stdout
+            mock_impacted.assert_called_once()
 
 
 if __name__ == '__main__':

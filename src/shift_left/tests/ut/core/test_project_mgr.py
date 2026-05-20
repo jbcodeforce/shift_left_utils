@@ -3,6 +3,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
+import json
 from pathlib import Path
 import shutil
 
@@ -495,6 +496,94 @@ class TestProjectManager(unittest.TestCase):
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group")
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts")
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql")
+
+    def test_impacted_table_by_modification(self):
+        """Test impacted_tables_by_modifications returns downstream tables and DDL paths."""
+        pipelines_root = TEST_PIPELINES_DIR
+        modified_files = {
+            "description": "Modified files in branch:'cc-client'",
+            "file_list": [
+                {
+                    "table_name": "sl_raw_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_raw_groups",
+                },
+                {
+                    "table_name": "sl_c360_src_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_c360_src_groups",
+                },
+            ],
+        }
+        result = pm.impacted_tables_by_modifications(
+            modified_files, project_path=pipelines_root
+        )
+        self.assertEqual(
+            set(result.ddl_modified_tables),
+            {"sl_raw_groups", "sl_c360_src_groups"},
+        )
+        self.assertEqual(
+            set(result.tables),
+            {
+                "sl_c360_src_groups",
+                "sl_c360_dim_groups",
+                "sl_c360_dim_users",
+                "sl_c360_fct_user_per_group",
+            },
+        )
+        self.assertEqual(len(result.production_ddl_paths), 4)
+        for ddl_path in result.production_ddl_paths:
+            self.assertFalse(os.path.isabs(ddl_path))
+            self.assertNotIn("pipelines/", ddl_path.replace("\\", "/"))
+        production_basenames = {os.path.basename(p) for p in result.production_ddl_paths}
+        self.assertIn("ddl.src_c360_groups.sql", production_basenames)
+        self.assertIn("ddl.c360_dim_groups.sql", production_basenames)
+        self.assertIn("ddl.c360_dim_users.sql", production_basenames)
+        self.assertIn("ddl.c360_fct_user_per_group.sql", production_basenames)
+        ut_paths = " ".join(result.unit_test_ddl_paths)
+        self.assertIn("dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql", ut_paths)
+        for ut_path in result.unit_test_ddl_paths:
+            self.assertFalse(os.path.isabs(ut_path))
+
+    def test_update_unit_test_ddl_for_foundation_tables(self):
+        """Foundation UT DDL is refreshed from production DDL for ddl_modified_tables only."""
+        pipelines_root = TEST_PIPELINES_DIR
+        ut_relative = "dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql"
+        ut_path = os.path.join(pipelines_root, ut_relative)
+        with open(ut_path, "r") as f:
+            original_ut_ddl = f.read()
+        stripped_ut_ddl = original_ut_ddl.replace("  updated_at TIMESTAMP,\n", "")
+        try:
+            with open(ut_path, "w") as f:
+                f.write(stripped_ut_ddl)
+
+            impacted = pm.ImpactedTablesByModificationsResult(
+                ddl_modified_tables=["sl_c360_src_groups"],
+                tables=["sl_c360_dim_groups"],
+                production_ddl_paths=[],
+                unit_test_ddl_paths=[ut_relative],
+            )
+            updated = pm.update_unit_test_ddl_for_foundation_tables(
+                impacted, project_path=pipelines_root
+            )
+            self.assertIn(ut_relative, updated)
+            with open(ut_path, "r") as f:
+                synced = f.read()
+            self.assertIn("updated_at TIMESTAMP", synced)
+            self.assertIn("sl_c360_src_groups_ut", synced)
+        finally:
+            with open(ut_path, "w") as f:
+                f.write(original_ut_ddl)
 
 if __name__ == '__main__':
     unittest.main()

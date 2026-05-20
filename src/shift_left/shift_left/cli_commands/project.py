@@ -18,6 +18,7 @@ import shift_left.core.integration_test_mgr as integration_test_mgr
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE,
         ModifiedFileInfo,
+        ImpactedTablesByModificationsResult,
         KIMBALL_PROJECT_TYPE)
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 from shift_left.core import table_analyzer
@@ -313,6 +314,66 @@ def list_modified_files(
     print(f"Tables affected saved in {fname}")
 
     return result
+
+
+@app.command()
+def list_impacted_tables(
+    modified_files_path: Annotated[
+        str,
+        typer.Option(
+            help="Path to modified_flink_files JSON produced by list-modified-files",
+        ),
+    ] = None,
+    project_path: Annotated[
+        str,
+        typer.Option(
+            envvar=["PIPELINES"],
+            help="Pipeline folder path. Defaults to $PIPELINES",
+        ),
+    ] = None,
+    output_file: Annotated[
+        str,
+        typer.Option(help="Output JSON file path under ~/.shift_left by default"),
+    ] = None,
+):
+    """
+    List tables and DDL files impacted by production DDL modifications.
+
+    Reads modified_flink_files JSON (from list-modified-files), resolves recursive downstream
+    tables and related unit-test DDL paths, and writes the result to ~/.shift_left/impacted_tables.json.
+    """
+    print("#" * 30 + " List impacted tables from DDL modifications")
+    modified_json = modified_files_path or _default_modified_flink_files_json_path()
+    if not os.path.exists(modified_json):
+        print(f"Modified files JSON not found: {modified_json}")
+        print("Run: shift_left project list-modified-files <branch> --project-path <path>")
+        raise typer.Exit(1)
+
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        print("Error: set PIPELINES or pass --project-path")
+        raise typer.Exit(1)
+
+    with open(modified_json, "r") as f:
+        modified_files = json.load(f)
+
+    try:
+        result = project_manager.impacted_tables_by_modifications(
+            modified_files, project_path=pipelines_path
+        )
+    except Exception as e:
+        print(f"{_get_status_emoji('ERROR')} listing impacted tables: {e}")
+        raise typer.Exit(1)
+
+    os.makedirs(shift_left_dir, exist_ok=True)
+    output_path = output_file or os.path.join(shift_left_dir, "impacted_tables.json")
+    with open(output_path, "w") as f:
+        f.write(result.model_dump_json(indent=2))
+
+    _print_impacted_tables_summary(result)
+    print(f"Impacted tables saved to: {output_path}")
+    return result
+
 
 @app.command()
 def update_tables_version(
@@ -660,6 +721,25 @@ def _get_status_emoji(status: str) -> str:
         "ERROR": "🚫"
     }
     return emoji_map.get(status, "❓")
+
+def _default_modified_flink_files_json_path() -> str:
+    txt_name = get_config().get("app", {}).get(
+        "modified_flink_files_file_name", "modified_flink_files.txt"
+    )
+    return os.path.join(shift_left_dir, txt_name.replace(".txt", ".json"))
+
+
+def _print_impacted_tables_summary(result: ImpactedTablesByModificationsResult) -> None:
+    print(f"\nSummary:")
+    print(f"   DDL-modified tables: {len(result.ddl_modified_tables)}")
+    for table_name in result.ddl_modified_tables:
+        print(f"      {table_name}")
+    print(f"   Downstream impacted tables: {len(result.tables)}")
+    for table_name in result.tables:
+        print(f"      {table_name}")
+    print(f"   Production DDL files: {len(result.production_ddl_paths)}")
+    print(f"   Unit-test DDL files: {len(result.unit_test_ddl_paths)}")
+
 
 def _load_table_names_from_file(file_name: str) -> list[ModifiedFileInfo]:
     if not os.path.exists(file_name):
