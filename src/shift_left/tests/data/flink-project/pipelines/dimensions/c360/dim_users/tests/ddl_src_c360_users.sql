@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS src_c360_users_ut (
+CREATE TABLE IF NOT EXISTS sl_c360_src_users_ut (
   user_id STRING NOT NULL,
   user_name STRING,
   user_email STRING NOT NULL,

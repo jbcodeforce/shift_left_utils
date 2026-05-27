@@ -27,40 +27,30 @@ import shift_left.core.compute_pool_mgr as m
 from it.BaseIT import _run_integration_tests, _SKIP_MSG
 from typer.testing import CliRunner
 from shift_left.cli_commands.project import app
-
-_TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent
-_CONFIG_CCLOUD = _TESTS_ROOT / "config-ccloud.yaml"
-_PIPELINES = _TESTS_ROOT / "data" / "flink-project" / "pipelines"
-
+from it.BaseIT import IntegrationTestCase
 
 _RUN_IT = _run_integration_tests()
 
 
-_SKIP_DESTRUCTIVE = (
-    "Set SHIFT_LEFT_RUN_COMPUTE_POOL_DESTRUCTIVE=1 to run the pool delete test"
-)
-
 
 @unittest.skipUnless(_RUN_IT, _SKIP_MSG)
-class TestComputePoolMgr(unittest.TestCase):
+class TestComputePoolMgr(IntegrationTestCase):
     """Compute pool list/search against Confluent Cloud (opt-in)."""
 
     @classmethod
     def setUpClass(cls):
-        os.environ.setdefault("SL_CONFIG_FILE", str(_CONFIG_CCLOUD))
-        os.environ.setdefault("PIPELINES", str(_PIPELINES))
+        cls.super().setUpClass()
         m.reset_compute_list()
         cls._compute_mgr = m
 
     def test_1_compute_pool_list(self):
-        config = get_config()
         print(
             f"test_1_compute_pool_list: environment "
-            f"{config.get('confluent_cloud').get('environment_id')}"
+            f"{self._config.get('confluent_cloud').get('environment_id')}"
         )
-        env_id =   config.get("confluent_cloud").get("environment_id")
+        env_id =   self._config.get("confluent_cloud").get("environment_id")
         assert env_id
-        region_name = config.get("confluent_cloud").get("cloud_region")
+        region_name = self._config.get("confluent_cloud").get("cloud_region")
         assert region_name
         cpl = self._compute_mgr.get_compute_pool_list(
             env_id=env_id,
@@ -71,16 +61,15 @@ class TestComputePoolMgr(unittest.TestCase):
         self.assertGreater(len(cpl.pools), 0, "No compute pools returned; check API credentials and environment")
         p0 = cpl.pools[0]
         self.assertEqual(
-            p0.env_id, config.get("confluent_cloud").get("environment_id")
+            p0.env_id, self._config.get("confluent_cloud").get("environment_id")
         )
-        self.assertEqual(p0.region, config.get("confluent_cloud").get("cloud_region"))
+        self.assertEqual(p0.region, self._config.get("confluent_cloud").get("cloud_region"))
         self.assertEqual(p0.status_phase, "PROVISIONED")
         self.assertGreaterEqual(p0.current_cfu, 0)
         self.assertGreater(p0.max_cfu, 9)
 
 
     def test_2_search_for_matching_compute_pools(self):
-        config = get_config()
         print("test_2_search_for_matching_compute_pools: match convention for dev-j9r-pool")
         expected_name = "dev-j9r-pool"
         self._compute_mgr.reset_compute_list()
@@ -91,10 +80,10 @@ class TestComputePoolMgr(unittest.TestCase):
         )
         self.assertEqual(cpl[0].name, expected_name)
         self.assertEqual(
-            cpl[0].env_id, config.get("confluent_cloud").get("environment_id")
+            cpl[0].env_id, self._config.get("confluent_cloud").get("environment_id")
         )
         self.assertEqual(
-            cpl[0].region, config.get("confluent_cloud").get("cloud_region")
+            cpl[0].region, self._config.get("confluent_cloud").get("cloud_region")
         )
         self.assertEqual(cpl[0].status_phase, "PROVISIONED")
         self.assertGreaterEqual(cpl[0].current_cfu, 0)
@@ -102,9 +91,8 @@ class TestComputePoolMgr(unittest.TestCase):
 
     def test_2_1_get_compute_pool_with_id(self):
         print("test_2_1_get_compute_pool_with_id")
-        config = get_config()
         self._compute_mgr.reset_compute_list()
-        pool_id = config.get("flink", {}).get("compute_pool_id")
+        pool_id = self._config.get("flink", {}).get("compute_pool_id")
         pool: ComputePoolInfo = self._compute_mgr.get_compute_pool(pool_id)
         print(pool.model_dump_json(indent=3))
         self.assertIsNotNone(
@@ -112,7 +100,7 @@ class TestComputePoolMgr(unittest.TestCase):
         )
         self.assertEqual(pool.id, pool_id)
         assert pool.name
-        self.assertEqual(pool.env_id, config.get("confluent_cloud").get("environment_id"))
+        self.assertEqual(pool.env_id, self._config.get("confluent_cloud").get("environment_id"))
         self.assertEqual(pool.region, config.get("confluent_cloud").get("cloud_region"))
         self.assertEqual(pool.status_phase, "PROVISIONED")
         self.assertGreaterEqual(pool.current_cfu, 0)
@@ -120,7 +108,6 @@ class TestComputePoolMgr(unittest.TestCase):
 
     def test_2_2_get_compute_pool_wrong_id(self):
         print("test_2_1_get_compute_pool_with_id")
-        config = get_config()
         self._compute_mgr.reset_compute_list()
         pool_id = "nonexistent"
         pool: ComputePoolInfo = self._compute_mgr.get_compute_pool(pool_id)

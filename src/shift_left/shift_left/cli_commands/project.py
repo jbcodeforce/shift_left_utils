@@ -399,6 +399,24 @@ def update_tables_version(
         raise typer.Exit(1)
 
 @app.command()
+def update_ut_ddl(
+    impacted_tables_path: Annotated[str, typer.Argument(help="Path to impacted_tables.json produced by list-impacted-tables")],
+    project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located")] = None,
+):
+    """
+    Update the unit test DDLs for the given tables
+    """
+    print("#" * 30 + f" Update unit test DDL for {impacted_tables_path}")
+    try:
+        with open(impacted_tables_path, "r") as f:
+            impacted_tables = json.load(f)
+        project_manager.update_unit_test_ddl_for_foundation_tables(impacted_tables, project_path)
+        print(f"{_get_status_emoji('PASS')} Unit test DDL updated in {impacted_tables_path}")
+    except Exception as e:
+        print(f"{_get_status_emoji('ERROR')} updating unit test DDL: {e}")
+        raise typer.Exit(1)
+
+@app.command()
 def init_integration_tests(
     sink_table_name: Annotated[str, typer.Argument(help="Name of the sink table to create integration tests for")],
     project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located. If not provided, uses $PIPELINES environment variable")] = None

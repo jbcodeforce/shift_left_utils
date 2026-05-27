@@ -13,6 +13,14 @@ This document tracks which `shift_left` Typer commands under `shift_left/cli_com
 
 Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`, `rag.py`; root app: `shift_left/cli.py`.
 
+## Refactoring tracking
+
+Move test classes as inheriting IntegrationTestCase
+
+| file | status |
+|-----|-----|
+| `test_fact_deployment.py` | ok - executed| 
+
 ## Root (`shift_left/cli.py`)
 
 | CLI command | Full IT (CLI) | Test file / notes |
@@ -24,8 +32,8 @@ Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`,
 | CLI command | Full IT (CLI) | Test file / notes |
 |-------------|---------------|-------------------|
 | `init` | NA  | done in unit test |
-| `list-topics` | Yes | `est_project_cli.py` |
-| `list-compute-pools` | Yes | `est_project_cli.py` |
+| `list-topics` | Yes | `test_project_cli.py` |
+| `list-compute-pools` | Yes | `test_project_cli.py` |
 | `delete-all-compute-pools` | Gap | Destructive; no dedicated IT |
 | `housekeep-statements` | Yes (same) | `test_project_cli.py` |
 | `validate-config` | Yes (same) | `test_project_cli.py` |
@@ -57,9 +65,8 @@ Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`,
 | `update-tables` | Yes | `cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`) |
 | `init-unit-tests` | Gap | Only commented examples in `debug_it.py` |
 | `run-unit-tests` | Yes (cloud) | `test_it_test_mgr.py` uses root `app` + real env |
-| `run-validation-tests` | Gap | |
-| `validate-unit-tests` | Gap | Synonym of `run-validation-tests` |
-| `delete-unit-tests` | Gap | |
+| `run-validation-tests` | Yes | test_it_test_mgr.py - test_3_execute_validation_tests|
+| `delete-unit-tests` | Yes | test_it_test_mgr.py - test_4_delete_test_artifacts |
 | `explain` | Opt-in / error path | `cli/test_table_cli.py` — cloud paths need `SHIFT_LEFT_IT_USE_DEMO_ENV`; no-args error covered locally |
 
 ## `pipeline` (`shift_left pipeline ...`)

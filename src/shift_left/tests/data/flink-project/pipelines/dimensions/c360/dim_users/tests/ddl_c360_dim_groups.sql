@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS c360_dim_groups_ut (
+CREATE TABLE IF NOT EXISTS sl_c360_dim_groups_ut (
   group_id STRING NOT NULL,
   tenant_id STRING NOT NULL,
   group_name STRING,

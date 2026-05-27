@@ -16,27 +16,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from it.BaseIT import IntegrationTestCase
 from typer.testing import CliRunner
 
 from shift_left.cli_commands.table import app
-
-_TESTS_ROOT = Path(__file__).resolve().parent.parent.parent
-_DEFAULT_PIPELINES = _TESTS_ROOT / "data" / "flink-project" / "pipelines"
-_DEFAULT_SRC = _TESTS_ROOT / "data" / "spark-project"
-_DEFAULT_STAGING = _TESTS_ROOT / "data" / "flink-project" / "staging"
-
+from it.BaseIT import _DEFAULT_STAGING,IntegrationTestCase
 # True after `source set_demo_env` (export added there)
 _DEMO_IT = os.environ.get("SL_IT_USE_DEMO_ENV", "").lower() in ("1", "true", "yes")
 
 
-class TestTableCLI(unittest.TestCase):
+class TestTableCLI(IntegrationTestCase):
     """Table CLI: inventory, makefiles, search-deps, update-tables; optional demo-only commands."""
 
     @classmethod
     def setUpClass(cls):
-        os.environ.setdefault("PIPELINES", str(_DEFAULT_PIPELINES))
-        os.environ.setdefault("SRC_FOLDER", str(_DEFAULT_SRC))
-        os.environ.setdefault("STAGING", str(_DEFAULT_STAGING))
+        cls.super().setUpClass()
 
     @classmethod
     def tearDownClass(cls):
@@ -46,31 +40,26 @@ class TestTableCLI(unittest.TestCase):
             shutil.rmtree(temp_dir)
 
     def test_init_table(self):
-        runner = CliRunner()
         staging = os.environ.get("STAGING", str(_DEFAULT_STAGING))
         target = os.path.join(staging, "data_product_1", "sources")
         os.makedirs(target, exist_ok=True)
-        result = runner.invoke(app, ["init", "src_table_5", target])
+        result = self.runner.invoke(app, ["init", "src_table_5", target])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         self.assertIn("table_5", result.stdout)
         self.assertTrue(os.path.exists(os.path.join(target, "src_table_5")))
         self.assertTrue(os.path.exists(os.path.join(target, "src_table_5", "Makefile")))
 
     def test_build_inventory(self):
-        runner = CliRunner()
-        pl = os.environ.get("PIPELINES", str(_DEFAULT_PIPELINES))
-        result = runner.invoke(app, ["build-inventory", pl])
+        result = self.runner.invoke(app, ["build-inventory"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
-        self.assertTrue(os.path.exists(os.path.join(pl, "inventory.json")))
+        self.assertTrue(os.path.exists(os.path.join(os.environ.get("PIPELINES"), "inventory.json")))
 
     def test_search_parents_of_table(self):
-        runner = CliRunner()
-        src = Path(os.environ.get("SRC_FOLDER", str(_DEFAULT_SRC)))
-        sql_file = src / "facts" / "users" / "fct_users.sql"
-        self.assertTrue(sql_file.is_file(), f"Missing fixture: {sql_file}")
-        result = runner.invoke(
+        sql_file = os.path.join(os.environ.get("SRC_FOLDER"), "facts", "users", "fct_users.sql")
+        self.assertTrue(os.path.exists(sql_file), f"Missing fixture: {sql_file}")
+        result = self.runner.invoke(
             app,
-            ["search-source-dependencies", str(sql_file), str(src)],
+            ["search-source-dependencies", sql_file, os.environ.get("SRC_FOLDER")],
         )
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         self.assertIn("fct_users", result.stdout)
