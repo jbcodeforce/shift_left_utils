@@ -121,7 +121,10 @@ class TestProjectCLI(unittest.TestCase):
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert result.exit_code == 0
-        assert "config.yaml validated" in result.stdout
+        assert "validated" in result.stdout
+        config_file = os.environ.get("SL_CONFIG_FILE", "config.yaml")
+        assert config_file in result.stdout
+        assert "Configuration validation failed" not in result.stdout
 
     @patch('shift_left.cli_commands.project.get_config')
     def test_validate_config_missing_sections(self, mock_get_config):
@@ -449,6 +452,59 @@ class TestProjectCLI(unittest.TestCase):
             assert payload["tables"] == ["sl_c360_src_groups"]
             assert "Impacted tables saved to" in result.stdout
             mock_impacted.assert_called_once()
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_all_compute_pools_of_product")
+    def test_delete_all_compute_pools_without_list_file(self, mock_delete_all):
+        runner = CliRunner()
+        result = runner.invoke(app, ["delete-all-compute-pools", "mv"])
+        assert result.exit_code == 0, result.stdout
+        mock_delete_all.assert_called_once_with("mv")
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
+    def test_delete_all_compute_pools_with_list_file_only(self, mock_delete_by_ids):
+        runner = CliRunner()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("lfcp-ab0\n# comment\nlfcp-ab1\n")
+            list_file = f.name
+        try:
+            result = runner.invoke(
+                app,
+                ["delete-all-compute-pools", "--compute-pool-list-file", list_file],
+            )
+            assert result.exit_code == 0, result.stdout
+            mock_delete_by_ids.assert_called_once_with(["lfcp-ab0", "lfcp-ab1"], product_name=None)
+        finally:
+            os.unlink(list_file)
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
+    def test_delete_all_compute_pools_with_list_file_and_product(self, mock_delete_by_ids):
+        runner = CliRunner()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("lfcp-ab0\n")
+            list_file = f.name
+        try:
+            result = runner.invoke(
+                app,
+                ["delete-all-compute-pools", "mv", "--compute-pool-list-file", list_file],
+            )
+            assert result.exit_code == 0, result.stdout
+            mock_delete_by_ids.assert_called_once_with(["lfcp-ab0"], product_name="mv")
+        finally:
+            os.unlink(list_file)
+
+    def test_delete_all_compute_pools_requires_product_or_list_file(self):
+        runner = CliRunner()
+        result = runner.invoke(app, ["delete-all-compute-pools"])
+        assert result.exit_code != 0
+        assert "provide PRODUCT_NAME and/or --compute-pool-list-file" in result.stdout
+
+    def test_delete_all_compute_pools_missing_list_file(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            ["delete-all-compute-pools", "--compute-pool-list-file", "/nonexistent/pools.txt"],
+        )
+        assert result.exit_code != 0
 
 
 if __name__ == '__main__':

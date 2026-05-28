@@ -128,21 +128,30 @@ $ project list-compute-pools [OPTIONS]
 
 ### `project delete-all-compute-pools`
 
-Delete all compute pools for the given product name
+Delete compute pools by product name and/or from a list file. Provide at least one of `PRODUCT_NAME` or `--compute-pool-list-file`.
 
 **Usage**:
 
 ```console
-$ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
+$ project delete-all-compute-pools [OPTIONS] [PRODUCT_NAME]
 ```
 
 **Arguments**:
 
-* `PRODUCT_NAME`: The product name to delete all compute pools for  [required]
+* `PRODUCT_NAME`: Delete all pools whose display name contains this string; optional when `--compute-pool-list-file` is set  [default: None]
 
 **Options**:
 
+* `--compute-pool-list-file TEXT`: File with one compute pool ID per line (`lfcp-...`); empty lines and `#` comments are ignored. Unknown IDs are skipped with a warning.  [default: None]
 * `--help`: Show this message and exit.
+
+**List file example** (`pools_to_delete.txt`):
+
+```
+lfcp-abc123
+lfcp-def456
+# optional comment
+```
 
 ### `project housekeep-statements`
 

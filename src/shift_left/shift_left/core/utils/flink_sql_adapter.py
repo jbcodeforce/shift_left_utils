@@ -16,6 +16,7 @@ import confluent_sql
 from confluent_sql.execution_mode import ExecutionMode
 from confluent_sql.exceptions import OperationalError, StatementNotFoundError
 
+from shift_left.core.models.flink_statement_model import OpRow, StatementResult, Data
 from shift_left.core.utils.app_config import logger
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient, VersionInfo
 
@@ -61,18 +62,11 @@ def flink_connection(config: dict, *, compute_pool_id: str | None = None):
     pk = os.getenv("SL_FLINK_API_KEY") or flink["api_key"]
     secret = os.getenv("SL_FLINK_API_SECRET") or flink["api_secret"]
 
-    catalog = config.get("flink", {}).get("catalog_name")
     env_id = cc.get("environment_id")
-    if catalog and env_id and str(catalog) != str(env_id):
-        logger.warning(
-            "confluent-sql driver sets catalog from environment_id; flink.catalog_name=%s differs.",
-            catalog,
-        )
-
     conn = confluent_sql.connect(
         flink_api_key=pk,
         flink_api_secret=secret,
-        environment_id=cc["environment_id"],
+        environment_id=env_id,
         compute_pool_id=compute_pool_id or flink["compute_pool_id"],
         organization_id=cc["organization_id"],
         endpoint=infer_flink_sql_endpoint(config),
@@ -96,14 +90,14 @@ def _classify_execution(sql: str) -> str:
 
     if s.startswith(("select ", "show ", "describe ", "explain ")):
         return "snapshot_query"
-    if "insert into " in s or "create materialized " in s:
-        return "streaming_ddl"
+    if "insert into " in s or "create materialized " in s or s.startswith("with "):  # this is to support validation sql that starts with with. 05/27/26
+        return "streaming_dml"
     if s.startswith("create table ") and " as select " in s:
         return "streaming_ddl"
     return "snapshot_ddl"
 
 
-def driver_statement_to_pydantic(conn, drv_stmt) -> Any:
+def driver_statement_to_pydantic(conn, drv_stmt, result: StatementResult | None = None) -> Any:
     from shift_left.core.models.flink_statement_model import Statement as PStatement
 
     spec = dict(drv_stmt.spec)
@@ -118,6 +112,8 @@ def driver_statement_to_pydantic(conn, drv_stmt) -> Any:
         "organization_id": conn.organization_id,
         "environment_id": conn.environment_id,
     }
+    if result:
+        merged["result"] = result
     return PStatement.model_validate(merged)
 
 
@@ -197,7 +193,7 @@ def _submit_inner(
 
     kind = _classify_execution(sql_content)
     start = time.perf_counter()
-
+    result = None
     if kind == "snapshot_query":
         with conn.closing_cursor(mode=ExecutionMode.SNAPSHOT) as cur:
             cur.execute(
@@ -216,6 +212,33 @@ def _submit_inner(
             properties=user_props or None,
             compute_pool_id=compute_pool_id,
         )
+    elif kind == "streaming_dml":
+        with conn.closing_streaming_cursor(as_dict=True) as cur:
+            cur.execute(
+                sql_content,
+                timeout=timeout_sec,
+                statement_name=statement_name,
+                properties=user_props or None,
+                compute_pool_id=compute_pool_id
+            )
+            last_row = None
+            while cur.may_have_results:
+                    rows = cur.fetchmany(10)
+                    if rows:
+                        for row in rows:
+                            logger.info(f"row: {row}")
+                        last_row = rows[-1]
+                    else:
+                        time.sleep(0.1)
+            if last_row:
+                data = [OpRow(op=last_row.op.value,row=[last_row.row])]
+                result = StatementResult(
+                    api_version="1.0.0",
+                    kind="StatementResult",
+                    metadata=None,
+                    results=Data(data=data)
+                )
+            drv = cur.statement
     else:
         drv = conn.execute_snapshot_ddl(
             sql_content,
@@ -234,7 +257,7 @@ def _submit_inner(
             start_time=start,
         )
 
-    ps = driver_statement_to_pydantic(conn, drv)
+    ps = driver_statement_to_pydantic(conn, drv, result)
     ps.execution_time = time.perf_counter() - start  # type: ignore[attr-defined]
     return ps
 
@@ -251,6 +274,7 @@ def submit_flink_statement(
     from shift_left.core.models.flink_statement_model import ErrorData, StatementError
 
     if stopped:
+        logger.error(f"stopped=true is not supported via confluent-sql path for {statement_name}")
         return StatementError(
             errors=[
                 ErrorData(
@@ -276,6 +300,7 @@ def submit_flink_statement(
                 timeout_sec=timeout_sec,
             )
         except OperationalError as e:
+            logger.error(f"OperationalError submitting {statement_name}: {e}")
             if e.http_status_code == 409:
                 try:
                     conn.delete_statement(statement_name)

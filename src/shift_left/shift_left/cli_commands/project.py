@@ -1,6 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+from pydantic.types import NonNegativeInt
 import typer
 import subprocess
 import os
@@ -84,13 +85,41 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         print(list_of_pools)
 
 @app.command()
-def delete_all_compute_pools(product_name: Annotated[str, typer.Argument(help="The product name to delete all compute pools for")]):
+def delete_all_compute_pools(
+        product_name: Annotated[
+            str | None,
+            typer.Argument(help="Delete all pools whose display name contains this product name"),
+        ] = None,
+        compute_pool_list_file: Annotated[
+            str | None,
+            typer.Option("--compute-pool-list-file", help="File with one compute pool ID per line to delete; when set, only listed pools are deleted"),
+        ] = None,
+):
         """
-        Delete all compute pools for the given product name
+        Delete compute pools by product name and/or from a list file.
+
+        Provide at least one of PRODUCT_NAME or --compute-pool-list-file.
+
+        PRODUCT_NAME only: delete all pools whose display name contains product_name.
+
+        --compute-pool-list-file only: delete only pool IDs listed in the file (one lfcp-... ID per line;
+        empty lines and lines starting with # are ignored).
+
+        Both: delete only IDs from the file; product_name is used for logging only.
         """
-        print("#" * 30 + f" Delete all compute pools for product {product_name}")
-        compute_pool_mgr.delete_all_compute_pools_of_product(product_name)
-        print(f"Done")
+        if not product_name and not compute_pool_list_file:
+            print("[red]Error: provide PRODUCT_NAME and/or --compute-pool-list-file[/red]")
+            raise typer.Exit(1)
+
+        if compute_pool_list_file:
+            product_suffix = f" (product {product_name})" if product_name else ""
+            print("#" * 30 + f" Delete compute pools from {compute_pool_list_file}{product_suffix}")
+            pool_ids = _load_compute_pool_ids_from_file(compute_pool_list_file)
+            compute_pool_mgr.delete_compute_pools_by_ids(pool_ids, product_name=product_name)
+        else:
+            print("#" * 30 + f" Delete all compute pools for product {product_name}")
+            compute_pool_mgr.delete_all_compute_pools_of_product(product_name)
+        print("Done")
 
 @app.command()
 def housekeep_statements( compute_pool_id: str = typer.Option(None, "--compute-pool-id", help="Flink compute pool ID. [default: None]"),
@@ -717,7 +746,6 @@ def assess_unused_tables(
 @app.command()
 def delete_unused_tables(
     table_list_file: Annotated[str, typer.Argument(help="File path to table list to delete")],
-    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Pipeline path where tables are defined")]
 ):
     """
     Delete unused tables
@@ -727,7 +755,7 @@ def delete_unused_tables(
     if not os.path.exists(table_list_file):
         print(f"[red]Error: file {table_list_file} does not exist[/red]")
         raise typer.Exit(1)
-    final_msg = table_analyzer.delete_unused_tables(inventory_path,table_list_file)
+    final_msg = table_analyzer.delete_unused_tables(table_list_file)
     print(final_msg)
 
 # ------- Private APIS ----------
@@ -767,4 +795,25 @@ def _load_table_names_from_file(file_name: str) -> list[ModifiedFileInfo]:
     with open(file_name, 'r') as f:
         content = json.load(f)
         return content['file_list']
+
+
+def _load_compute_pool_ids_from_file(file_name: str) -> list[str]:
+    """Load compute pool IDs from a text file (one ID per line)."""
+    if not os.path.exists(file_name):
+        print(f"[red]Error: file {file_name} does not exist[/red]")
+        raise typer.Exit(1)
+
+    pool_ids: list[str] = []
+    with open(file_name, "r") as f:
+        for line in f.read().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            pool_ids.append(stripped)
+
+    if not pool_ids:
+        print(f"[red]Error: file {file_name} contains no compute pool IDs[/red]")
+        raise typer.Exit(1)
+
+    return pool_ids
 

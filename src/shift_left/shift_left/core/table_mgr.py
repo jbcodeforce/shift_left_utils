@@ -220,7 +220,7 @@ def get_or_create_inventory(pipeline_folder: str):
 def validate_table_cross_products(rootdir: str):
     config=get_config()
     for product in config["app"]["products"]:
-        sqls=  _get_sql_paths_files(rootdir,product)
+        sqls=  _get_sql_paths_files(rootdir, product)
         invalid_names= _validate_table_names(sqls)
         invalid_pipelines= _validate_pipelines(sqls, rootdir)
         print('-'*50 + product.upper() + '-'*50)
@@ -418,7 +418,7 @@ def _create_makefile(table_name: str,
 
 def _get_sql_paths_files(folder_path: str, product: str) -> dict[str, any]:
     """
-    Buuild a dict of filename with matching path to access the keyed file
+    Build a dict of filename with matching path to access the keyed file
     """
     sql_files_paths = {}
     for root, dirs, files in os.walk(folder_path):

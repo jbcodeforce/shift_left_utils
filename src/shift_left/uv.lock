@@ -213,14 +213,14 @@ wheels = [
 
 [[package]]
 name = "confluent-sql"
-version = "0.3.0"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/80/f2482406c87fb325546c38cabca9bc32ee26a03bc41b58b3ac8aa0cd6b73/confluent_sql-0.3.0.tar.gz", hash = "sha256:9791ad7b66d43b2d4cbb8a13d4d45c4cb44e645818d051aa7a8d493a216974f7", size = 188089, upload-time = "2026-04-09T14:33:59.469Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d0/a6/a0a5cbe3ed306c04801bc9b21aabc5fba3149e0400dfcdd666f0b79f33ba/confluent_sql-0.3.1.tar.gz", hash = "sha256:d2c19cfa90b3540fff5476730fd348c72cfc90629cf0ca1d4e8ff5ae2b07fe5b", size = 199471, upload-time = "2026-05-21T14:10:44.581Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/92/df5f3daa8eb7ca73a2ceb70baccf90c97e3fd12e70aa24a6f7fc52ef42b3/confluent_sql-0.3.0-py3-none-any.whl", hash = "sha256:e591a6f1433d2ac6650dc4835b429cf4a69048a31fcde12be6fd00e724eb662c", size = 73519, upload-time = "2026-04-09T14:33:58.363Z" },
+    { url = "https://files.pythonhosted.org/packages/12/b7/a182469c07abea12c29d5e697c6febd7aa9c940d3a1088dcd09064eda8c2/confluent_sql-0.3.1-py3-none-any.whl", hash = "sha256:13b08e238f693c1f6059f53ef06153ae5afb39cd1a36db79d1824021a6627cc2", size = 73950, upload-time = "2026-05-21T14:10:43.382Z" },
 ]
 
 [[package]]
@@ -1762,7 +1762,7 @@ requires-dist = [
     { name = "chromadb", marker = "extra == 'rag'", specifier = ">=0.4.0" },
     { name = "click", specifier = "<8.2.0" },
     { name = "confluent-kafka", specifier = ">=2.10.0" },
-    { name = "confluent-sql", specifier = "~=0.3.0" },
+    { name = "confluent-sql", specifier = ">=0.3.1" },
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "matplotlib", specifier = ">=3.10.1" },
     { name = "mcp", specifier = ">=1.16.0" },

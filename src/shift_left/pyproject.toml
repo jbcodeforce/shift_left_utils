@@ -31,7 +31,7 @@ dependencies = [
     # "pemja>0.4.2",
     # "confluent_flink_table_api_python_plugin>=1.20.48"
     "requests>=2.32.3",
-    "confluent-sql~=0.3.0",
+    "confluent-sql>=0.3.1",
     "pydantic-yaml>=1.4.0",
     "toml>=0.10.2",
     "confluent-kafka>=2.10.0",

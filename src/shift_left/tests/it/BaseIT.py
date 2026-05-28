@@ -3,7 +3,6 @@ import pathlib
 import unittest
 from shift_left.core.utils.app_config import get_config, session_log_dir
 from typer.testing import CliRunner
-from shift_left.cli import app
 
 _TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent
 _CONFIG_CCLOUD = _TESTS_ROOT / "config-ccloud.yaml"

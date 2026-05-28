@@ -292,11 +292,45 @@ class TestComputePoolMgr(unittest.TestCase):
         cpm._save_compute_pool_list(mock_compute_pool_list)
 
         mock_confluent_cloud_client.return_value = MagicMock()
-        mock_confluent_cloud_client.return_value.delete_compute_pool.return_value = "Deleted"
+        mock_confluent_cloud_client.return_value.make_request.return_value = "Deleted"
         cpm.delete_all_compute_pools_of_product("mv")
         compute_pool_list = cpm.get_compute_pool_list()
         self.assertEqual(len(compute_pool_list.pools), 0)
 
+    @patch('shift_left.core.compute_pool_mgr.ConfluentCloudClient')
+    def test_delete_compute_pools_by_ids(self, mock_confluent_cloud_client) -> None:
+        """Test delete compute pools from an explicit ID list."""
+        cpm.reset_compute_list()
+        mock_compute_pool_list = self._get_compute_pool_list(5)
+        cpm._save_compute_pool_list(mock_compute_pool_list)
+
+        mock_confluent_cloud_client.return_value = MagicMock()
+        mock_confluent_cloud_client.return_value.make_request.return_value = "Deleted"
+        deleted = cpm.delete_compute_pools_by_ids(["lfcp-ab0", "lfcp-ab2"], product_name="mv")
+        self.assertEqual(deleted, 2)
+        compute_pool_list = cpm.get_compute_pool_list()
+        self.assertEqual(len(compute_pool_list.pools), 3)
+        remaining_ids = {pool.id for pool in compute_pool_list.pools}
+        self.assertEqual(remaining_ids, {"lfcp-ab1", "lfcp-ab3", "lfcp-ab4"})
+
+    @patch('shift_left.core.compute_pool_mgr.ConfluentCloudClient')
+    def test_delete_compute_pools_by_ids_unknown_id(self, mock_confluent_cloud_client) -> None:
+        """Unknown pool IDs are skipped; known IDs are still deleted."""
+        cpm.reset_compute_list()
+        mock_compute_pool_list = self._get_compute_pool_list(3)
+        cpm._save_compute_pool_list(mock_compute_pool_list)
+
+        mock_client = MagicMock()
+        mock_confluent_cloud_client.return_value = mock_client
+        mock_client.make_request.side_effect = lambda method, url, auth_header: (
+            {"errors": [{"detail": "not found"}]} if method == "GET" else "Deleted"
+        )
+
+        deleted = cpm.delete_compute_pools_by_ids(["lfcp-ab0", "lfcp-unknown", "lfcp-ab1"])
+        self.assertEqual(deleted, 2)
+        compute_pool_list = cpm.get_compute_pool_list()
+        self.assertEqual(len(compute_pool_list.pools), 1)
+        self.assertEqual(compute_pool_list.pools[0].id, "lfcp-ab2")
 
 
 if __name__ == '__main__':

@@ -38,8 +38,7 @@ from shift_left.core.utils.ut_ai_data_tuning import AIBasedDataTuning
 SCRIPTS_DIR: Final[str] = "sql-scripts"
 PIPELINE_FOLDER_NAME: Final[str] = "pipelines"
 TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
-DEFAULT_POST_FIX_UNIT_TEST="_ut"
-CONFIGURED_POST_FIX_UNIT_TEST: Final[str] = get_config().get('app').get('post_fix_unit_test',DEFAULT_POST_FIX_UNIT_TEST)
+DEFAULT_POST_FIX_UNIT_TEST: Final[str] = "_ut"
 TOPIC_LIST_FILE: Final[str] = shift_left_dir + "/topic_list.json"
 
 # Polling and retry configuration constants
@@ -60,17 +59,19 @@ DEFAULT_TEST_CASES_COUNT: Final[int] = 2  # Number of test cases to create by de
 
 class TopicListCache(BaseModel):
     created_at: Optional[datetime] = Field(default=datetime.now())
-    topic_list: Optional[dict[str, str]] = Field(default={})
+    topic_list: List[str] = Field(default=[])
+
 
 # ----------- Public APIs  ------------------------------------------------------------
 def init_unit_test_for_table(table_name: str,
         create_csv: bool = False,
         nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
-        use_ai: bool = False) -> None:
+        use_ai: bool = False,
+        post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST) -> None:
     """
     Initialize the unit test folder and template files for a given table. It will parse the SQL statemnts to create the insert statements for the unit tests.
     """
-    inventory_path = os.path.join(os.getenv("PIPELINES"),)
+    inventory_path = os.path.join(os.getenv("PIPELINES"))
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     table_folder = table_ref.table_folder_name
@@ -81,7 +82,8 @@ def init_unit_test_for_table(table_name: str,
                     table_inventory=table_inventory,
                     create_csv=create_csv,
                     nb_test_cases=nb_test_cases,
-                    use_ai=use_ai)
+                    use_ai=use_ai,
+                    post_fix_unit_test=post_fix_unit_test)
     logger.info(f"Unit test for {table_name} created")
     print(f"Unit test for {table_name} created")
 
@@ -95,8 +97,7 @@ def execute_one_or_all_tests(table_name: str,
     1. Loads test suite definition from yaml file
     2. Creates foundation tables using DDL
     3. Executes input SQL statements to populate test data
-    4. Runs validation SQL to verify results
-    5. Polls validation results with retries
+
     """
     statement_mgr.reset_statement_list()
     config = get_config()
@@ -135,7 +136,8 @@ def execute_one_or_all_tests(table_name: str,
 def execute_validation_tests(table_name: str,
                     test_case_name: str = None,
                     compute_pool_id: Optional[str] = None,
-                    run_all: bool = False
+                    run_all: bool = False,
+                    post_fix_unit_test: str = "_ut"
 ) -> TestSuiteResult:
     """
     Execute all validation tests defined in the test suite definition for a given table.
@@ -172,7 +174,8 @@ def execute_validation_tests(table_name: str,
                     test_case=test_case,
                     table_ref=table_ref,
                     prefix=f"{prefix}-val-{str(idx + 1)}",
-                    compute_pool_id=compute_pool_id
+                    compute_pool_id=compute_pool_id,
+                    post_fix_unit_test=post_fix_unit_test
                 )
 
                 test_suite_result.test_results[test_case.name] = TestResult(
@@ -201,7 +204,8 @@ def execute_validation_tests(table_name: str,
     return test_suite_result
 
 def delete_test_artifacts(table_name: str,
-                          compute_pool_id: Optional[str] = None) -> None:
+                          compute_pool_id: Optional[str] = None,
+                          post_fix_unit_test: str = "_ut") -> None:
     """
     Delete the test artifacts (foundations, inserts, validations and statements) for a given table.
     """
@@ -210,34 +214,33 @@ def delete_test_artifacts(table_name: str,
         compute_pool_id = config['flink']['compute_pool_id']
     statement_mgr.get_statement_list()
 
-    config = get_config()
     test_suite_def, table_ref = _load_test_suite_definition(table_name)
     prefix = config['kafka']['cluster_type']
     for idx, test_case in enumerate(test_suite_def.test_suite):
         logger.info(f"Deleting test artifacts for {test_case.name}")
         print(f"Deleting test artifacts for {test_case.name}")
         for output in test_case.outputs:
-            statement_name = _build_statement_name(output.table_name, prefix+"-val-"+str(idx + 1), CONFIGURED_POST_FIX_UNIT_TEST)
+            statement_name = _build_statement_name(output.table_name, prefix+"-val-"+str(idx + 1), post_fix_unit_test)
             statement_mgr.delete_statement_if_exists(statement_name)
             logger.info(f"Deleted statement {statement_name}")
             print(f"Deleted statement {statement_name}")
         for input in test_case.inputs:
-            statement_name = _build_statement_name(input.table_name, prefix+"-ins-"+str(idx + 1), CONFIGURED_POST_FIX_UNIT_TEST)
+            statement_name = _build_statement_name(input.table_name, prefix+"-ins-"+str(idx + 1), post_fix_unit_test)
             statement_mgr.delete_statement_if_exists(statement_name)
             logger.info(f"Deleted statement {statement_name}")
             print(f"Deleted statement {statement_name}")
-    logger.info(f"Deleting ddl and dml artifacts for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
-    print(f"Deleting ddl and dml artifacts for {table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
-    statement_name = _build_statement_name(table_name, prefix+"-dml", CONFIGURED_POST_FIX_UNIT_TEST)
+    logger.info(f"Deleting ddl and dml artifacts for {table_name}{post_fix_unit_test}")
+    print(f"Deleting ddl and dml artifacts for {table_name}{post_fix_unit_test}")
+    statement_name = _build_statement_name(table_name, prefix+"-dml", post_fix_unit_test)
     statement_mgr.delete_statement_if_exists(statement_name)
-    statement_name = _build_statement_name(table_name, prefix+"-ddl", CONFIGURED_POST_FIX_UNIT_TEST)
+    statement_name = _build_statement_name(table_name, prefix+"-ddl", post_fix_unit_test)
     statement_mgr.delete_statement_if_exists(statement_name)
-    statement_mgr.drop_table(table_name+CONFIGURED_POST_FIX_UNIT_TEST, compute_pool_id)
+    statement_mgr.drop_table(table_name+post_fix_unit_test, compute_pool_id)
     for foundation in test_suite_def.foundations:
-        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
-        statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl", CONFIGURED_POST_FIX_UNIT_TEST)
+        logger.info(f"Deleting ddl and dml artifacts for {foundation.table_name}{post_fix_unit_test}")
+        statement_name = _build_statement_name(foundation.table_name, prefix+"-ddl", post_fix_unit_test)
         statement_mgr.delete_statement_if_exists(statement_name)
-        statement_mgr.drop_table(foundation.table_name+CONFIGURED_POST_FIX_UNIT_TEST, compute_pool_id)
+        statement_mgr.drop_table(foundation.table_name+post_fix_unit_test, compute_pool_id)
     logger.info(f"Test artifacts for {table_name} deleted")
 
 
@@ -285,31 +288,20 @@ def _execute_flink_test_statement(
     Execute the Flink statement and return the statement object and whether it was newly created.
     Returns (statement, is_new) where is_new indicates if this was a newly executed statement.
     """
-    logger.info(f"Run flink statement {statement_name}")
-    if existing_statement:
-        statement = existing_statement
-    else:
-        statement = statement_mgr.get_statement(statement_name)
-
     # Check if we need to create/execute the statement
     should_execute = False
     is_new = False
-    if statement is None:
+    if existing_statement is None or isinstance(existing_statement, StatementError):
         should_execute = True
         is_new = True
-    elif isinstance(statement, StatementError):
-        if hasattr(statement, 'errors') and statement.errors and len(statement.errors) > 0:
-            if statement.errors[0].status == "404":
-                is_new = True
-        should_execute = True
-    elif isinstance(statement, Statement):
+    elif isinstance(existing_statement, Statement):
         # Statement exists - check if it's running
-        if statement.status and statement.status.phase != "RUNNING":
+        if existing_statement.status and existing_statement.status.phase != "RUNNING":
             should_execute = True
             statement_mgr.delete_statement_if_exists(statement_name)
         else:
             logger.info(f"{statement_name} statement already exists -> do nothing")
-            return statement, is_new  # Return existing statement, not new
+            return existing_statement, is_new  # Return existing statement, not new
 
     if should_execute:
         try:
@@ -320,25 +312,23 @@ def _execute_flink_test_statement(
             logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
             print(f"Execute statement {statement_name}  on: {compute_pool_id}")
             post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out, {})
-            if "Exists but deleted so retry" in post_statement:
-                logger.info(f"Statement {statement_name} exists but deleted so retry")
-                post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out, {})
+            logger.info(f"Statement {statement_name} posted: {post_statement}")
             return post_statement, is_new  # Return new statement
         except Exception as e:
             logger.error(e)
             raise e
     else:
         # Return existing statement if available but it needs processing
-        if isinstance(statement, Statement):
-            logger.info(f"{statement.name} statement already exists -> {statement.status.phase}")
-            print(f"{statement_name} statement already exists -> {statement.status.phase}")
-            return statement, is_new
+        if isinstance(existing_statement, Statement):
+            logger.info(f"{existing_statement.name} statement already exists -> {existing_statement.status.phase}")
+            print(f"{statement_name} statement already exists -> {existing_statement.status.phase}")
+            return existing_statement, is_new
         else:
             logger.error(f"Error executing test statement {statement_name}")
             raise ValueError(f"Error executing test statement {statement_name}")
 
 def _load_test_suite_definition(table_name: str) -> Tuple[SLTestDefinition, FlinkTableReference]:
-    inventory_path = os.path.join(os.getenv("PIPELINES"),)
+    inventory_path = os.path.join(os.getenv("PIPELINES"))
     table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
     table_ref: FlinkTableReference = get_table_ref_from_inventory(table_name, table_inventory)
     if not table_ref:
@@ -387,13 +377,14 @@ def _execute_foundation_statements(
 
 def _read_and_treat_sql_content_for_ut(sql_path: str,
                                     fct: Callable[[str], str],
-                                    table_name: str) -> str:
+                                    table_name: str,
+                                    post_fix_unit_test: str) -> str:
     """
     Read the SQL content from the file and apply the given function fct() to the content.
     """
     sql_path = from_pipeline_to_absolute(sql_path)
     with open(sql_path, "r") as f:
-        return fct(f.read(), table_name)
+        return fct(f.read(), table_name, post_fix_unit_test)
 
 
 
@@ -401,12 +392,13 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                    table_ref: FlinkTableReference,
                                    prefix: str = 'dev',
                                    compute_pool_id: Optional[str] = None,
-                                   statements: Optional[Set[Statement]] = None
+                                   statements: Optional[Set[Statement]] = None,
+                                   post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> Set[Statement]:
     """
     Run DDL and DML statements for the given tested table
     """
-    def replace_table_name(sql_content: str, table_name: str) -> str:
+    def replace_table_name(sql_content: str, table_name: str, post_fix: str) -> str:
         """
         Replace the table names in the SQL content with the configured postfix for the unit test.
         Change the scan.bounded.mode for DDL to stop dml.
@@ -425,8 +417,8 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
 
             # Handle backticked table names
             backtick_pattern = r'`(' + escaped_table + r')`'
-            if table+DEFAULT_POST_FIX_UNIT_TEST in sql_content:
-                sql_content = re.sub(backtick_pattern, f'`{table}{CONFIGURED_POST_FIX_UNIT_TEST}`', sql_content, flags=re.IGNORECASE)
+            if table+post_fix in sql_content:
+                sql_content = re.sub(backtick_pattern, f'`{table}{post_fix}`', sql_content, flags=re.IGNORECASE)
             else:
                 sql_content = re.sub(backtick_pattern, f'`{table}`', sql_content, flags=re.IGNORECASE)
             # Handle non-backticked table names with word boundaries
@@ -434,7 +426,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
 
             def replacement_func(match):
                 table_name = match.group(1)
-                return f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}"
+                return f"{table_name}{post_fix}"
 
             sql_content = re.sub(word_pattern, replacement_func, sql_content, flags=re.IGNORECASE)
             if "CREATE TABLE" in sql_content:
@@ -460,6 +452,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 fct=replace_table_name,
                                 product_name=table_ref.product_name,
                                 statements=statements)
+    logger.info(f"DDL {table_name} result: {ddl_result}")
     if ddl_result is not None:
         statements.update(ddl_result)
 
@@ -471,6 +464,7 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 fct=replace_table_name,
                                 product_name=table_ref.product_name,
                                 statements=statements)
+    logger.info(f"DML {table_name} result: {dml_result}")
     if dml_result is not None:
         statements.update(dml_result)
 
@@ -482,21 +476,22 @@ def _load_sql_and_execute_statement(table_name: str,
                                 compute_pool_id: Optional[str] = None,
                                 fct: Callable[[str], str] = lambda x: x,
                                 product_name: Optional[str] = None,
-                                statements: Optional[Set[Statement]] = None) -> Optional[Set[Statement]]:
+                                statements: Optional[Set[Statement]] = None,
+                                post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST) -> Optional[Set[Statement]]:
 
     # Initialize statements list if None
     if statements is None:
         statements = set()
 
-    statement_name = _build_statement_name(table_name, prefix, CONFIGURED_POST_FIX_UNIT_TEST)
-
+    statement_name = _build_statement_name(table_name, prefix, post_fix_unit_test)
+    logger.info(f"For table: {table_name} and post fix: {post_fix_unit_test}, statement name: {statement_name}")
     # For DDL statements, check if table already exists
     if "ddl" in prefix:
         try:
-            table_under_test_exists = _table_exists(table_name+CONFIGURED_POST_FIX_UNIT_TEST)
+            table_under_test_exists = _table_exists(table_name+post_fix_unit_test)
             if table_under_test_exists:
-                logger.info(f"Table {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} already exists, skipping DDL")
-                print(f"Table {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} already exists, skipping DDL")
+                logger.info(f"Table {table_name}{post_fix_unit_test} already exists, skipping DDL")
+                print(f"Table {table_name}{post_fix_unit_test} already exists, skipping DDL")
                 return statements
         except Exception as e:
             logger.warning(f"Error checking if table exists: {e}")
@@ -505,6 +500,7 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check existing statement status
     try:
         statement_info = statement_mgr.get_statement(statement_name)
+        logger.info(f"Statement info: {statement_info}")
         if statement_info and isinstance(statement_info, Statement):
             if statement_info.status.phase in ["RUNNING", "COMPLETED"]:
                 logger.info(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
@@ -518,8 +514,10 @@ def _load_sql_and_execute_statement(table_name: str,
                     statement_mgr.delete_statement_if_exists(statement_name)
                 except Exception as e:
                     logger.warning(f"Error deleting failed statement: {e}")
+        elif isinstance(statement_info, StatementError):
+            statement_info = None
         # at this point it is possible statement_info is a StatementError because of 404 for statement not found. we can then continue
-        sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name)
+        sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name, post_fix_unit_test)
 
         statement, is_new = _execute_flink_test_statement(
             sql_content=sql_content,
@@ -556,7 +554,7 @@ def _load_sql_and_execute_statement(table_name: str,
                 elif wait_time >= max_wait:
                     logger.warning(f"DDL deployment taking longer than expected for {statement_name}")
 
-            print(f"Executed statement for table: {table_name}{CONFIGURED_POST_FIX_UNIT_TEST} status: {statement.status.phase}\n")
+            print(f"Executed statement for table: {table_name}{post_fix_unit_test} status: {statement.status.phase}\n")
 
     except Exception as e:
         logger.warning(f"Error checking statement status: {e}")
@@ -566,7 +564,8 @@ def _load_sql_and_execute_statement(table_name: str,
 def _execute_test_inputs(test_case: SLTestCase,
                         table_ref: FlinkTableReference,
                         prefix: str = 'dev',
-                        compute_pool_id: Optional[str] = None
+                        compute_pool_id: Optional[str] = None,
+                        post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> Set[Statement]:
     """
     Execute the input and validation SQL statements for a given test case.
@@ -578,7 +577,7 @@ def _execute_test_inputs(test_case: SLTestCase,
     statements = set()
     for input_step in test_case.inputs:
         statement = None
-        print(f"Run insert test data for {input_step.table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
+        print(f"Run insert test data for {input_step.table_name}{post_fix_unit_test}")
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             statements = _load_sql_and_execute_statement(table_name=input_step.table_name,
@@ -592,7 +591,7 @@ def _execute_test_inputs(test_case: SLTestCase,
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             sql_path = from_pipeline_to_absolute(sql_path)
             headers, rows = _read_csv_file(sql_path)
-            sql = _transform_csv_to_sql(input_step.table_name+CONFIGURED_POST_FIX_UNIT_TEST, headers, rows)
+            sql = _transform_csv_to_sql(input_step.table_name+post_fix_unit_test, headers, rows)
             print(f"Execute test input {sql}")
             statement_name = _build_statement_name(input_step.table_name, prefix)
 
@@ -614,7 +613,8 @@ def _execute_test_inputs(test_case: SLTestCase,
 def _execute_test_validation(test_case: SLTestCase,
                           table_ref: FlinkTableReference,
                           prefix: str = 'dev',
-                          compute_pool_id: Optional[str] = None
+                          compute_pool_id: Optional[str] = None,
+                          post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> Tuple[Set[Statement], str, Optional[StatementResult]]:
     """
     Execute the validation SQL statements for a given test case.
@@ -631,13 +631,11 @@ def _execute_test_validation(test_case: SLTestCase,
 
     for output_step in test_case.outputs:
         sql_path = os.path.join(table_ref.table_folder_name, output_step.file_name)
-        statement_name = _build_statement_name(output_step.table_name, prefix, CONFIGURED_POST_FIX_UNIT_TEST)
+        statement_name = _build_statement_name(output_step.table_name, prefix, post_fix_unit_test)
         # First try to delete any existing statement
         try:
             delete_result = statement_mgr.delete_statement_if_exists(statement_name)
-            if delete_result is None:
-                logger.info(f"No existing statement found for {statement_name}")
-            elif "deleted" not in delete_result:
+            if delete_result and "deleted" not in delete_result:
                 logger.warning(f"Unexpected delete result for {statement_name}: {delete_result}")
         except Exception as e:
             logger.warning(f"Error deleting statement {statement_name}: {e}")
@@ -652,24 +650,23 @@ def _execute_test_validation(test_case: SLTestCase,
                 compute_pool_id=compute_pool_id,
                 fct=_replace_table_name_ut_with_configured_postfix,
                 product_name=table_ref.product_name,
-                statements=statements
+                statements=statements,
+                post_fix_unit_test=post_fix_unit_test
             )
 
             time.sleep(2)
-            # Poll for results
             result, statement_result = _poll_response(statement_name)
             if result:
                 result_text += result
 
-            # Clean up after getting results
             try:
                 delete_result = statement_mgr.delete_statement_if_exists(statement_name)
                 if delete_result is None:
                     logger.info(f"Statement {statement_name} already deleted")
                 elif "deleted" not in delete_result:
                     logger.warning(f"Unexpected final delete result for {statement_name}: {delete_result}")
-            except Exception as e:
-                logger.warning(f"Error in final cleanup of statement {statement_name}: {e}")
+            except Exception as cleanup_error:
+                logger.warning(f"Error in final cleanup of statement {statement_name}: {cleanup_error}")
 
             return statements, result_text, statement_result
 
@@ -731,7 +728,8 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
                     table_inventory: Dict[str, FlinkTableReference],
                     create_csv: bool = False,
                     nb_test_cases: int = DEFAULT_TEST_CASES_COUNT,
-                    use_ai: bool = False) -> SLTestDefinition:
+                    use_ai: bool = False,
+                    post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST) -> SLTestDefinition:
     """
     Add the test files to the table/tests folder by looking at the referenced tables in the DML SQL content.
     """
@@ -764,7 +762,7 @@ def _add_test_files(table_to_test_ref: FlinkTableReference,
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
                 columns_names, rows = _build_data_sample(table_struct[input_data.table_name])
                 with open(input_file, "w") as f:
-                    f.write(f"insert into {input_data.table_name}{DEFAULT_POST_FIX_UNIT_TEST}\n({columns_names})\nvalues\n{rows}\n")
+                    f.write(f"insert into {input_data.table_name}{post_fix_unit_test}\n({columns_names})\nvalues\n{rows}\n")
 
             if input_data.file_type == "csv":
                 input_file = os.path.join(tests_folder_path, '..', input_data.file_name)
@@ -965,6 +963,22 @@ def _build_data_sample(columns: Dict[str, Dict[str, Any]], idx_offset: int = 0) 
     return columns_names, rows
 
 
+
+
+def _coerce_cache_created_at(created_at) -> Optional[datetime]:
+    """Normalize cache timestamp from Pydantic (datetime) or JSON file (ISO / legacy str)."""
+    if created_at is None:
+        return None
+    if isinstance(created_at, datetime):
+        return created_at
+    if isinstance(created_at, str):
+        try:
+            return datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+    return None
+
+
 _topic_list_cache: Optional[TopicListCache] = None
 def _table_exists(table_name: str) -> bool:
     """
@@ -977,10 +991,11 @@ def _table_exists(table_name: str) -> bool:
             try:
                 with open(TOPIC_LIST_FILE, "r") as f:
                     _topic_list_cache = TopicListCache.model_validate(json.load(f))
-                if _topic_list_cache.created_at and (datetime.now() - datetime.strptime(_topic_list_cache.created_at, "%Y-%m-%d %H:%M:%S")).total_seconds() < get_config()['app']['cache_ttl']:
+                cache_created_at = _coerce_cache_created_at(_topic_list_cache.created_at)
+                if cache_created_at and (datetime.now() - cache_created_at).total_seconds() < get_config()['app']['cache_ttl']:
                     reload = False
             except Exception as e:
-                logger.warning(f"Error loading topic list from file {TOPIC_LIST_FILE}: {e}")
+                logger.info(f"Re-loading topic list from file {TOPIC_LIST_FILE}: {e}")
                 reload = True
                 os.remove(TOPIC_LIST_FILE)
         if reload:
@@ -1025,7 +1040,7 @@ def _transform_csv_to_sql(table_name: str,
     sql_content = sql_content[:-2] + ";\n"
     return sql_content
 
-def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = CONFIGURED_POST_FIX_UNIT_TEST) -> str:
+def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = DEFAULT_POST_FIX_UNIT_TEST) -> str:
 
     _table_name_for_statement = table_name
     if len(_table_name_for_statement) > MAX_STATEMENT_NAME_LENGTH:
@@ -1033,9 +1048,9 @@ def _build_statement_name(table_name: str, prefix: str, post_fix_ut: str = CONFI
     statement_name = f"{prefix}-{_table_name_for_statement}{post_fix_ut}"
     return statement_name.replace('_', '-').replace('.', '-')
 
-def _replace_table_name_ut_with_configured_postfix(sql_content: str, table_name: str) -> str:
+def _replace_table_name_ut_with_configured_postfix(sql_content: str, table_name: str, post_fix: str) -> str:
 
-    return sql_content.replace(table_name+DEFAULT_POST_FIX_UNIT_TEST, f"{table_name}{CONFIGURED_POST_FIX_UNIT_TEST}")
+    return sql_content.replace(table_name+DEFAULT_POST_FIX_UNIT_TEST, f"{table_name}{post_fix}")
 
 def _add_data_consistency_with_ai(table_folder_name: str,
     test_definition: SLTestDefinition,

@@ -53,17 +53,17 @@ Move test classes as inheriting IntegrationTestCase
 
 ## `table` (`shift_left table ...`)
 
-| CLI command | Full IT (CLI) | Test file / notes |
+| CLI command | Tests | Test file / notes |
 |-------------|---------------|-------------------|
-| `init` | Yes | `cli/test_table_cli.py` |
-| `build-inventory` | Yes | `cli/test_table_cli.py`; also `cli/test_happy_path_cli.py`, `test_statement_mgr.py` (root app) |
-| `search-source-dependencies` | Yes | `cli/test_table_cli.py` |
+| `init` | UT | `ut/cli/test_table_cli.py` |
+| `build-inventory` | UT | `ut/cli/test_table_cli.py`;  |
+| `search-source-dependencies` | UT | `ut/cli/test_table_cli.py` |
 | `migrate` | Opt-in | `cli/test_table_cli.py` (`SHIFT_LEFT_IT_USE_DEMO_ENV`); `tests/ai/test_migrate_cli_ksql.py` (AI area, ksql) |
-| `update-makefile` | Yes | `cli/test_table_cli.py` |
-| `update-all-makefiles` | Yes | `cli/test_table_cli.py` |
-| `validate-table-names` | Yes | `cli/test_table_cli.py` |
-| `update-tables` | Yes | `cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`) |
-| `init-unit-tests` | Gap | Only commented examples in `debug_it.py` |
+| `update-makefile` | NO | |
+| `update-all-makefiles` | NO |  |
+| `validate-table-names` | Yes | `ut/cli/test_table_cli.py` |
+| `update-tables` | Yes | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`) |
+| `init-unit-tests` | UT | `ut/cli/test_table_cli.py` |
 | `run-unit-tests` | Yes (cloud) | `test_it_test_mgr.py` uses root `app` + real env |
 | `run-validation-tests` | Yes | test_it_test_mgr.py - test_3_execute_validation_tests|
 | `delete-unit-tests` | Yes | test_it_test_mgr.py - test_4_delete_test_artifacts |

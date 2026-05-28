@@ -104,11 +104,9 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'], env=env)
         # result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'sl_c360_fct_user_per_group', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--product-name', 'qx'], env=env)
-        #result = runner.invoke(app, ['table', 'migrate', 'dim_training_course', os.getenv('SRC_FOLDER','.') + '/dimensions/qx/dim_training_course.sql', os.getenv('STAGING')], env=env)
-        #result = runner.invoke(app, ['table', 'init-unit-tests', 'aqem_fct_step_role_assignee_relation'], env=env)
-        #result = runner.invoke(app, ['table', 'build-inventory'], env=env)
         #result = runner.invoke(app, ['pipeline', 'build-metadata', os.getenv('PIPELINES') + '/stage/stage_tenant_dimension/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql'], env=env)
-        #result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'], env=env)
+        #result = runner.invoke(app, ['table', 'run-unit-tests', 'sl_c360_dim_users', '--test-case-name', 'test_c360_dim_users_1'], env=env)
+        result = runner.invoke(app, ['table', 'validate-unit-tests', 'sl_c360_dim_users', '--test-case-name', 'test_c360_dim_users_1'], env=env)
         #result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'], env=env)
         #result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'], env=env)
         #result = runner.invoke(app,['pipeline', 'build-all-metadata'], env=env)
@@ -118,7 +116,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         #result = runner.invoke(app, ['pipeline', 'report', 'customer_analytics_c360'], env=env)
         # result = runner.invoke(app, ['pipeline', 'report-running-statements', '--table-name', 'sl_c360_fct_user_per_group'], env=env)
         #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/test_prepare_tables_integration.sql', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
-        result = runner.invoke(app, ['project', 'list-modified-files', 'cc-client', '--project-path', os.getenv('PIPELINES') + "/../../../../../../", '--file-filter', '.sql', '--since', '2026-05-01'], env=env)
+        #result = runner.invoke(app, ['project', 'list-modified-files', 'cc-client', '--project-path', os.getenv('PIPELINES') + "/../../../../../../", '--file-filter', '.sql', '--since', '2026-05-01'], env=env)
         print(result.stdout)
 
 

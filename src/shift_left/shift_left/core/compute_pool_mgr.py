@@ -5,7 +5,7 @@ import time
 import os, json
 from datetime import datetime
 from importlib import import_module
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from shift_left.core.utils.app_config import get_config, logger, session_log_dir
 from shift_left.core.models.flink_compute_pool_model import ComputePoolList, ComputePoolInfo, ComputePoolListResponse, ComputePoolResponse
 from shift_left.core.utils.naming_convention import ComputePoolNameModifier
@@ -255,6 +255,36 @@ def delete_all_compute_pools_of_product(product_name: str):
     else:
         logger.error("No product name provided, will not delete any compute pool")
         raise Exception("No product name provided, will not delete any compute pool")
+
+
+def delete_compute_pools_by_ids(pool_ids: List[str], product_name: Optional[str] = None) -> int:
+    """
+    Delete compute pools listed by ID. product_name is used for logging only.
+    Unknown IDs are skipped with a warning.
+    """
+    if not pool_ids:
+        logger.error("No compute pool IDs provided, will not delete any compute pool")
+        raise Exception("No compute pool IDs provided, will not delete any compute pool")
+
+    compute_pool_list = get_compute_pool_list()
+    log_context = f" for product {product_name}" if product_name else ""
+    logger.info(f"Delete compute pools from list{log_context}: {pool_ids}")
+    print(f"Delete compute pools from list{log_context}")
+
+    count = 0
+    for pool_id in pool_ids:
+        pool = get_compute_pool_with_id(compute_pool_list, pool_id)
+        if pool is None:
+            print(f"[yellow]Warning: compute pool {pool_id} not found, skipping[/yellow]")
+            logger.warning(f"Compute pool {pool_id} not found, skipping")
+            continue
+        delete_compute_pool(pool_id)
+        print(f"Deleted compute pool {pool_id}")
+        count += 1
+
+    logger.info(f"Deleted {count} compute pools from list{log_context}")
+    print(f"Deleted {count} compute pools from list{log_context}")
+    return count
 
 # ------ Private methods ------
 
