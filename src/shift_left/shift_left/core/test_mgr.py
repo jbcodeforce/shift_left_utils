@@ -10,6 +10,7 @@ Provides testing capabilities including:
 - Integration with Confluent Cloud Flink REST API
 - YAML-based test suite definitions and CSV test data support
 """
+from turtle import st
 from pydantic import BaseModel, Field
 from typing import List, Final, Optional, Dict, Tuple, Any, Callable, Set
 import yaml
@@ -41,9 +42,6 @@ TEST_DEFINITION_FILE_NAME: Final[str] = "test_definitions.yaml"
 DEFAULT_POST_FIX_UNIT_TEST: Final[str] = "_ut"
 TOPIC_LIST_FILE: Final[str] = shift_left_dir + "/topic_list.json"
 
-# Polling and retry configuration constants
-MAX_POLLING_RETRIES: Final[int] = 7
-POLLING_RETRY_DELAY_SECONDS: Final[int] = 10
 
 # SQL generation limits
 MAX_SQL_CONTENT_SIZE_BYTES: Final[int] = 4_000_000  # 4MB limit for SQL content
@@ -88,9 +86,10 @@ def init_unit_test_for_table(table_name: str,
     print(f"Unit test for {table_name} created")
 
 def execute_one_or_all_tests(table_name: str,
-                      test_case_name: str = None,
+                      test_case_name: Optional[str] = None,
                       compute_pool_id: Optional[str] = None,
-                      run_validation: bool = False
+                      run_validation: bool = False,
+                      post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> TestSuiteResult:
     """
     Execute all test cases defined in the test suite definition for a given table.
@@ -104,7 +103,7 @@ def execute_one_or_all_tests(table_name: str,
     if compute_pool_id is None:
         compute_pool_id = config['flink']['compute_pool_id']
     prefix = config['kafka']['cluster_type']
-    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id, prefix)
+    test_suite_def, table_ref, prefix, test_result = _init_test_foundations(table_name, test_case_name, compute_pool_id, prefix, post_fix_unit_test)
 
     test_suite_result = TestSuiteResult(foundation_statements=test_result.foundation_statements, test_results={})
 
@@ -116,14 +115,16 @@ def execute_one_or_all_tests(table_name: str,
         statements = _execute_test_inputs(test_case=test_case,
                                         table_ref=table_ref,
                                         prefix=prefix+"-ins-"+str(idx + 1),
-                                        compute_pool_id=compute_pool_id)
+                                        compute_pool_id=compute_pool_id,
+                                        post_fix_unit_test=post_fix_unit_test)
         test_result = TestResult(test_case_name=test_case.name, result="insertion done")
         test_result.statements.update(statements)
         if run_validation:
-            statements, result_text, statement_result = _execute_test_validation(test_case=test_case,
+            statements, result_text, statement_result = _execute_validation_tests(test_case=test_case,
                                                                 table_ref=table_ref,
                                                                 prefix=prefix+"-val-"+str(idx + 1),
-                                                                compute_pool_id=compute_pool_id)
+                                                                compute_pool_id=compute_pool_id,
+                                                                post_fix_unit_test=post_fix_unit_test)
             test_result.result = result_text
             test_result.statements.update(statements)
             test_result.validation_result = statement_result
@@ -164,13 +165,14 @@ def execute_validation_tests(table_name: str,
     )
 
     try:
+        statements = set()
         for idx, test_case in enumerate(test_suite_def.test_suite):
             if not run_all and test_case_name and test_case.name != test_case_name:
                 continue
 
             logger.info(f"Executing validation for test case: {test_case.name}")
             try:
-                statements, result_text, statement_result = _execute_test_validation(
+                statements, result_text, statement_result = _execute_validation_tests(
                     test_case=test_case,
                     table_ref=table_ref,
                     prefix=f"{prefix}-val-{str(idx + 1)}",
@@ -182,7 +184,8 @@ def execute_validation_tests(table_name: str,
                     test_case_name=test_case.name,
                     result=result_text,
                     validation_result=statement_result,
-                    status="completed"
+                    status="completed",
+                    statements=statements
                 )
 
             except Exception as case_error:
@@ -190,7 +193,8 @@ def execute_validation_tests(table_name: str,
                 test_suite_result.test_results[test_case.name] = TestResult(
                     test_case_name=test_case.name,
                     result=f"Error: {str(case_error)}",
-                    status="error"
+                    status="error",
+                    statements=statements
                 )
 
             if test_case_name and test_case.name == test_case_name:
@@ -250,7 +254,8 @@ def delete_test_artifacts(table_name: str,
 def _init_test_foundations(table_name: str,
         test_case_name: str,
         compute_pool_id: Optional[str] = None,
-        prefix: str = "dev"
+        prefix: str = "dev",
+        post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> Tuple[SLTestDefinition, FlinkTableReference, str, TestResult]:
     """
     For each input table as defined in the test suite foundations:
@@ -268,12 +273,15 @@ def _init_test_foundations(table_name: str,
     test_result.foundation_statements = _execute_foundation_statements(test_suite_def,
                                             table_ref,
                                             prefix,
-                                            compute_pool_id)
+                                            compute_pool_id,
+                                            post_fix_unit_test)
     test_result.foundation_statements=_start_ddl_dml_for_flink_under_test(table_name,
                                             table_ref,
                                             prefix,
                                             compute_pool_id,
-                                            statements=test_result.foundation_statements)
+                                            post_fix_unit_test,
+                                            statements=test_result.foundation_statements
+                                            )
     return test_suite_def, table_ref, prefix, test_result
 
 
@@ -355,10 +363,12 @@ def _execute_foundation_statements(
     test_suite_def: SLTestDefinition,
     table_ref: FlinkTableReference,
     prefix: str = 'dev',
-    compute_pool_id: Optional[str] = None
+    compute_pool_id: Optional[str] = None,
+    post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
 ) -> Set[Statement]:
     """
-    Execute the DDL statements for the foundation tables for the unit tests.
+    Execute the DDL statements for the foundation tables of the unit tests.
+    @return a list of statements that were executed.
     """
 
     statements = set()
@@ -366,13 +376,15 @@ def _execute_foundation_statements(
     for foundation in test_suite_def.foundations:
         testfile_path = os.path.join(table_folder, foundation.ddl_for_test)
         print(f"May execute foundation statement for {foundation.table_name} {testfile_path} on {compute_pool_id}")
-        statements = _load_sql_and_execute_statement(table_name=foundation.table_name,
+        statement = _load_sql_and_execute_statement(table_name=foundation.table_name,
                                     sql_path=testfile_path,
                                     prefix=prefix+"-ddl",
                                     compute_pool_id=compute_pool_id,
                                     fct=_replace_table_name_ut_with_configured_postfix,
                                     product_name=table_ref.product_name,
-                                    statements=statements)
+                                    post_fix_unit_test=post_fix_unit_test)
+        if statement:
+            statements.add(statement)
     return statements
 
 def _read_and_treat_sql_content_for_ut(sql_path: str,
@@ -392,8 +404,8 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                    table_ref: FlinkTableReference,
                                    prefix: str = 'dev',
                                    compute_pool_id: Optional[str] = None,
-                                   statements: Optional[Set[Statement]] = None,
-                                   post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST
+                                   post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST,
+                                   statements: Optional[Set[Statement]] = None
 ) -> Set[Statement]:
     """
     Run DDL and DML statements for the given tested table
@@ -451,10 +463,10 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 compute_pool_id=compute_pool_id,
                                 fct=replace_table_name,
                                 product_name=table_ref.product_name,
-                                statements=statements)
+                                post_fix_unit_test=post_fix_unit_test)
     logger.info(f"DDL {table_name} result: {ddl_result}")
     if ddl_result is not None:
-        statements.update(ddl_result)
+        statements.add(ddl_result)
 
     # Process DML
     dml_result = _load_sql_and_execute_statement(table_name=table_name,
@@ -463,10 +475,10 @@ def _start_ddl_dml_for_flink_under_test(table_name: str,
                                 compute_pool_id=compute_pool_id,
                                 fct=replace_table_name,
                                 product_name=table_ref.product_name,
-                                statements=statements)
+                                post_fix_unit_test=post_fix_unit_test)
     logger.info(f"DML {table_name} result: {dml_result}")
     if dml_result is not None:
-        statements.update(dml_result)
+        statements.add(dml_result)
 
     return statements
 
@@ -476,14 +488,10 @@ def _load_sql_and_execute_statement(table_name: str,
                                 compute_pool_id: Optional[str] = None,
                                 fct: Callable[[str], str] = lambda x: x,
                                 product_name: Optional[str] = None,
-                                statements: Optional[Set[Statement]] = None,
-                                post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST) -> Optional[Set[Statement]]:
-
-    # Initialize statements list if None
-    if statements is None:
-        statements = set()
+                                post_fix_unit_test: str = DEFAULT_POST_FIX_UNIT_TEST) -> Statement | None:
 
     statement_name = _build_statement_name(table_name, prefix, post_fix_unit_test)
+    statement = None
     logger.info(f"For table: {table_name} and post fix: {post_fix_unit_test}, statement name: {statement_name}")
     # For DDL statements, check if table already exists
     if "ddl" in prefix:
@@ -492,31 +500,30 @@ def _load_sql_and_execute_statement(table_name: str,
             if table_under_test_exists:
                 logger.info(f"Table {table_name}{post_fix_unit_test} already exists, skipping DDL")
                 print(f"Table {table_name}{post_fix_unit_test} already exists, skipping DDL")
-                return statements
+                return statement # Table already exists, no need to execute the statement, it is None
         except Exception as e:
             logger.warning(f"Error checking if table exists: {e}")
             # Continue execution - we'll try to create the table anyway
 
     # Check existing statement status
     try:
-        statement_info = statement_mgr.get_statement(statement_name)
-        logger.info(f"Statement info: {statement_info}")
-        if statement_info and isinstance(statement_info, Statement):
-            if statement_info.status.phase in ["RUNNING", "COMPLETED"]:
-                logger.info(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
-                print(f"Statement {statement_name} already exists and is {statement_info.status.phase}")
-                statements.add(statement_info)
-                return statements
-            elif statement_info.status.phase == "FAILED":
+        statement = statement_mgr.get_statement(statement_name)
+        logger.info(f"Statement retrieved: {statement.model_dump_json(indent=2)}")
+        if statement and isinstance(statement, Statement):
+            if statement.status.phase in ["RUNNING", "COMPLETED"]:
+                logger.info(f"Statement {statement_name} already exists and is {statement.status.phase}")
+                print(f"Statement {statement_name} already exists and is {statement.status.phase}")
+                return statement
+            elif statement.status.phase == "FAILED":
                 logger.warning(f"Found failed statement {statement_name}, will try to recreate")
                 print(f"Found failed statement {statement_name}, will try to recreate")
                 try:
                     statement_mgr.delete_statement_if_exists(statement_name)
                 except Exception as e:
                     logger.warning(f"Error deleting failed statement: {e}")
-        elif isinstance(statement_info, StatementError):
-            statement_info = None
-        # at this point it is possible statement_info is a StatementError because of 404 for statement not found. we can then continue
+        elif isinstance(statement, StatementError):
+            statement = None
+        # at this point it is possible statement is a StatementError because of 404 for statement not found. we can then continue
         sql_content = _read_and_treat_sql_content_for_ut(sql_path, fct, table_name, post_fix_unit_test)
 
         statement, is_new = _execute_flink_test_statement(
@@ -524,12 +531,10 @@ def _load_sql_and_execute_statement(table_name: str,
             statement_name=statement_name,
             compute_pool_id=compute_pool_id,
             product_name=product_name,
-            existing_statement=statement_info
+            existing_statement=statement
         )
 
         if statement and is_new:
-            statements.add(statement)
-
             # Handle statement status
             if statement.status and statement.status.phase == "FAILED":
                 error_msg = f"Failed to create {table_name}: {statement.status.detail}"
@@ -559,7 +564,7 @@ def _load_sql_and_execute_statement(table_name: str,
     except Exception as e:
         logger.warning(f"Error checking statement status: {e}")
         # Continue execution - we'll try to create the statement
-    return statements
+    return statement
 
 def _execute_test_inputs(test_case: SLTestCase,
                         table_ref: FlinkTableReference,
@@ -580,13 +585,15 @@ def _execute_test_inputs(test_case: SLTestCase,
         print(f"Run insert test data for {input_step.table_name}{post_fix_unit_test}")
         if input_step.file_type == "sql":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
-            statements = _load_sql_and_execute_statement(table_name=input_step.table_name,
+            statement = _load_sql_and_execute_statement(table_name=input_step.table_name,
                                         sql_path=sql_path,
                                         prefix=prefix,
                                         compute_pool_id=compute_pool_id,
                                         fct=_replace_table_name_ut_with_configured_postfix,
                                         product_name=table_ref.product_name,
-                                        statements=statements)
+                                        post_fix_unit_test=post_fix_unit_test)
+            if statement:
+                statements.add(statement)
         elif input_step.file_type == "csv":
             sql_path = os.path.join(table_ref.table_folder_name, input_step.file_name)
             sql_path = from_pipeline_to_absolute(sql_path)
@@ -610,7 +617,7 @@ def _execute_test_inputs(test_case: SLTestCase,
             raise ValueError(f"Error in test input file type for {input_step.table_name}")
     return statements
 
-def _execute_test_validation(test_case: SLTestCase,
+def _execute_validation_tests(test_case: SLTestCase,
                           table_ref: FlinkTableReference,
                           prefix: str = 'dev',
                           compute_pool_id: Optional[str] = None,
@@ -642,22 +649,24 @@ def _execute_test_validation(test_case: SLTestCase,
             # Continue execution - the statement will be recreated
 
         try:
+            final_row= 'FAIL'
             # Execute the validation statement
-            statements = _load_sql_and_execute_statement(
+            statement = _load_sql_and_execute_statement(
                 table_name=output_step.table_name,
                 sql_path=sql_path,
                 prefix=prefix,
                 compute_pool_id=compute_pool_id,
                 fct=_replace_table_name_ut_with_configured_postfix,
                 product_name=table_ref.product_name,
-                statements=statements,
                 post_fix_unit_test=post_fix_unit_test
             )
-
-            time.sleep(2)
-            result, statement_result = _poll_response(statement_name)
-            if result:
-                result_text += result
+            if statement:
+                statements.add(statement)
+                statement_result = statement.result
+                if statement_result and statement_result.results and statement_result.results.data:
+                    # Take the last record in the list
+                    final_row = statement_result.results.data[0].row[0]
+                    result_text += str(final_row) + "\n"
 
             try:
                 delete_result = statement_mgr.delete_statement_if_exists(statement_name)
@@ -680,48 +689,6 @@ def _execute_test_validation(test_case: SLTestCase,
             raise  # Re-raise the original error
 
     return statements, result_text, None
-
-def _poll_response(statement_name: str) -> Tuple[str, Optional[StatementResult]]:
-    #Get result from the validation query
-    resp = None
-    max_retries = MAX_POLLING_RETRIES
-    retry_delay = POLLING_RETRY_DELAY_SECONDS
-
-    for poll in range(1, max_retries):
-        try:
-            # Check statement status first
-            statement = statement_mgr.get_statement(statement_name)
-            if (statement and hasattr(statement, 'status') and statement.status and
-                statement.status.phase == "FAILED"):
-                logger.info(f"Statement {statement_name} failed, stopping polling")
-                print(f"Statement {statement_name} failed: {statement.status.detail if statement.status.detail else 'No details available'}")
-                break
-
-            resp = statement_mgr.get_statement_results(statement_name)
-            # Check if results and data are non-empty
-            if resp and resp.results and resp.results.data:
-                logger.info(f"Received results on poll {poll}")
-                logger.info(f"resp: {resp}")
-                logger.info(f"data: {resp.results.data}")
-                break
-            elif resp:
-                logger.info(f"Attempt {poll}: Empty results, retrying in {retry_delay}s...")
-                print(f"... wait for result to {statement_name}")
-                time.sleep(retry_delay)
-        except Exception as e:
-            logger.info(f"Attempt {poll} failed with error: {e}")
-            print(f"Attempt {poll} failed with error: {e}")
-            #time.sleep(retry_delay)
-            break
-
-    #Check and print the result of the validation query
-    final_row= 'FAIL'
-    if resp and resp.results and resp.results.data:
-        # Take the last record in the list
-        final_row = resp.results.data[len(resp.results.data) - 1].row[0]
-    logger.info(f"Final Result for {statement_name}: {final_row}")
-    print(f"Final Result for {statement_name}: {final_row}")
-    return final_row, resp
 
 def _add_test_files(table_to_test_ref: FlinkTableReference,
                     tests_folder: str,

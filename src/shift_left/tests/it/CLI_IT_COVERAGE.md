@@ -53,9 +53,9 @@ Move test classes as inheriting IntegrationTestCase
 
 ## `table` (`shift_left table ...`)
 
-| CLI command | Tests | Test file / notes |
-|-------------|---------------|-------------------|
-| `init` | UT | `ut/cli/test_table_cli.py` |
+| CLI command                  | Tests | Test file / notes          | Exec Status |
+|------------------------------|-------|----------------------------|-------------|
+| `init`                       |   UT  | `ut/cli/test_table_cli.py` |.  ok        |
 | `build-inventory` | UT | `ut/cli/test_table_cli.py`;  |
 | `search-source-dependencies` | UT | `ut/cli/test_table_cli.py` |
 | `migrate` | Opt-in | `cli/test_table_cli.py` (`SHIFT_LEFT_IT_USE_DEMO_ENV`); `tests/ai/test_migrate_cli_ksql.py` (AI area, ksql) |
@@ -64,9 +64,9 @@ Move test classes as inheriting IntegrationTestCase
 | `validate-table-names` | Yes | `ut/cli/test_table_cli.py` |
 | `update-tables` | Yes | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`) |
 | `init-unit-tests` | UT | `ut/cli/test_table_cli.py` |
-| `run-unit-tests` | Yes (cloud) | `test_it_test_mgr.py` uses root `app` + real env |
-| `run-validation-tests` | Yes | test_it_test_mgr.py - test_3_execute_validation_tests|
-| `delete-unit-tests` | Yes | test_it_test_mgr.py - test_4_delete_test_artifacts |
+| `run-unit-tests` | IT (cloud) | `it/cli/test_ut_test_mgr.py` uses root `app` + real env |
+| `run-validation-tests` | IT | tit/cli/test_ut_test_mgr.py |
+| `delete-unit-tests` | IT | it/cli/test_ut_test_mgr.py-|
 | `explain` | Opt-in / error path | `cli/test_table_cli.py` — cloud paths need `SHIFT_LEFT_IT_USE_DEMO_ENV`; no-args error covered locally |
 
 ## `pipeline` (`shift_left pipeline ...`)

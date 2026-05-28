@@ -133,7 +133,7 @@ def wait_until_statement_not_pending_via_driver(
             with flink_connection(config, compute_pool_id=compute_pool_id) as conn:
                 drv = conn.get_statement(statement_name)
                 if drv.phase.value not in ("PENDING",):
-                    ps = driver_statement_to_pydantic(conn, drv)
+                    ps = driver_statement_to_pydantic(conn, drv, None)
                     ps.execution_time = time.perf_counter() - start_time  # type: ignore[attr-defined]
                     ps.loop_counter = pending_counter  # type: ignore[attr-defined]
                     return ps
@@ -339,7 +339,7 @@ def get_flink_statement_optional(config: dict, statement_name: str):
     try:
         with flink_connection(config) as conn:
             drv = conn.get_statement(statement_name)
-            return driver_statement_to_pydantic(conn, drv)
+            return driver_statement_to_pydantic(conn, drv, None)
     except StatementNotFoundError:
         logger.warning("Statement %s not found", statement_name)
         return None

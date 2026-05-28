@@ -218,7 +218,8 @@ def run_unit_tests(  table_name: Annotated[str, typer.Argument(help= "Name of th
     test_suite_result  = test_mgr.execute_one_or_all_tests(table_name=table_name,
                                                 test_case_name=test_case_name,
                                                 compute_pool_id=compute_pool_id,
-                                                run_validation=run_all)
+                                                run_validation=run_all,
+                                                post_fix_unit_test=post_fix_unit_test)
 
     file_name = f"{session_log_dir}/{table_name}-test-suite-result.json"
     with open(file_name, "w") as f:
@@ -249,6 +250,8 @@ def run_validation_tests(table_name: Annotated[str, typer.Argument(help= "Name o
         f.write(test_suite_result.model_dump_json(indent=2))
     print(f"Test suite report saved into {file_name}")
     logger.info(f"Test result: {test_suite_result.model_dump_json(indent=2)}")
+    for test_result in test_suite_result.test_results.values():
+        print(f"Test result of {test_result.test_case_name} is {test_result.result}")
     print("#" * 30 + f" Unit tests validation execution for {table_name} - {compute_pool_id}")
 
 @app.command()

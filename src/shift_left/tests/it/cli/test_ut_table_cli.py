@@ -46,28 +46,26 @@ class TestTableUnitTestsCLI(IntegrationTestCase):
             )
 
     def test_running_unit_tests(self):
-        """
-        Run the foundations to test the user dimension table.
-        """
+
+        print("-"*40)
+        print("Running unit tests for the user dimension table")
+        print("-"*40)
         result = self.runner.invoke(app, ["run-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
         self._assert_topics_exist(["sl_c360_src_users_ut", "sl_c360_dim_groups_ut", "sl_c360_dim_users_ut"])
 
-
-    def test_validate_unit_tests(self):
-        """
-        Validate the unit tests for the user dimension table.
-        """
+        print("-"*40)
+        print("Validating unit tests for the user dimension table")
+        print("-"*40)
         result = self.runner.invoke(app, ["validate-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
 
-    def test_delete_unit_tests(self):
-        """
-        Delete the unit tests for the user dimension table.
-        """
-        result = self.runner.invoke(app, ["delete-unit-tests", "sl_c360_dim_users", "--post-fix-unit-test", "_jb"])
+        print("-"*40)
+        print("Deleting unit tests for the user dimension table")
+        print("-"*40)
+        result = self.runner.invoke(app, ["delete-unit-tests", "sl_c360_dim_users", "--post-fix-unit-test", "_ut"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
 

@@ -239,7 +239,7 @@ class TestTestManager(unittest.TestCase):
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
         mock_poll_response.side_effect = self._mock_poll_response
-        statements, result_text, results = test_mgr._execute_test_validation(test_case, table_ref, 'dev-val', 'test_pool')
+        statements, result_text, results = test_mgr._execute_validation_tests(test_case, table_ref, 'dev-val', 'test_pool')
         assert len(statements) == 1
         assert statements.pop().name == "dev-val-p1-fct-order-ut"
         assert result_text == "PASS"
