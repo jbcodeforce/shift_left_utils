@@ -99,16 +99,17 @@ def build_TableReport(report_name: str,
     else:
         print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Building table report for {report_name} with {len(nodes)} nodes from now")
     if get_metrics:
-        compute_pool_ids = [node.compute_pool_id for node in nodes]
-        pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date=from_date)
-        num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids,from_date=from_date)
-        num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids,from_date=from_date)
+        compute_pool_ids = [node.compute_pool_id for node in nodes if node.compute_pool_id is not None and node.compute_pool_id != "None"]
+        pending_by_statement = metrics_mgr.get_pending_records(compute_pool_ids, from_date)
+        num_records_out_by_statement = metrics_mgr.get_num_records_out(compute_pool_ids, from_date)
+        num_records_in_by_statement = metrics_mgr.get_num_records_in(compute_pool_ids, from_date)
         for node in nodes:
             table_info = build_TableInfo(node,get_metrics=get_metrics)
             if node.existing_statement_info:
-                table_info.pending_records = pending_records.get(node.existing_statement_info.name, 0)
-                table_info.num_records_out = num_records_out.get(node.existing_statement_info.name, 0)
-                table_info.num_records_in = num_records_in.get(node.existing_statement_info.name, 0)
+                stmt_name = node.existing_statement_info.name
+                table_info.pending_records = pending_by_statement.get(stmt_name, 0)
+                table_info.num_records_out = num_records_out_by_statement.get(stmt_name, 0)
+                table_info.num_records_in = num_records_in_by_statement.get(stmt_name, 0)
             else:
                 logger.error(f"Node {node.table_name} has no existing statement info")
                 table_info.pending_records = 0
@@ -150,20 +151,38 @@ def build_TableInfo(node: FlinkStatementNode, get_metrics: bool = False) -> Tabl
 
     return table_info
 
-def build_simple_report(execution_plan: FlinkStatementExecutionPlan) -> str:
+def build_simple_report(tableReport: TableReport, from_date: str = "") -> str:
+    """
+    Build a simple string as a report of what is in the tables.
+    """
     report = f"{pad_or_truncate('Ancestor Table Name',40)}\t{pad_or_truncate('Statement Name', 40)} {'Status':<10} {'Compute Pool':<15} {'Created At':<16} {'Pending_msgs':<12} {'Num_msg_in':<11} {'Num_msg_out':<11}\n"
     report+=f"-"*165 + "\n"
-    compute_pool_ids = [node.compute_pool_id for node in execution_plan.nodes]
-    pending_records = metrics_mgr.get_pending_records(compute_pool_ids,from_date="")
-    num_records_out = metrics_mgr.get_num_records_out(compute_pool_ids,from_date="")
-    num_records_in = metrics_mgr.get_num_records_in(compute_pool_ids,from_date="")
-    for node in execution_plan.nodes:
-        if node.existing_statement_info:
-            pending_records_value = pending_records.get(node.existing_statement_info.name, 0)
-            num_records_out_value = num_records_out.get(node.existing_statement_info.name, 0)
-            num_records_in_value = num_records_in.get(node.existing_statement_info.name, 0)
-            report+=f"{pad_or_truncate(node.table_name, 40)}\t{pad_or_truncate(node.dml_statement_name, 40)} {pad_or_truncate(node.existing_statement_info.status_phase,10)} {pad_or_truncate(node.compute_pool_id,15)} {pad_or_truncate(node.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)}\t{pad_or_truncate(pending_records_value,12)} {pad_or_truncate(num_records_in_value,11)} {pad_or_truncate(num_records_out_value,11)}\n"
+    compute_pool_ids = [table.compute_pool_id for table in tableReport.tables if table.compute_pool_id and table.compute_pool_id != "None"]
+
+    pending_records_value_per_statement = metrics_mgr.get_pending_records(compute_pool_ids, from_date=from_date)
+    num_records_out_value_per_statement = metrics_mgr.get_num_records_out(compute_pool_ids, from_date=from_date)
+    num_records_in_value_per_statement = metrics_mgr.get_num_records_in(compute_pool_ids, from_date=from_date)
+    for table in tableReport.tables:
+        if table.statement_name and table.compute_pool_id:
+            if table.statement_name in pending_records_value_per_statement:
+                pending_records_value = pending_records_value_per_statement[table.statement_name]
+            else:
+                pending_records_value = 0
+            if table.statement_name in num_records_out_value_per_statement:
+                num_records_out_value = num_records_out_value_per_statement[table.statement_name]
+            else:
+                num_records_out_value = 0
+            if table.statement_name in num_records_in_value_per_statement:
+                num_records_in_value = num_records_in_value_per_statement[table.statement_name]
+            else:
+                num_records_in_value = 0
+        else:
+            pending_records_value = 0
+            num_records_out_value = 0
+            num_records_in_value = 0
+        report+=f"{pad_or_truncate(table.table_name, 40)}\t{pad_or_truncate(table.statement_name, 40)} {pad_or_truncate(table.status,10)} {pad_or_truncate(table.compute_pool_id,15)} {pad_or_truncate(table.created_at.strftime('%Y-%m-%d %H:%M:%S'),16)}\t{pad_or_truncate(pending_records_value,12)} {pad_or_truncate(num_records_in_value,11)} {pad_or_truncate(num_records_out_value,11)}\n"
     return report
+
 
 
 
@@ -223,9 +242,14 @@ def build_summary_from_execution_plan(execution_plan: FlinkStatementExecutionPla
     summary+="\n---Matching compute pools: "
     summary+=f"\nPool ID   \t{pad_or_truncate('Pool Name',40)}\tCurrent/Max CFU\tFlink Statement name\n" + "-" * 140
     for node in execution_plan.nodes:
-        pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
-        if pool:
-            summary+=f"\n{pool.id} \t{pad_or_truncate(pool.name,40)}\t{pad_or_truncate(str(pool.current_cfu) + '/' + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
+        if node.compute_pool_id and node.compute_pool_id != "None":
+            pool = compute_pool_mgr.get_compute_pool_with_id(compute_pool_list, node.compute_pool_id)
+            if pool:
+                summary+=f"\n{pool.id} \t{pad_or_truncate(pool.name,40)}\t{pad_or_truncate(str(pool.current_cfu) + '/' + str(pool.max_cfu),10)}\t{node.dml_statement_name}"
+            else:
+                summary+=f"\n{node.compute_pool_id} \t{pad_or_truncate('UNKNOWN',40)}\t{pad_or_truncate('UNKNOWN',10)}\t{node.dml_statement_name}"
+        else:
+            summary+=f"\n{pad_or_truncate('UNKNOWN',10)} \t{pad_or_truncate('UNKNOWN',40)}\t{pad_or_truncate('UNKNOWN',10)}\t{node.dml_statement_name}"
     with open(shift_left_dir + f"/{execution_plan.start_table_name}_summary.txt", "w") as f:
         f.write(summary)
     return summary

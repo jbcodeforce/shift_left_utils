@@ -39,8 +39,6 @@ def _create_input_table(compute_pool_id: str, input_table_name: str):
     sql_statement = f"CREATE TABLE IF NOT EXISTS {input_table_name}"
     sql_statement += """(id INT, name STRING, PRIMARY KEY (id) NOT ENFORCED) DISTRIBUTED BY HASH(id) INTO 2 BUCKETS WITH (
     'kafka.producer.compression.type'='snappy',
-    'key.avro-registry.schema-context' = '.flink-dev',
-    'value.avro-registry.schema-context' = '.flink-dev',
     'kafka.retention.time' = '0',
     'changelog.mode' = 'append',
     'kafka.cleanup-policy'= 'compact',
@@ -60,8 +58,6 @@ def _create_output_table(compute_pool_id: str, output_table_name: str):
     sql_statement = f"CREATE TABLE IF NOT EXISTS {output_table_name}"
     sql_statement += """(id int, total_count BIGINT, primary key(id) not enforced) DISTRIBUTED BY HASH(id) INTO 2 BUCKETS WITH (
     'kafka.producer.compression.type'='snappy',
-    'key.avro-registry.schema-context' = '.flink-dev',
-    'value.avro-registry.schema-context' = '.flink-dev',
     'kafka.retention.time' = '0',
     'changelog.mode' = 'retract',
     'kafka.cleanup-policy'= 'compact',

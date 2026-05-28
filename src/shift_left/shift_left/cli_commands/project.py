@@ -1,6 +1,7 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+from pydantic.types import NonNegativeInt
 import typer
 import subprocess
 import os
@@ -11,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from rich import print
 from shift_left.core.utils.app_config import get_config, shift_left_dir, validate_config as validate_config_impl
-from shift_left.core.compute_pool_mgr import get_compute_pool_list
 import shift_left.core.statement_mgr as statement_mgr
 import shift_left.core.compute_pool_mgr as compute_pool_mgr
 import shift_left.core.project_manager as project_manager
@@ -19,12 +19,14 @@ import shift_left.core.integration_test_mgr as integration_test_mgr
 from shift_left.core.project_manager import (
         DATA_PRODUCT_PROJECT_TYPE,
         ModifiedFileInfo,
+        ImpactedTablesByModificationsResult,
         KIMBALL_PROJECT_TYPE)
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 from shift_left.core import table_analyzer
 from typing_extensions import Annotated
 from rich.console import Console
 from rich.table import Table
+from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 
 
 """
@@ -77,19 +79,47 @@ def list_compute_pools(environment_id: str = typer.Option(None, help="Environmen
         if not environment_id:
                environment_id = get_config().get('confluent_cloud').get('environment_id')
         if not region:
-               region = get_config().get('confluent_cloud').get('region')
+               region = get_config().get('confluent_cloud').get('cloud_region')
         print("#" * 30 + f" List compute pools for environment {environment_id} - in region {region}")
         list_of_pools = compute_pool_mgr.get_compute_pool_list(environment_id, region)
         print(list_of_pools)
 
 @app.command()
-def delete_all_compute_pools(product_name: Annotated[str, typer.Argument(help="The product name to delete all compute pools for")]):
+def delete_all_compute_pools(
+        product_name: Annotated[
+            str | None,
+            typer.Argument(help="Delete all pools whose display name contains this product name"),
+        ] = None,
+        compute_pool_list_file: Annotated[
+            str | None,
+            typer.Option("--compute-pool-list-file", help="File with one compute pool ID per line to delete; when set, only listed pools are deleted"),
+        ] = None,
+):
         """
-        Delete all compute pools for the given product name
+        Delete compute pools by product name and/or from a list file.
+
+        Provide at least one of PRODUCT_NAME or --compute-pool-list-file.
+
+        PRODUCT_NAME only: delete all pools whose display name contains product_name.
+
+        --compute-pool-list-file only: delete only pool IDs listed in the file (one lfcp-... ID per line;
+        empty lines and lines starting with # are ignored).
+
+        Both: delete only IDs from the file; product_name is used for logging only.
         """
-        print("#" * 30 + f" Delete all compute pools for product {product_name}")
-        compute_pool_mgr.delete_all_compute_pools_of_product(product_name)
-        print(f"Done")
+        if not product_name and not compute_pool_list_file:
+            print("[red]Error: provide PRODUCT_NAME and/or --compute-pool-list-file[/red]")
+            raise typer.Exit(1)
+
+        if compute_pool_list_file:
+            product_suffix = f" (product {product_name})" if product_name else ""
+            print("#" * 30 + f" Delete compute pools from {compute_pool_list_file}{product_suffix}")
+            pool_ids = _load_compute_pool_ids_from_file(compute_pool_list_file)
+            compute_pool_mgr.delete_compute_pools_by_ids(pool_ids, product_name=product_name)
+        else:
+            print("#" * 30 + f" Delete all compute pools for product {product_name}")
+            compute_pool_mgr.delete_all_compute_pools_of_product(product_name)
+        print("Done")
 
 @app.command()
 def housekeep_statements( compute_pool_id: str = typer.Option(None, "--compute-pool-id", help="Flink compute pool ID. [default: None]"),
@@ -228,10 +258,10 @@ def validate_config():
         """
         Validate the config.yaml file
         """
-        print(f"#" * 30 + f" Validate {os.getenv('CONFIG_FILE')}")
+        print(f"#" * 30 + f" Validate {os.getenv('SL_CONFIG_FILE')}")
         config = get_config()
         validate_config_impl(config)
-        print("Config.yaml validated")
+        print(f"{os.getenv('SL_CONFIG_FILE')} validated")
 
 @app.command()
 def report_table_cross_products():
@@ -249,6 +279,15 @@ def report_table_cross_products():
         else:
             print(f"No table cross products found")
 
+
+@app.command()
+def list_environments():
+        """
+        List the environments
+        """
+        print("#" * 30 + f" List environments")
+        result = ConfluentCloudClient(get_config()).get_environment_list()
+        print(result)
 
 @app.command()
 def list_tables_with_one_child():
@@ -276,6 +315,7 @@ def list_modified_files(
 ):
     """
     Get the list of files modified in the current git branch compared to the specified branch.
+    project list-modified-files cc-client --project-path ../.. --file-filter .sql --since 2026-05-01
     Filters for Flink-related files (by default SQL files) and saves the list to a text file.
     This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
     """
@@ -304,6 +344,66 @@ def list_modified_files(
 
     return result
 
+
+@app.command()
+def list_impacted_tables(
+    modified_files_path: Annotated[
+        str,
+        typer.Option(
+            help="Path to modified_flink_files JSON produced by list-modified-files",
+        ),
+    ] = None,
+    project_path: Annotated[
+        str,
+        typer.Option(
+            envvar=["PIPELINES"],
+            help="Pipeline folder path. Defaults to $PIPELINES",
+        ),
+    ] = None,
+    output_file: Annotated[
+        str,
+        typer.Option(help="Output JSON file path under ~/.shift_left by default"),
+    ] = None,
+):
+    """
+    List tables and DDL files impacted by production DDL modifications.
+
+    Reads modified_flink_files JSON (from list-modified-files), resolves recursive downstream
+    tables and related unit-test DDL paths, and writes the result to ~/.shift_left/impacted_tables.json.
+    """
+    print("#" * 30 + " List impacted tables from DDL modifications")
+    modified_json = modified_files_path or _default_modified_flink_files_json_path()
+    if not os.path.exists(modified_json):
+        print(f"Modified files JSON not found: {modified_json}")
+        print("Run: shift_left project list-modified-files <branch> --project-path <path>")
+        raise typer.Exit(1)
+
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        print("Error: set PIPELINES or pass --project-path")
+        raise typer.Exit(1)
+
+    with open(modified_json, "r") as f:
+        modified_files = json.load(f)
+
+    try:
+        result = project_manager.impacted_tables_by_modifications(
+            modified_files, project_path=pipelines_path
+        )
+    except Exception as e:
+        print(f"{_get_status_emoji('ERROR')} listing impacted tables: {e}")
+        raise typer.Exit(1)
+
+    os.makedirs(shift_left_dir, exist_ok=True)
+    output_path = output_file or os.path.join(shift_left_dir, "impacted_tables.json")
+    with open(output_path, "w") as f:
+        f.write(result.model_dump_json(indent=2))
+
+    _print_impacted_tables_summary(result)
+    print(f"Impacted tables saved to: {output_path}")
+    return result
+
+
 @app.command()
 def update_tables_version(
     table_list_file_name: Annotated[str, typer.Argument(help="File name containing json object with table names and file modified url to update the table version for")],
@@ -325,6 +425,24 @@ def update_tables_version(
         print(f"{_get_status_emoji('PASS')} Table version updated in {len(table_infos)} tables")
     except Exception as e:
         print(f"{_get_status_emoji('ERROR')} updating table version: {e}")
+        raise typer.Exit(1)
+
+@app.command()
+def update_ut_ddl(
+    impacted_tables_path: Annotated[str, typer.Argument(help="Path to impacted_tables.json produced by list-impacted-tables")],
+    project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located")] = None,
+):
+    """
+    Update the unit test DDLs for the given tables
+    """
+    print("#" * 30 + f" Update unit test DDL for {impacted_tables_path}")
+    try:
+        with open(impacted_tables_path, "r") as f:
+            impacted_tables = json.load(f)
+        project_manager.update_unit_test_ddl_for_foundation_tables(impacted_tables, project_path)
+        print(f"{_get_status_emoji('PASS')} Unit test DDL updated in {impacted_tables_path}")
+    except Exception as e:
+        print(f"{_get_status_emoji('ERROR')} updating unit test DDL: {e}")
         raise typer.Exit(1)
 
 @app.command()
@@ -628,7 +746,6 @@ def assess_unused_tables(
 @app.command()
 def delete_unused_tables(
     table_list_file: Annotated[str, typer.Argument(help="File path to table list to delete")],
-    inventory_path: Annotated[str, typer.Argument(envvar=["PIPELINES"], help="Pipeline path where tables are defined")]
 ):
     """
     Delete unused tables
@@ -638,7 +755,7 @@ def delete_unused_tables(
     if not os.path.exists(table_list_file):
         print(f"[red]Error: file {table_list_file} does not exist[/red]")
         raise typer.Exit(1)
-    final_msg = table_analyzer.delete_unused_tables(inventory_path,table_list_file)
+    final_msg = table_analyzer.delete_unused_tables(table_list_file)
     print(final_msg)
 
 # ------- Private APIS ----------
@@ -651,6 +768,25 @@ def _get_status_emoji(status: str) -> str:
     }
     return emoji_map.get(status, "❓")
 
+def _default_modified_flink_files_json_path() -> str:
+    txt_name = get_config().get("app", {}).get(
+        "modified_flink_files_file_name", "modified_flink_files.txt"
+    )
+    return os.path.join(shift_left_dir, txt_name.replace(".txt", ".json"))
+
+
+def _print_impacted_tables_summary(result: ImpactedTablesByModificationsResult) -> None:
+    print(f"\nSummary:")
+    print(f"   DDL-modified tables: {len(result.ddl_modified_tables)}")
+    for table_name in result.ddl_modified_tables:
+        print(f"      {table_name}")
+    print(f"   Downstream impacted tables: {len(result.tables)}")
+    for table_name in result.tables:
+        print(f"      {table_name}")
+    print(f"   Production DDL files: {len(result.production_ddl_paths)}")
+    print(f"   Unit-test DDL files: {len(result.unit_test_ddl_paths)}")
+
+
 def _load_table_names_from_file(file_name: str) -> list[ModifiedFileInfo]:
     if not os.path.exists(file_name):
         print(f"[red]Error: file {file_name} does not exist[/red]")
@@ -659,4 +795,25 @@ def _load_table_names_from_file(file_name: str) -> list[ModifiedFileInfo]:
     with open(file_name, 'r') as f:
         content = json.load(f)
         return content['file_list']
+
+
+def _load_compute_pool_ids_from_file(file_name: str) -> list[str]:
+    """Load compute pool IDs from a text file (one ID per line)."""
+    if not os.path.exists(file_name):
+        print(f"[red]Error: file {file_name} does not exist[/red]")
+        raise typer.Exit(1)
+
+    pool_ids: list[str] = []
+    with open(file_name, "r") as f:
+        for line in f.read().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            pool_ids.append(stripped)
+
+    if not pool_ids:
+        print(f"[red]Error: file {file_name} contains no compute pool IDs[/red]")
+        raise typer.Exit(1)
+
+    return pool_ids
 

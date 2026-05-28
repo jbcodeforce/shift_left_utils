@@ -6,7 +6,7 @@ import os, sys
 import shutil
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml")
 from shift_left.ai.agent_factory import AgentFactory
 from shift_left.ai.spark_sql_code_agent import SparkToFlinkSqlAgent
 from shift_left.ai.ksql_code_agent import KsqlToFlinkSqlAgent, SqlTableDetection

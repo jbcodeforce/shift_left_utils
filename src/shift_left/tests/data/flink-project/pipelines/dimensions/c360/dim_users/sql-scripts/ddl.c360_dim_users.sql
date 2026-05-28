@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS c360_dim_users (
+CREATE TABLE IF NOT EXISTS sl_c360_dim_users (
   user_id STRING NOT NULL,
   user_name STRING,
   user_email STRING,
@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS c360_dim_users (
 ) DISTRIBUTED BY HASH(tenant_id, user_id) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
-  'key.avro-registry.schema-context' = '.flink-dev',
-  'value.avro-registry.schema-context' = '.flink-dev',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',

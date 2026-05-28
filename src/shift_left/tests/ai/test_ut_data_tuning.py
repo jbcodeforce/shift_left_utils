@@ -16,7 +16,7 @@ class TestUtaiDataTuning(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
-        os.environ["CONFIG_FILE"] =  str(data_dir / "config-ccloud.yaml")
+        os.environ["SL_CONFIG_FILE"] =  str(data_dir / "config-ccloud.yaml")
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 
     def test_generate_data(self):

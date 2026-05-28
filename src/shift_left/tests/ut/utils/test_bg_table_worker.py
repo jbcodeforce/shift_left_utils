@@ -6,7 +6,7 @@ import pathlib
 from importlib import import_module
 import os
 from typing import Tuple
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 from shift_left.core.utils.table_worker import ReplaceVersionInSqlContent
 
 class TestBgTableWorker(unittest.TestCase):

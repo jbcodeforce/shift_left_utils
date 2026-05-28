@@ -49,6 +49,7 @@ The `shift_left` CLI is available in this project with the following main comman
 
 ### Utility
 - `shift_left version` - Show CLI version
+- `shift_left version --config` - Show CLI version plus redacted effective configuration (same as `format_config_for_debug()`)
 
 ## CLI Usage Patterns
 

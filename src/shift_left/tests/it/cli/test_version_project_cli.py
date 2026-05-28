@@ -5,22 +5,13 @@ import unittest
 import pathlib
 import os
 import shutil
-import tempfile
-from unittest.mock import patch, MagicMock
-from typer.testing import CliRunner
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+
 from shift_left.core.utils.app_config import shift_left_dir
 from shift_left.cli_commands.project import app
-import subprocess
+from it.BaseIT import IntegrationTestCase
 
-class TestProjectCLI(unittest.TestCase):
+class TestProjectCLI(IntegrationTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        data_dir = pathlib.Path(__file__).parent / "../../data"  # Path to the data directory
-        os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
-        os.environ["SRC_FOLDER"] = str(data_dir / "dbt-project")
-        os.environ["STAGING"] = str(data_dir / "flink-project/staging")
 
     @classmethod
     def tearDownClass(cls):

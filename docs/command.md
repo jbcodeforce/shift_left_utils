@@ -18,6 +18,7 @@ $ [OPTIONS] COMMAND [ARGS]...
 * `project`
 * `table`
 * `pipeline`
+* `rag`
 
 ## `version`
 
@@ -31,6 +32,7 @@ $ version [OPTIONS]
 
 **Options**:
 
+* `--config`: Print effective configuration (secrets redacted) after the version line.
 * `--help`: Show this message and exit.
 
 ## `project`
@@ -50,13 +52,16 @@ $ project [OPTIONS] COMMAND [ARGS]...
 * `init`: Create a project structure with a...
 * `list-topics`: Get the list of topics for the Kafka...
 * `list-compute-pools`: Get the complete list and detail of the...
-* `delete-all-compute-pools`: Delete all compute pools for the given...
+* `delete-all-compute-pools`: Delete compute pools by product name...
 * `housekeep-statements`: Delete statements in FAILED or COMPLETED...
 * `validate-config`: Validate the config.yaml file
 * `report-table-cross-products`: Report the list of tables that are...
+* `list-environments`: List the environments
 * `list-tables-with-one-child`: Report the list of tables that have...
 * `list-modified-files`: Get the list of files modified in the...
+* `list-impacted-tables`: List tables and DDL files impacted by...
 * `update-tables-version`: Update the table version for the given file
+* `update-ut-ddl`: Update the unit test DDLs for the given...
 * `init-integration-tests`: Initialize integration test structure for...
 * `run-integration-tests`: Run integration tests for a given sink table.
 * `delete-integration-tests`: Delete all integration test artifacts...
@@ -128,20 +133,30 @@ $ project list-compute-pools [OPTIONS]
 
 ### `project delete-all-compute-pools`
 
-Delete all compute pools for the given product name
+Delete compute pools by product name and/or from a list file.
+
+Provide at least one of PRODUCT_NAME or --compute-pool-list-file.
+
+PRODUCT_NAME only: delete all pools whose display name contains product_name.
+
+--compute-pool-list-file only: delete only pool IDs listed in the file (one lfcp-... ID per line;
+empty lines and lines starting with # are ignored).
+
+Both: delete only IDs from the file; product_name is used for logging only.
 
 **Usage**:
 
 ```console
-$ project delete-all-compute-pools [OPTIONS] PRODUCT_NAME
+$ project delete-all-compute-pools [OPTIONS] [PRODUCT_NAME]
 ```
 
 **Arguments**:
 
-* `PRODUCT_NAME`: The product name to delete all compute pools for  [required]
+* `[PRODUCT_NAME]`: Delete all pools whose display name contains this product name
 
 **Options**:
 
+* `--compute-pool-list-file TEXT`: File with one compute pool ID per line to delete; when set, only listed pools are deleted
 * `--help`: Show this message and exit.
 
 ### `project housekeep-statements`
@@ -194,6 +209,20 @@ $ project report-table-cross-products [OPTIONS]
 
 * `--help`: Show this message and exit.
 
+### `project list-environments`
+
+List the environments
+
+**Usage**:
+
+```console
+$ project list-environments [OPTIONS]
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
 ### `project list-tables-with-one-child`
 
 Report the list of tables that have exactly one child table
@@ -211,6 +240,7 @@ $ project list-tables-with-one-child [OPTIONS]
 ### `project list-modified-files`
 
 Get the list of files modified in the current git branch compared to the specified branch.
+project list-modified-files cc-client --project-path ../.. --file-filter .sql --since 2026-05-01
 Filters for Flink-related files (by default SQL files) and saves the list to a text file.
 This is useful for identifying which Flink statements need to be redeployed in a blue-green deployment.
 
@@ -231,6 +261,26 @@ $ project list-modified-files [OPTIONS] BRANCH_NAME
 * `--since TEXT`: Date from which the files were modified (e.g., &#x27;YYYY-MM-DD&#x27;)  [default: 2025-12-01]
 * `--help`: Show this message and exit.
 
+### `project list-impacted-tables`
+
+List tables and DDL files impacted by production DDL modifications.
+
+Reads modified_flink_files JSON (from list-modified-files), resolves recursive downstream
+tables and related unit-test DDL paths, and writes the result to ~/.shift_left/impacted_tables.json.
+
+**Usage**:
+
+```console
+$ project list-impacted-tables [OPTIONS]
+```
+
+**Options**:
+
+* `--modified-files-path TEXT`: Path to modified_flink_files JSON produced by list-modified-files
+* `--project-path TEXT`: Pipeline folder path. Defaults to $PIPELINES  [env var: PIPELINES]
+* `--output-file TEXT`: Output JSON file path under ~/.shift_left by default
+* `--help`: Show this message and exit.
+
 ### `project update-tables-version`
 
 Update the table version for the given file
@@ -248,6 +298,25 @@ $ project update-tables-version [OPTIONS] TABLE_LIST_FILE_NAME
 **Options**:
 
 * `--default-version TEXT`: Default version to use if not provided in the file  [default: _v2]
+* `--help`: Show this message and exit.
+
+### `project update-ut-ddl`
+
+Update the unit test DDLs for the given tables
+
+**Usage**:
+
+```console
+$ project update-ut-ddl [OPTIONS] IMPACTED_TABLES_PATH
+```
+
+**Arguments**:
+
+* `IMPACTED_TABLES_PATH`: Path to impacted_tables.json produced by list-impacted-tables  [required]
+
+**Options**:
+
+* `--project-path TEXT`: Project path where pipelines are located  [env var: PIPELINES]
 * `--help`: Show this message and exit.
 
 ### `project init-integration-tests`
@@ -393,13 +462,12 @@ Delete unused tables
 **Usage**:
 
 ```console
-$ project delete-unused-tables [OPTIONS] TABLE_LIST_FILE INVENTORY_PATH
+$ project delete-unused-tables [OPTIONS] TABLE_LIST_FILE
 ```
 
 **Arguments**:
 
 * `TABLE_LIST_FILE`: File path to table list to delete  [required]
-* `INVENTORY_PATH`: Pipeline path where tables are defined  [env var: PIPELINES; required]
 
 **Options**:
 
@@ -442,13 +510,13 @@ Build a new table structure under the specified path. For example to add a sourc
 **Usage**:
 
 ```console
-$ table init [OPTIONS] TABLE_NAME TABLE_PATH
+$ table init [OPTIONS] [TABLE_NAME] [TABLE_PATH]
 ```
 
 **Arguments**:
 
-* `TABLE_NAME`: Table name to build  [required]
-* `TABLE_PATH`: Folder Path in which the table folder structure will be created.  [required]
+* `[TABLE_NAME]`: Table name to build  [default: test_table_1]
+* `[TABLE_PATH]`: Folder Path in which the table folder structure will be created from $PIPELINES folder.  [default: sources]
 
 **Options**:
 
@@ -487,7 +555,7 @@ $ table search-source-dependencies [OPTIONS] TABLE_SQL_FILE_NAME SRC_PROJECT_FOL
 **Arguments**:
 
 * `TABLE_SQL_FILE_NAME`: Full path to the file name of the dbt sql file  [required]
-* `SRC_PROJECT_FOLDER`: Folder name for all the dbt sources (e.g. models)  [env var: SRC_FOLDER; required]
+* `SRC_PROJECT_FOLDER`: Folder name for all the dbt sources (e.g. models)  [env var: SL_SRC_FOLDER; required]
 
 **Options**:
 
@@ -507,12 +575,12 @@ $ table migrate [OPTIONS] TABLE_NAME SQL_SRC_FILE_NAME TARGET_PATH
 **Arguments**:
 
 * `TABLE_NAME`: the name of the table once migrated.  [required]
-* `SQL_SRC_FILE_NAME`: the source file name for the sql script to migrate.  [required]
+* `SQL_SRC_FILE_NAME`: the source file name for the sql or pyspark script to migrate.  [required]
 * `TARGET_PATH`: the target path where to store the migrated content (default is $STAGING)  [env var: STAGING; required]
 
 **Options**:
 
-* `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, etc.  [default: spark]
+* `--source-type TEXT`: the type of the SQL source file to migrate. It can be ksql, dbt, spark, pyspark, etc.  [default: spark]
 * `--validate`: Validate the migrated sql using Confluent Cloud for Flink.
 * `--product-name TEXT`: Product name to use for the table. If not provided, it will use the table_path last folder as product name  [default: default]
 * `--help`: Show this message and exit.
@@ -579,12 +647,13 @@ Update the tables with SQL code changes defined in external python callback. It 
 **Usage**:
 
 ```console
-$ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
+$ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM [CLASS_TO_USE]
 ```
 
 **Arguments**:
 
 * `FOLDER_TO_WORK_FROM`: Folder from where to do the table update. It could be the all pipelines or subfolders.  [required]
+* `[CLASS_TO_USE]`: The class to use to do the Statement processing  [default: shift_left.core.utils.table_worker.TableWorker]
 
 **Options**:
 
@@ -592,7 +661,6 @@ $ table update-tables [OPTIONS] FOLDER_TO_WORK_FROM
 * `--both-ddl-dml`: Run both DDL and DML sql files
 * `--string-to-change-from TEXT`: String to change in the SQL content
 * `--string-to-change-to TEXT`: String to change in the SQL content
-* `--class-to-use TEXT`: [default: typing.Annotated[str, &lt;typer.models.ArgumentInfo object at 0x106cfd040&gt;]]
 * `--help`: Show this message and exit.
 
 ### `table init-unit-tests`
@@ -616,11 +684,12 @@ $ table init-unit-tests [OPTIONS] TABLE_NAME
 * `--create-csv`: If set, also create a CSV file for the unit test data.
 * `--nb-test-cases INTEGER`: Number of test cases to create. Default is 2.  [default: 2]
 * `--ai`: Use AI to generate test data and validate with tool calling.
+* `--post-fix-unit-test TEXT`: Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.  [default: _ut]
 * `--help`: Show this message and exit.
 
 ### `table run-unit-tests`
 
-Run all the unit tests or a specified test case by sending data to `_ut` topics and validating the results
+Run all the unit tests or a specified test case by sending data to `_ut` topics
 
 **Usage**:
 
@@ -636,8 +705,8 @@ $ table run-unit-tests [OPTIONS] TABLE_NAME
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: By default run insert sqls and foundations, with this flag it will also run validation sql too.
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
-* `--post-fix-unit-test TEXT`: Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: SL_FLINK_COMPUTE_POOL_ID]
+* `--post-fix-unit-test TEXT`: Provide a unique post fix (e.g _foo) to avoid conflicts with other UT runs. If not provided will use config.yaml, if that doesnt exist, use default _ut.  [default: _ut]
 * `--help`: Show this message and exit.
 
 ### `table run-validation-tests`
@@ -658,8 +727,8 @@ $ table run-validation-tests [OPTIONS] TABLE_NAME
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
-* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: SL_FLINK_COMPUTE_POOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.  [default: _ut]
 * `--help`: Show this message and exit.
 
 ### `table validate-unit-tests`
@@ -680,8 +749,8 @@ $ table validate-unit-tests [OPTIONS] TABLE_NAME
 
 * `--test-case-name TEXT`: Name of the individual unit test to run. By default it will run all the tests
 * `--run-all`: With this flag, and not test case name provided, it will run all the validation sqls.
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
-* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: SL_FLINK_COMPUTE_POOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.  [default: _ut]
 * `--help`: Show this message and exit.
 
 ### `table delete-unit-tests`
@@ -700,8 +769,8 @@ $ table delete-unit-tests [OPTIONS] TABLE_NAME
 
 **Options**:
 
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
-* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: SL_FLINK_COMPUTE_POOL_ID]
+* `--post-fix-unit-test TEXT`: By default it is _ut. A Unique post fix to avoid conflict between multiple UT runs. If not provided, it will use config.yaml one.  [default: _ut]
 * `--help`: Show this message and exit.
 
 ### `table explain`
@@ -719,7 +788,7 @@ $ table explain [OPTIONS]
 * `--table-name TEXT`: Name of the table to get Flink execution plan explanations from.
 * `--product-name TEXT`: The directory to run the explain on each tables found within this directory. table or dir needs to be provided.
 * `--table-list-file-name TEXT`: The file containing the list of tables to deploy.
-* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: CPOOL_ID]
+* `--compute-pool-id TEXT`: Flink compute pool ID. If not provided, it will use config.yaml one.  [env var: SL_FLINK_COMPUTE_POOL_ID]
 * `--persist-report`: Persist the report in the shift_left_dir folder.
 * `--help`: Show this message and exit.
 
@@ -949,7 +1018,7 @@ $ pipeline report-running-statements [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -971,7 +1040,7 @@ $ pipeline undeploy [OPTIONS] [INVENTORY_PATH]
 
 **Arguments**:
 
-* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: ./tests/data/flink-project/pipelines]
+* `[INVENTORY_PATH]`: Path to the inventory folder, if not provided will use the $PIPELINES environment variable.  [env var: PIPELINES; default: /Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines]
 
 **Options**:
 
@@ -1039,4 +1108,46 @@ $ pipeline analyze-pool-usage [OPTIONS] [INVENTORY_PATH]
 
 * `-p, --product-name TEXT`: Analyze pool usage for a specific product only
 * `-d, --directory TEXT`: Analyze pool usage for pipelines in a specific directory
+* `--help`: Show this message and exit.
+
+## `rag`
+
+**Usage**:
+
+```console
+$ rag [OPTIONS] COMMAND [ARGS]...
+```
+
+**Options**:
+
+* `--help`: Show this message and exit.
+
+**Commands**:
+
+* `build`: Build or rebuild the RAG vector index from...
+
+### `rag build`
+
+Build or rebuild the RAG vector index from a ksql-project corpus.
+
+Loads (ksql, Flink DDL/DML) example pairs from flink-references and sources,
+then indexes them for similar-ksql retrieval during translation.
+
+Example:
+  shift_left rag build /path/to/ksql-project --index /path/to/rag_index
+  shift_left rag build $FLINK_PROJECT/../ksql-project
+
+**Usage**:
+
+```console
+$ rag build [OPTIONS] [CORPUS]
+```
+
+**Arguments**:
+
+* `[CORPUS]`: Path to ksql-project root (contains flink-references/ and sources/).  [default: .]
+
+**Options**:
+
+* `-o, --index TEXT`: Output path for ChromaDB index (default: &lt;corpus&gt;/rag_index or SL_RAG_INDEX_PATH).
 * `--help`: Show this message and exit.

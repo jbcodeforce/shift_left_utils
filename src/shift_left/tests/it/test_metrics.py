@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import pathlib
 import os
-os.environ["CONFIG_FILE"] = os.getenv("CONFIG_FILE", str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml"))
+os.environ["SL_CONFIG_FILE"] = os.getenv("SL_CONFIG_FILE", str(pathlib.Path(__file__).parent.parent /  "config-ccloud.yaml"))
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from datetime import datetime, timedelta

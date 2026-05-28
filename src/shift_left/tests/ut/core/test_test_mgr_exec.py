@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch, ANY
 
 _TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault("SL_CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
 os.environ.setdefault("PIPELINES", str(_TESTS_ROOT / "data/flink-project/pipelines"))
 # Dummy credentials so get_config()/validate_config succeed when running pytest without sourcing set_test_env.
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
@@ -29,10 +29,10 @@ if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
     os.environ.setdefault("SL_FLINK_DATABASE_NAME", "j9r-kafka")
 
 from shift_left.core.models.flink_statement_model import (
-    Statement, 
-    StatementResult, 
-    Data, 
-    OpRow, 
+    Statement,
+    StatementResult,
+    Data,
+    OpRow,
     StatementError,
     ErrorData)
 import shift_left.core.test_mgr as test_mgr
@@ -43,19 +43,16 @@ from shift_left.core.utils.app_config import reset_all_caches
 
 class TestTestManager(unittest.TestCase):
     """Unit test suite for test manager functionality."""
-    
+
+    POST_FIX_UNIT_TEST = test_mgr.DEFAULT_POST_FIX_UNIT_TEST
+
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
-    
-    def setUp(self):
-        # Ensure proper test isolation by resetting caches and rebuilding inventory
-        reset_all_caches()
-        build_inventory(os.getenv("PIPELINES"))
-        self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
-    
+        cls._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
+
     # ---- Mock functions to be used in tests to avoid calling remote services ----
     def _mock_table_exists(self, table_name):
         """
@@ -67,9 +64,9 @@ class TestTestManager(unittest.TestCase):
         return value
 
     def _mock_get_None_statement(self, statement_name):
-        print(f"mock_get_statement: {statement_name} returns None")  
+        print(f"mock_get_statement: {statement_name} returns None")
         return None
-    
+
     def _mock_post_ddl_statement(
         self,
         compute_pool_id: Any,
@@ -102,19 +99,34 @@ class TestTestManager(unittest.TestCase):
                 return Statement(name=statement_name, status={"phase": "UNKNOWN"})
 
     def _mock_get_running_statement(self, statement_name):
-            print(f"mock_get_statement: {statement_name}")  
+            print(f"mock_get_statement: {statement_name}")
             return Statement(name=statement_name, status={"phase": "RUNNING"})
 
-    def _mock_load_sql_and_execute_statement(self, table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements):
-            print(f"\nmock_load_sql_and_execute_statement: {table_name} {sql_path} {prefix} {compute_pool_id} {fct} {product_name} {statements}\n")
+    def _mock_load_sql_and_execute_statement(
+        self,
+        table_name,
+        sql_path,
+        prefix,
+        compute_pool_id,
+        fct,
+        product_name,
+        statements=None,
+        post_fix_unit_test=POST_FIX_UNIT_TEST,
+    ):
+            print(
+                f"\nmock_load_sql_and_execute_statement: {table_name} {sql_path} {prefix} "
+                f"{compute_pool_id} {fct} {product_name} {statements} {post_fix_unit_test}\n"
+            )
             if statements is None:
                 statements = set()
-            else:
-                statement_name = test_mgr._build_statement_name(table_name, prefix)
-                statements.add(Statement(name=statement_name, status={"phase": "COMPLETED"}))
+            statement_name = test_mgr._build_statement_name(
+                table_name, prefix, post_fix_unit_test
+            )
+            statements.add(Statement(name=statement_name, status={"phase": "COMPLETED"}))
             return statements
 
-    def _mock_transform_sql_content(self, sql_input, table_name) -> str:
+    def _mock_transform_sql_content(self, sql_input, table_name, post_fix_unit_test) -> str:
+            self.assertEqual(post_fix_unit_test, self.POST_FIX_UNIT_TEST)
             return sql_input
 
     def _mock_poll_response(self, statement_name) -> Tuple[str, Optional[StatementResult]]:
@@ -173,7 +185,7 @@ class TestTestManager(unittest.TestCase):
 
         mock_load_sql_and_execute_flink_test_statement.side_effect = _mock_load_sql_and_execute_flink_test_statement
 
-        table_name = "c360_dim_groups"
+        table_name = "sl_c360_dim_groups"
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
         test_case = test_suite_def.test_suite[1]
         statements= test_mgr._execute_test_inputs(test_case, table_ref, "dev", "test_pool")
@@ -197,15 +209,19 @@ class TestTestManager(unittest.TestCase):
 
         mock_get_statement.return_value = None
         mock_post_flink_statement.return_value = Statement(name=statement_name, status={"phase": "COMPLETED"})
-        
 
-        sql_content = test_mgr._read_and_treat_sql_content_for_ut(table_ref.dml_ref, self._mock_transform_sql_content, table_name)
-        statement, is_new = test_mgr._execute_flink_test_statement(sql_content, statement_name, "test_pool", "test_product")
+
+        sql_content = test_mgr._read_and_treat_sql_content_for_ut(
+            table_ref.dml_ref, self._mock_transform_sql_content, table_name, self.POST_FIX_UNIT_TEST
+        )
+        statement, is_new = test_mgr._execute_flink_test_statement(
+            sql_content, statement_name, "test_pool", "test_product", existing_statement=None
+        )
         assert statement is not None
         assert is_new
         assert statement.name == statement_name
         assert statement.status.phase == "COMPLETED"
-        
+
 
     @patch('shift_left.core.test_mgr._poll_response')
     @patch('shift_left.core.test_mgr._load_sql_and_execute_statement')
@@ -218,7 +234,7 @@ class TestTestManager(unittest.TestCase):
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
         mock_poll_response.side_effect = self._mock_poll_response
-        statements, result_text, results = test_mgr._execute_test_validation(test_case, table_ref, 'dev-val', 'test_pool')
+        statements, result_text, results = test_mgr._execute_validation_tests(test_case, table_ref, 'dev-val', 'test_pool')
         assert len(statements) == 1
         assert statements.pop().name == "dev-val-p1-fct-order-ut"
         assert result_text == "PASS"
@@ -241,9 +257,9 @@ class TestTestManager(unittest.TestCase):
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
         mock_poll_response.side_effect = self._mock_poll_response
-        results = test_mgr.execute_validation_tests(table_name=table_name, 
-                                                                            test_case_name="", 
-                                                                            compute_pool_id="test_pool", 
+        results = test_mgr.execute_validation_tests(table_name=table_name,
+                                                                            test_case_name="",
+                                                                            compute_pool_id="test_pool",
                                                                             run_all=True)
 
         print(f"results: {results.model_dump_json(indent=2)}")
@@ -269,10 +285,14 @@ class TestTestManager(unittest.TestCase):
         se = StatementError(errors=[ErrorData(status="404", detail="Not found")])
         mock_get_statement.return_value = se
         mock_post_flink_statement.side_effect = self._mock_post_dml_statement
-        
 
-        sql_content = test_mgr._read_and_treat_sql_content_for_ut(table_ref.dml_ref, self._mock_transform_sql_content, table_name)
-        statement, is_new = test_mgr._execute_flink_test_statement(sql_content, statement_name, "test_pool", "test_product")
+
+        sql_content = test_mgr._read_and_treat_sql_content_for_ut(
+            table_ref.dml_ref, self._mock_transform_sql_content, table_name, self.POST_FIX_UNIT_TEST
+        )
+        statement, is_new = test_mgr._execute_flink_test_statement(
+            sql_content, statement_name, "test_pool", "test_product", existing_statement=se
+        )
         assert statement is not None
         assert is_new
         assert statement.name == statement_name
@@ -281,8 +301,8 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    def test_exec_flink_test_statement_with_failed_statement(self, 
-                    mock_get_statement, 
+    def test_exec_flink_test_statement_with_failed_statement(self,
+                    mock_get_statement,
                     mock_post_flink_statement,
                     mock_delete_statement_if_exists):
         """
@@ -299,8 +319,12 @@ class TestTestManager(unittest.TestCase):
         mock_post_flink_statement.side_effect = self._mock_post_dml_statement
         mock_delete_statement_if_exists.return_value = "deleted"
 
-        sql_content = test_mgr._read_and_treat_sql_content_for_ut(table_ref.dml_ref, self._mock_transform_sql_content, table_name)
-        statement, is_new = test_mgr._execute_flink_test_statement(sql_content, statement_name, "test_pool", "test_product")
+        sql_content = test_mgr._read_and_treat_sql_content_for_ut(
+            table_ref.dml_ref, self._mock_transform_sql_content, table_name, self.POST_FIX_UNIT_TEST
+        )
+        statement, is_new = test_mgr._execute_flink_test_statement(
+            sql_content, statement_name, "test_pool", "test_product", existing_statement=se
+        )
         assert statement is not None
         assert not is_new
         assert statement.name == statement_name
@@ -308,9 +332,7 @@ class TestTestManager(unittest.TestCase):
 
 
 
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    def test_exec_flink_test_statement_running_statement(self, 
-                    mock_get_statement):
+    def test_exec_flink_test_statement_running_statement(self):
         """
         when the statement is in error, it should be created and executed
         post is not called
@@ -321,10 +343,13 @@ class TestTestManager(unittest.TestCase):
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
         statement_name = test_mgr._build_statement_name(table_name, prefix+"-dml")
         se = Statement(name=statement_name, status={"phase": "RUNNING"})
-        mock_get_statement.return_value = se
 
-        sql_content = test_mgr._read_and_treat_sql_content_for_ut(table_ref.dml_ref, self._mock_transform_sql_content, table_name)
-        statement, is_new = test_mgr._execute_flink_test_statement(sql_content, statement_name, "test_pool", "test_product")
+        sql_content = test_mgr._read_and_treat_sql_content_for_ut(
+            table_ref.dml_ref, self._mock_transform_sql_content, table_name, self.POST_FIX_UNIT_TEST
+        )
+        statement, is_new = test_mgr._execute_flink_test_statement(
+            sql_content, statement_name, "test_pool", "test_product", existing_statement=se
+        )
         assert statement is not None
         assert not is_new
         assert statement.name == statement_name
@@ -333,15 +358,15 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_run_statement_under_test_happy_path(self, 
-                                     mock_post_flink_statement, 
+    def test_run_statement_under_test_happy_path(self,
+                                     mock_post_flink_statement,
                                      mock_table_exists,
                                      mock_get_statement):
-        """Test should create ddl and dml statements as the table under tests 
+        """Test should create ddl and dml statements as the table under tests
         does not exist
         """
 
-        
+
         mock_post_flink_statement.side_effect = self._mock_post_ddl_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
@@ -350,7 +375,7 @@ class TestTestManager(unittest.TestCase):
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
         assert test_suite_def is not None
         statements = test_mgr._start_ddl_dml_for_flink_under_test(table_name, table_ref)
-        
+
         self.assertEqual(len(statements), 2)
         for statement in statements:
             print(f"UT: statement: {statement.name} {statement.status}")
@@ -360,18 +385,18 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_table_exists_run_dml_only(self, 
-                                     mock_post_flink_statement, 
+    def test_table_exists_run_dml_only(self,
+                                     mock_post_flink_statement,
                                      mock_table_exists,
                                      mock_get_statement):
-        """Test starting the statement under test: should not run ddl as table exists 
+        """Test starting the statement under test: should not run ddl as table exists
         but dml statements as statement is unknown
         """
 
         def _mock_table_exists(table_name):
             print(f"mock_table_exists: {table_name}")
             return True
-        
+
 
         mock_post_flink_statement.side_effect = self._mock_post_dml_statement
         mock_table_exists.side_effect = _mock_table_exists
@@ -381,7 +406,7 @@ class TestTestManager(unittest.TestCase):
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
         assert test_suite_def is not None
         statements = test_mgr._start_ddl_dml_for_flink_under_test(table_name, table_ref)
-        
+
         self.assertEqual(len(statements), 1)
         for statement in statements:
             assert isinstance(statement, Statement)
@@ -392,8 +417,8 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_do_not_run_statements_if_table_exists_and_dml_running(self, 
-                                     mock_post_flink_statement, 
+    def test_do_not_run_statements_if_table_exists_and_dml_running(self,
+                                     mock_post_flink_statement,
                                      mock_table_exists,
                                      mock_get_statement):
         """Table exists so no DDL execution, DLM already RUNNING so not restart it
@@ -421,13 +446,13 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_onte_test_case_execution(self, 
-                        mock_post_flink_statement, 
+    def test_onte_test_case_execution(self,
+                        mock_post_flink_statement,
                         mock_get_statement_results,
                         mock_table_exists,
                         mock_get_statement,
                         mock_delete_statement):
-        
+
         """Test the execution of one test case, with processing of statement results."""
 
         self._sql_content = ""
@@ -436,9 +461,9 @@ class TestTestManager(unittest.TestCase):
             print(f"mock_statement_results: {statement_name}")
             op_row = OpRow(op=0, row=["PASS"]) if "val-1" in statement_name else OpRow(op=0, row=["FAIL"])
             data = Data(data=[op_row])
-            result = StatementResult(results=data, 
-                                     api_version="v1", 
-                                     kind="StatementResult", 
+            result = StatementResult(results=data,
+                                     api_version="v1",
+                                     kind="StatementResult",
                                      metadata=None)
             return result
 
@@ -458,26 +483,26 @@ class TestTestManager(unittest.TestCase):
         assert suite_result.test_results["test_case_2"].result == "FAIL"
         print(suite_result.model_dump_json(indent=2))
 
-    
+
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     def test_poll_response_success_first_try(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when results are available on first try."""
         from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
-        
+
         # Mock get_statement to return a successful statement
         mock_statement = Statement(name="test_statement", status={"phase": "COMPLETED"})
         mock_get_statement.return_value = mock_statement
-        
+
         # Mock successful response on first call
         op_row = OpRow(op=0, row=["PASS"])
         data = Data(data=[op_row])
         result = StatementResult(results=data, api_version="v1", kind="StatementResult", metadata=None)
         mock_get_results.return_value = result
-        
+
         final_result, statement_result = test_mgr._poll_response("test_statement")
-        
+
         self.assertEqual(final_result, "PASS")
         self.assertEqual(statement_result, result)
         mock_get_results.assert_called_once_with("test_statement")
@@ -488,21 +513,21 @@ class TestTestManager(unittest.TestCase):
     def test_poll_response_retry_logic(self, mock_sleep, mock_get_results, mock_get_statement):
         """Test _poll_response function retry logic with empty results."""
         from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
-        
+
         # Mock get_statement to return a successful statement
         mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
         mock_get_statement.return_value = mock_statement
-        
+
         # First few calls return empty results, last call returns data
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
         op_row = OpRow(op=0, row=["PASS"])
         data = Data(data=[op_row])
         success_result = StatementResult(results=data, api_version="v1", kind="StatementResult", metadata=None)
-        
+
         mock_get_results.side_effect = [empty_result, empty_result, success_result]
-        
+
         final_result, statement_result = test_mgr._poll_response("test_statement")
-        
+
         self.assertEqual(final_result, "PASS")
         self.assertEqual(statement_result, success_result)
         self.assertEqual(mock_get_results.call_count, 3)
@@ -513,18 +538,18 @@ class TestTestManager(unittest.TestCase):
     def test_poll_response_max_retries_exceeded(self, mock_get_results, mock_get_statement):
         """Test _poll_response function when max retries are exceeded."""
         from shift_left.core.models.flink_statement_model import StatementResult, Data, Statement
-        
+
         # Mock get_statement to return a running statement
         mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
         mock_get_statement.return_value = mock_statement
-        
+
         # Always return empty results
         empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
         mock_get_results.return_value = empty_result
-        
+
         with patch('shift_left.core.test_mgr.time.sleep'):
             final_result, statement_result = test_mgr._poll_response("test_statement")
-        
+
         self.assertEqual(final_result, "FAIL")  # Default when no data
         # Should call get_results for max_retries - 1 times (range(1, 7) = 1,2,3,4,5,6)
         self.assertEqual(mock_get_results.call_count, 6)  # max_retries - 1
@@ -534,25 +559,25 @@ class TestTestManager(unittest.TestCase):
     def test_poll_response_exception_handling(self, mock_get_results, mock_get_statement):
         """Test _poll_response function exception handling."""
         from shift_left.core.models.flink_statement_model import Statement
-        
+
         # Mock get_statement to return a running statement
         mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
         mock_get_statement.return_value = mock_statement
-        
+
         # Mock exception on first call
         mock_get_results.side_effect = Exception("API Error")
-        
+
         final_result, statement_result = test_mgr._poll_response("test_statement")
-        
+
         self.assertEqual(final_result, "FAIL")
         self.assertIsNone(statement_result)
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.get_or_build_sql_content_transformer')
-    def test_execute_flink_test_statement_new_statement(self, 
-                                                         mock_transformer, 
-                                                         mock_post_statement, 
+    def test_execute_flink_test_statement_new_statement(self,
+                                                         mock_transformer,
+                                                         mock_post_statement,
                                                          mock_get_statement):
         """Test _execute_flink_test_statement when API returns 404 StatementError (recreate as new)."""
         from shift_left.core.models.flink_statement_model import StatementError, ErrorData
@@ -578,19 +603,17 @@ class TestTestManager(unittest.TestCase):
         mock_post_statement.assert_called_once()
         mock_transformer_instance.update_sql_content.assert_called_once()
 
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    def test_execute_flink_test_statement_existing_statement(self, mock_get_statement):
+    def test_execute_flink_test_statement_existing_statement(self):
         """Test _execute_flink_test_statement when statement already exists."""
-        # Mock that statement exists
         existing_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
-        mock_get_statement.return_value = existing_statement
-        
+
         result, is_new = test_mgr._execute_flink_test_statement(
-            sql_content="SELECT * FROM test", 
+            sql_content="SELECT * FROM test",
             statement_name="test_statement",
-            compute_pool_id="test_pool"
+            compute_pool_id="test_pool",
+            existing_statement=existing_statement,
         )
-        
+
         self.assertEqual(result, existing_statement)
         self.assertFalse(is_new)  # Should not be new since it already exists
 
@@ -610,20 +633,20 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr._read_and_treat_sql_content_for_ut')
     @patch('shift_left.core.test_mgr._execute_flink_test_statement')
-    def test_load_sql_and_execute_statement_ddl_table_exists(self, 
-                                                              mock_execute, 
-                                                              mock_read_sql, 
+    def test_load_sql_and_execute_statement_ddl_table_exists(self,
+                                                              mock_execute,
+                                                              mock_read_sql,
                                                               mock_table_exists):
         """Test _load_sql_and_execute_statement when DDL table already exists."""
         mock_table_exists.return_value = True
         mock_read_sql.return_value = "CREATE TABLE test_table (id INT);"
-        
+
         result = test_mgr._load_sql_and_execute_statement(
             table_name="test_table",
             sql_path="test.sql",
             prefix="dev-ddl"
         )
-        
+
         # Should return [] when table exists and prefix is ddl
         self.assertEqual(result, set())
         mock_execute.assert_not_called()
@@ -635,14 +658,14 @@ class TestTestManager(unittest.TestCase):
     @patch('shift_left.core.test_mgr._table_exists')
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
-    def test_exec_one_testcase(self, 
-                                mock_post_flink_statement, 
+    def test_exec_one_testcase(self,
+                                mock_post_flink_statement,
                                 mock_get_statement_results,
                                 mock_table_exists,
                                 mock_get_statement,
                                 mock_delete_statement):
-        
-        """Test the execution of one test case for p1_fct_order: 
+
+        """Test the execution of one test case for p1_fct_order:
         - create the foundation statements
         - run insert statements
         - run validation statements
@@ -656,9 +679,9 @@ class TestTestManager(unittest.TestCase):
             # Return PASS for validation statements related to test_case_1, FAIL for others
             op_row = OpRow(op=0, row=["PASS"]) if "val-1" in statement_name else OpRow(op=0, row=["FAIL"])
             data = Data(data=[op_row])
-            result = StatementResult(results=data, 
-                                     api_version="v1", 
-                                     kind="StatementResult", 
+            result = StatementResult(results=data,
+                                     api_version="v1",
+                                     kind="StatementResult",
                                      metadata=None)
             return result
 
@@ -669,7 +692,7 @@ class TestTestManager(unittest.TestCase):
         def _mock_get_statement(statement_name):
             print(f"mock_get_statement: {statement_name}")
             return None
-        
+
         def _mock_post_statement(
             compute_pool_id, statement_name, sql_content, properties=None, stopped=False
         ):
@@ -703,6 +726,6 @@ class TestTestManager(unittest.TestCase):
         assert test_result.result == "PASS"
         for statement in test_result.statements:
             print(f"statement: {statement.name} {statement.status}")
-        
+
 if __name__ == '__main__':
     unittest.main()

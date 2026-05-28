@@ -11,7 +11,7 @@ from shift_left.ai.process_src_tables import migrate_one_file
 from ai.utilities import compare_files_unordered
 
 data_dir = pathlib.Path(__file__).parent.parent / "data"
-os.environ["CONFIG_FILE"] = str(data_dir.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(data_dir.parent / "config-ccloud.yaml")
 from shift_left.ai.process_src_tables import migrate_one_file
 import shift_left.core.utils.app_config as app_config
 # Mock validate_config to avoid SystemExit

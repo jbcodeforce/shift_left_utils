@@ -5,9 +5,9 @@ import pathlib
 import json
 import time
 import yaml
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-#os.environ["CONFIG_FILE"]= os.getenv("HOME") + ".shift_left/config-dev.yaml"
+#os.environ["SL_CONFIG_FILE"]= os.getenv("HOME") + ".shift_left/config-dev.yaml"
 
 from shift_left.core.utils.app_config import get_config, shift_left_dir, logger
 from shift_left.core.models.flink_statement_model import (
@@ -110,6 +110,15 @@ class TestDebugUnitTests(BaseUT):
         inventory_path = os.getenv("PIPELINES")
         result = assess_unused_tables(inventory_path, include_topics=False)
         print(result)
+
+    def _test_build_pipeline_definition_from_ddl_dml_content(self):
+        path= os.getenv("PIPELINES")
+        dml_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql"
+        ddl_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql"
+        os.remove(path + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME)
+        result = pipeline_mgr.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
+        assert result
+        print(result.model_dump_json(indent=3))
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,22 @@
 # CHANGELOG
 
+### v0.1.50 2026-05-15
+
+* Adapt statement result for next token
+* Integrate confluent-sql module (built for dbt-adpater) for lower level of REST API wrapper for statement deployment
+* Add the `shift_left version --config` flag to get a view of the application configuration of all parameters.
+* Refactor confluent client to cover what is not in confluent-sql
+* Refactor integration tests in tests/it
+* Address issue in SQL parser for column content extraction that missed part due to ')' for TIMESTAMP() type.
+* Add a command for project to list tables and DDL files impacted by production DDL modifications.
+	```sh
+	shift_left project list-impacted-tables modified-files.json --project-path $PIPELINES --output-file impacted-files.json
+	```
+* Modify the foundation DDLs for a set of tables. 
+	```sh
+	shift_left project list-impacted-tables modified-files.json --project-path $PIPELINES --output-file impacted-files.json
+	```
+
 ### v0.1.49 2026-03-21
 
 * Support version flag in deploy command with table-list to deploy to change the table name in the SQL content during deployment. This is to support chirurgical blue/green deployment.

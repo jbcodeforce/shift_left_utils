@@ -1,7 +1,7 @@
 include ../../../common.mk
 
-# --- c360_dim_users
-TABLE_NAME=c360_dim_users
+# --- sl_c360_dim_users
+TABLE_NAME=sl_c360_dim_users
 SCRIPT_PRE_KEBAB=dev-usw2-c360
 SCRIPT_POST_KEBAB=$(subst _,-,$(TABLE_NAME))
 
@@ -21,9 +21,9 @@ create_c360_dim_users: create_flink_ddl  create_flink_dml
 list_record_data_from_topic:
 	$(call list_topic_content, $(TABLE_NAME))
 
-# --- DDL 
-create_flink_ddl: 
-	$(call create_flink_statement, $(DDL_STATEMENT), $(DDL_SCRIPT)) 
+# --- DDL
+create_flink_ddl:
+	$(call create_flink_statement, $(DDL_STATEMENT), $(DDL_SCRIPT))
 	$(call delete_flink_statement, $(DDL_STATEMENT) )
 
 
@@ -33,7 +33,7 @@ describe_flink_ddl:
 delete_flink_ddl:
 	$(call delete_flink_statement, $(DDL_STATEMENT))
 
-drop_table: 
+drop_table:
 	$(call drop_table, $(DROP_DDL_STATEMENT), $(TABLE_NAME))
 	$(call delete_flink_statement, $(DROP_DDL_STATEMENT))
 
@@ -42,10 +42,10 @@ describe_flink_dml:
 	$(call describe_flink_statement,  $(DML_STATEMENT))
 
 create_flink_dml:
-	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT), $(DML_PROPERTIES)) 
+	$(call create_flink_statement, $(DML_STATEMENT), $(DML_SCRIPT), $(DML_PROPERTIES))
 
 create_flink_dev:
-	$(call create_flink_statement, $(DML_STATEMENT), $(DML_TESTS_SCRIPT)) 
+	$(call create_flink_statement, $(DML_STATEMENT), $(DML_TESTS_SCRIPT))
 
 delete_flink_dml:
 	$(call delete_flink_statement, $(DML_STATEMENT))

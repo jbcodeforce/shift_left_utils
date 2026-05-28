@@ -4,14 +4,14 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import os
 import pathlib
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 from shift_left.core.utils.file_search import (
     EXTERNAL_KAFKA_TYPE,
     get_or_build_source_file_inventory,
     build_inventory,
     get_table_ref_from_inventory,
     create_folder_if_not_exist,
-    get_ddl_dml_from_folder, 
+    get_ddl_dml_from_folder,
     from_pipeline_to_absolute,
     from_absolute_to_pipeline,
     update_pipeline_definition_file,
@@ -38,7 +38,7 @@ from shift_left.core.utils.app_config import get_config, logger
 import json
 import pathlib
 """
-To be successful, the test_file_search.py has to be run from the folder above tests and the 
+To be successful, the test_file_search.py has to be run from the folder above tests and the
 inventory and pipelines_definition.json files have to be present.
 """
 class TestFileSearch(unittest.TestCase):
@@ -48,6 +48,10 @@ class TestFileSearch(unittest.TestCase):
         data_dir = pathlib.Path(__file__).parent.parent.parent / "./data"  # Path to the data directory
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
+        import shift_left.core.table_mgr as tm
+        import shift_left.core.pipeline_mgr as pm
+        tm.get_or_create_inventory(os.getenv("PIPELINES"))
+        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
     def test_table_ref_equality(self):
         ref1 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
@@ -59,7 +63,7 @@ class TestFileSearch(unittest.TestCase):
         ref1 = FlinkTableReference.model_validate({"table_name": "table1", "product_name": "p1", "type": "fact", "dml_ref": "dml1", "ddl_ref": "ddl1", "table_folder_name": "folder1" })
         ref2 = FlinkTableReference.model_validate({"table_name": "table2", "product_name": "p1", "type": "fact", "dml_ref": "dml2", "ddl_ref": "ddl2", "table_folder_name": "folder2" })
         self.assertNotEqual(ref1, ref2)
-        self.assertNotEqual(ref1.__hash__(), ref2.__hash__())  
+        self.assertNotEqual(ref1.__hash__(), ref2.__hash__())
 
     def test_flink_statement_node(self):
         node = FlinkStatementNode(table_name="root_node", product_name="p1")
@@ -84,7 +88,7 @@ class TestFileSearch(unittest.TestCase):
         assert node.dml_statement_name == "dev-usw2-p1-dml-src-table"
         assert node.ddl_statement_name == "dev-usw2-p1-ddl-src-table"
 
-    
+
     def test_read_pipeline_definition_from_file(self):
         result: FlinkTablePipelineDefinition = read_pipeline_definition_from_file(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
         assert result
@@ -111,7 +115,7 @@ class TestFileSearch(unittest.TestCase):
     def test_absolute_to_relative(self):
         path= "/home/bill/Code/shift_left_utils/examples/flink-project/pipelines"
         assert "pipelines" == from_absolute_to_pipeline(path)
-    
+
     def test_relative_to_pipeline(self):
         test_path = "pipelines/facts/p1/fct_order"
         abs_path = from_pipeline_to_absolute(test_path)
@@ -204,7 +208,7 @@ class TestFileSearch(unittest.TestCase):
         """Test folder creation functionality"""
         import tempfile
         import shutil
-        
+
         # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
         try:
@@ -213,7 +217,7 @@ class TestFileSearch(unittest.TestCase):
             result = create_folder_if_not_exist(new_folder)
             self.assertTrue(os.path.exists(new_folder))
             self.assertEqual(result, new_folder)
-            
+
             # Test with existing folder
             result = create_folder_if_not_exist(new_folder)
             self.assertTrue(os.path.exists(new_folder))
@@ -226,7 +230,7 @@ class TestFileSearch(unittest.TestCase):
         """Test updating pipeline definition file"""
         import tempfile
         import shutil
-        
+
         temp_dir = tempfile.mkdtemp()
         try:
             # Create a test pipeline definition
@@ -238,11 +242,11 @@ class TestFileSearch(unittest.TestCase):
                 dml_ref="test/dml.sql",
                 ddl_ref="test/ddl.sql"
             )
-            
+
             # Test file creation and update
             file_path = os.path.join(temp_dir, "pipeline_definition.json")
             update_pipeline_definition_file(file_path, test_def)
-            
+
             # Verify file was created and contains correct data
             self.assertTrue(os.path.exists(file_path))
             with open(file_path, 'r') as f:
@@ -261,10 +265,10 @@ class TestFileSearch(unittest.TestCase):
             dml_statement_name="dml-test-table",
             ddl_statement_name="ddl-test-table"
         )
-        
+
         # Apply naming convention
         modified_node = _apply_statement_naming_convention(node)
-        
+
         # Verify naming convention was applied
         self.assertNotEqual(modified_node.dml_statement_name, "dml-test-table")
         self.assertNotEqual(modified_node.ddl_statement_name, "ddl-test-table")
@@ -290,7 +294,7 @@ class TestFileSearch(unittest.TestCase):
             ("/path/to/dead_letter/table", "dead_letter"),
             ("/path/to/unknown/table", "unknown-type")
         ]
-        
+
         for path, expected_type in test_cases:
             actual_type = get_table_type_from_file_path(path)
             self.assertEqual(actual_type, expected_type)
@@ -299,7 +303,7 @@ class TestFileSearch(unittest.TestCase):
         """Test error cases for DDL/DML file retrieval"""
         import tempfile
         import shutil
-        
+
         temp_dir = tempfile.mkdtemp()
         try:
             # Test missing DDL file
@@ -308,7 +312,7 @@ class TestFileSearch(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 get_ddl_dml_from_folder(temp_dir, "sql-scripts")
             self.assertTrue("No DDL file found" in str(context.exception))
-            
+
             # Test missing DML file - should not raise exception anymore, just return None for DML
             ddl_file = os.path.join(scripts_dir, "ddl.test.sql")
             with open(ddl_file, 'w') as f:
@@ -331,7 +335,7 @@ class TestFileSearch(unittest.TestCase):
             ("/path/to/facts/table", 'None'),  # No product name
             ("/path/to/unknown/table", "unknown")  # Unknown structure
         ]
-        
+
         for path, expected_product in test_cases:
             actual_product = extract_product_name(path)
             self.assertEqual(actual_product, expected_product)

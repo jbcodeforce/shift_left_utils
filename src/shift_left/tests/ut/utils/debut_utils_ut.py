@@ -6,7 +6,7 @@ import pathlib
 from unittest.mock import patch
 
 # Set up config file path for testing
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config-ccloud.yaml")
 
 from shift_left.core.utils.app_config import validate_config, get_config
 """

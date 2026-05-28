@@ -200,13 +200,12 @@ def assess_unused_tables(
     return result
 
 def delete_unused_tables(
-    inventory_path: str,
     table_list_file: str
 ) -> str:
     """
     Delete unused tables
     """
-    logger.info(f"Deleting unused tables in {inventory_path}")
+    logger.info(f"Deleting unused tables in {table_list_file}")
     with open(table_list_file, 'r') as f:
         table_list = f.readlines()
         logger.info(f"Found {len(table_list)} tables to delete")

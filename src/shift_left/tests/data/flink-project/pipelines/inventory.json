@@ -26,24 +26,6 @@
         "table_folder_name": "pipelines/intermediates/p2/c",
         "kafka_topic": null
     },
-    "c360_dim_groups": {
-        "table_name": "c360_dim_groups",
-        "product_name": "c360",
-        "type": "dimension",
-        "dml_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/dml.c360_dim_groups.sql",
-        "ddl_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/ddl.c360_dim_groups.sql",
-        "table_folder_name": "pipelines/dimensions/c360/dim_groups",
-        "kafka_topic": null
-    },
-    "c360_dim_users": {
-        "table_name": "c360_dim_users",
-        "product_name": "c360",
-        "type": "dimension",
-        "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_users.sql",
-        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users_dlq.sql",
-        "table_folder_name": "pipelines/dimensions/c360/dim_users",
-        "kafka_topic": null
-    },
     "d": {
         "table_name": "d",
         "product_name": "p2",
@@ -69,15 +51,6 @@
         "dml_ref": "pipelines/facts/p2/f/sql-scripts/dml.f.sql",
         "ddl_ref": "pipelines/facts/p2/f/sql-scripts/ddl.f.sql",
         "table_folder_name": "pipelines/facts/p2/f",
-        "kafka_topic": null
-    },
-    "fct_user_per_group": {
-        "table_name": "fct_user_per_group",
-        "product_name": "c360",
-        "type": "fact",
-        "dml_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql",
-        "ddl_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql",
-        "table_folder_name": "pipelines/facts/c360/fct_user_per_group",
         "kafka_topic": null
     },
     "int_common_tenant": {
@@ -134,6 +107,15 @@
         "table_folder_name": "pipelines/intermediates/p1/int_test",
         "kafka_topic": null
     },
+    "orphan": {
+        "table_name": "orphan",
+        "product_name": "common",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/common/orphan/sql-scripts/dml.orphan.sql",
+        "ddl_ref": "pipelines/seeds/common/orphan/sql-scripts/ddl.orphan.sql",
+        "table_folder_name": "pipelines/seeds/common/orphan",
+        "kafka_topic": null
+    },
     "p": {
         "table_name": "p",
         "product_name": "p2",
@@ -152,8 +134,89 @@
         "table_folder_name": "pipelines/facts/p1/fct_order",
         "kafka_topic": null
     },
-    "raw_users": {
-        "table_name": "raw_users",
+    "sl_c360_dim_groups": {
+        "table_name": "sl_c360_dim_groups",
+        "product_name": "c360",
+        "type": "dimension",
+        "dml_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/dml.c360_dim_groups.sql",
+        "ddl_ref": "pipelines/dimensions/c360/dim_groups/sql-scripts/ddl.c360_dim_groups.sql",
+        "table_folder_name": "pipelines/dimensions/c360/dim_groups",
+        "kafka_topic": null
+    },
+    "sl_c360_dim_users": {
+        "table_name": "sl_c360_dim_users",
+        "product_name": "c360",
+        "type": "dimension",
+        "dml_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/dml.c360_dim_users.sql",
+        "ddl_ref": "pipelines/dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users.sql",
+        "table_folder_name": "pipelines/dimensions/c360/dim_users",
+        "kafka_topic": null
+    },
+    "sl_c360_fct_user_per_group": {
+        "table_name": "sl_c360_fct_user_per_group",
+        "product_name": "c360",
+        "type": "fact",
+        "dml_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql",
+        "ddl_ref": "pipelines/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql",
+        "table_folder_name": "pipelines/facts/c360/fct_user_per_group",
+        "kafka_topic": null
+    },
+    "sl_c360_src_groups": {
+        "table_name": "sl_c360_src_groups",
+        "product_name": "c360",
+        "type": "source",
+        "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
+        "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
+        "table_folder_name": "pipelines/sources/c360/src_groups",
+        "kafka_topic": null
+    },
+    "sl_c360_src_users": {
+        "table_name": "sl_c360_src_users",
+        "product_name": "c360",
+        "type": "source",
+        "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
+        "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360_users.sql",
+        "table_folder_name": "pipelines/sources/c360/src_users",
+        "kafka_topic": null
+    },
+    "sl_cmn_src_tenants": {
+        "table_name": "sl_cmn_src_tenants",
+        "product_name": "common",
+        "type": "source",
+        "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
+        "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
+        "table_folder_name": "pipelines/sources/common/src_tenant",
+        "kafka_topic": null
+    },
+    "sl_raw_groups": {
+        "table_name": "sl_raw_groups",
+        "product_name": "c360",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/dml.raw_groups.sql",
+        "ddl_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
+        "table_folder_name": "pipelines/seeds/c360/raw_groups",
+        "kafka_topic": null
+    },
+    "sl_raw_tenants": {
+        "table_name": "sl_raw_tenants",
+        "product_name": "common",
+        "type": "seed",
+        "dml_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/dml.raw_tenants.sql",
+        "ddl_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/ddl.raw_tenants.sql",
+        "table_folder_name": "pipelines/seeds/common/raw_tenants",
+        "kafka_topic": null
+    },
+    "sl_raw_transactions": {
+        "table_name": "sl_raw_transactions",
+        "product_name": "common",
+        "type": "seed",
+        "dml_ref": "",
+        "ddl_ref": "pipelines/seeds/common/raw_transactions/sql-scripts/ddl.raw_transactions.sql",
+        "table_folder_name": "pipelines/seeds/common/raw_transactions",
+        "kafka_topic": null
+    },
+    "sl_raw_users": {
+        "table_name": "sl_raw_users",
         "product_name": "c360",
         "type": "seed",
         "dml_ref": "pipelines/seeds/c360/raw_users/sql-scripts/dml.raw_users.sql",
@@ -177,33 +240,6 @@
         "dml_ref": "pipelines/sources/p2/src_b/sql-scripts/dml.src_b.sql",
         "ddl_ref": "pipelines/sources/p2/src_b/sql-scripts/ddl.src_b.sql",
         "table_folder_name": "pipelines/sources/p2/src_b",
-        "kafka_topic": null
-    },
-    "src_c360_groups": {
-        "table_name": "src_c360_groups",
-        "product_name": "c360",
-        "type": "source",
-        "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
-        "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-        "table_folder_name": "pipelines/sources/c360/src_groups",
-        "kafka_topic": null
-    },
-    "src_c360_users": {
-        "table_name": "src_c360_users",
-        "product_name": "c360",
-        "type": "source",
-        "dml_ref": "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql",
-        "ddl_ref": "pipelines/sources/c360/src_users/sql-scripts/ddl.src_c360users.sql",
-        "table_folder_name": "pipelines/sources/c360/src_users",
-        "kafka_topic": null
-    },
-    "src_common_tenant": {
-        "table_name": "src_common_tenant",
-        "product_name": "common",
-        "type": "source",
-        "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
-        "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
-        "table_folder_name": "pipelines/sources/common/src_tenant",
         "kafka_topic": null
     },
     "src_p1_table_2": {

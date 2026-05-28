@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import MagicMock
 
 data_dir = pathlib.Path(__file__).resolve().parent.parent / "data"
-os.environ["CONFIG_FILE"] = str(data_dir.parent / "config-ccloud.yaml")
+os.environ["SL_CONFIG_FILE"] = str(data_dir.parent / "config-ccloud.yaml")
 
 import shift_left.core.utils.app_config as app_config
 from shift_left.core.utils.app_config import logger

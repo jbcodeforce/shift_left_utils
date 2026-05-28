@@ -99,7 +99,16 @@ def delete_all_metadata(path_from_where_to_delete:  Annotated[str, typer.Argumen
     Delete all pipeline definition json files from a given folder path
     """
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Delete pipeline definitions from {path_from_where_to_delete}")
-    pipeline_mgr.delete_all_metada_files(path_from_where_to_delete)
+    try:
+        pipeline_mgr.delete_all_metada_files(path_from_where_to_delete)
+    except Exception as e:
+        logger.exception(
+            "delete_all_metadata failed for path=%s",
+            path_from_where_to_delete,
+        )
+        sanitized_error = safe_error_display(e)
+        print(f"[red]Error: {sanitized_error}[/red]")
+        raise typer.Exit(1)
     print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Done")
 
 

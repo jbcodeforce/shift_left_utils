@@ -4,11 +4,12 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 from unittest.mock import patch, MagicMock
 import os
+import json
 import pathlib
 from datetime import datetime
 from typing import Tuple
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 import shift_left.core.pipeline_mgr as pm
@@ -20,6 +21,7 @@ from shift_left.core.models.flink_statement_model import (
     Statement,
     StatementInfo
 )
+from shift_left.core.models.flink_compute_pool_model import ComputePoolResponse, ComputePoolSpec, Status, ComputePoolEnvironment
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode,
 )
@@ -60,21 +62,24 @@ class TestPoolAssignment(unittest.TestCase):
             name="dev-table-1",
             env_id=env_id,
             max_cfu=100,
-            current_cfu=50
+            current_cfu=50,
+            status_phase="PROVISIONED"
         )
         pool_2 = ComputePoolInfo(
             id=TEST_COMPUTE_POOL_ID_2,
             name="dev-table-2",
             env_id=env_id,
             max_cfu=100,
-            current_cfu=78
+            current_cfu=78,
+            status_phase="PROVISIONED"
         )
         pool_3 = ComputePoolInfo(
             id=TEST_COMPUTE_POOL_ID_3,
             name="dev-table-3",
             env_id=env_id,
             max_cfu=10,
-            current_cfu=0
+            current_cfu=0,
+            status_phase="PROVISIONED"
         )
         return ComputePoolList(pools=[pool_1, pool_2, pool_3])
 
@@ -155,7 +160,7 @@ class TestPoolAssignment(unittest.TestCase):
             }
         }
 
-    def _mock_create_pool(self, name: str, cp_id: str):
+    def _mock_create_pool_response(self, name: str, cp_id: str):
             return {
             "api_version": "fcpm/v2",
             "kind": "ComputePool",
@@ -266,15 +271,24 @@ class TestPoolAssignment(unittest.TestCase):
                          mock_get_compute_pool_list,
                          MockConfluentCloudClient):
         """When the cfu is too high create a new compute pool if not already exists"""
-        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        cp_list = self._create_mock_compute_pool_list()
+        cp_list.pools.append(ComputePoolInfo(
+            id="high-cfu",
+            name="cp-high-cfu",
+            env_id="env-00000",
+            max_cfu=50,
+            current_cfu=45,
+            status_phase="PROVISIONED"
+        ))
+        mock_get_compute_pool_list.return_value = cp_list
         mock_client_instance = MockConfluentCloudClient.return_value
-        mock_response={}
+        mock_response = self._mock_create_pool_response("cp-name-1", "cp-id-1")
+        mock_client_instance.get_ccloud_auth.return_value = "Bearer token"
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.side_effect = self._create_mock_compute_pool_info
-        mock_client_instance.create_compute_pool.return_value = self._mock_create_pool("cp-name-1", "cp-id-1")
         node = self._create_mock_statement_node(table_name="table-X", compute_pool_id="high-cfu")
         self.config['flink']['compute_pool_id'] = TEST_COMPUTE_POOL_ID_3
-        node = dm._assign_compute_pool_id_to_node(node, None)
+        node = dm._assign_compute_pool_id_to_node(node, node.compute_pool_id)
         assert node.compute_pool_id == 'cp-id-1'
         assert node.compute_pool_name == "cp-name-1"
 
@@ -286,10 +300,11 @@ class TestPoolAssignment(unittest.TestCase):
         """When could not find a matching compute pool, create a new one"""
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_client_instance = MockConfluentCloudClient.return_value
-        mock_response={}
+        mock_response = self._mock_create_pool_response("cp-name-1", "cp-id-1")
+        mock_client_instance.get_ccloud_auth.return_value = "Bearer token"
         mock_client_instance.make_request.return_value = mock_response
         mock_client_instance.get_compute_pool_info.return_value = self._create_mock_compute_pool_info("cp-id-1", "cp-name-1",  5, 50)
-        mock_client_instance.create_compute_pool.return_value = self._mock_create_pool("cp-name-1", "cp-id-1")
+        mock_client_instance.create_compute_pool.return_value = self._mock_create_pool_response("cp-name-1", "cp-id-1")
         node = self._create_mock_statement_node("table-7", compute_pool_id='')
         self.config['flink']['compute_pool_id'] = ''
         node = dm._assign_compute_pool_id_to_node(node, '')

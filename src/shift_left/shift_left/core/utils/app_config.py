@@ -1,6 +1,8 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 """
+import copy
+import json
 import yaml
 import os
 from functools import lru_cache
@@ -12,10 +14,71 @@ import string
 from typing import Dict, Any, Optional
 from .error_sanitizer import sanitize_error_message
 
+BASE_CC_API = "api.confluent.cloud/org/v2"
+__version__ = "0.1.51"
+
+class SecureFormatter(logging.Formatter):
+    """
+    Custom logging formatter that sanitizes sensitive information from log messages.
+
+    This formatter ensures that API keys, passwords, tokens, and other sensitive data
+    are automatically masked in all log outputs, preventing accidental exposure
+    of secrets in log files.
+    """
+
+    def format(self, record):
+        """Format the log record and sanitize any sensitive information."""
+        # First get the formatted message using the parent formatter
+        formatted_message = super().format(record)
+
+        # Sanitize the entire formatted message
+        sanitized_message = sanitize_error_message(formatted_message)
+
+        return sanitized_message
+
+
+def generate_session_id() -> tuple[str, str]:
+    """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
+    date_str = datetime.datetime.now().strftime("%m-%d-%y-%H-%M-%S")
+    random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+    return f"{date_str}-{random_str}", random_str
+
+
+
+shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left')
+log_dir = os.path.join(shift_left_dir, 'logs')
+log_name, session_id = generate_session_id()
+session_log_dir = os.path.join(log_dir, log_name)
+
+# Configure secure logging with automatic sensitive data sanitization
+# The SecureFormatter ensures that API keys, passwords, tokens, and other
+# sensitive information are automatically masked in all log outputs
+logger = logging.getLogger("shift_left")
+logger.propagate = False  # Prevent propagation to root logger
+os.makedirs(session_log_dir, exist_ok=True)
+
+log_file_path = os.path.join(session_log_dir, "shift_left_cli.log")
+file_handler = RotatingFileHandler(
+    log_file_path,
+    maxBytes=5*1024*1024,  # 5MB
+    backupCount=3        # Keep up to 3 backup files
+)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
+logger.addHandler(file_handler)
+print("-" * 40 + " SHIFT_LEFT " + __version__ + " " + "-" * 40)
+header_line=f"""| CONFIG_FILE     : {os.getenv('SL_CONFIG_FILE',os.getenv('CONFIG_FILE', './config.yaml'))}
+| LOGS folder     : {session_log_dir}
+| Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
+print(header_line)
+logger.info(header_line)
+print("-" * 92)
+#console_handler = logging.StreamHandler()
+#console_handler.setLevel(logging.INFO)
+#logger.addHandler(console_handler)
+
 _config: dict[str, dict[str,str]] = {}
 
-BASE_CC_API = "api.confluent.cloud/org/v2"
-__version__ = "0.1.50"
 
 # Environment variable mapping for sensitive values
 ENV_VAR_MAPPING = {
@@ -24,7 +87,7 @@ ENV_VAR_MAPPING = {
     "kafka.api_secret": "SL_KAFKA_API_SECRET",
     "kafka.sasl.username": "SL_KAFKA_API_KEY",
     "kafka.sasl.password": "SL_KAFKA_API_SECRET",
-    "kafka.cluster_id": "SL_CCLOUD_KAFKA_CLUSTER_ID",
+    "kafka.cluster_id": "SL_KAFKA_CLUSTER_ID",
 
     # Confluent Cloud API credentials
     "confluent_cloud.api_key": "SL_CONFLUENT_CLOUD_API_KEY",
@@ -125,65 +188,7 @@ def print_env_var_help():
     print("="*80 + "\n")
 
 
-class SecureFormatter(logging.Formatter):
-    """
-    Custom logging formatter that sanitizes sensitive information from log messages.
 
-    This formatter ensures that API keys, passwords, tokens, and other sensitive data
-    are automatically masked in all log outputs, preventing accidental exposure
-    of secrets in log files.
-    """
-
-    def format(self, record):
-        """Format the log record and sanitize any sensitive information."""
-        # First get the formatted message using the parent formatter
-        formatted_message = super().format(record)
-
-        # Sanitize the entire formatted message
-        sanitized_message = sanitize_error_message(formatted_message)
-
-        return sanitized_message
-
-
-def generate_session_id() -> tuple[str, str]:
-    """Generate a session ID in format mm-dd-yy-XXXX where XXXX is random alphanumeric"""
-    date_str = datetime.datetime.now().strftime("%m-%d-%y-%H-%M-%S")
-    random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-    return f"{date_str}-{random_str}", random_str
-
-
-
-shift_left_dir = os.path.join(os.path.expanduser("~"), '.shift_left')
-log_dir = os.path.join(shift_left_dir, 'logs')
-log_name, session_id = generate_session_id()
-session_log_dir = os.path.join(log_dir, log_name)
-
-# Configure secure logging with automatic sensitive data sanitization
-# The SecureFormatter ensures that API keys, passwords, tokens, and other
-# sensitive information are automatically masked in all log outputs
-logger = logging.getLogger("shift_left")
-logger.propagate = False  # Prevent propagation to root logger
-os.makedirs(session_log_dir, exist_ok=True)
-
-log_file_path = os.path.join(session_log_dir, "shift_left_cli.log")
-file_handler = RotatingFileHandler(
-    log_file_path,
-    maxBytes=5*1024*1024,  # 5MB
-    backupCount=3        # Keep up to 3 backup files
-)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(SecureFormatter('%(asctime)s - %(name)s - %(levelname)s %(pathname)s:%(lineno)d - %(funcName)s() - %(message)s'))
-logger.addHandler(file_handler)
-print("-" * 40 + " SHIFT_LEFT " + __version__ + " " + "-" * 40)
-header_line=f"""| CONFIG_FILE     : {os.getenv('SL_CONFIG_FILE',os.getenv('CONFIG_FILE', './config.yaml'))}
-| LOGS folder     : {session_log_dir}
-| Session started : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"""
-print(header_line)
-logger.info(header_line)
-print("-" * 92)
-#console_handler = logging.StreamHandler()
-#console_handler.setLevel(logging.INFO)
-#logger.addHandler(console_handler)
 
 
 def validate_config(config: dict[str,dict[str,str]], minimal: bool = False) -> None:
@@ -365,6 +370,52 @@ def get_config() -> dict[str,dict[str,str]]:
           validate_config(_config, minimal=True)
 
   return _config
+
+
+_DEBUG_SENSITIVE_KEY_MARKERS = (
+    "secret",
+    "password",
+    "api_key",
+    "api_secret",
+    "token",
+    "authorization",
+    "bearer",
+)
+
+
+def _is_sensitive_config_key(key: str) -> bool:
+    k = key.lower()
+    return any(marker in k for marker in _DEBUG_SENSITIVE_KEY_MARKERS)
+
+
+def _redact_config_for_debug(obj: Any) -> Any:
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            sk = str(k)
+            if _is_sensitive_config_key(sk):
+                if isinstance(v, str):
+                    out[sk] = v[:5] + "*****MASKED*****"
+                else:
+                    out[sk] = "***MASKED***"
+
+            else:
+                out[sk] = _redact_config_for_debug(v)
+        return out
+    if isinstance(obj, list):
+        return [_redact_config_for_debug(i) for i in obj]
+    return obj
+
+
+def format_config_for_debug(indent: int = 2) -> str:
+    """
+    Return a JSON string of the effective ``get_config()`` with sensitive values
+    replaced by ``***MASKED***`` (key-name heuristic). For support / IT debugging only.
+    """
+    config_path = os.getenv("SL_CONFIG_FILE", os.getenv("CONFIG_FILE", "./config.yaml"))
+    redacted = _redact_config_for_debug(copy.deepcopy(get_config()))
+    body = json.dumps(redacted, indent=indent, default=str)
+    return f"CONFIG_FILE (effective): {config_path}\n{body}"
 
 
 def reset_config_cache():

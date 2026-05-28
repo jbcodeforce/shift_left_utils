@@ -4,9 +4,9 @@ Copyright 2024-2025 Confluent, Inc.
 import os
 import pathlib
 import unittest
-from unittest.mock import patch, ANY
+from unittest.mock import patch, ANY, mock_open
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 
@@ -23,49 +23,16 @@ from shift_left.core.utils.file_search import FlinkTableReference, get_or_build_
 
 
 class TestTestManager(unittest.TestCase):
-    """Unit test suite for test manager functionality."""
+    """Unit test suite for test manager private functions."""
 
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
+        cls._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
 
-    def setUp(self):
-        # Ensure proper test isolation by resetting caches and rebuilding inventory
-        reset_all_caches()
-        build_inventory(os.getenv("PIPELINES"))
-        self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
-
-
-
-
-    # --------- tests creation and preparation ---------
-    def test_create_tests_structure(self):
-        """Test creation of tests structure with templates & test definitions.
-        The table e uses c so c will be part of foundations SQL and CSV inputs are created.
-        """
-        # Clean up any existing test files
-        test_folder = os.path.join(os.getenv("PIPELINES"), "facts/p2/e/tests")
-        if os.path.exists(test_folder):
-            for file in os.listdir(test_folder):
-                os.remove(os.path.join(test_folder, file))
-            os.rmdir(test_folder)
-        table_name = "e"
-        test_mgr.init_unit_test_for_table(table_name, create_csv=True)
-
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/test_definitions.yaml"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/validate_e_2.sql"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/insert_c_2.csv"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/insert_c_1.sql"))
-        test_def, table_ref = test_mgr._load_test_suite_definition(table_name)
-        self.assertTrue(test_def)
-        print(test_def.model_dump_json(indent=3))
-        self.assertEqual(test_def.foundations[0].table_name, "c")
-        self.assertEqual(test_def.foundations[0].ddl_for_test, "./tests/ddl_c.sql")
-
-    def test_validate_test_model(self):
+    def test_validate_test_pydantic_model(self):
         """Test loading of test definition."""
         td1 = SLTestData(table_name="tb1", file_name="ftb1")
         o1 = SLTestData(table_name="tbo1", file_name="to1")
@@ -77,7 +44,7 @@ class TestTestManager(unittest.TestCase):
 
     def test_load_test_definition_for_fact_table(self):
         """Test loading test definition for fact table."""
-        table_name = "p1_fct_order"
+        table_name = "sl_c360_dim_users"
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
 
         self.assertTrue(test_suite_def)
@@ -325,6 +292,48 @@ class TestTestManager(unittest.TestCase):
             # Verify that the cache file was written
             mock_file.assert_called()
 
+    def test_coerce_cache_created_at_handles_datetime_and_iso_string(self):
+        from datetime import datetime
+
+        dt = datetime(2026, 5, 27, 18, 6, 23, 37801)
+        self.assertEqual(test_mgr._coerce_cache_created_at(dt), dt)
+        self.assertEqual(
+            test_mgr._coerce_cache_created_at("2026-05-27T18:06:23.037801"),
+            dt,
+        )
+        legacy = datetime.strptime("2026-05-27 18:06:23", "%Y-%m-%d %H:%M:%S")
+        self.assertEqual(
+            test_mgr._coerce_cache_created_at("2026-05-27 18:06:23"),
+            legacy,
+        )
+
+    @patch('shift_left.core.test_mgr.get_config')
+    @patch('shift_left.core.test_mgr.ConfluentCloudClient')
+    def test_table_exists_uses_fresh_iso_cache_without_api_call(
+        self, mock_ccloud_client, mock_get_config
+    ):
+        """Topic list file written by model_dump_json uses ISO created_at (not strptime format)."""
+        import json
+        import tempfile
+        from datetime import datetime, timedelta
+
+        mock_get_config.return_value = {'app': {'cache_ttl': 3600}}
+        cache_payload = {
+            "created_at": (datetime.now() - timedelta(seconds=30)).isoformat(),
+            "topic_list": ["sl_c360_src_users_ut", "sl_c360_dim_groups_ut"],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(cache_payload, f)
+            cache_path = f.name
+        try:
+            with patch('shift_left.core.test_mgr.TOPIC_LIST_FILE', cache_path):
+                test_mgr._topic_list_cache = None
+                self.assertTrue(test_mgr._table_exists("sl_c360_src_users_ut"))
+                self.assertFalse(test_mgr._table_exists("missing_topic"))
+                mock_ccloud_client.assert_not_called()
+        finally:
+            os.remove(cache_path)
+
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement_list')
     @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
@@ -357,33 +366,33 @@ class TestTestManager(unittest.TestCase):
 
 
     @patch('shift_left.core.test_mgr.from_pipeline_to_absolute')
-    def test_read_and_treat_sql_content_for_ut(self, mock_from_pipeline):
+    @patch('builtins.open', new_callable=mock_open, read_data="SELECT * FROM test_table WHERE id > 0;")
+    def test_read_and_treat_sql_content_for_ut(self, mock_file, mock_from_pipeline):
         """Test reading and treating SQL content for unit tests."""
-        # Create a temporary SQL file
         temp_sql_content = "SELECT * FROM test_table WHERE id > 0;"
-        temp_sql_file = "/tmp/test_sql.sql"
-        mock_from_pipeline.return_value = temp_sql_file
+        mock_from_pipeline.return_value = "/tmp/test_sql.sql"
+        post_fix_unit_test = "_foo"
 
-        def _transform_sql_content(sql_content, table_name):
+        def _transform_sql_content(sql_content, table_name, post_fix):
+            self.assertEqual(table_name, "test_table")
+            self.assertEqual(post_fix, post_fix_unit_test)
             return sql_content
 
-        def _transform_sql_content_upper(sql_content, table_name):
+        def _transform_sql_content_upper(sql_content, table_name, post_fix):
+            self.assertEqual(table_name, "test_table")
+            self.assertEqual(post_fix, post_fix_unit_test)
             return sql_content.upper()
 
-        with open(temp_sql_file, "w") as f:
-            f.write(temp_sql_content)
+        result = test_mgr._read_and_treat_sql_content_for_ut(
+            "test_path", _transform_sql_content, "test_table", post_fix_unit_test
+        )
+        self.assertEqual(result, temp_sql_content)
+        mock_file.assert_called_once_with("/tmp/test_sql.sql", "r")
 
-        try:
-            # Test with identity function
-            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", _transform_sql_content, "test_table")
-            self.assertEqual(result, temp_sql_content)
-
-            # Test with transformation function
-            result = test_mgr._read_and_treat_sql_content_for_ut("test_path", _transform_sql_content_upper, "test_table")
-            self.assertEqual(result, temp_sql_content.upper())
-        finally:
-            if os.path.exists(temp_sql_file):
-                os.remove(temp_sql_file)
+        result = test_mgr._read_and_treat_sql_content_for_ut(
+            "test_path", _transform_sql_content_upper, "test_table", post_fix_unit_test
+        )
+        self.assertEqual(result, temp_sql_content.upper())
 
 
     @patch('shift_left.core.test_mgr.from_pipeline_to_absolute')
@@ -618,6 +627,10 @@ class TestTestManager(unittest.TestCase):
             os.remove(corrupted_cache)
 
 
+    def _apply_replace_table_name_fct(self, fct, sql_content, table_name, post_fix_unit_test):
+        """Invoke replace_table_name callback with the same signature as _load_sql_and_execute_statement."""
+        return fct(sql_content, table_name, post_fix_unit_test)
+
     @patch('shift_left.core.test_mgr.SQLparser')
     def test_replace_table_name_substring_issue_fix(self, mock_parser_class):
         """
@@ -631,138 +644,144 @@ class TestTestManager(unittest.TestCase):
         The improved function should produce:
         - table_name_a_ut and table_name_a_b_c_ut (CORRECT)
         """
-        # Access the nested function from _start_ddl_dml_for_flink_under_test
         from shift_left.core.utils.file_search import FlinkTableReference
 
-        # Create a mock parser
         mock_parser = mock_parser_class.return_value
+        post_fix_unit_test = test_mgr.DEFAULT_POST_FIX_UNIT_TEST
 
-        # Test Case 1: Simple case with no substring conflicts
-        mock_parser.extract_table_references.return_value = {'table_a', 'table_b'}
-
-        # Create a dummy table reference to access the replace_table_name function
         table_ref = FlinkTableReference(
             table_name="test_table",
             dml_ref="test.sql",
             ddl_ref="test_ddl.sql"
         )
 
-        # We need to call the function through _start_ddl_dml_for_flink_under_test
-        # but we'll extract the replace_table_name logic by testing the SQL transformation
-
+        # Test Case 1: Simple case with no substring conflicts
+        mock_parser.extract_table_references.return_value = {'table_a', 'table_b'}
         sql_input = "SELECT * FROM table_a JOIN table_b ON table_a.id = table_b.id"
 
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
-            # Mock the file loading to return our test SQL
-            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
-                # Apply the function transformation to our test SQL
-                return fct(sql_input, table_name)
+            def mock_sql_loader(table_name, sql_path, prefix, compute_pool_id, fct, product_name,
+                                statements=None, post_fix_unit_test=post_fix_unit_test):
+                return self._apply_replace_table_name_fct(
+                    fct, sql_input, table_name, post_fix_unit_test
+                )
 
             mock_load_sql.side_effect = mock_sql_loader
-
-            # This will call replace_table_name internally
-            test_mgr._start_ddl_dml_for_flink_under_test("test_table", table_ref)
-
-            # Verify the function was called with our SQL
+            test_mgr._start_ddl_dml_for_flink_under_test(
+                "test_table", table_ref, post_fix_unit_test=post_fix_unit_test
+            )
             self.assertTrue(mock_load_sql.called)
 
         # Test Case 2: Substring conflict case - the main bug we're fixing
         mock_parser.extract_table_references.return_value = {'table_name_a', 'table_name_a_b_c'}
-
-        sql_with_substring_issue = "SELECT * FROM table_name_a JOIN table_name_a_b_c ON table_name_a.id = table_name_a_b_c.id"
+        sql_with_substring_issue = (
+            "SELECT * FROM table_name_a JOIN table_name_a_b_c "
+            "ON table_name_a.id = table_name_a_b_c.id"
+        )
 
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
 
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name,
+                                        statements=None, post_fix_unit_test=post_fix_unit_test):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_with_substring_issue, table_name)
+                transformed_sql = self._apply_replace_table_name_fct(
+                    fct, sql_with_substring_issue, table_name, post_fix_unit_test
+                )
                 return None
 
             mock_load_sql.side_effect = capture_transformed_sql
+            test_mgr._start_ddl_dml_for_flink_under_test(
+                "test_table", table_ref, post_fix_unit_test=post_fix_unit_test
+            )
 
-            test_mgr._start_ddl_dml_for_flink_under_test("test_table", table_ref)
-
-            # Verify the transformation was applied correctly
             self.assertIsNotNone(transformed_sql)
+            self.assertIn(f'table_name_a{post_fix_unit_test}', transformed_sql)
+            self.assertIn(f'table_name_a_b_c{post_fix_unit_test}', transformed_sql)
+            self.assertNotIn(f'table_name_a{post_fix_unit_test}_b_c', transformed_sql)
 
-            # Check that both table names got the correct suffix
-            self.assertIn('table_name_a_ut', transformed_sql)
-            self.assertIn('table_name_a_b_c_ut', transformed_sql)
-
-            # Most importantly, verify the substring issue is fixed:
-            # table_name_a_b_c should NOT become table_name_a_ut_b_c
-            self.assertNotIn('table_name_a_ut_b_c', transformed_sql)
-
-            # Verify the exact expected result
-            expected_result = "SELECT * FROM table_name_a_ut JOIN table_name_a_b_c_ut ON table_name_a_ut.id = table_name_a_b_c_ut.id"
+            expected_result = (
+                f"SELECT * FROM table_name_a{post_fix_unit_test} JOIN table_name_a_b_c{post_fix_unit_test} "
+                f"ON table_name_a{post_fix_unit_test}.id = table_name_a_b_c{post_fix_unit_test}.id"
+            )
             self.assertEqual(transformed_sql, expected_result)
 
         # Test Case 3: Multiple overlapping table names
-        mock_parser.extract_table_references.return_value = {'user_data', 'user_data_archive', 'user_data_backup'}
-
-        sql_multiple_overlaps = "SELECT * FROM user_data JOIN user_data_archive JOIN user_data_backup ON user_data.id = user_data_archive.id"
+        mock_parser.extract_table_references.return_value = {
+            'user_data', 'user_data_archive', 'user_data_backup'
+        }
+        sql_multiple_overlaps = (
+            "SELECT * FROM user_data JOIN user_data_archive JOIN user_data_backup "
+            "ON user_data.id = user_data_archive.id"
+        )
 
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
 
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name,
+                                        statements=None, post_fix_unit_test=post_fix_unit_test):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_multiple_overlaps, table_name)
+                transformed_sql = self._apply_replace_table_name_fct(
+                    fct, sql_multiple_overlaps, table_name, post_fix_unit_test
+                )
                 return None
 
             mock_load_sql.side_effect = capture_transformed_sql
+            test_mgr._start_ddl_dml_for_flink_under_test(
+                "test_table", table_ref, post_fix_unit_test=post_fix_unit_test
+            )
 
-            test_mgr._start_ddl_dml_for_flink_under_test("test_table", table_ref)
-
-            # Verify all table names got the correct suffix
-            self.assertIn('user_data_ut', transformed_sql)
-            self.assertIn('user_data_archive_ut', transformed_sql)
-            self.assertIn('user_data_backup_ut', transformed_sql)
-
-            # Verify NO incorrect substring replacements occurred
-            self.assertNotIn('user_data_ut_archive', transformed_sql)
-            self.assertNotIn('user_data_ut_backup', transformed_sql)
+            self.assertIn(f'user_data{post_fix_unit_test}', transformed_sql)
+            self.assertIn(f'user_data_archive{post_fix_unit_test}', transformed_sql)
+            self.assertIn(f'user_data_backup{post_fix_unit_test}', transformed_sql)
+            self.assertNotIn(f'user_data{post_fix_unit_test}_archive', transformed_sql)
+            self.assertNotIn(f'user_data{post_fix_unit_test}_backup', transformed_sql)
 
         # Test Case 4: Case insensitive matching
         mock_parser.extract_table_references.return_value = {'Table_Name_A', 'table_name_b'}
-
-        sql_case_insensitive = "SELECT * FROM Table_Name_A JOIN table_name_b ON Table_Name_A.id = table_name_b.id"
+        sql_case_insensitive = (
+            "SELECT * FROM Table_Name_A JOIN table_name_b "
+            "ON Table_Name_A.id = table_name_b.id"
+        )
 
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
 
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name,
+                                        statements=None, post_fix_unit_test=post_fix_unit_test):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_case_insensitive, table_name)
+                transformed_sql = self._apply_replace_table_name_fct(
+                    fct, sql_case_insensitive, table_name, post_fix_unit_test
+                )
                 return None
 
             mock_load_sql.side_effect = capture_transformed_sql
+            test_mgr._start_ddl_dml_for_flink_under_test(
+                "test_table", table_ref, post_fix_unit_test=post_fix_unit_test
+            )
 
-            test_mgr._start_ddl_dml_for_flink_under_test("test_table", table_ref)
-
-            # Verify case insensitive replacement works
-            self.assertIn('Table_Name_A_ut', transformed_sql)
-            self.assertIn('table_name_b_ut', transformed_sql)
+            self.assertIn(f'Table_Name_A{post_fix_unit_test}', transformed_sql)
+            self.assertIn(f'table_name_b{post_fix_unit_test}', transformed_sql)
 
         # Test Case 5: Edge case with empty table names list
         mock_parser.extract_table_references.return_value = set()
-
         sql_no_tables = "SELECT 1 as test_value"
 
         with patch('shift_left.core.test_mgr._load_sql_and_execute_statement') as mock_load_sql:
             transformed_sql = None
 
-            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name, statements=None):
+            def capture_transformed_sql(table_name, sql_path, prefix, compute_pool_id, fct, product_name,
+                                        statements=None, post_fix_unit_test=post_fix_unit_test):
                 nonlocal transformed_sql
-                transformed_sql = fct(sql_no_tables, table_name)
+                transformed_sql = self._apply_replace_table_name_fct(
+                    fct, sql_no_tables, table_name, post_fix_unit_test
+                )
                 return None
 
             mock_load_sql.side_effect = capture_transformed_sql
-
-            test_mgr._start_ddl_dml_for_flink_under_test("test_table", table_ref)
-
-            # SQL should remain unchanged when no tables are found
+            test_mgr._start_ddl_dml_for_flink_under_test(
+                "test_table", table_ref, post_fix_unit_test=post_fix_unit_test
+            )
             self.assertEqual(transformed_sql, sql_no_tables)
 
     def test_generate_test_readme(self):
@@ -794,25 +813,21 @@ class TestTestManager(unittest.TestCase):
     def test_create_validation_sql_content(self):
         inventory_path = os.path.join(os.getenv("PIPELINES"),)
         table_inventory = get_or_build_inventory(inventory_path, inventory_path, False)
-        sql_content = test_mgr._build_validation_sql_content(table_name="fct_user_per_group",
+        sql_content = test_mgr._build_validation_sql_content(table_name="sl_c360_fct_user_per_group",
                                                         table_inventory=table_inventory)
         print(f"sql_content: {sql_content}")
         assert sql_content is not None
+        assert "expected_tenant_id" in sql_content
         assert "expected_group_id" in sql_content
         assert "expected_group_name" in sql_content
-        assert "expected_group_type" in sql_content
         assert "expected_total_users" in sql_content
         assert "expected_active_users" in sql_content
         assert "expected_inactive_users" in sql_content
-        assert "expected_latest_user_created_date" in sql_content
-        assert "case when a.group_id = e.expected_group_id then 'PASS' else 'FAIL' end as group_id_check" in sql_content
+        assert "case when a.tenant_id = e.expected_tenant_id then 'PASS' else 'FAIL' end as tenant_id_check" in sql_content
         assert "case when a.group_name = e.expected_group_name then 'PASS' else 'FAIL' end as group_name_check" in sql_content
-        assert "case when a.group_type = e.expected_group_type then 'PASS' else 'FAIL' end as group_type_check" in sql_content
         assert "case when a.total_users = e.expected_total_users then 'PASS' else 'FAIL' end as total_users_check" in sql_content
         assert "case when a.active_users = e.expected_active_users then 'PASS' else 'FAIL' end as active_users_check" in sql_content
         assert "case when a.inactive_users = e.expected_inactive_users then 'PASS' else 'FAIL' end as inactive_users_check" in sql_content
-        assert "case when a.latest_user_created_date = e.expected_latest_user_created_date then 'PASS' else 'FAIL' end as latest_user_created_date_check" in sql_content
-        assert "case when a.fact_updated_at = e.expected_fact_updated_at then 'PASS' else 'FAIL' end as fact_updated_at_check" in sql_content
 
     def test_same_inputs_multiple_validations(self):
         """

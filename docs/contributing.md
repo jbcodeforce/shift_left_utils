@@ -201,6 +201,36 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 	cp src/shift_left/shift_left/core/templates/config_tmpl.yaml ./config.yaml
 	```
 
+	The minimun for integration testing is something like:
+	```yaml
+	kafka:
+		bootstrap.servers: pkc......us-west-2.aws.confluent.cloud:9092
+		cluster_id: lkc-...
+		reject_topics_prefixes: ["clone","dim_","src_"]
+		src_topic_prefix: cdc
+	cluster_type: dev
+		confluent_cloud:
+		environment_id: env-....
+		cloud_region: us-west-2
+		cloud_provider: aws
+		organization_id: ....
+		service_account_id: sa-....
+	flink:
+		compute_pool_id: lfcp-...
+		catalog_name: j9r-env
+		database_name: j9r-kafka
+		max_cfu: 20
+		max_cfu_percent_before_allocation: 0.8
+	app:
+		logging: INFO
+		accepted_common_products: ['common', 'seeds']
+		post_fix_unit_test: _jb
+		sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
+		translator_to_flink_sql_agent: shift_left.core.utils.spark_sql_code_agent.SparkToFlinkSqlAgent
+		dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
+		compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
+	```
+
 * Get the credentials for the Confluent Cloud Kafka cluster and Flink compute pool, modify the config.yaml file
 
 ???- info "the structure of the config.yaml"
@@ -214,10 +244,10 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 
     The Flink, and Confluent Cloud api keys and secrets are different.
 
-* Set the CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
+* Set the SL_CONFIG_FILE environment variable to point to the config.yaml file. The following is used for integration tests.
 
 ```sh
-export CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
+export SL_CONFIG_FILE=shift_left_utils/src/shift_left/tests/config.yaml
 ```
 
 * **Install shift_left Tool**:
@@ -287,13 +317,13 @@ export PIPELINES=$(pwd)/tests/flink-project/pipelines
 * Running the cli from python code, be sure to be under the `src/shift_left` folder and use:
 
 ```sh
- uv run shift_left
+ uv run shift_left/cli.py
 ```
 
 * It is also possible to test the CLI with python:
 
 ```sh
-uv run shift_left pipeline build-metadata $PIPELINES/facts/p1/fct_order $PIPELINES
+uv run shift_left/cli.py pipeline build-all-metadata 
 ```
 
 To avoid redundant tests, the tests are grouped in three sets:
@@ -307,7 +337,7 @@ The test should supports debugging and test in Terminal, so all file accesses ar
 Tests are executed in a virtual environment with python 3 and pytest.
 
 ```sh
-uv run pytest -s tests/it/core/test_table_mgr.py
+uv run pytest -s tests/it/test_confluent_client.py
 uv run pytest -s tests/ut/core/test_project_mgr.py
 uv run pytest -s tests/ut/core/test_pipeline_mgr.py
 ```
@@ -315,10 +345,45 @@ uv run pytest -s tests/ut/core/test_pipeline_mgr.py
 * Test the CLIs
 
 ```sh
-uv run pytest -s tests/cli/test_project_cli.py
+uv run pytest -s tests/ut/cli/test_project_cli.py
 ```
 
 To avoid comflict between test execution, each test gets its own copy of data into a temporary folder defined in the pytest fixture in `ut/core/conftest.py`. Tests can run simultaneously without conflicts. The temporary directories are automatically removed after tests.
+
+### Validation scenario
+
+* The following can be done to demonstrate the tool with pipelines defined in tests/data:
+	```sh
+	cd src/shift_left
+	source set_demo_env
+	uv run shift_left/cli.py table build-inventory
+	uv run shift_left/cli.py pipeline delete-all-metadata
+	uv run shift_left/cli.py pipeline build-all-metadata
+	uv run shift_left/cli.py pipeline build-execution-plan --product-name c360
+	# above should lead to the same execution plan as:
+	uv run shift_left/cli.py pipeline build-execution-plan --table-name fct_user_per_group --compute-pool-id $SL_FLINK_COMPUTE_POOL_ID
+	# present a graph of relationship
+	uv run shift_left/cli.py pipeline report fct_user_per_group --open
+	```
+
+* Deploy the full hierarchy
+	```sh
+	uv run shift_left/cli.py pipeline deploy --table-name fct_user_per_group --compute-pool-id $SL_FLINK_COMPUTE_POOL_ID
+	```
+
+### Troubleshouting
+
+When shift_left command executes, it reports the path for the logs folder for the current run, as each run creates its own log. Here is an example of the trace:
+
+```
+---------------------------------------- SHIFT_LEFT 0.1.51a ----------------------------------------
+| CONFIG_FILE     : ./tests/config-ccloud.yaml
+| LOGS folder     : /Users/jerome/.shift_left/logs/05-13-26-14-33-58-zNyD
+| Session started : 2026-05-13 14:33:58
+--------------------------------------------------------------------------------------------
+```
+
+Do a cat or vi of /Users/jerome/.shift_left/logs/05-13-26-14-33-58-zNyD/shift_left_cli.log to see the execution log.
 
 ### Debug core functions
 

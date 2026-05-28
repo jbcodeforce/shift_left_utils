@@ -1,4 +1,4 @@
-insert into src_c360_users_ut
+insert into sl_c360_src_users_ut
 (
 	`user_id`,
 	`user_name`,

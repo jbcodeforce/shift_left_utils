@@ -8,7 +8,7 @@ import os
 import pathlib
 from datetime import datetime
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 from shift_left.core.models.flink_statement_model import FlinkStatementNode
@@ -318,14 +318,14 @@ class TestBuildNodePlan(unittest.TestCase):
         assert node_map["src_x"].upgrade_mode == "Stateless"
         assert node_map["src_b"].upgrade_mode == "Stateless"
         assert node_map["src_a"].upgrade_mode == "Stateless"
-        assert node_map["x"].upgrade_mode == "Stateless"
+        assert node_map["x"].upgrade_mode == "Stateful"  # because of upsert mode
         assert node_map["y"].upgrade_mode == "Stateless"
-        assert node_map["z"].upgrade_mode == "Stateful"
+        assert node_map["z"].upgrade_mode == "Stateful"  # because of upsert mode and joins
         assert node_map["d"].upgrade_mode == "Stateful"
         assert node_map["c"].upgrade_mode == "Stateless"
         assert node_map["p"].upgrade_mode == "Stateless"
         assert node_map["a"].upgrade_mode == "Stateful"
-        assert node_map["b"].upgrade_mode == "Stateless"
+        assert node_map["b"].upgrade_mode == "Stateful"  # because of upsert mode
         assert node_map["e"].upgrade_mode == "Stateless"
         assert node_map["f"].upgrade_mode == "Stateless"
 

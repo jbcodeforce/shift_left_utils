@@ -17,7 +17,7 @@ class TestKsqlMigration(unittest.TestCase):
         src_folder = data_dir + "/ksql-project"
         os.environ["STAGING"] = staging
         os.environ["SRC_FOLDER"] = src_folder
-        os.environ["CONFIG_FILE"] = str(data_dir +  "../config-ccloud.yaml")
+        os.environ["SL_CONFIG_FILE"] = str(data_dir +  "../config-ccloud.yaml")
         sql_src = os.path.join(src_folder, "sources", "filtering.ksql")
         print("Starting KSQL migration (output below)...", flush=True)
 

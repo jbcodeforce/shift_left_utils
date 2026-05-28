@@ -1,26 +1,37 @@
-export CONFIG_FILE=./tests/config-ccloud.yaml
+export CONFIG_FILE=./config.yaml
 
-export FLINK_PROJECT=./tests/data/flink-project
+export FLINK_PROJECT=.
 export PIPELINES=$FLINK_PROJECT/pipelines
 export STAGING=$FLINK_PROJECT/staging
-export SRC_FOLDER=./tests/data/spark-project
+# Source folder used for AI based migration
+# export SRC_FOLDER=./tests/data/spark-project
 
-export TOPIC_LIST_FILE=$FLINK_PROJECT/src_topic_list.txt 
 
-export CCLOUD_ENV_ID=env-<>
-export CCLOUD_ENV_NAME=j9r-env
-export CCLOUD_KAFKA_CLUSTER=j9r-kafka
-export CLOUD_REGION=us-west-2
-export CLOUD_PROVIDER=aws
-export CCLOUD_CONTEXT=login-<>@confluent.io-https://confluent.cloud
-export CCLOUD_COMPUTE_POOL_ID=lfcp-xvrvmz
-
+# Only used for LLM based migration
 export SL_LLM_BASE_URL=https://localhost:11434/v1
 export SL_LLM_MODE=qwen/qwen3:30b
 export SL_LLM_API_KEY=ollama_test_key
-export SL_KAFKA_API_KEY=
-export SL_KAFKA_API_SECRET=
+
+# Confluent resources
+export CLOUD_REGION=us-west-2
+export CLOUD_PROVIDER=aws
+export CLOUD_ORGANIZATION_ID=
+
+export SL_CONFLUENT_PRINCIPAL_ID=sa-
 export SL_CONFLUENT_CLOUD_API_KEY=
-export SL_CONFLUENT_CLOUD_API_SECRET=
+export SL_CONFLUENT_CLOUD_API_SECRET=cflt
+
+# Flink resources
+export SL_FLINK_ENV_ID=env
+export SL_FLINK_ENV_NAME=
+export SL_FLINK_DATABASE_NAME=
+export SL_FLINK_COMPUTE_POOL_ID=lfcp-
 export SL_FLINK_API_KEY=
 export SL_FLINK_API_SECRET=
+
+# Kafka resources
+export SL_KAFKA_API_KEY=
+export SL_KAFKA_API_SECRET=
+export SL_CCLOUD_KAFKA_CLUSTER_ID=lkc
+
+

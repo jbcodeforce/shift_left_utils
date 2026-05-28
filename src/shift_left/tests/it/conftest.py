@@ -11,21 +11,19 @@ _IT_DIR = Path(__file__).resolve().parent
 _TESTS_ROOT = _IT_DIR.parent
 
 _default_cfg = str(_TESTS_ROOT / "config.yaml")
-os.environ.setdefault("CONFIG_FILE", _default_cfg)
-# Prefer SL_CONFIG_FILE when set (e.g. after: source set_demo_env); else align with CONFIG_FILE.
-os.environ.setdefault("SL_CONFIG_FILE", os.environ.get("CONFIG_FILE", _default_cfg))
+os.environ.setdefault("SL_CONFIG_FILE", _default_cfg)
 os.environ.setdefault("PIPELINES", str(_TESTS_ROOT / "data" / "flink-project" / "pipelines"))
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
     os.environ.setdefault("SL_KAFKA_API_KEY", "test")
     os.environ.setdefault("SL_KAFKA_API_SECRET", "test")
+    os.environ.setdefault("SL_KAFKA_CLUSTER_ID", "lkc-test")
     os.environ.setdefault("SL_CONFLUENT_CLOUD_API_KEY", "test")
     os.environ.setdefault("SL_CONFLUENT_CLOUD_API_SECRET", "test")
     os.environ.setdefault("SL_FLINK_API_KEY", "test")
     os.environ.setdefault("SL_FLINK_API_SECRET", "test")
-    os.environ.setdefault("SL_CCLOUD_KAFKA_CLUSTER_ID", "lkc-test")
-    os.environ.setdefault("CLOUD_PROVIDER", "aws")
-    os.environ.setdefault("CLOUD_REGION", "us-west-2")
-    os.environ.setdefault("CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("SL_CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("SL_CLOUD_ORGANIZATION_ID", "id-org-test")
     os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
     os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
     os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")

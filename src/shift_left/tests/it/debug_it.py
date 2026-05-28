@@ -4,6 +4,9 @@ import os
 import pathlib
 import json
 import re
+"""
+This is the file to keep to be able to debug step by step the code with access to CC.
+"""
 
 # Load .env file BEFORE any imports that might need environment variables
 def load_env_file(env_file_path):
@@ -58,50 +61,24 @@ def load_env_file(env_file_path):
 
     return env_vars
 
-# Try to find and load .env file
-_env_file_paths = [
-    # Path from launch.json (relative to workspaceFolder)
-    pathlib.Path(__file__).parent.parent.parent.parent.parent.parent / "flink_project_demos" / "customer_360" / "c360_flink_processing" / ".env",
-    # Alternative path
-    pathlib.Path(__file__).parent.parent.parent.parent.parent / "flink_project_demos" / "customer_360" / "c360_flink_processing" / ".env",
-]
-
-_env_loaded = False
-for env_file in _env_file_paths:
-    if env_file.exists():
-        load_env_file(str(env_file))
-        print(f"✓ Loaded environment variables from: {env_file}")
-        _env_loaded = True
-        break
-
-if not _env_loaded:
-    print(f"⚠ .env file not found. Tried paths: {_env_file_paths}")
 
 # Debug: Print key environment variables to verify they're loaded
 if __name__ == '__main__' or True:  # Always print when debugging
     print("\n=== Environment Variables at Module Load ===")
-    key_vars = ['FLINK_PROJECT', 'CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
+    key_vars = ['FLINK_PROJECT', 'SL_CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
     for var in key_vars:
         value = os.environ.get(var, 'NOT SET')
         print(f"{var}: {value}")
     print("=" * 50 + "\n")
 
-#os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
+#os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent / "config-ccloud.yaml")
 #data_dir = pathlib.Path(__file__).parent.parent / "data"  # Path to the data directory
 #os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
 #os.environ["SRC_FOLDER"] = str(data_dir / "spark-project")
 
-from shift_left.core.utils.app_config import get_config
-import  shift_left.core.pipeline_mgr as pipeline_mgr
-import shift_left.core.deployment_mgr as deployment_mgr
-import shift_left.core.metric_mgr as metric_mgr
-import shift_left.core.test_mgr as test_mgr
-import shift_left.core.table_mgr as table_mgr
+
 from typer.testing import CliRunner
 from shift_left.cli import app
-
-import shift_left.core.statement_mgr as sm
-import shift_left.core.deployment_mgr as dm
 
 def get_env_for_cli():
     """Get all environment variables that should be passed to CliRunner."""
@@ -117,7 +94,7 @@ class TestDebugIntegrationTests(unittest.TestCase):
         env = get_env_for_cli()
 
         # Verify key environment variables are set
-        key_vars = ['FLINK_PROJECT', 'CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
+        key_vars = ['FLINK_PROJECT', 'SL_CONFIG_FILE', 'PIPELINES', 'SRC_FOLDER', 'STAGING']
         print("\n=== Environment Variables Check ===")
         for var in key_vars:
             value = env.get(var, 'NOT SET')
@@ -125,20 +102,21 @@ class TestDebugIntegrationTests(unittest.TestCase):
         print("=" * 40 + "\n")
 
         #result = runner.invoke(app, ['pipeline', 'deploy', '--table-name', 'aqem_fct_event_action_item_assignee_user', '--force-ancestors', '--cross-product-deployment'], env=env)
-        #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'src_qx_training_trainee', '--may-start-descendants', '--cross-product-deployment'], env=env)
+        # result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--table-name', 'sl_c360_fct_user_per_group', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
         #result = runner.invoke(app, ['pipeline', 'build-execution-plan', '--product-name', 'qx'], env=env)
-        #result = runner.invoke(app, ['table', 'migrate', 'dim_training_course', os.getenv('SRC_FOLDER','.') + '/dimensions/qx/dim_training_course.sql', os.getenv('STAGING')], env=env)
-        #result = runner.invoke(app, ['table', 'init-unit-tests', 'aqem_fct_step_role_assignee_relation'], env=env)
-        #result = runner.invoke(app, ['table', 'build-inventory'], env=env)
         #result = runner.invoke(app, ['pipeline', 'build-metadata', os.getenv('PIPELINES') + '/stage/stage_tenant_dimension/dim_event_action_item/sql-scripts/dml.aqem_dim_event_action_item.sql'], env=env)
-        #result = runner.invoke(app, ['table', 'run-unit-tests', 'aqem_dim_event_element', '--test-case-name', 'test_aqem_dim_event_element_1'], env=env)
+        result = runner.invoke(app, ['table', 'run-unit-tests', 'sl_c360_dim_users', '--test-case-name', 'test_c360_dim_users_1'], env=env)
+        #result = runner.invoke(app, ['table', 'validate-unit-tests', 'sl_c360_dim_users', '--test-case-name', 'test_c360_dim_users_1'], env=env)
         #result = runner.invoke(app, ['pipeline', 'deploy', '--product-name', 'aqem', '--max-thread' , 10, '--pool-creation'], env=env)
         #result = runner.invoke(app, ['pipeline', 'undeploy', '--product-name', 'aqem', '--no-ack'], env=env)
         #result = runner.invoke(app,['pipeline', 'build-all-metadata'], env=env)
         #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/alter_table_avro_dev.sql'], env=env)
         #result = runner.invoke(app, ['table', 'init-unit-tests',  '--nb-test-cases', '1', 'aqem_dim_event_element'], env=env)
         #result = runner.invoke(app, ['pipeline', 'analyze-pool-usage', '--directory', os.getenv('PIPELINES') + '/sources'], env=env)
-        result = runner.invoke(app, ['pipeline', 'report', 'customer_analytics_c360'], env=env)
+        #result = runner.invoke(app, ['pipeline', 'report', 'customer_analytics_c360'], env=env)
+        # result = runner.invoke(app, ['pipeline', 'report-running-statements', '--table-name', 'sl_c360_fct_user_per_group'], env=env)
+        #result = runner.invoke(app, ['pipeline', 'prepare', os.getenv('PIPELINES') + '/test_prepare_tables_integration.sql', '--compute-pool-id', os.getenv('SL_FLINK_COMPUTE_POOL_ID')], env=env)
+        #result = runner.invoke(app, ['project', 'list-modified-files', 'cc-client', '--project-path', os.getenv('PIPELINES') + "/../../../../../../", '--file-filter', '.sql', '--since', '2026-05-01'], env=env)
         print(result.stdout)
 
 

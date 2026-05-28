@@ -1,3 +1,27 @@
+## [0.1.51] - 2026-05-28
+
+### Changes:
+- 57e46ae Merge branch 'v0.1.50' into develop
+- 6611186 fix issue in config
+- 9296fd2 work on using confluent-sql client for statement, reduce confluent-client scope
+- 691ca8b issue_89_fix run-unit-tests
+- 8ca38c4 Merge pull request #90 from jbcodeforce/run_unit_test_bug
+- a5ceccd Merge branch 'develop' into cc-client
+- 33246e9 update to c360 example, tune app_config
+- 5d94a9f remake ut for utils and core working
+- 878e00d add specific name for dml, ddl tests and tune it for statements
+- c169328 fix next
+- b4dc3c3 merge with st-result resolve
+- df79809 rework integration tests. when statement fails report error to user.
+- 99c9766 clean it
+- 3613664 fix ut after refactor
+- 18e4c38 update to project manager to add unit test impact
+- 35ba236 push update to integration tests
+- 72f4bb6 fix validation test with new confluent-sql library
+- 361f387 remove one flink url construction and improve trace
+- 1aaf45a fix issue in validation, and simplify statements reporting
+- 1e3bc47 make post_fix for unit test from parameter -> or config.yaml -> or default value as _ut
+
 ## [0.1.50] - 2026-04-27
 
 ### Changes:

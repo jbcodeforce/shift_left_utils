@@ -1,52 +1,10 @@
 kafka:
   bootstrap.servers:  <TO_FILL>
-  cluster_id: lkc-jq9kq
-  pkafka_cluster: pkc-gwq2v
-  api_key: <kafka-api-key>
-  api_secret: <kafka-api-key_secret>
-  security.protocol: SASL_SSL
-  sasl.mechanism: PLAIN
-  session.timeout.ms: 5000
-  reject_topics_prefixes: ["clone","dim_","src_"]
-  cluster_type: dev
-  src_topic_prefix: clone
-confluent_cloud:
-  base_api: api.confluent.cloud/org/v2
-  environment_id:  env-<TO_FILL>
-  region:  <TO_FILL>
-  provider:  <TO_FILL>
-  organization_id: <TO_FILL>
-  api_key:  <TO_FILL>
-  api_secret:  <TO_FILL>
-  page_size: 100
-  glb_name: glb # or None
-  url_scope: private 
-flink:
-  flink_url: flink.<TO_FILL>.confluent.cloud
-  api_key:  <TO_FILL>
-  api_secret:  <TO_FILL>
-  compute_pool_id: lfcp- <TO_FILL>
-  catalog_name:  <TO_FILL>
-  database_name:  <TO_FILL>
-  max_cfu: 10
-  max_cfu_percent_before_allocation: .8
-  statement_name_post_fix: None
 app:
-  delta_max_time_in_min: 15  # this is to apply randomly to the event timestamp to create out of order
-  default_PK: __db
-  timezone: America/Los_Angeles
-  src_table_name_prefix: src_
   logging: INFO
-  products: ["p1", "p2", "p3"]
   accepted_common_products: ['common', 'seeds']
-  cache_ttl: 120 # in seconds
+  post_fix_unit_test: _jb
   sql_content_modifier: shift_left.core.utils.table_worker.ReplaceEnvInSqlContent
-  translator_to_flink_sql_agent: shift_left.core.utils.translator_to_flink_sql.DbtTranslatorToFlinkSqlAgent
+  translator_to_flink_sql_agent: shift_left.core.utils.spark_sql_code_agent.SparkToFlinkSqlAgent
   dml_naming_convention_modifier: shift_left.core.utils.naming_convention.DmlNameModifier
   compute_pool_naming_convention_modifier: shift_left.core.utils.naming_convention.ComputePoolNameModifier
-  data_limit_where_condition : rf"where tenant_id in ( SELECT tenant_id FROM tenant_filter_pipeline WHERE product = {product_name})"
-  data_limit_replace_from_reg_ex: r"\s*select\s+\*\s+from\s+final\s*;?"
-  data_limit_table_type: source
-  data_limit_column_name_to_select_from: tenant_id
-  post_fix_unit_test: _ut
-  post_fix_integration_test: _it

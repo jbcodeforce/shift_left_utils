@@ -1,4 +1,4 @@
-INSERT INTO src_c360_groups (
+INSERT INTO sl_c360_src_groups (
   group_id,
   tenant_id,
   group_name,
@@ -8,7 +8,7 @@ INSERT INTO src_c360_groups (
   updated_at
 )
 WITH deduplicated_groups AS (
-  SELECT 
+  SELECT
     group_id,
     tenant_id,
     group_name,
@@ -16,20 +16,20 @@ WITH deduplicated_groups AS (
     created_date,
     is_active,
     CURRENT_TIMESTAMP AS updated_at,
-    
+
     -- Deduplication: Keep latest record per group_id
     -- This handles cases where the same group appears multiple times
     ROW_NUMBER() OVER (
-      PARTITION BY tenant_id, group_id 
+      PARTITION BY tenant_id, group_id
       ORDER BY `$rowtime` DESC
     ) AS row_num
-    
-  FROM raw_groups
-  WHERE 
+
+  FROM sl_raw_groups
+  WHERE
     group_id IS NOT NULL  -- Ensure we have valid group_id  and tenant_id
-    AND tenant_id IS NOT NULL  
+    AND tenant_id IS NOT NULL
 )
-SELECT 
+SELECT
   group_id,
   tenant_id,
   group_name,

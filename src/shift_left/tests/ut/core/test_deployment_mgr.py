@@ -9,11 +9,13 @@ from datetime import datetime
 import uuid
 from typing import Tuple
 import time
+import threading
 TEST_PIPELINES_DIR = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 
 import shift_left.core.pipeline_mgr as pm
+import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.pipeline_mgr import PIPELINE_JSON_FILE_NAME
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.utils.file_search import read_pipeline_definition_from_file
@@ -24,13 +26,12 @@ from shift_left.core.models.flink_statement_model import (
     StatementInfo,
     Status,
     Spec,
-    Metadata
+    Metadata,
 )
 from shift_left.core.deployment_mgr import (
     FlinkStatementNode
 )
 
-from shift_left.core.models.flink_statement_model import Statement, StatementInfo
 from ut.core.BaseUT import BaseUT
 
 class TestDeploymentManager(BaseUT):
@@ -282,46 +283,78 @@ class TestDeploymentManager(BaseUT):
         print(f"summary: {summary}")
         print(f"report: {report.model_dump_json(indent=3)}")
 
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_in')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_num_records_out')
+    @patch('shift_left.core.deployment_mgr.report_mgr.metrics_mgr.get_pending_records')
+    @patch('shift_left.core.deployment_mgr.compute_pool_mgr.get_compute_pool_list')
+    @patch('shift_left.core.deployment_mgr.statement_mgr.get_statement_list')
     @patch('shift_left.core.deployment_mgr._assign_compute_pool_id_to_node')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.drop_table')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
+    @patch('shift_left.core.deployment_mgr._deploy_one_node')
     def test_deploy_product_using_parallel(self,
-                                           mock_delete,
-                                           mock_drop,
-                                           mock_post,
-                                           mock_assign_compute_pool_id):
+                                           mock_deploy_one_node,
+                                           mock_assign_compute_pool_id,
+                                           mock_get_statement_list,
+                                           mock_get_compute_pool_list,
+                                           mock_get_pending_records,
+                                           mock_get_num_records_out,
+                                           mock_get_num_records_in):
         """
-        Deploying a product p1 in parallel should deploy all the tables in parallel.
+        Deploying a product p1 in parallel should deploy autonomous statements concurrently.
         """
-        def _drop_table(table_name: str, compute_pool_id: str) -> str:
-            print(f"@@@@ drop_table {table_name} {compute_pool_id}")
-            time.sleep(1)
-            return "deleted"
-
-        def _post_flink_statement(compute_pool_id: str, statement_name: str, sql_content: str) -> Statement:
-            print(f"\n@@@@ post_flink_statement {compute_pool_id} {statement_name} {sql_content}")
-            time.sleep(1)
-            if "ddl" in statement_name:
-                return self._create_mock_statement(name=statement_name, status_phase="COMPLETED")
-            return self._create_mock_statement(name=statement_name, status_phase="RUNNING")
-
-        def _delete_statement(statement_name: str):
-            print(f"@@@@ delete statement {statement_name}")
-            time.sleep(1)
-            return "deleted"
-
-        mock_delete.side_effect = _delete_statement
-        mock_drop.side_effect = _drop_table
-        mock_post.side_effect = _post_flink_statement
+        mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
+        mock_get_num_records_in.return_value = {}
+        mock_get_statement_list.return_value = {}
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
-        dm.build_deploy_pipelines_from_product(product_name="p1",
-                                                inventory_path=self.inventory_path,
-                                                execute_plan=True,
-                                                force_ancestors=True,
-                                                may_start_descendants=True,
-                                                sequential=False,
-                                                pool_creation=False)
+
+        parallel_lock = threading.Lock()
+        in_flight = 0
+        max_parallel = 0
+        deployed_tables = []
+
+        def _deploy_one_node_mock(node, accept_exceptions=False, compute_pool_id=""):
+            nonlocal in_flight, max_parallel
+            deployed_tables.append(node.table_name)
+            with parallel_lock:
+                in_flight += 1
+                max_parallel = max(max_parallel, in_flight)
+            try:
+                time.sleep(0.15)
+                statement = self._create_mock_statement(
+                    name=node.dml_statement_name,
+                    status_phase="RUNNING",
+                )
+                node.existing_statement_info = statement_mgr.map_to_statement_info(statement)
+                return statement
+            finally:
+                with parallel_lock:
+                    in_flight -= 1
+
+        mock_deploy_one_node.side_effect = _deploy_one_node_mock
+
+        summary, table_report, deployment_succeeded = dm.build_deploy_pipelines_from_product(
+            product_name="p1",
+            inventory_path=self.inventory_path,
+            execute_plan=True,
+            force_ancestors=True,
+            may_start_descendants=True,
+            sequential=False,
+            pool_creation=False,
+        )
+
+        self.assertTrue(deployment_succeeded)
+        self.assertGreater(len(table_report.tables), 0)
+        self.assertIn("Deployed", summary)
+        self.assertGreater(mock_deploy_one_node.call_count, 0)
+        self.assertGreater(
+            max_parallel,
+            1,
+            "Expected more than one concurrent _deploy_one_node call (parallel workers)",
+        )
+        self.assertGreaterEqual(mock_deploy_one_node.call_count, 7)
+        self.assertGreater(len(deployed_tables), 1)
+        self.assertGreater(len(set(deployed_tables)), 1)
 
 
     @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
@@ -722,7 +755,6 @@ class TestDeploymentManager(BaseUT):
         self.assertIsInstance(result, str)
         self.assertIn("Full pipeline delete from product test_product", result)
         self.assertIn("Failed to process table1: Connection failed", result)
-
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 Copyright 2024-2025 Confluent, Inc.
 """
 import re
-from typing import Set, List, Tuple, Dict, Any
+from typing import Set, List, Tuple, Dict, Any, Optional
 from shift_left.core.models.flink_statement_model import FlinkStatementComplexity
 from shift_left.core.utils.app_config import logger
 """
@@ -128,6 +128,9 @@ class SQLparser:
         has_stateful_operation = False
 
         for line in lines:
+            if has_stateful_operation:
+                break
+
             # Normalize the current line
             normalized_line = self._normalize_sql(line)
 
@@ -164,6 +167,36 @@ class SQLparser:
 
         return "Stateful" if has_stateful_operation else "Stateless"
 
+    def _extract_create_table_columns_section(self, sql_content: str) -> Optional[str]:
+        """
+        Return the substring inside CREATE TABLE ... ( ... ) that lists columns.
+
+        Uses parenthesis depth so the first `)` inside a type (e.g. TIMESTAMP_LTZ(3),
+        DECIMAL(10,2)) does not end the capture; only the closing `)` matching the
+        opening `(` after the table name is used.
+        """
+        m = re.search(
+            r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[`"]?[\w.-]+[`"]?(?:\.[`"]?[\w.-]+[`"]?)*)\s*\(',
+            sql_content,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if not m:
+            return None
+        body_start = m.end()
+        depth = 1
+        i = body_start
+        n = len(sql_content)
+        while i < n and depth > 0:
+            c = sql_content[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    return sql_content[body_start:i]
+            i += 1
+        return None
+
     def build_column_metadata_from_sql_content(self, sql_content: str) -> Dict[str, Dict]:
         """
         Parse SQL CREATE TABLE statement and extract column definitions into a dictionary.
@@ -198,20 +231,21 @@ class SQLparser:
         sql_content = re.sub(r'`', '', sql_content, flags=re.DOTALL)
         sql_content = re.sub(r'VARCHAR\(.*?\)', 'STRING', sql_content, flags=re.MULTILINE)
         sql_content = ' '.join(sql_content.split())
-
-        # Extract the column definitions
-        match = re.search(r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[`"]?[\w.-]+[`"]?(?:\.[`"]?[\w.-]+[`"]?)*)\s*\((.*?)\)', sql_content, re.IGNORECASE | re.DOTALL)
-        if not match:
+        # Extract column list: balanced parens so TIMESTAMP_LTZ(3) etc. do not truncate early
+        columns_section = self._extract_create_table_columns_section(sql_content)
+        if not columns_section:
             return {}
-
-        columns_section = match.group(1)
         # Extract primary key columns from CONSTRAINT PRIMARY KEY or PRIMARY KEY clause
         prim_key_pattern = r'(?:CONSTRAINT\s+(?:PRIMARY\s+)?)?PRIMARY\s+KEY\s*\((.*?)\)'
         prim_key_match = re.search(prim_key_pattern, sql_content, re.IGNORECASE)
         prim_keys = prim_key_match.group(1) if prim_key_match else ''
 
-        # Split into individual column definitions
-        column_defs = [col.strip() for col in columns_section.split(',') if col.strip()]
+        # Split into individual column definitions (commas inside types e.g. DECIMAL(10, 2))
+        column_defs = [
+            col.strip()
+            for col in self._split_by_comma_respecting_parens(columns_section)
+            if col.strip()
+        ]
 
         # Extract column details
         columns = {}

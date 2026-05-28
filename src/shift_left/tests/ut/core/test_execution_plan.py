@@ -7,7 +7,7 @@ import os
 import pathlib
 
 
-os.environ["CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
+os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent / "config.yaml")
 os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
 
 import shift_left.core.pipeline_mgr as pm
@@ -483,8 +483,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
         summary, report, _ = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
@@ -531,8 +531,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
         summary, report, _ = dm.build_deploy_pipelines_from_product(
             product_name="p2",
             inventory_path=self.inventory_path,
@@ -581,8 +581,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
 
         summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
@@ -635,8 +635,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
 
         summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
@@ -686,8 +686,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
         summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/sources/p2",
             inventory_path=self.inventory_path,
@@ -697,7 +697,7 @@ class TestExecutionPlan(BaseUT):
             force_ancestors=True
         )
         print(f"{summary}\n")
-        assert len(report.tables) == 5
+        assert len(report.tables) == 13
         print("Table\t\tStatement\t\tTo Restart")
         for table in report.tables:
             print(f"{table.table_name}\t\t{table.statement_name}\t\t{table.to_restart}")
@@ -737,8 +737,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
         # intermediates/p2 contains z, x, y, a, b, d, c
         summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/intermediates/p2",
@@ -790,8 +790,8 @@ class TestExecutionPlan(BaseUT):
         mock_get_compute_pool_list.side_effect = self._create_mock_compute_pool_list
         mock_assign_compute_pool_id.side_effect = self._mock_assign_compute_pool
         mock_get_retention_size.return_value = 100000
-        mock_get_pending_records.return_value = 10000
-        mock_get_num_records_out.return_value = 100000
+        mock_get_pending_records.return_value = {}
+        mock_get_num_records_out.return_value = {}
 
         summary, report, _ = dm.build_and_deploy_all_from_directory(
             directory=self.inventory_path + "/facts/p2",

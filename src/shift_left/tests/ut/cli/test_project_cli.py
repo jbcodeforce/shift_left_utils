@@ -6,11 +6,12 @@ import pathlib
 import os
 import shutil
 import tempfile
+import json
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
 
 _TESTS_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-os.environ.setdefault("CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
+os.environ.setdefault("SL_CONFIG_FILE", str(_TESTS_ROOT / "config.yaml"))
 # Dummy credentials so get_config()/validate_config succeed when pytest imports CLI modules
 # (integration_test_mgr and others call get_config() at import time).
 if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
@@ -21,9 +22,9 @@ if not os.environ.get("SL_CONFLUENT_CLOUD_API_KEY"):
     os.environ.setdefault("SL_FLINK_API_KEY", "test")
     os.environ.setdefault("SL_FLINK_API_SECRET", "test")
     os.environ.setdefault("SL_CCLOUD_KAFKA_CLUSTER_ID", "lkc-test")
-    os.environ.setdefault("CLOUD_PROVIDER", "aws")
-    os.environ.setdefault("CLOUD_REGION", "us-west-2")
-    os.environ.setdefault("CLOUD_ORGANIZATION_ID", "id-org-test")
+    os.environ.setdefault("SL_CLOUD_PROVIDER", "aws")
+    os.environ.setdefault("SL_CLOUD_REGION", "us-west-2")
+    os.environ.setdefault("SL_CLOUD_ORGANIZATION_ID", "id-org-test")
     os.environ.setdefault("SL_FLINK_ENV_ID", "env-nknqp3")
     os.environ.setdefault("SL_CONFLUENT_PRINCIPAL_ID", "sa-test")
     os.environ.setdefault("SL_FLINK_COMPUTE_POOL_ID", "lfcp-xvrvmz")
@@ -79,8 +80,8 @@ class TestProjectCLI(unittest.TestCase):
             "confluent_cloud": {
                 "base_api": "https://api.confluent.cloud",
                 "environment_id": "env-123",
-                "region": "us-west-2",
-                "provider": "aws",
+                "cloud_region": "us-west-2",
+                "cloud_provider": "aws",
                 "organization_id": "org-123",
                 "service_account_id": "sa-123",
                 "api_key": "test_key",
@@ -120,7 +121,10 @@ class TestProjectCLI(unittest.TestCase):
         result = runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert result.exit_code == 0
-        assert "Config.yaml validated" in result.stdout
+        assert "validated" in result.stdout
+        config_file = os.environ.get("SL_CONFIG_FILE", "config.yaml")
+        assert config_file in result.stdout
+        assert "Configuration validation failed" not in result.stdout
 
     @patch('shift_left.cli_commands.project.get_config')
     def test_validate_config_missing_sections(self, mock_get_config):
@@ -390,6 +394,117 @@ class TestProjectCLI(unittest.TestCase):
 
         assert result.exit_code == 1
         assert "Git command failed" in result.stdout
+
+    @patch("shift_left.cli_commands.project.project_manager.impacted_tables_by_modifications")
+    def test_list_impacted_tables_writes_json(self, mock_impacted):
+        """Test list_impacted_tables writes impacted_tables.json under shift_left_dir."""
+        from shift_left.core.project_manager import ImpactedTablesByModificationsResult
+
+        runner = CliRunner()
+        mock_impacted.return_value = ImpactedTablesByModificationsResult(
+            ddl_modified_tables=["sl_raw_groups"],
+            tables=["sl_c360_src_groups"],
+            production_ddl_paths=["/tmp/ddl.src_c360_groups.sql"],
+            unit_test_ddl_paths=["/tmp/tests/ddl_src_c360_groups.sql"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            modified_json = pathlib.Path(tmp) / "modified_flink_files.json"
+            modified_json.write_text(
+                json.dumps(
+                    {
+                        "description": "test",
+                        "file_list": [
+                            {
+                                "table_name": "sl_raw_groups",
+                                "file_modified_url": "/pipelines/seeds/ddl.raw_groups.sql",
+                                "same_sql_content": False,
+                                "running": False,
+                                "new_table_name": "sl_raw_groups",
+                            }
+                        ],
+                    }
+                )
+            )
+            out_shift_left = pathlib.Path(tmp) / ".shift_left"
+            out_shift_left.mkdir()
+            output_json = out_shift_left / "impacted_tables.json"
+
+            with patch(
+                "shift_left.cli_commands.project.shift_left_dir", str(out_shift_left)
+            ):
+                result = runner.invoke(
+                    app,
+                    [
+                        "list-impacted-tables",
+                        "--modified-files-path",
+                        str(modified_json),
+                        "--project-path",
+                        str(pathlib.Path(tmp) / "pipelines"),
+                        "--output-file",
+                        str(output_json),
+                    ],
+                )
+
+            assert result.exit_code == 0, result.stdout
+            assert output_json.exists()
+            payload = json.loads(output_json.read_text())
+            assert payload["tables"] == ["sl_c360_src_groups"]
+            assert "Impacted tables saved to" in result.stdout
+            mock_impacted.assert_called_once()
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_all_compute_pools_of_product")
+    def test_delete_all_compute_pools_without_list_file(self, mock_delete_all):
+        runner = CliRunner()
+        result = runner.invoke(app, ["delete-all-compute-pools", "mv"])
+        assert result.exit_code == 0, result.stdout
+        mock_delete_all.assert_called_once_with("mv")
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
+    def test_delete_all_compute_pools_with_list_file_only(self, mock_delete_by_ids):
+        runner = CliRunner()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("lfcp-ab0\n# comment\nlfcp-ab1\n")
+            list_file = f.name
+        try:
+            result = runner.invoke(
+                app,
+                ["delete-all-compute-pools", "--compute-pool-list-file", list_file],
+            )
+            assert result.exit_code == 0, result.stdout
+            mock_delete_by_ids.assert_called_once_with(["lfcp-ab0", "lfcp-ab1"], product_name=None)
+        finally:
+            os.unlink(list_file)
+
+    @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
+    def test_delete_all_compute_pools_with_list_file_and_product(self, mock_delete_by_ids):
+        runner = CliRunner()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("lfcp-ab0\n")
+            list_file = f.name
+        try:
+            result = runner.invoke(
+                app,
+                ["delete-all-compute-pools", "mv", "--compute-pool-list-file", list_file],
+            )
+            assert result.exit_code == 0, result.stdout
+            mock_delete_by_ids.assert_called_once_with(["lfcp-ab0"], product_name="mv")
+        finally:
+            os.unlink(list_file)
+
+    def test_delete_all_compute_pools_requires_product_or_list_file(self):
+        runner = CliRunner()
+        result = runner.invoke(app, ["delete-all-compute-pools"])
+        assert result.exit_code != 0
+        assert "provide PRODUCT_NAME and/or --compute-pool-list-file" in result.stdout
+
+    def test_delete_all_compute_pools_missing_list_file(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            ["delete-all-compute-pools", "--compute-pool-list-file", "/nonexistent/pools.txt"],
+        )
+        assert result.exit_code != 0
 
 
 if __name__ == '__main__':

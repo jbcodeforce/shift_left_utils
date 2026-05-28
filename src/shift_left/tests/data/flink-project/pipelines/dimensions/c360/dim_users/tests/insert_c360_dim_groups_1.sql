@@ -1,4 +1,4 @@
-insert into c360_dim_groups_ut
+insert into sl_c360_dim_groups_ut
 (`group_id`, `tenant_id`, `group_name`, `group_type`, `tenant_name`, `created_date`, `is_active`, `updated_at`)
 values
 ('group_id_1', 'tenant_id_1', 'group_name_1', 'group_type_1', 'tenant_name_1', 'created_date_1', false, TIMESTAMP '2021-01-01 00:00:00'),

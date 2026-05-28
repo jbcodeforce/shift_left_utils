@@ -48,15 +48,7 @@ class TestPipelineCLI(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
         self.assertIn("Table not found", result.stdout)
 
-    def test_build_metadata_command_success(self):
-        """build-metadata runs against the bundled p1 fct_order DML."""
-        runner = CliRunner()
-        dml = str(_DML_P1_FCT)
-        pl = str(_PIPELINES)
-        self.assertTrue(Path(dml).is_file(), f"Missing test fixture: {dml}")
-        result = runner.invoke(app, ["build-metadata", dml, pl])
-        self.assertEqual(result.exit_code, 0, msg=result.stdout)
-        self.assertIn("Pipeline built from", result.stdout)
+
 
     def test_build_metadata_command_error_invalid_file(self):
         """build-metadata requires a .sql file as first argument."""

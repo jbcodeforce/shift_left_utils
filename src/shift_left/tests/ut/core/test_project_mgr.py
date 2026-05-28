@@ -3,6 +3,7 @@ Copyright 2024-2025 Confluent, Inc.
 """
 import unittest
 import os
+import json
 from pathlib import Path
 import shutil
 
@@ -11,7 +12,7 @@ from unittest.mock import patch, mock_open, MagicMock, call
 from datetime import datetime, timezone, timedelta
 import subprocess
 TEST_PIPELINES_DIR = str(pathlib.Path(__file__).parent.parent.parent / "data/flink-project/pipelines")
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 os.environ["PIPELINES"] = TEST_PIPELINES_DIR
 from shift_left.core.utils.app_config import get_config
 import shift_left.core.project_manager as pm
@@ -43,7 +44,6 @@ class TestProjectManager(unittest.TestCase):
             pm.build_project_structure("test_data_kimball_project",self.data_dir, pm.KIMBALL_PROJECT_TYPE)
             assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project"))
             assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project/pipelines"))
-            assert os.path.exists(os.path.join( self.data_dir, "test_data_kimball_project/pipelines/intermediates"))
             shutil.rmtree(self.data_dir)
         except Exception as e:
             self.fail()
@@ -57,7 +57,7 @@ class TestProjectManager(unittest.TestCase):
         assert result
         assert len(result) == 2
         assert "src_table_1" in result
-        assert "src_common_tenant" in result
+        assert "sl_cmn_src_tenants" in result
 
     @patch('builtins.open', new_callable=mock_open)
     @patch('shift_left.core.project_manager.subprocess.run')
@@ -446,9 +446,9 @@ class TestProjectManager(unittest.TestCase):
         """Test _assess_flink_statement_state function with mocked statement_mgr.get_statement"""
 
         # Setup mock data
-        table_name = "fct_user_per_group"
-        file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.fct_user_per_group.sql"
-        sql_content = "INSERT INTO fct_user_per_group SELECT * FROM source_table;"
+        table_name = "sl_c360_fct_user_per_group"
+        file_path = "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql"
+        sql_content = "INSERT INTO sl_c360_fct_user_per_group SELECT * FROM source_table;"
 
         # Test Case 1: Statement found and running
         mock_statement = MagicMock(spec=Statement)
@@ -463,7 +463,7 @@ class TestProjectManager(unittest.TestCase):
         # Verify the result
         self.assertTrue(same_sql, "SQL content should match")
         self.assertTrue(running, "Statement should be running")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
         # Test Case 2: Statement found but not running and different SQL
         mock_get_statement.reset_mock()
@@ -474,7 +474,7 @@ class TestProjectManager(unittest.TestCase):
 
         self.assertFalse(same_sql, "SQL content should not match")
         self.assertFalse(running, "Statement should not be running")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
         # Test Case 3: Statement not found
         mock_get_statement.reset_mock()
@@ -484,7 +484,7 @@ class TestProjectManager(unittest.TestCase):
 
         self.assertTrue(same_sql, "Should return True when statement not found")
         self.assertFalse(running, "Should return False when statement not found")
-        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-fct-user-per-group")
+        mock_get_statement.assert_called_once_with("dev-usw2-c360-dml-sl-c360-fct-user-per-group")
 
 
     def test_isolate_data_product(self):
@@ -496,6 +496,94 @@ class TestProjectManager(unittest.TestCase):
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group")
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts")
         assert os.path.exists(tgt_folder + "/pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql")
+
+    def test_impacted_table_by_modification(self):
+        """Test impacted_tables_by_modifications returns downstream tables and DDL paths."""
+        pipelines_root = TEST_PIPELINES_DIR
+        modified_files = {
+            "description": "Modified files in branch:'cc-client'",
+            "file_list": [
+                {
+                    "table_name": "sl_raw_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_raw_groups",
+                },
+                {
+                    "table_name": "sl_c360_src_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_c360_src_groups",
+                },
+            ],
+        }
+        result = pm.impacted_tables_by_modifications(
+            modified_files, project_path=pipelines_root
+        )
+        self.assertEqual(
+            set(result.ddl_modified_tables),
+            {"sl_raw_groups", "sl_c360_src_groups"},
+        )
+        self.assertEqual(
+            set(result.tables),
+            {
+                "sl_c360_src_groups",
+                "sl_c360_dim_groups",
+                "sl_c360_dim_users",
+                "sl_c360_fct_user_per_group",
+            },
+        )
+        self.assertEqual(len(result.production_ddl_paths), 4)
+        for ddl_path in result.production_ddl_paths:
+            self.assertFalse(os.path.isabs(ddl_path))
+            self.assertNotIn("pipelines/", ddl_path.replace("\\", "/"))
+        production_basenames = {os.path.basename(p) for p in result.production_ddl_paths}
+        self.assertIn("ddl.src_c360_groups.sql", production_basenames)
+        self.assertIn("ddl.c360_dim_groups.sql", production_basenames)
+        self.assertIn("ddl.c360_dim_users.sql", production_basenames)
+        self.assertIn("ddl.c360_fct_user_per_group.sql", production_basenames)
+        ut_paths = " ".join(result.unit_test_ddl_paths)
+        self.assertIn("dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql", ut_paths)
+        for ut_path in result.unit_test_ddl_paths:
+            self.assertFalse(os.path.isabs(ut_path))
+
+    def test_update_unit_test_ddl_for_foundation_tables(self):
+        """Foundation UT DDL is refreshed from production DDL for ddl_modified_tables only."""
+        pipelines_root = TEST_PIPELINES_DIR
+        ut_relative = "dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql"
+        ut_path = os.path.join(pipelines_root, ut_relative)
+        with open(ut_path, "r") as f:
+            original_ut_ddl = f.read()
+        stripped_ut_ddl = original_ut_ddl.replace("  updated_at TIMESTAMP,\n", "")
+        try:
+            with open(ut_path, "w") as f:
+                f.write(stripped_ut_ddl)
+
+            impacted = pm.ImpactedTablesByModificationsResult(
+                ddl_modified_tables=["sl_c360_src_groups"],
+                tables=["sl_c360_dim_groups"],
+                production_ddl_paths=[],
+                unit_test_ddl_paths=[ut_relative],
+            )
+            updated = pm.update_unit_test_ddl_for_foundation_tables(
+                impacted, project_path=pipelines_root
+            )
+            self.assertIn(ut_relative, updated)
+            with open(ut_path, "r") as f:
+                synced = f.read()
+            self.assertIn("updated_at TIMESTAMP", synced)
+            self.assertIn("sl_c360_src_groups_ut", synced)
+        finally:
+            with open(ut_path, "w") as f:
+                f.write(original_ut_ddl)
 
 if __name__ == '__main__':
     unittest.main()

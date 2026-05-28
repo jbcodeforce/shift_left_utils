@@ -4,6 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 Service to manage project structure.
 """
 import datetime
+import glob
 import os
 from pathlib import Path
 import re
@@ -11,9 +12,12 @@ import hashlib
 import subprocess
 import shutil
 import importlib.resources
+import yaml
 from datetime import timezone
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Union
 from pydantic import BaseModel, Field
+from shift_left.core.models.flink_test_model import SLTestDefinition
+from shift_left.core.test_mgr import TEST_DEFINITION_FILE_NAME
 from shift_left.core.table_mgr import get_or_build_inventory
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
 from shift_left.core.utils.app_config import get_config, logger, shift_left_dir
@@ -56,6 +60,22 @@ class ModifiedFilesResult(BaseModel):
     description: str = Field(description="Summary information about the operation")
     file_list: set[ModifiedFileInfo] = Field(description="Set of modified files with extracted table names")
 
+
+class ImpactedTablesByModificationsResult(BaseModel):
+    """Tables and DDL paths impacted by production DDL modifications."""
+    ddl_modified_tables: list[str] = Field(
+        description="Table names whose production DDL files were modified"
+    )
+    tables: list[str] = Field(
+        description="Downstream tables (recursive children of DDL-modified tables)"
+    )
+    production_ddl_paths: list[str] = Field(
+        description="Paths to production DDL files relative to PIPELINES for impacted downstream tables"
+    )
+    unit_test_ddl_paths: list[str] = Field(
+        description="Paths to unit-test foundation DDL files relative to PIPELINES"
+    )
+
 # ------- Public APIS ----------
 
 def build_project_structure(project_name: str,
@@ -65,7 +85,6 @@ def build_project_structure(project_name: str,
     project_folder=os.path.join(project_path, project_name)
     create_folder_if_not_exist(project_folder)
     create_folder_if_not_exist(os.path.join(project_folder, "pipelines"))
-    create_folder_if_not_exist(os.path.join(project_folder, "staging"))
     create_folder_if_not_exist(os.path.join(project_folder, "docs"))
     if project_type == DATA_PRODUCT_PROJECT_TYPE:
         _define_dp_structure(os.path.join(project_folder, "pipelines"))
@@ -137,6 +156,72 @@ def list_tables_with_one_child(project_path: str):
         if table_hierarchy and table_hierarchy.children and len(table_hierarchy.children) <= 1:
             tables_with_one_child.append(table_name)
     return tables_with_one_child
+
+
+def impacted_tables_by_modifications(
+    modified_files: Union[ModifiedFilesResult, dict],
+    project_path: str | None = None,
+) -> ImpactedTablesByModificationsResult:
+    """
+    From modified file metadata, find downstream tables and DDL files affected by production DDL changes.
+
+    Filters to production DDL under sql-scripts, walks pipeline children recursively, and collects
+    matching unit-test foundation DDL paths from test_definitions.yaml files.
+    """
+    result = _normalize_modified_files_result(modified_files)
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        raise ValueError("project_path must be provided or PIPELINES environment variable must be set")
+
+    ddl_modified_tables = _extract_ddl_modified_tables(result.file_list)
+    inventory = get_or_build_inventory(pipelines_path, pipelines_path, False)
+    tables = _collect_descendant_tables(ddl_modified_tables, inventory)
+    production_ddl_paths = _resolve_production_ddl_paths(tables, inventory, pipelines_path)
+    impacted_names = set(ddl_modified_tables) | set(tables)
+    unit_test_ddl_paths = _collect_unit_test_ddl_paths(
+        pipelines_path, impacted_names, inventory
+    )
+
+    return ImpactedTablesByModificationsResult(
+        ddl_modified_tables=sorted(ddl_modified_tables),
+        tables=sorted(tables),
+        production_ddl_paths=sorted(production_ddl_paths),
+        unit_test_ddl_paths=sorted(unit_test_ddl_paths),
+    )
+
+
+def update_unit_test_ddl_for_foundation_tables(
+    impacted: Union[ImpactedTablesByModificationsResult, dict],
+    project_path: str | None = None,
+) -> List[str]:
+    """
+    Update unit-test foundation DDL files from production DDL for ddl_modified_tables only.
+
+    Scans test_definitions.yaml under PIPELINES, and for each foundation whose production
+    table had a DDL modification, rewrites the foundation ddl_for_test file using the current
+    production CREATE TABLE (with the configured unit-test table name postfix).
+
+    Args:
+        impacted: Output from impacted_tables_by_modifications or impacted_tables.json content.
+        project_path: Pipeline root ($PIPELINES). Required if PIPELINES is not set.
+
+    Returns:
+        Paths (relative to PIPELINES) of unit-test DDL files that were updated.
+    """
+    if isinstance(impacted, dict):
+        impacted = ImpactedTablesByModificationsResult.model_validate(impacted)
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        raise ValueError("project_path must be provided or PIPELINES environment variable must be set")
+    if not impacted.ddl_modified_tables:
+        return []
+
+    inventory = get_or_build_inventory(pipelines_path, pipelines_path, False)
+    post_fix = get_config().get("app", {}).get("post_fix_unit_test", "_ut")
+    return _sync_foundation_ut_ddl_from_production(
+        impacted.ddl_modified_tables, pipelines_path, inventory, post_fix
+    )
+
 
 def list_modified_files(project_path: str,
                         branch_name: str,
@@ -343,6 +428,258 @@ def isolate_data_product(product_name: str, source_folder: str, target_folder: s
 # --- Private APIs ---
 # ----------------------------------
 
+def _normalize_modified_files_result(
+    modified_files: Union[ModifiedFilesResult, dict],
+) -> ModifiedFilesResult:
+    if isinstance(modified_files, ModifiedFilesResult):
+        return modified_files
+    file_list = modified_files.get("file_list", [])
+    entries = [
+        ModifiedFileInfo.model_validate(item) if isinstance(item, dict) else item
+        for item in file_list
+    ]
+    return ModifiedFilesResult(
+        description=modified_files.get("description", ""),
+        file_list=set(entries),
+    )
+
+
+def _is_production_ddl_modification(file_modified_url: str) -> bool:
+    normalized = os.path.normpath(file_modified_url)
+    path_parts = normalized.split(os.sep)
+    if len(path_parts) >= 2 and path_parts[-2] == "tests":
+        return False
+    if "/sql-scripts/" not in normalized.replace("\\", "/"):
+        return False
+    return os.path.basename(normalized).lower().startswith("ddl.")
+
+
+def _extract_ddl_modified_tables(file_list: set[ModifiedFileInfo]) -> list[str]:
+    tables: list[str] = []
+    seen: set[str] = set()
+    for file_info in file_list:
+        if not _is_production_ddl_modification(file_info.file_modified_url):
+            continue
+        if file_info.table_name not in seen:
+            seen.add(file_info.table_name)
+            tables.append(file_info.table_name)
+    return tables
+
+
+def _collect_descendant_tables(
+    ddl_modified_tables: list[str],
+    inventory: dict,
+) -> list[str]:
+    descendants: set[str] = set()
+    for table_name in ddl_modified_tables:
+        _walk_pipeline_children(table_name, inventory, descendants, set())
+    return sorted(descendants)
+
+
+def _walk_pipeline_children(
+    table_name: str,
+    inventory: dict,
+    descendants: set[str],
+    visited: set[str],
+) -> None:
+    if table_name in visited:
+        return
+    visited.add(table_name)
+    if table_name not in inventory:
+        logger.warning(f"Table {table_name} not found in inventory while collecting descendants")
+        return
+    table_ref = inventory[table_name]
+    pipeline_definition = read_pipeline_definition_from_file(
+        table_ref["table_folder_name"] + "/" + PIPELINE_JSON_FILE_NAME
+    )
+    if not pipeline_definition or not pipeline_definition.children:
+        return
+    for child in pipeline_definition.children:
+        descendants.add(child.table_name)
+        _walk_pipeline_children(child.table_name, inventory, descendants, visited)
+
+
+def _path_relative_to_pipelines(path: str, pipelines_path: str) -> str:
+    """Return a path relative to the PIPELINES directory (no leading pipelines/ segment)."""
+    pipelines_path = os.path.normpath(os.path.abspath(pipelines_path))
+    pipeline_segment = os.path.basename(pipelines_path)
+
+    normalized = path.replace("\\", "/")
+    if not os.path.isabs(path):
+        if normalized.startswith(f"{pipeline_segment}/"):
+            return normalized[len(pipeline_segment) + 1 :]
+        return normalized
+
+    rel = os.path.relpath(os.path.normpath(path), pipelines_path)
+    return rel.replace("\\", "/")
+
+
+def _resolve_production_ddl_paths(
+    tables: list[str], inventory: dict, pipelines_path: str
+) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for table_name in tables:
+        table_ref = inventory.get(table_name)
+        if not table_ref or not table_ref.get("ddl_ref"):
+            logger.debug(f"No ddl_ref for table {table_name}")
+            continue
+        ddl_ref = table_ref["ddl_ref"]
+        absolute_path = from_pipeline_to_absolute(ddl_ref)
+        if not os.path.exists(absolute_path):
+            logger.debug(f"Production DDL file does not exist: {absolute_path}")
+            continue
+        relative_path = _path_relative_to_pipelines(ddl_ref, pipelines_path)
+        if relative_path not in seen:
+            seen.add(relative_path)
+            paths.append(relative_path)
+    return paths
+
+
+def _ddl_stem_from_inventory_table(table_name: str, inventory: dict) -> set[str]:
+    """Return table name and DDL file stem aliases used in unit-test foundations."""
+    aliases = {table_name}
+    table_ref = inventory.get(table_name)
+    if not table_ref:
+        return aliases
+    ddl_ref = table_ref.get("ddl_ref", "")
+    stem = os.path.splitext(os.path.basename(ddl_ref))[0]
+    if stem.lower().startswith("ddl."):
+        stem = stem[4:]
+    aliases.add(stem)
+    return aliases
+
+
+def _foundation_matches_impacted_table(
+    foundation_table_name: str,
+    impacted_names: set[str],
+    inventory: dict,
+) -> bool:
+    if foundation_table_name in impacted_names:
+        return True
+    for impacted in impacted_names:
+        if foundation_table_name in _ddl_stem_from_inventory_table(impacted, inventory):
+            return True
+        if impacted.endswith(foundation_table_name):
+            return True
+    return False
+
+
+def _collect_unit_test_ddl_paths(
+    pipelines_path: str,
+    impacted_names: set[str],
+    inventory: dict,
+) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    pattern = os.path.join(pipelines_path, "**", "tests", TEST_DEFINITION_FILE_NAME)
+    for definition_path in glob.glob(pattern, recursive=True):
+        tests_folder = os.path.dirname(definition_path)
+        table_folder = os.path.dirname(tests_folder)
+        try:
+            with open(definition_path, "r") as f:
+                test_definition = SLTestDefinition.model_validate(yaml.safe_load(f))
+        except Exception as e:
+            logger.debug(f"Skipping {definition_path}: {e}")
+            continue
+        for foundation in test_definition.foundations:
+            if not _foundation_matches_impacted_table(
+                foundation.table_name, impacted_names, inventory
+            ):
+                continue
+            ddl_path = os.path.normpath(
+                os.path.join(table_folder, foundation.ddl_for_test.lstrip("./"))
+            )
+            if not os.path.exists(ddl_path):
+                logger.debug(f"Unit test DDL file does not exist: {ddl_path}")
+                continue
+            relative_path = _path_relative_to_pipelines(ddl_path, pipelines_path)
+            if relative_path not in seen:
+                seen.add(relative_path)
+                paths.append(relative_path)
+    return paths
+
+
+def _resolve_foundation_inventory_table(
+    foundation_table_name: str, inventory: dict
+) -> str | None:
+    """Map a test_definitions foundation name to an inventory table key."""
+    if foundation_table_name in inventory:
+        return foundation_table_name
+    for table_name in inventory:
+        if foundation_table_name in _ddl_stem_from_inventory_table(table_name, inventory):
+            return table_name
+        if table_name.endswith(foundation_table_name):
+            return table_name
+    return None
+
+
+def _sync_foundation_ut_ddl_from_production(
+    ddl_modified_tables: list[str],
+    pipelines_path: str,
+    inventory: dict,
+    post_fix_unit_test: str,
+) -> list[str]:
+    """Rewrite foundation unit-test DDL files from production DDL for modified tables."""
+    updated_paths: list[str] = []
+    seen: set[str] = set()
+    foundation_tables = set(ddl_modified_tables)
+    pattern = os.path.join(pipelines_path, "**", "tests", TEST_DEFINITION_FILE_NAME)
+
+    for definition_path in glob.glob(pattern, recursive=True):
+        tests_folder = os.path.dirname(definition_path)
+        table_folder = os.path.dirname(tests_folder)
+        try:
+            with open(definition_path, "r") as f:
+                test_definition = SLTestDefinition.model_validate(yaml.safe_load(f))
+        except Exception as e:
+            logger.debug(f"Skipping {definition_path}: {e}")
+            continue
+
+        for foundation in test_definition.foundations:
+            if not _foundation_matches_impacted_table(
+                foundation.table_name, foundation_tables, inventory
+            ):
+                continue
+            inventory_table = _resolve_foundation_inventory_table(
+                foundation.table_name, inventory
+            )
+            if not inventory_table:
+                logger.warning(
+                    f"Foundation {foundation.table_name} has no inventory match; skipping UT DDL sync"
+                )
+                continue
+
+            table_ref = inventory[inventory_table]
+            production_ddl_path = from_pipeline_to_absolute(table_ref["ddl_ref"])
+            if not os.path.exists(production_ddl_path):
+                logger.warning(f"Production DDL not found: {production_ddl_path}")
+                continue
+
+            ut_ddl_path = os.path.normpath(
+                os.path.join(table_folder, foundation.ddl_for_test.lstrip("./"))
+            )
+            with open(production_ddl_path, "r") as f:
+                ddl_sql_content = f.read()
+            ddl_sql_content = ddl_sql_content.replace(
+                inventory_table,
+                f"{inventory_table}{post_fix_unit_test}",
+            )
+            create_folder_if_not_exist(os.path.dirname(ut_ddl_path))
+            with open(ut_ddl_path, "w") as f:
+                f.write(ddl_sql_content)
+
+            relative_path = _path_relative_to_pipelines(ut_ddl_path, pipelines_path)
+            if relative_path not in seen:
+                seen.add(relative_path)
+                updated_paths.append(relative_path)
+                logger.info(
+                    f"Updated foundation UT DDL for {foundation.table_name} -> {relative_path}"
+                )
+
+    return sorted(updated_paths)
+
+
 def _add_children_to_process_files(file_info: ModifiedFileInfo, to_process_tables: list[ModifiedFileInfo], inventory: dict):
     """
     Add the children of the table to the list of tables to process
@@ -495,9 +832,8 @@ def _create_terraform_skeleton(project_folder: str):
     logger.info(f"create_terraform_skeleton({project_folder})")
     iac_folder = os.path.join(project_folder, "IaC")
     create_folder_if_not_exist(iac_folder)
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments"))
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "dev"))
-    create_folder_if_not_exist(os.path.join(iac_folder, "environments", "prod"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "dev"))
+    create_folder_if_not_exist(os.path.join(iac_folder, "prod"))
     project_name = Path(project_folder).name
     env = Environment(loader=PackageLoader("shift_left.core", "templates"))
     tf_provider_tmpl = env.get_template("tf_provider.jinja")
@@ -505,7 +841,7 @@ def _create_terraform_skeleton(project_folder: str):
         "project_name": project_name,
         "environment": "demo",
     }
-    dev_folder = os.path.join(iac_folder, "environments", "dev")
+    dev_folder = os.path.join(iac_folder, "dev")
     providers_tf = os.path.join(dev_folder, "providers.tf")
     with open(providers_tf, "w") as f:
         f.write(tf_provider_tmpl.render(context))
@@ -565,12 +901,11 @@ def _initialize_git_repo(project_folder: str):
 def _define_dp_structure(pipeline_folder: str):
     data_folder=pipeline_folder + "/data_product_1"
     create_folder_if_not_exist(data_folder)
-    create_folder_if_not_exist(data_folder + "/intermediates")
-    create_folder_if_not_exist(data_folder + "/facts")
-    create_folder_if_not_exist(data_folder + "/sources")
+    _define_kimball_structure(data_folder)
+
 
 def _define_kimball_structure(pipeline_folder: str):
-    create_folder_if_not_exist(pipeline_folder + "/intermediates")
+    create_folder_if_not_exist(pipeline_folder + "/seeds")
     create_folder_if_not_exist(pipeline_folder + "/facts")
     create_folder_if_not_exist(pipeline_folder + "/dimensions")
     create_folder_if_not_exist(pipeline_folder + "/sources")
@@ -581,10 +916,10 @@ def _add_important_files(project_folder: str):
     for file in ["common.mk"]:
         template_path = importlib.resources.files("shift_left.core.templates").joinpath(file)
         shutil.copyfile(template_path, os.path.join(project_folder, "pipelines", file))
-    template_path = importlib.resources.files("shift_left.core.templates").joinpath(".env_tmpl")
-    shutil.copyfile(template_path, os.path.join(project_folder, ".env"))
+    template_path = importlib.resources.files("shift_left.core.templates").joinpath("set_env_temp")
+    shutil.copyfile(template_path, os.path.join(project_folder, "set_env"))
     # Update FLINK_PROJECT in .env file with project folder path
-    env_file = os.path.join(project_folder, ".env")
+    env_file = os.path.join(project_folder, "set_env")
     with open(env_file, 'r') as f:
         env_content = f.read()
     env_content = env_content.replace("FLINK_PROJECT=", f"FLINK_PROJECT={project_folder}")
@@ -593,7 +928,7 @@ def _add_important_files(project_folder: str):
     template_path = importlib.resources.files("shift_left.core.templates").joinpath(".gitignore_tmpl")
     shutil.copyfile(template_path, os.path.join(project_folder, ".gitignore"))
     template_path = importlib.resources.files("shift_left.core.templates").joinpath("config_tmpl.yaml")
-    shutil.copyfile(template_path, os.path.join(shift_left_dir, "config.yaml"))
+    shutil.copyfile(template_path, os.path.join(project_folder, "config.yaml"))
 
 
 def _assess_flink_statement_state(table_name: str, file_path: str, sql_content: str) -> Tuple[bool, bool]:

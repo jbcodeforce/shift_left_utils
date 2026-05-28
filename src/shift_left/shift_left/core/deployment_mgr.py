@@ -9,6 +9,7 @@ The execution plan is persisted to a JSON file.
 The execution plan is used to execute the statements in the correct order.
 The execution plan is used to undeploy a pipeline.
 """
+import re
 import time
 import os
 import multiprocessing
@@ -60,6 +61,19 @@ def _deployment_step_succeeded(result: Statement | StatementError | None) -> boo
             return False
         return all(getattr(e, "status", None) == "SKIPPED" for e in result.errors)
     return False
+
+
+def _statement_error_user_message(err: StatementError) -> str:
+    """Single-line message for console/log when a StatementError is returned from the driver."""
+    if not err.errors:
+        return "(no error details)"
+    parts: List[str] = []
+    for e in err.errors:
+        eid = getattr(e, "id", None) or ""
+        st = getattr(e, "status", None) or ""
+        detail = getattr(e, "detail", None) or ""
+        parts.append(f"{eid} [{st}]: {detail}".strip())
+    return "; ".join(parts)
 
 
 def build_deploy_pipeline_from_table(
@@ -611,6 +625,15 @@ def full_pipeline_undeploy_from_product(product_name: str,
     return trace
 
 
+def _strip_sql_comments_from_text(sql_content: str) -> str:
+    """Remove /* */ and -- ... end-of-line comments (aligned with project_manager._remove_sql_comments)."""
+    if not sql_content:
+        return ""
+    sql_content = re.sub(r"/\*.*?\*/", "", sql_content, flags=re.DOTALL)
+    sql_content = re.sub(r"--.*?$", "", sql_content, flags=re.MULTILINE)
+    return sql_content
+
+
 def prepare_tables_from_sql_file(sql_file_name: str,
                                  compute_pool_id: str):
     """
@@ -618,28 +641,32 @@ def prepare_tables_from_sql_file(sql_file_name: str,
     It is used to alter tables. For deployment by adding the necessary comments and metadata.
     """
     config = get_config()
-    compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
+    if not compute_pool_id:
+        compute_pool_id = compute_pool_id or config['flink']['compute_pool_id']
     transformer = statement_mgr.get_or_build_sql_content_transformer()
     stmnt_suffix = datetime.now().strftime("%Y%m%d%H%M%S")
     with open(sql_file_name, "r") as f:
-        idx=0
-        for line in f:
-            if line.lstrip().startswith('--'):
-                continue
-            _, sql_out= transformer.update_sql_content(line,
-                                                       "",
-                                                       "")
-            print(sql_out)
+        sql_text = _strip_sql_comments_from_text(f.read())
+    idx = 0
+    # the sql_text is a set of alter table statement to execute one by one
+    for line in sql_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        _, sql_out = transformer.update_sql_content(line, "", "")
+        logger.info(sql_out)
+        if sql_out and len(sql_out) > 10:
             statement_name = f"prepare-table-{stmnt_suffix}-{idx}"
-            statement = statement_mgr.post_flink_statement(compute_pool_id,
-                                                           statement_name,
-                                                           sql_out,
+            statement: Statement | StatementError = statement_mgr.post_flink_statement(compute_pool_id,
+                                                            statement_name,
+                                                            sql_out,
                                                             {})
-            while statement.status.phase not in ["COMPLETED", "FAILED"]:
-                time.sleep(2)
-                statement = statement_mgr.get_statement(statement_name)
-                logger.info(f"Prepare table {statement_name} status is: {statement}")
-            idx+=1
+            if isinstance(statement, Statement):
+                while statement.status.phase not in ["COMPLETED", "FAILED"]: # type: ignore
+                    time.sleep(2)
+                    statement = statement_mgr.get_statement(statement_name)
+                    logger.info(f"Prepare table {statement_name} status is: {statement}")
+            idx += 1
             statement_mgr.delete_statement_if_exists(statement_name)
 #
 # ------------------------------------- private APIs  ---------------------------------
@@ -1007,7 +1034,7 @@ def _assign_compute_pool_id_to_node(node: FlinkStatementNode, compute_pool_id: s
     # get the list of compute pools available that match the table name
     pools=compute_pool_mgr.search_for_matching_compute_pools(table_name=node.table_name)
     # If we don't have any matching compute pool, we need to find a pool to use
-    if  not pools or len(pools) == 0:
+    if  len(pools) == 0:
         logger.info(f"No matching compute pool found for {node.table_name}")
         # assess user's parameter for compute pool id
         if compute_pool_id and compute_pool_mgr.is_pool_valid(compute_pool_id):
@@ -1140,9 +1167,16 @@ def _execute_statements_in_parallel(to_process: List[FlinkStatementNode],
                         nodes_to_execute = _modify_impacted_nodes(result, nodes_to_execute)
                         batch_succeeded = False
                 else:
-                    logger.warning(f"Result from future is StatementError")
-                    if not _deployment_step_succeeded(result):
-                        batch_succeeded = False
+                    if isinstance(result, StatementError):
+                        if not _deployment_step_succeeded(result):
+                            detail = _statement_error_user_message(result)
+                            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Deployment failed: {detail}")
+                            logger.warning("StatementError from parallel deploy: %s", detail)
+                            batch_succeeded = False
+                    else:
+                        logger.warning("Unexpected result type from future: %s", type(result))
+                        if not _deployment_step_succeeded(result):
+                            batch_succeeded = False
             except Exception as e:
                 logger.error(f"Failed to get result from future: {str(e)}")
                 batch_succeeded = False
@@ -1169,6 +1203,10 @@ def _execute_statements_in_sequence(nodes_to_execute: List[FlinkStatementNode],
     step_succeeded = _deployment_step_succeeded(statement)
     if isinstance(statement, Statement):
         statements.append(statement)
+    elif isinstance(statement, StatementError) and not step_succeeded:
+        detail = _statement_error_user_message(statement)
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} Table {node.table_name}: {detail}")
+        logger.error("StatementError for %s: %s", node.table_name, detail)
     else:
         logger.info(f"Statement {node.dml_statement_name} not deployed, move to next node")
     node.to_run = False
@@ -1284,13 +1322,23 @@ def _deploy_ddl_dml(node_to_process: FlinkStatementNode)-> Statement | Statement
             statement = statement_mgr.get_statement(node_to_process.ddl_statement_name)
             logger.info(f"DDL deployment status is: {statement.status.phase}")
             if statement.status.phase in ["FAILED"]:
-                raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
-    elif isinstance(statement, StatementError) and statement.errors[0].status == "FAILED" and statement.errors[0].detail == "resource not found":
+                extra = (
+                    f": {statement.status.detail}"
+                    if statement.status and statement.status.detail
+                    else ""
+                )
+                msg = f"DDL deployment failed for {node_to_process.table_name}{extra}"
+                print(f"{time.strftime('%Y%m%d_%H:%M:%S')} {msg}")
+                raise RuntimeError(msg)
+    elif isinstance(statement, StatementError) and statement.errors and statement.errors[0].status == "FAILED" and statement.errors[0].detail == "resource not found":
         logger.info(f"DDL statement {node_to_process.ddl_statement_name} not found, so no need to deploy")
         return statement
     else:
-        logger.error(f"DDL deployment failed for {node_to_process.table_name}")
-        raise RuntimeError(f"DDL deployment failed for {node_to_process.table_name}")
+        err_msg = _statement_error_user_message(statement)
+        msg = f"DDL deployment failed for {node_to_process.table_name}: {err_msg}"
+        logger.error(msg)
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} {msg}")
+        raise RuntimeError(msg)
     return _deploy_dml(node_to_process, True)
 
 
@@ -1309,9 +1357,24 @@ def _deploy_dml(to_process: FlinkStatementNode, dml_already_deleted: bool= False
             statement = statement_mgr.get_statement(to_process.dml_statement_name)
             logger.debug(f"DML deployment status is: {statement.status.phase}")
         if statement.status.phase == "FAILED":
-            raise RuntimeError(f"DML deployment failed for {to_process.table_name}")
-    logger.info(f"DML deployment completed for {to_process.table_name}")
-    print(f"{time.strftime('%Y%m%d_%H:%M:%S')} DML deployment completed for {to_process.table_name}")
+            extra = (
+                f": {statement.status.detail}"
+                if statement.status and statement.status.detail
+                else ""
+            )
+            msg = f"DML deployment failed for {to_process.table_name}{extra}"
+            print(f"{time.strftime('%Y%m%d_%H:%M:%S')} {msg}")
+            raise RuntimeError(msg)
+        logger.info(f"DML deployment completed for {to_process.table_name}")
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} DML deployment completed for {to_process.table_name}")
+        return statement
+    if isinstance(statement, StatementError):
+        detail = _statement_error_user_message(statement)
+        full = f"DML submit failed for {to_process.table_name}: {detail}"
+        print(f"{time.strftime('%Y%m%d_%H:%M:%S')} {full}")
+        logger.error(full)
+        return statement
+    logger.warning("Unexpected statement type from build_and_deploy: %s", type(statement))
     return statement
 
 

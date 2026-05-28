@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS src_c360_groups (
+CREATE TABLE IF NOT EXISTS sl_c360_src_groups (
   group_id STRING NOT NULL,
   tenant_id STRING NOT NULL,
   group_name STRING,
@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS src_c360_groups (
 ) DISTRIBUTED BY HASH(tenant_id, group_id) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
-  'key.avro-registry.schema-context' = '.flink-dev',
-  'value.avro-registry.schema-context' = '.flink-dev',
   'key.format' = 'avro-registry',
   'value.format' = 'avro-registry',
   'kafka.retention.time' = '0',

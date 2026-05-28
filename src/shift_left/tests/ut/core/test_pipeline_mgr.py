@@ -4,7 +4,7 @@ Copyright 2024-2025 Confluent, Inc.
 import unittest
 import os
 import pathlib
-os.environ["CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
+os.environ["SL_CONFIG_FILE"] =  str(pathlib.Path(__file__).parent.parent.parent /  "config.yaml")
 
 import shift_left.core.pipeline_mgr as pm
 import shift_left.core.table_mgr as tm
@@ -22,7 +22,7 @@ class TestPipelineManager(unittest.TestCase):
         os.environ["PIPELINES"] = str(data_dir / "flink-project/pipelines")
         tm.get_or_create_inventory(os.getenv("PIPELINES"))
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
-        pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
+        #pm.build_all_pipeline_definitions(os.getenv("PIPELINES"))
 
 
 
@@ -34,7 +34,7 @@ class TestPipelineManager(unittest.TestCase):
         ddl_table_path=path + "/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql"
         result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         assert result
-        assert result.table_name == "src_c360_groups"
+        assert result.table_name == "sl_c360_src_groups"
         assert len(result.parents) == 1 # 04/2026: unknown_table are referenced but not in the inventory. This is for seed and consuming from exiting topics.
         assert len(result.children) == 0
         assert "source" == result.type
@@ -60,6 +60,19 @@ class TestPipelineManager(unittest.TestCase):
         assert pipe_def
         assert len(pipe_def.children) == 1
         assert len(pipe_def.parents) == 1
+
+    def test_1_1_build_c360_fact_table_definition(self):
+        print("test_1_1_build_c360_fact_table_definition")
+        path= os.getenv("PIPELINES")
+        dml_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql"
+        ddl_table_path=path + "/facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql"
+        if os.path.exists(path + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME):
+            os.remove(path + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME)
+        result = pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
+        assert result
+        assert len(result.children) == 0
+        assert len(result.parents) == 1
+        print(result.model_dump_json(indent=3))
 
     def test_all_pipeline_def(self):
         pm.delete_all_metada_files(os.getenv("PIPELINES"))
