@@ -23,49 +23,16 @@ from shift_left.core.utils.file_search import FlinkTableReference, get_or_build_
 
 
 class TestTestManager(unittest.TestCase):
-    """Unit test suite for test manager functionality."""
+    """Unit test suite for test manager private functions."""
 
     @classmethod
     def setUpClass(cls):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
+        cls._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
 
-    def setUp(self):
-        # Ensure proper test isolation by resetting caches and rebuilding inventory
-        reset_all_caches()
-        build_inventory(os.getenv("PIPELINES"))
-        self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
-
-
-
-
-    # --------- tests creation and preparation ---------
-    def test_create_tests_structure(self):
-        """Test creation of tests structure with templates & test definitions.
-        The table e uses c so c will be part of foundations SQL and CSV inputs are created.
-        """
-        # Clean up any existing test files
-        test_folder = os.path.join(os.getenv("PIPELINES"), "facts/p2/e/tests")
-        if os.path.exists(test_folder):
-            for file in os.listdir(test_folder):
-                os.remove(os.path.join(test_folder, file))
-            os.rmdir(test_folder)
-        table_name = "e"
-        test_mgr.init_unit_test_for_table(table_name, create_csv=True)
-
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/test_definitions.yaml"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/validate_e_2.sql"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/insert_c_2.csv"))
-        self.assertTrue(os.path.exists(os.getenv("PIPELINES") + "/facts/p2/e/tests/insert_c_1.sql"))
-        test_def, table_ref = test_mgr._load_test_suite_definition(table_name)
-        self.assertTrue(test_def)
-        print(test_def.model_dump_json(indent=3))
-        self.assertEqual(test_def.foundations[0].table_name, "c")
-        self.assertEqual(test_def.foundations[0].ddl_for_test, "./tests/ddl_c.sql")
-
-    def test_validate_test_model(self):
+    def test_validate_test_pydantic_model(self):
         """Test loading of test definition."""
         td1 = SLTestData(table_name="tb1", file_name="ftb1")
         o1 = SLTestData(table_name="tbo1", file_name="to1")
@@ -77,7 +44,7 @@ class TestTestManager(unittest.TestCase):
 
     def test_load_test_definition_for_fact_table(self):
         """Test loading test definition for fact table."""
-        table_name = "p1_fct_order"
+        table_name = "sl_c360_dim_users"
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
 
         self.assertTrue(test_suite_def)

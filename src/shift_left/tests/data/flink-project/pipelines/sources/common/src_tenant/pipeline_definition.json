@@ -1,10 +1,10 @@
 {
-   "table_name": "sl_c360_src_groups",
-   "product_name": "c360",
+   "table_name": "sl_cmn_src_tenants",
+   "product_name": "common",
    "type": "source",
-   "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
-   "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-   "path": "pipelines/sources/c360/src_groups",
+   "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
+   "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
+   "path": "pipelines/sources/common/src_tenant",
    "kafka_topic": null,
    "complexity": {
       "number_of_regular_joins": 0,
@@ -17,12 +17,12 @@
    },
    "parents": [
       {
-         "table_name": "sl_raw_groups",
-         "product_name": "c360",
+         "table_name": "sl_raw_tenants",
+         "product_name": "common",
          "type": "seed",
-         "dml_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/dml.raw_groups.sql",
-         "ddl_ref": "pipelines/seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
-         "path": "pipelines/seeds/c360/raw_groups",
+         "dml_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/dml.raw_tenants.sql",
+         "ddl_ref": "pipelines/seeds/common/raw_tenants/sql-scripts/ddl.raw_tenants.sql",
+         "path": "pipelines/seeds/common/raw_tenants",
          "kafka_topic": null,
          "complexity": {
             "number_of_regular_joins": 0,
@@ -36,12 +36,12 @@
          "parents": [],
          "children": [
             {
-               "table_name": "sl_c360_src_groups",
-               "product_name": "c360",
+               "table_name": "sl_cmn_src_tenants",
+               "product_name": "common",
                "type": "source",
-               "dml_ref": "pipelines/sources/c360/src_groups/sql-scripts/dml.src_c360_groups.sql",
-               "ddl_ref": "pipelines/sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
-               "path": "pipelines/sources/c360/src_groups",
+               "dml_ref": "pipelines/sources/common/src_tenant/sql-scripts/dml.src_common_tenant.sql",
+               "ddl_ref": "pipelines/sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql",
+               "path": "pipelines/sources/common/src_tenant",
                "kafka_topic": null,
                "complexity": {
                   "number_of_regular_joins": 0,

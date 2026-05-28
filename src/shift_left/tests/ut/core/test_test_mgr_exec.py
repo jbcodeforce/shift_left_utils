@@ -51,12 +51,7 @@ class TestTestManager(unittest.TestCase):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
-
-    def setUp(self):
-        # Ensure proper test isolation by resetting caches and rebuilding inventory
-        reset_all_caches()
-        build_inventory(os.getenv("PIPELINES"))
-        self._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
+        cls._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
 
     # ---- Mock functions to be used in tests to avoid calling remote services ----
     def _mock_table_exists(self, table_name):

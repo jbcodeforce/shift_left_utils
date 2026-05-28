@@ -17,80 +17,80 @@ Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`,
 
 Move test classes as inheriting IntegrationTestCase
 
-| file | status |
-|-----|-----|
-| `test_fact_deployment.py` | ok - executed| 
+| file                        | status          |
+|-----------------------------|-----------------|
+| `test_fact_deployment.py`   | ok - executed   |
 
 ## Root (`shift_left/cli.py`)
 
-| CLI command | Full IT (CLI) | Test file / notes |
-|-------------|---------------|-------------------|
-| `version` | Yes | `test_fact_deployment.py` |
+| CLI command | Full IT (CLI)  | Test file / notes           | Exec Status |
+|-------------|----------------|-----------------------------|-------------|
+| `version`   | Yes            | `test_fact_deployment.py`   | —           |
 
 ## `project` (`shift_left project ...`)
 
-| CLI command | Full IT (CLI) | Test file / notes |
-|-------------|---------------|-------------------|
-| `init` | NA  | done in unit test |
-| `list-topics` | Yes | `test_project_cli.py` |
-| `list-compute-pools` | Yes | `test_project_cli.py` |
-| `delete-all-compute-pools` | Gap | Destructive; no dedicated IT |
-| `housekeep-statements` | Yes (same) | `test_project_cli.py` |
-| `validate-config` | Yes (same) | `test_project_cli.py` |
-| `report-table-cross-products` | Gap | Uses `PIPELINES` / inventory |
-| `list-environments` | Yes (same) | `test_project_cli.py` |
-| `list-tables-with-one-child` | Gap | |
-| `list-modified-files` | Yes (same) | `test_project_cli.py` |
-| `update-tables-version` | Yes | `cli/test_version_project_cli.py` (expects `~/.shift_left/modified_flink_files.json`) |
-| `init-integration-tests` | Gap | `tests/it/test_itg_test_mgr.py` covers manager APIs, not CLI |
-| `run-integration-tests` | Gap | |
-| `delete-integration-tests` | Gap | |
-| `isolate-data-product` | Gap | |
-| `get-statement-list` | Gap | |
-| `assess-unused-tables` | Gap | |
-| `delete-unused-tables` | Gap | |
-| `update-all-makefiles` | Not registered | `#@app.command()` in `project.py` |
+| CLI command                      | Full IT (CLI)  | Test file / notes                                                                       |
+|----------------------------------|----------------|-----------------------------------------------------------------------------------------|
+| `init`                           | NA             | done in unit test                                                                       |
+| `list-topics`                    | Yes            | `test_project_cli.py`                                                                   |
+| `list-compute-pools`             | Yes            | `test_project_cli.py`                                                                   |
+| `delete-all-compute-pools`       | Gap            | Destructive; no dedicated IT                                                            |
+| `housekeep-statements`           | Yes (same)     | `test_project_cli.py`                                                                   |
+| `validate-config`                | Yes (same)     | `test_project_cli.py`                                                                   |
+| `report-table-cross-products`    | Gap            | Uses `PIPELINES` / inventory                                                            |
+| `list-environments`              | Yes (same)     | `test_project_cli.py`                                                                   |
+| `list-tables-with-one-child`     | Gap            | —                                                                                       |
+| `list-modified-files`            | Yes (same)     | `test_project_cli.py`                                                                   |
+| `update-tables-version`          | Yes            | `cli/test_version_project_cli.py` (expects `~/.shift_left/modified_flink_files.json`)   |
+| `init-integration-tests`         | Gap            | `tests/it/test_itg_test_mgr.py` covers manager APIs, not CLI                            |
+| `run-integration-tests`          | Gap            | —                                                                                       |
+| `delete-integration-tests`       | Gap            | —                                                                                       |
+| `isolate-data-product`           | Gap            | —                                                                                       |
+| `get-statement-list`             | Gap            | —                                                                                       |
+| `assess-unused-tables`           | Gap            | —                                                                                       |
+| `delete-unused-tables`           | Gap            | —                                                                                       |
+| `update-all-makefiles`           | Not registered | `#@app.command()` in `project.py`                                                       |
 
 ## `table` (`shift_left table ...`)
 
-| CLI command                  | Tests | Test file / notes          | Exec Status |
-|------------------------------|-------|----------------------------|-------------|
-| `init`                       |   UT  | `ut/cli/test_table_cli.py` |.  ok        |
-| `build-inventory` | UT | `ut/cli/test_table_cli.py`;  |
-| `search-source-dependencies` | UT | `ut/cli/test_table_cli.py` |
-| `migrate` | Opt-in | `cli/test_table_cli.py` (`SHIFT_LEFT_IT_USE_DEMO_ENV`); `tests/ai/test_migrate_cli_ksql.py` (AI area, ksql) |
-| `update-makefile` | NO | |
-| `update-all-makefiles` | NO |  |
-| `validate-table-names` | Yes | `ut/cli/test_table_cli.py` |
-| `update-tables` | Yes | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`) |
-| `init-unit-tests` | UT | `ut/cli/test_table_cli.py` |
-| `run-unit-tests` | IT (cloud) | `it/cli/test_ut_test_mgr.py` uses root `app` + real env |
-| `run-validation-tests` | IT | tit/cli/test_ut_test_mgr.py |
-| `delete-unit-tests` | IT | it/cli/test_ut_test_mgr.py-|
-| `explain` | Opt-in / error path | `cli/test_table_cli.py` — cloud paths need `SHIFT_LEFT_IT_USE_DEMO_ENV`; no-args error covered locally |
+| CLI command                    | Tests                | Test file / notes                                                                                      | Exec Status                  |
+|--------------------------------|----------------------|--------------------------------------------------------------------------------------------------------|------------------------------|
+| `init`                         | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `build-inventory`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `search-source-dependencies`   | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `migrate`                      | Opt-in               | `cli/test_table_cli.py` (`SHIFT_LEFT_IT_USE_DEMO_ENV`); `tests/ai/test_migrate_cli_ksql.py` (AI, ksql) | —                            |
+| `update-makefile`              | UT                   | —                                                                                                      | May be note needed anymore   |
+| `update-all-makefiles`         | UT                   | —                                                                                                      | May be not needed anymore    |
+| `validate-table-names`         | UT                   | `ut/cli/test_table_cli.py`                                                                             | —                            |
+| `update-tables`                | UT                   | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`)                                          | —                            |
+| `init-unit-tests`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | —                            |
+| `run-unit-tests`               | IT (cloud)           | `it/cli/test_ut_test_mgr.py` (root `app` + real env)                                                   | —                            |
+| `run-validation-tests`         | IT                   | `it/cli/test_ut_test_mgr.py`                                                                           | —                            |
+| `delete-unit-tests`            | IT                   | `it/cli/test_ut_test_mgr.py`                                                                           | —                            |
+| `explain`                      | Opt-in / error path  | `cli/test_table_cli.py` — cloud paths need `SHIFT_LEFT_IT_USE_DEMO_ENV`; no-args error covered locally | —                            |
 
 ## `pipeline` (`shift_left pipeline ...`)
 
-| CLI command | Full IT (CLI) | Test file / notes |
-|-------------|---------------|-------------------|
-| `field-lineage` | Gap | |
-| `build-metadata` | Yes | `test_fact_deployment.py` |
-| `delete-all-metadata` | Yes | `test_fact_deployment.py` |
-| `build-all-metadata` | Yes | `test_fact_deployment.py`|
-| `report` | Yes | `test_fact_deployment.py`) |
-| `healthcheck` | Gap | Needs product + live statements/pools |
-| `deploy` | Yes | `test_fact_deployment` |
-| `build-execution-plan` | Yes | `test_fact_deployment.py` |
-| `report-running-statements` | Yes | `test_fact_deployment.py` |
-| `undeploy` | Yes | `test_fact_deployment.py` |
-| `prepare` | Yes | `test_fact_deployment.py` |
-| `analyze-pool-usage` | Opt-in | `cli/test_pipeline_cli.py` (`SHIFT_LEFT_RUN_CLOUD_IT`) |
+| CLI command                   | Full IT (CLI)  | Test file / notes                                        |
+|-------------------------------|----------------|----------------------------------------------------------|
+| `field-lineage`               | Gap            | —                                                        |
+| `build-metadata`              | Yes            | `test_fact_deployment.py`                                |
+| `delete-all-metadata`         | Yes            | `test_fact_deployment.py`                                |
+| `build-all-metadata`          | Yes            | `test_fact_deployment.py`                                |
+| `report`                      | Yes            | `test_fact_deployment.py`                                |
+| `healthcheck`                 | Gap            | Needs product + live statements/pools                    |
+| `deploy`                      | Yes            | `test_fact_deployment.py`                                |
+| `build-execution-plan`        | Yes            | `test_fact_deployment.py`                                |
+| `report-running-statements`   | Yes            | `test_fact_deployment.py`                                |
+| `undeploy`                    | Yes            | `test_fact_deployment.py`                                |
+| `prepare`                     | Yes            | `test_fact_deployment.py`                                |
+| `analyze-pool-usage`          | Opt-in         | `cli/test_pipeline_cli.py` (`SHIFT_LEFT_RUN_CLOUD_IT`)   |
 
 ## `rag` (`shift_left rag ...`)
 
-| CLI command | Full IT (CLI) | Test file / notes |
-|-------------|---------------|-------------------|
-| `build` | Gap | Needs corpus fixture with `flink-references/`; candidate: new `tests/it/cli/test_rag_cli.py` using `tests/data/...` |
+| CLI command | Full IT (CLI)  | Test file / notes                                                                                                      |
+|-------------|----------------|------------------------------------------------------------------------------------------------------------------------|
+| `build`     | Gap            | Needs corpus fixture with `flink-references/`; candidate: new `tests/it/cli/test_rag_cli.py` using `tests/data/...`    |
 
 ## `test_fact_deployment.py`
 

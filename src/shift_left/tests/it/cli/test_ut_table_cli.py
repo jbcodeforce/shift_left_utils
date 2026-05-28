@@ -36,9 +36,19 @@ class TestTableUnitTestsCLI(IntegrationTestCase):
     - delete-unit-tests
     """
 
+    def _reset_topic_list_cache(self) -> None:
+        """Clear in-memory and on-disk topic list cache."""
+        test_mgr._topic_list_cache = None
+        if os.path.exists(test_mgr.TOPIC_LIST_FILE):
+            os.remove(test_mgr.TOPIC_LIST_FILE)
+
+    def setUp(self):
+        self._reset_topic_list_cache()
+
     def _assert_topics_exist(self, topic_names: list[str]) -> None:
         """Assert Kafka topics exist in the cluster (refresh topic list cache first)."""
-        test_mgr._topic_list_cache = None
+        self._reset_topic_list_cache()
+
         for topic_name in topic_names:
             self.assertTrue(
                 test_mgr._table_exists(topic_name),
@@ -50,7 +60,7 @@ class TestTableUnitTestsCLI(IntegrationTestCase):
         print("-"*40)
         print("Running unit tests for the user dimension table")
         print("-"*40)
-        result = self.runner.invoke(app, ["run-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1"])
+        result = self.runner.invoke(app, ["run-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1", "--post-fix-unit-test", "_ut"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
         self._assert_topics_exist(["sl_c360_src_users_ut", "sl_c360_dim_groups_ut", "sl_c360_dim_users_ut"])
@@ -58,7 +68,7 @@ class TestTableUnitTestsCLI(IntegrationTestCase):
         print("-"*40)
         print("Validating unit tests for the user dimension table")
         print("-"*40)
-        result = self.runner.invoke(app, ["validate-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1"])
+        result = self.runner.invoke(app, ["validate-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1", "--post-fix-unit-test", "_ut"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
 
@@ -66,6 +76,18 @@ class TestTableUnitTestsCLI(IntegrationTestCase):
         print("Deleting unit tests for the user dimension table")
         print("-"*40)
         result = self.runner.invoke(app, ["delete-unit-tests", "sl_c360_dim_users", "--post-fix-unit-test", "_ut"])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        print(result.stdout)
+
+    def test_running_unit_tests_with_post_fix_unit_test_from_config(self):
+        print("-"*40)
+        print("Running unit tests for the user dimension table with default post fix unit test")
+        print("-"*40)
+        result = self.runner.invoke(app, ["run-unit-tests", "sl_c360_dim_users", "--test-case-name", "test_c360_dim_users_1"])
+        self.assertEqual(result.exit_code, 0, msg=result.stdout)
+        print(result.stdout)
+        self._assert_topics_exist(["sl_c360_src_users_jb", "sl_c360_dim_groups_jb", "sl_c360_dim_users_jb"])
+        result = self.runner.invoke(app, ["delete-unit-tests", "sl_c360_dim_users"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         print(result.stdout)
 
