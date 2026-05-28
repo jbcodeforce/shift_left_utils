@@ -32,10 +32,6 @@ def infer_flink_sql_endpoint(config: dict) -> str:
     if endpoint:
         return str(endpoint).rstrip("/")
 
-    tmp = ConfluentCloudClient(config)
-    if tmp.base_url:
-        return f"https://flink.{tmp.base_url}".rstrip("/")
-
     cc = config["confluent_cloud"]
     provider = cc.get("cloud_provider") or cc.get("provider") or "aws"
     region = cc.get("cloud_region") or cc.get("region") or ""

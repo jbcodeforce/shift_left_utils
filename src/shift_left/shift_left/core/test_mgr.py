@@ -312,7 +312,7 @@ def _execute_flink_test_statement(
             logger.info(f"Execute statement {statement_name} on: {compute_pool_id}")
             print(f"Execute statement {statement_name}  on: {compute_pool_id}")
             post_statement = statement_mgr.post_flink_statement(compute_pool_id, statement_name, sql_out, {})
-            logger.info(f"Statement {statement_name} posted: {post_statement}")
+            logger.info(f"Statement {statement_name} posted: {post_statement.model_dump_json(indent=2)}")
             return post_statement, is_new  # Return new statement
         except Exception as e:
             logger.error(e)
