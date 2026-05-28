@@ -37,15 +37,17 @@
             },
             "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
         },
+        // IT env mirrors src/shift_left/set_demo_env (VS Code envFile does not parse `export KEY=...` shell syntax).
+        // Confluent/Kafka/Flink secrets use ${env:...}; export the same names from set_demo_env before starting Cursor from that shell, or set them in the OS environment.
         {
-         "name": "SL Python IT Debugger: current file",
+            "name": "SL Python IT Debugger: current file",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "preLaunchTask": "verify_env_file",
-            "envFile": "${workspaceFolder}/src/shift_left/set_demo_env",
+            "envFile": "${workspaceFolder}/../flink_project_demos/customer_360/c360_flink_processing/.env",
             "env": {
                 // Note: Variables from envFile are loaded first, then these override/add to them
                 // The Python script also loads .env at module level to ensure variables are available
@@ -54,8 +56,6 @@
 				"SL_LLM_MODEL" : "qwen3-coder-30b-a3b-instruct-mlx-4bit",
 				"SL_LLM_API_KEY" : "llm_test_key",
 				"SL_RAG_ENABLED" : "1",
-				"SL_CONFIG_FILE": "${workspaceFolder}/src/shift_left/tests/config-ccloud.yaml",
-				"SHIFT_LEFT_RUN_CLOUD_IT" : "1",
 				"SL_RAG_INDEX_PATH" : "${workspaceFolder}/../flink_project_demos/ksql_tutorial/rag_index"
               },
                "python": "${workspaceFolder}/src/shift_left/.venv/bin/python"
