@@ -10,6 +10,12 @@ os.environ["SL_CONFIG_FILE"] = str(pathlib.Path(__file__).parent.parent.parent /
 from shift_left.cli_commands.project import app
 from it.BaseIT import _run_integration_tests, _SKIP_MSG, IntegrationTestCase
 
+
+# for unit test integrity and preparations
+from shift_left.core.table_mgr import get_or_create_inventory
+from shift_left.core.pipeline_mgr import delete_all_metada_files, build_all_pipeline_definitions
+
+
 _RUN_IT = _run_integration_tests()
 @unittest.skipUnless(_RUN_IT, _SKIP_MSG)
 class TestProjectCLI(IntegrationTestCase):
@@ -20,23 +26,26 @@ class TestProjectCLI(IntegrationTestCase):
 
 
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        get_or_create_inventory(os.environ["PIPELINES"])
+        delete_all_metada_files(os.environ["PIPELINES"])
+        build_all_pipeline_definitions(os.environ["PIPELINES"])
+
+
+    @classmethod
     def tearDownClass(cls):
         temp_dir = pathlib.Path(__file__).parent /  "../tmp"
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-
-
-    def test_validate_config(self):
-        result = self.runner.invoke(app, [ "validate-config"])
-        print(result.stdout)
-        assert result.exit_code == 0
 
     def test_list_topics(self):
 
         temp_dir = pathlib.Path(__file__).parent.parent.parent /  "../tmp"
         os.makedirs(temp_dir, exist_ok=True)
         temp_file = temp_dir / "topic_list.txt"
-        os.remove(temp_file)
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
         result = self.runner.invoke(app, [ "list-topics", str(temp_dir)])
         print(result.stdout)
         assert result.exit_code == 0
@@ -47,14 +56,14 @@ class TestProjectCLI(IntegrationTestCase):
         print(result.stdout)
         assert result.exit_code == 0
 
-    def test_list_tables_with_one_child(self):
-        result = self.runner.invoke(app, [ "list-tables-with-one-child"])
-        print(result.stdout)
-        assert result.exit_code == 0
-
     def test_list_compute_pools(self):
-        print("test_5: using cli project list-compute-pools")
         result = self.runner.invoke(app, ["list-compute-pools"])
+        print(result)
+        assert result.exit_code == 0
+        print(result.stdout)
+
+    def test_list_statements(self):
+        result = self.runner.invoke(app, ["get-statement-list", os.environ["SL_FLINK_COMPUTE_POOL_ID"]])
         print(result)
         assert result.exit_code == 0
         print(result.stdout)

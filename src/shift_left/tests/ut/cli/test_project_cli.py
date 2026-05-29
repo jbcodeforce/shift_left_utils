@@ -35,8 +35,11 @@ from shift_left.core.utils.app_config import get_config
 from shift_left.cli_commands.project import app
 import shift_left.core.pipeline_mgr as pm
 import subprocess
-
-class TestProjectCLI(unittest.TestCase):
+from ut.core.BaseUT import BaseUT
+class TestProjectCLI(BaseUT):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.runner = CliRunner()
 
     @classmethod
     def setUpClass(cls):
@@ -52,17 +55,34 @@ class TestProjectCLI(unittest.TestCase):
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
+
     def test_init_project(self):
-        runner = CliRunner()
         temp_dir = pathlib.Path(__file__).parent /  "../tmp"
-        print(temp_dir)
-        result = runner.invoke(app, [ "init", "project_test_via_cli", str(temp_dir)])
+        result = self.runner.invoke(app, [ "init", "project_test_via_cli", str(temp_dir)])
         print(result.stdout)
         assert result.exit_code == 0
         assert "Project project_test_via_cli created in " in result.stdout
         assert os.path.exists(temp_dir / "project_test_via_cli")
         assert os.path.exists(temp_dir / "project_test_via_cli/pipelines")
 
+    def test_init_data_product_project(self):
+        temp_dir = pathlib.Path(__file__).parent / "../tmp"
+        result = self.runner.invoke(
+            app,
+            ["init", "project_data_product_cli", str(temp_dir), "--project-type", "data_product"],
+        )
+        assert result.exit_code == 0
+        assert os.path.exists(temp_dir / "project_data_product_cli/pipelines/data_product_1")
+
+
+    # ------------- Config -------------
+    #
+    def test_validate_current_config(self):
+        result = self.runner.invoke(app, ["validate-config"])
+        print(result.stdout)
+        assert result.exit_code == 0
+        assert "validated" in result.stdout
+        assert "./tests/config" in result.stdout
 
 
     @patch('shift_left.cli_commands.project.get_config')
@@ -117,8 +137,7 @@ class TestProjectCLI(unittest.TestCase):
         # Mock get_config to return our test configuration
         mock_get_config.return_value = valid_config
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["validate-config"])
+        result = self.runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert result.exit_code == 0
         assert "validated" in result.stdout
@@ -140,9 +159,7 @@ class TestProjectCLI(unittest.TestCase):
         # Mock get_config to return our test configuration
         mock_get_config.return_value = invalid_config
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["validate-config"])
-        print(result.stdout)
+        result = self.runner.invoke(app, ["validate-config"])
         # Should still exit with 0 but show validation errors in output
         assert "Configuration validation failed" in result.stdout
         assert "missing confluent_cloud section" in result.stdout
@@ -200,8 +217,7 @@ class TestProjectCLI(unittest.TestCase):
         # Mock get_config to return our test configuration
         mock_get_config.return_value = config_with_placeholders
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["validate-config"])
+        result = self.runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert "Configuration validation failed" in result.stdout
         assert "placeholder value '<TO_FILL>'" in result.stdout
@@ -257,33 +273,54 @@ class TestProjectCLI(unittest.TestCase):
         # Mock get_config to return our test configuration
         mock_get_config.return_value = invalid_types_config
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["validate-config"])
+        result = self.runner.invoke(app, ["validate-config"])
         print(result.stdout)
         assert "Configuration validation failed" in result.stdout
         assert "must be a number" in result.stdout
         assert "must be a valid log level" in result.stdout
         assert "must be a list" in result.stdout
 
-    @patch('shift_left.cli_commands.project.project_manager._assess_flink_statement_state')
-    @patch('shift_left.core.project_manager.subprocess.run')
-    def test_list_modified_files_success(self, mock_subprocess_run, mock_assess_state):
-        """Test list_modified_files command with mocked git and temp project (no real git)."""
-        runner = CliRunner()
+    # ------------- table management within a project -------------
+    #
+    def test_list_tables_with_one_child(self):
+        result = self.runner.invoke(app, [ "list-tables-with-one-child"])
+        print(result.stdout)
+        assert result.exit_code == 0
+        assert "sl_c360_dim_users" in result.stdout
+        assert "sl_c360_dim_groups" in result.stdout
+        assert "tables_with_one_child.txt" in result.stdout
 
-        # Temp project dir with minimal SQL files so project_manager can open them
+    def test_report_table_cross_products(self):
+        result = self.runner.invoke(app, [ "report-table-cross-products"])
+        print(result.stdout)
+        assert result.exit_code == 0
+        assert "sl_cmn_src_tenants" in result.stdout
+        assert "table_cross_products.txt" in result.stdout
+
+    @patch("shift_left.core.project_manager.statement_mgr.get_statement")
+    @patch("shift_left.core.project_manager.subprocess.run")
+    def test_list_modified_files_success(self, mock_subprocess_run, mock_get_statement):
+        """Test list_modified_files command with mocked git and temp project (no real git)."""
+        from shift_left.core.models.flink_statement_model import Statement, Spec, Status
+
+        mock_statement = MagicMock(spec=Statement)
+        mock_statement.spec = MagicMock(spec=Spec)
+        mock_statement.spec.statement = "INSERT INTO sl_c360_src_users SELECT 1"
+        mock_statement.status = MagicMock(spec=Status)
+        mock_statement.status.phase = "RUNNING"
+        mock_get_statement.return_value = mock_statement
+
         with tempfile.TemporaryDirectory() as project_tmp:
             pipelines = pathlib.Path(project_tmp) / "pipelines"
             (pipelines / "sources/c360/src_users/sql-scripts").mkdir(parents=True)
             (pipelines / "facts/c360/fct_user_per_group/sql-scripts").mkdir(parents=True)
             (pipelines / "sources/c360/src_users/sql-scripts").joinpath("dml.src_c360_users.sql").write_text(
-                "INSERT INTO src_c360_users SELECT 1"
+                "INSERT INTO sl_c360_src_users SELECT 1"
             )
             (pipelines / "facts/c360/fct_user_per_group/sql-scripts").joinpath(
                 "ddl.c360_fct_user_per_group.sql"
             ).write_text("CREATE TABLE c360_fct_user_per_group (id INT)")
 
-            # Temp output dir so we don't touch real HOME
             with tempfile.TemporaryDirectory() as output_tmp:
                 out_shift_left = pathlib.Path(output_tmp) / ".shift_left"
                 out_shift_left.mkdir()
@@ -295,10 +332,9 @@ class TestProjectCLI(unittest.TestCase):
                     )
                     output_txt = out_shift_left / _modified_log
 
-                    # Mock git (no real git calls)
                     mock_subprocess_run.side_effect = [
                         MagicMock(stdout="feature-branch\n", stderr="", returncode=0),
-                        MagicMock(stdout="main\n", stderr="", returncode=0),
+                        MagicMock(stdout="", stderr="", returncode=0),
                         MagicMock(
                             stdout=(
                                 "pipelines/sources/c360/src_users/sql-scripts/dml.src_c360_users.sql\n"
@@ -309,10 +345,8 @@ class TestProjectCLI(unittest.TestCase):
                             returncode=0,
                         ),
                     ]
-                    # Only DML file calls _assess_flink_statement_state
-                    mock_assess_state.side_effect = [(False, True)]
 
-                    result = runner.invoke(
+                    result = self.runner.invoke(
                         app,
                         [
                             "list-modified-files",
@@ -328,9 +362,9 @@ class TestProjectCLI(unittest.TestCase):
 
                     assert output_txt.exists()
                     content = output_txt.read_text()
-                    # CLI writes table names (one per line) to the .txt file
-                    assert "src_c360_users" in content
+                    assert "sl_c360_src_users" in content
                     assert "c360_fct_user_per_group" in content
+                    mock_get_statement.assert_called()
                 finally:
                     if old_home is not None:
                         os.environ["HOME"] = old_home
@@ -395,79 +429,210 @@ class TestProjectCLI(unittest.TestCase):
         assert result.exit_code == 1
         assert "Git command failed" in result.stdout
 
-    @patch("shift_left.cli_commands.project.project_manager.impacted_tables_by_modifications")
-    def test_list_impacted_tables_writes_json(self, mock_impacted):
-        """Test list_impacted_tables writes impacted_tables.json under shift_left_dir."""
-        from shift_left.core.project_manager import ImpactedTablesByModificationsResult
-
-        runner = CliRunner()
-        mock_impacted.return_value = ImpactedTablesByModificationsResult(
-            ddl_modified_tables=["sl_raw_groups"],
-            tables=["sl_c360_src_groups"],
-            production_ddl_paths=["/tmp/ddl.src_c360_groups.sql"],
-            unit_test_ddl_paths=["/tmp/tests/ddl_src_c360_groups.sql"],
-        )
+    def test_list_impacted_tables_from_fixture(self):
+        """Test list_impacted_tables via CLI with real project_manager integration."""
+        pipelines_root = os.environ["PIPELINES"]
+        modified_files = {
+            "description": "Modified files in branch:'cc-client'",
+            "file_list": [
+                {
+                    "table_name": "sl_raw_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "seeds/c360/raw_groups/sql-scripts/ddl.raw_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_raw_groups",
+                },
+                {
+                    "table_name": "sl_c360_src_groups",
+                    "file_modified_url": os.path.join(
+                        pipelines_root,
+                        "sources/c360/src_groups/sql-scripts/ddl.src_c360_groups.sql",
+                    ),
+                    "same_sql_content": False,
+                    "running": False,
+                    "new_table_name": "sl_c360_src_groups",
+                },
+            ],
+        }
 
         with tempfile.TemporaryDirectory() as tmp:
             modified_json = pathlib.Path(tmp) / "modified_flink_files.json"
-            modified_json.write_text(
-                json.dumps(
-                    {
-                        "description": "test",
-                        "file_list": [
-                            {
-                                "table_name": "sl_raw_groups",
-                                "file_modified_url": "/pipelines/seeds/ddl.raw_groups.sql",
-                                "same_sql_content": False,
-                                "running": False,
-                                "new_table_name": "sl_raw_groups",
-                            }
-                        ],
-                    }
-                )
-            )
-            out_shift_left = pathlib.Path(tmp) / ".shift_left"
-            out_shift_left.mkdir()
-            output_json = out_shift_left / "impacted_tables.json"
+            modified_json.write_text(json.dumps(modified_files))
+            output_json = pathlib.Path(tmp) / "impacted_tables.json"
 
-            with patch(
-                "shift_left.cli_commands.project.shift_left_dir", str(out_shift_left)
-            ):
-                result = runner.invoke(
-                    app,
-                    [
-                        "list-impacted-tables",
-                        "--modified-files-path",
-                        str(modified_json),
-                        "--project-path",
-                        str(pathlib.Path(tmp) / "pipelines"),
-                        "--output-file",
-                        str(output_json),
-                    ],
-                )
+            result = self.runner.invoke(
+                app,
+                [
+                    "list-impacted-tables",
+                    "--modified-files-path",
+                    str(modified_json),
+                    "--project-path",
+                    pipelines_root,
+                    "--output-file",
+                    str(output_json),
+                ],
+            )
 
             assert result.exit_code == 0, result.stdout
             assert output_json.exists()
             payload = json.loads(output_json.read_text())
-            assert payload["tables"] == ["sl_c360_src_groups"]
+            assert set(payload["ddl_modified_tables"]) == {"sl_raw_groups", "sl_c360_src_groups"}
+            assert "sl_c360_dim_groups" in payload["tables"]
+            assert "sl_c360_fct_user_per_group" in payload["tables"]
             assert "Impacted tables saved to" in result.stdout
-            mock_impacted.assert_called_once()
+            ut_paths = " ".join(payload["unit_test_ddl_paths"])
+            assert "dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql" in ut_paths
 
+    def test_list_impacted_tables_missing_pipelines(self):
+        """Test list_impacted_tables exits when PIPELINES is unset and no --project-path."""
+        with tempfile.TemporaryDirectory() as tmp:
+            modified_json = pathlib.Path(tmp) / "modified_flink_files.json"
+            modified_json.write_text(json.dumps({"description": "test", "file_list": []}))
+            old_pipelines = os.environ.pop("PIPELINES", None)
+            try:
+                result = self.runner.invoke(
+                    app,
+                    ["list-impacted-tables", "--modified-files-path", str(modified_json)],
+                )
+                assert result.exit_code != 0
+                assert "set PIPELINES or pass --project-path" in result.stdout
+            finally:
+                if old_pipelines is not None:
+                    os.environ["PIPELINES"] = old_pipelines
+
+    def test_update_ut_ddl_syncs_foundation_ddl(self):
+        """Foundation UT DDL is refreshed from production DDL via update-ut-ddl CLI."""
+        pipelines_root = os.environ["PIPELINES"]
+        ut_relative = "dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql"
+        ut_path = os.path.join(pipelines_root, ut_relative)
+        with open(ut_path, "r") as f:
+            original_ut_ddl = f.read()
+        stripped_ut_ddl = original_ut_ddl.replace("  updated_at TIMESTAMP,\n", "")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            impacted_json = pathlib.Path(tmp) / "impacted_tables.json"
+            impacted_json.write_text(
+                json.dumps(
+                    {
+                        "ddl_modified_tables": ["sl_c360_src_groups"],
+                        "tables": ["sl_c360_dim_groups"],
+                        "production_ddl_paths": [],
+                        "unit_test_ddl_paths": [ut_relative],
+                    }
+                )
+            )
+            try:
+                with open(ut_path, "w") as f:
+                    f.write(stripped_ut_ddl)
+
+                result = self.runner.invoke(
+                    app,
+                    ["update-ut-ddl", str(impacted_json), "--project-path", pipelines_root],
+                )
+
+                assert result.exit_code == 0, result.stdout
+                with open(ut_path, "r") as f:
+                    synced = f.read()
+                assert "updated_at TIMESTAMP" in synced
+                post_fix = get_config().get("app", {}).get("post_fix_unit_test", "_ut")
+                assert f"sl_c360_src_groups{post_fix}" in synced
+            finally:
+                with open(ut_path, "w") as f:
+                    f.write(original_ut_ddl)
+
+    def test_update_ut_ddl_skips_empty_ddl_modified(self):
+        """update-ut-ddl succeeds when ddl_modified_tables is empty."""
+        pipelines_root = os.environ["PIPELINES"]
+        with tempfile.TemporaryDirectory() as tmp:
+            impacted_json = pathlib.Path(tmp) / "impacted_tables.json"
+            impacted_json.write_text(
+                json.dumps(
+                    {
+                        "ddl_modified_tables": [],
+                        "tables": [],
+                        "production_ddl_paths": [],
+                        "unit_test_ddl_paths": [],
+                    }
+                )
+            )
+            result = self.runner.invoke(
+                app,
+                ["update-ut-ddl", str(impacted_json), "--project-path", pipelines_root],
+            )
+            assert result.exit_code == 0, result.stdout
+
+    @patch("shift_left.core.project_manager.ConfluentCloudClient")
+    def test_list_topics_writes_file(self, mock_client_cls):
+        """Test list-topics CLI writes topic_list.txt from ConfluentCloudClient."""
+        mock_client_cls.return_value.list_topics.return_value = {
+            "data": [{"cluster_id": "lkc-1", "topic_name": "orders", "partitions_count": 6}]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self.runner.invoke(app, ["list-topics", tmp])
+            assert result.exit_code == 0, result.stdout
+            topic_file = pathlib.Path(tmp) / "topic_list.txt"
+            assert topic_file.exists()
+            assert "orders" in topic_file.read_text()
+            assert "Topic list saved in" in result.stdout
+
+    def test_isolate_data_product(self):
+        """Test isolate-data-product CLI copies product hierarchy to target folder."""
+        pipelines_root = os.environ["PIPELINES"]
+        with tempfile.TemporaryDirectory() as tgt:
+            result = self.runner.invoke(
+                app,
+                ["isolate-data-product", "c360", pipelines_root, tgt],
+            )
+            assert result.exit_code == 0, result.stdout
+            assert os.path.exists(
+                os.path.join(tgt, "pipelines/facts/c360/fct_user_per_group/sql-scripts/dml.c360_fct_user_per_group.sql")
+            )
+            assert "Data product isolated in" in result.stdout
+
+    @patch("shift_left.core.project_manager.update_tables_version")
+    def test_update_tables_version(self, mock_update):
+        """Smoke test update-tables-version CLI wiring."""
+        mock_update.return_value = set()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(
+                {
+                    "file_list": [
+                        {
+                            "table_name": "f",
+                            "file_modified_url": "/facts/p2/f/sql-scripts/dml.f.sql",
+                            "same_sql_content": False,
+                            "running": False,
+                            "new_table_name": "f",
+                        }
+                    ]
+                },
+                f,
+            )
+            path = f.name
+        try:
+            result = self.runner.invoke(app, ["update-tables-version", path])
+            assert result.exit_code == 0, result.stdout
+            mock_update.assert_called_once()
+        finally:
+            os.unlink(path)
+
+    # ------------- compute pool management -------------
     @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_all_compute_pools_of_product")
     def test_delete_all_compute_pools_without_list_file(self, mock_delete_all):
-        runner = CliRunner()
-        result = runner.invoke(app, ["delete-all-compute-pools", "mv"])
+        result = self.runner.invoke(app, ["delete-all-compute-pools", "mv"])
         assert result.exit_code == 0, result.stdout
         mock_delete_all.assert_called_once_with("mv")
 
     @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
     def test_delete_all_compute_pools_with_list_file_only(self, mock_delete_by_ids):
-        runner = CliRunner()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("lfcp-ab0\n# comment\nlfcp-ab1\n")
             list_file = f.name
         try:
-            result = runner.invoke(
+            result = self.runner.invoke(
                 app,
                 ["delete-all-compute-pools", "--compute-pool-list-file", list_file],
             )
@@ -478,12 +643,11 @@ class TestProjectCLI(unittest.TestCase):
 
     @patch("shift_left.cli_commands.project.compute_pool_mgr.delete_compute_pools_by_ids")
     def test_delete_all_compute_pools_with_list_file_and_product(self, mock_delete_by_ids):
-        runner = CliRunner()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("lfcp-ab0\n")
             list_file = f.name
         try:
-            result = runner.invoke(
+            result = self.runner.invoke(
                 app,
                 ["delete-all-compute-pools", "mv", "--compute-pool-list-file", list_file],
             )
@@ -493,14 +657,12 @@ class TestProjectCLI(unittest.TestCase):
             os.unlink(list_file)
 
     def test_delete_all_compute_pools_requires_product_or_list_file(self):
-        runner = CliRunner()
-        result = runner.invoke(app, ["delete-all-compute-pools"])
+        result = self.runner.invoke(app, ["delete-all-compute-pools"])
         assert result.exit_code != 0
         assert "provide PRODUCT_NAME and/or --compute-pool-list-file" in result.stdout
 
     def test_delete_all_compute_pools_missing_list_file(self):
-        runner = CliRunner()
-        result = runner.invoke(
+        result = self.runner.invoke(
             app,
             ["delete-all-compute-pools", "--compute-pool-list-file", "/nonexistent/pools.txt"],
         )

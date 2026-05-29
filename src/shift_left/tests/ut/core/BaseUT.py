@@ -18,6 +18,7 @@ from shift_left.core.deployment_mgr import (
     FlinkStatementExecutionPlan
 )
 import os
+from typer.testing import CliRunner
 
 class BaseUT(unittest.TestCase):
 
@@ -27,6 +28,7 @@ class BaseUT(unittest.TestCase):
         self.TEST_COMPUTE_POOL_ID_2 = "test-pool-122"
         self.TEST_COMPUTE_POOL_ID_3 = "test-pool-123"
         self.inventory_path = os.getenv("PIPELINES")
+        self.runner = CliRunner()
 
     def setUp(self):
         """

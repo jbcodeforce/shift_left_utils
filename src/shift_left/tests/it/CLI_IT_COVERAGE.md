@@ -13,6 +13,14 @@ This document tracks which `shift_left` Typer commands under `shift_left/cli_com
 
 Source modules: `shift_left/cli_commands/project.py`, `table.py`, `pipeline.py`, `rag.py`; root app: `shift_left/cli.py`.
 
+## Coverage tracking
+
+Use skill `.cursor/skills/cli_first_test_coverage/` when consolidating UT/IT overlap for a CLI group.
+
+- [x] project CLI, UT coverage (CLI-first; core private helpers only)
+- [x] table CLI, UT/IT coverage and overlap
+- [x] pipeline CLI, UT/IT coverage and overlap
+
 ## Refactoring tracking
 
 Move test classes as inheriting IntegrationTestCase
@@ -29,27 +37,30 @@ Move test classes as inheriting IntegrationTestCase
 
 ## `project` (`shift_left project ...`)
 
-| CLI command                      | Full IT (CLI)  | Test file / notes                                                                       |
-|----------------------------------|----------------|-----------------------------------------------------------------------------------------|
-| `init`                           | NA             | done in unit test                                                                       |
-| `list-topics`                    | Yes            | `test_project_cli.py`                                                                   |
-| `list-compute-pools`             | Yes            | `test_project_cli.py`                                                                   |
-| `delete-all-compute-pools`       | Gap            | Destructive; no dedicated IT                                                            |
-| `housekeep-statements`           | Yes (same)     | `test_project_cli.py`                                                                   |
-| `validate-config`                | Yes (same)     | `test_project_cli.py`                                                                   |
-| `report-table-cross-products`    | Gap            | Uses `PIPELINES` / inventory                                                            |
-| `list-environments`              | Yes (same)     | `test_project_cli.py`                                                                   |
-| `list-tables-with-one-child`     | Gap            | —                                                                                       |
-| `list-modified-files`            | Yes (same)     | `test_project_cli.py`                                                                   |
-| `update-tables-version`          | Yes            | `cli/test_version_project_cli.py` (expects `~/.shift_left/modified_flink_files.json`)   |
-| `init-integration-tests`         | Gap            | `tests/it/test_itg_test_mgr.py` covers manager APIs, not CLI                            |
-| `run-integration-tests`          | Gap            | —                                                                                       |
-| `delete-integration-tests`       | Gap            | —                                                                                       |
-| `isolate-data-product`           | Gap            | —                                                                                       |
-| `get-statement-list`             | Gap            | —                                                                                       |
-| `assess-unused-tables`           | Gap            | —                                                                                       |
-| `delete-unused-tables`           | Gap            | —                                                                                       |
-| `update-all-makefiles`           | Not registered | `#@app.command()` in `project.py`                                                       |
+Status on 05/2026
+
+| CLI command                      | Tests  | Test file / notes                      | Status|
+|----------------------------------|--------|----------------------------------------|-------|
+| `init`                           | UT     |  `ut/cli/test_project_cli.py`          | okay  |
+| `delete-all-compute-pools`       | UT     |  `ut/cli/test_project_cli.py`          | okay  |
+| `list-topics`                    | UT + IT| `ut/cli/test_project_cli.py`, `it/cli/test_project_cli.py` | okay  |
+| `list-compute-pools`             | IT     | `it/cli/test_project_cli.py`           | okay  |   
+| `housekeep-statements`           | Gap    |   Tested by Srini                      | okay  |
+| `validate-config`                | UT     |  `ut/cli/test_project_cli.py`          | okay  |
+| `report-table-cross-products`    | UT     |  `ut/cli/test_project_cli.py`          | okay  |
+| `list-environments`              | IT     | `it/cli/test_project_cli.py`           | okay  |
+| `list-tables-with-one-child`     | UT     |   `ut/cli/test_project_cli.py`         | okay  |
+| `list-modified-files`            | UT     |  `ut/cli/test_project_cli.py`          | okay  |
+| `list_impacted_tables`           | UT     |  `ut/cli/test_project_cli.py` (real fixture integration) | okay  | 
+| `update-tables-version`          | UT     |  `ut/cli/test_project_cli.py` (CLI wiring smoke)         | okay  |
+| `update-ut-ddl`                  | UT     |  `ut/cli/test_project_cli.py`                          | okay  |
+| `init-integration-tests`         | Gap    | `tests/it/test_itg_test_mgr.py` covers manager APIs, not CLI  | |
+| `run-integration-tests`          | Gap    | —                                      |      |
+| `delete-integration-tests`       | Gap    | —                                      |      |
+| `isolate-data-product`           | UT     | `ut/cli/test_project_cli.py`           | okay  | 
+| `get-statement-list`             | IT     | `it/cli/test_project_cli.py`           | okay  |
+| `assess-unused-tables`           | Gap    | —                 |
+| `delete-unused-tables`           | Gap    | —                 |
 
 ## `table` (`shift_left table ...`)
 
@@ -58,33 +69,34 @@ Move test classes as inheriting IntegrationTestCase
 | `init`                         | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
 | `build-inventory`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
 | `search-source-dependencies`   | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
-| `migrate`                      | Opt-in               | `cli/test_table_cli.py` (`SHIFT_LEFT_IT_USE_DEMO_ENV`); `tests/ai/test_migrate_cli_ksql.py` (AI, ksql) | —                            |
-| `update-makefile`              | UT                   | —                                                                                                      | May be note needed anymore   |
-| `update-all-makefiles`         | UT                   | —                                                                                                      | May be not needed anymore    |
-| `validate-table-names`         | UT                   | `ut/cli/test_table_cli.py`                                                                             | —                            |
-| `update-tables`                | UT                   | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`)                                          | —                            |
-| `init-unit-tests`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | —                            |
-| `run-unit-tests`               | IT (cloud)           | `it/cli/test_ut_test_mgr.py` (root `app` + real env)                                                   | —                            |
-| `run-validation-tests`         | IT                   | `it/cli/test_ut_test_mgr.py`                                                                           | —                            |
-| `delete-unit-tests`            | IT                   | `it/cli/test_ut_test_mgr.py`                                                                           | —                            |
-| `explain`                      | Opt-in / error path  | `cli/test_table_cli.py` — cloud paths need `SHIFT_LEFT_IT_USE_DEMO_ENV`; no-args error covered locally | —                            |
+| `migrate`                      | UT + opt-in AI       | `ut/cli/test_table_cli.py` (smoke); `tests/ai/test_migrate_cli_ksql.py`                                | ok                           |
+| `update-makefile`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `update-all-makefiles`         | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `validate-table-names`         | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `update-tables`                | UT                   | `ut/cli/test_table_cli.py` (basic, `--ddl`, `--both-ddl-dml`)                                          | ok                           |
+| `init-unit-tests`              | UT                   | `ut/cli/test_table_cli.py`                                                                             | ok                           |
+| `run-unit-tests`               | UT smoke + IT cloud  | `ut/cli/test_table_cli.py`; `it/cli/test_ut_table_cli.py`                                              | ok                           |
+| `run-validation-tests`         | IT                   | `it/cli/test_ut_table_cli.py`                                                                          | —                            |
+| `validate-unit-tests`          | UT smoke             | `ut/cli/test_table_cli.py` (delegates to run-validation-tests)                                           | ok                           |
+| `delete-unit-tests`            | UT smoke + IT cloud  | `ut/cli/test_table_cli.py`; `it/cli/test_ut_table_cli.py`                                              | ok                           |
+| `explain`                      | UT error + IT demo   | `ut/cli/test_table_cli.py` (no-args error); `it/cli/test_table_cli.py` (demo happy paths)              | ok                           |
 
 ## `pipeline` (`shift_left pipeline ...`)
 
-| CLI command                   | Full IT (CLI)  | Test file / notes                                        |
-|-------------------------------|----------------|----------------------------------------------------------|
-| `field-lineage`               | Gap            | —                                                        |
-| `build-metadata`              | Yes            | `test_fact_deployment.py`                                |
-| `delete-all-metadata`         | Yes            | `test_fact_deployment.py`                                |
-| `build-all-metadata`          | Yes            | `test_fact_deployment.py`                                |
-| `report`                      | Yes            | `test_fact_deployment.py`                                |
-| `healthcheck`                 | Gap            | Needs product + live statements/pools                    |
-| `deploy`                      | Yes            | `test_fact_deployment.py`                                |
-| `build-execution-plan`        | Yes            | `test_fact_deployment.py`                                |
-| `report-running-statements`   | Yes            | `test_fact_deployment.py`                                |
-| `undeploy`                    | Yes            | `test_fact_deployment.py`                                |
-| `prepare`                     | Yes            | `test_fact_deployment.py`                                |
-| `analyze-pool-usage`          | Opt-in         | `cli/test_pipeline_cli.py` (`SHIFT_LEFT_RUN_CLOUD_IT`)   |
+| CLI command                   | Tests                | Test file / notes                                                                                      | Exec Status |
+|-------------------------------|----------------------|--------------------------------------------------------------------------------------------------------|-------------|
+| `field-lineage`               | UT smoke             | `ut/cli/test_pipeline_cli.py`                                                                          | ok          |
+| `build-metadata`              | UT + IT cloud chain  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `delete-all-metadata`         | UT + IT cloud chain  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `build-all-metadata`          | UT + IT cloud chain  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `report`                      | UT                   | `ut/cli/test_pipeline_cli.py` (success, error)                                                         | ok          |
+| `healthcheck`                 | UT smoke             | `ut/cli/test_pipeline_cli.py` (mocked statements/pools)                                              | ok          |
+| `deploy`                      | UT smoke + IT cloud  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `build-execution-plan`        | UT smoke + IT cloud  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `report-running-statements`   | UT + IT cloud        | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `undeploy`                    | UT smoke + IT cloud  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_fact_deployment.py`                                        | ok          |
+| `prepare`                     | UT smoke + IT cloud  | `ut/cli/test_pipeline_cli.py`; `it/cli/test_pipeline_cli.py`, `it/cli/test_fact_deployment.py`         | ok          |
+| `analyze-pool-usage`          | IT opt-in            | `it/cli/test_pipeline_cli.py` (`SHIFT_LEFT_RUN_CLOUD_IT`)                                              | ok          |
 
 ## `rag` (`shift_left rag ...`)
 
@@ -100,7 +112,7 @@ Move test classes as inheriting IntegrationTestCase
 
 - **Project**: many reporting / cleanup / integration-test commands still have **Gap** for CLI-level IT.
 - **Table**: unit-test lifecycle commands (`init-unit-tests`, `run-validation-tests`, `validate-unit-tests`, `delete-unit-tests`) are **Gap** at CLI IT level.
-- **Pipeline**: `field-lineage` and `healthcheck` are **Gap**.
+- **Pipeline**: `field-lineage` and `healthcheck` covered at UT CLI smoke level; cloud chain remains in `test_fact_deployment.py`.
 - **Rag**: **Gap**.
 
 ## Maintenance

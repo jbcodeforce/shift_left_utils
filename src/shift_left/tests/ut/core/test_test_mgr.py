@@ -44,7 +44,7 @@ class TestTestManager(unittest.TestCase):
 
     def test_load_test_definition_for_fact_table(self):
         """Test loading test definition for fact table."""
-        table_name = "sl_c360_dim_users"
+        table_name = "p1_fct_order"
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
 
         self.assertTrue(test_suite_def)
@@ -333,37 +333,6 @@ class TestTestManager(unittest.TestCase):
                 mock_ccloud_client.assert_not_called()
         finally:
             os.remove(cache_path)
-
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_list')
-    @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
-    @patch('shift_left.core.test_mgr.statement_mgr.drop_table')
-    def test_delete_test_artifacts(self,
-                                   mock_drop_table,
-                                   mock_delete_statement,
-                                   mock_get_statement_list):
-        """Test deletion of test artifacts including statements and tables."""
-        mock_get_statement_list.return_value = []
-
-        table_name = "p1_fct_order"
-        compute_pool_id = "test_pool"
-
-        test_mgr.delete_test_artifacts(table_name, compute_pool_id)
-
-        # Verify statement deletions were called
-        self.assertTrue(mock_delete_statement.called)
-        # Verify table drops were called
-        self.assertTrue(mock_drop_table.called)
-
-        # Check that drop_table was called for main table and foundations
-        expected_calls = []
-        expected_calls.append(unittest.mock.call(table_name + "_ut", compute_pool_id))
-        expected_calls.append(unittest.mock.call("int_table_1_ut", compute_pool_id))
-        expected_calls.append(unittest.mock.call("int_table_2_ut", compute_pool_id))
-
-        mock_drop_table.assert_has_calls(expected_calls, any_order=True)
-
-
 
     @patch('shift_left.core.test_mgr.from_pipeline_to_absolute')
     @patch('builtins.open', new_callable=mock_open, read_data="SELECT * FROM test_table WHERE id > 0;")

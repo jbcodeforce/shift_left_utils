@@ -74,15 +74,12 @@ class TestPipelineManager(unittest.TestCase):
         assert len(result.parents) == 1
         print(result.model_dump_json(indent=3))
 
-    def test_all_pipeline_def(self):
-        pm.delete_all_metada_files(os.getenv("PIPELINES"))
-        pm.build_all_pipeline_definitions( os.getenv("PIPELINES"))
-        assert os.path.exists(os.getenv("PIPELINES") + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME)
-        assert os.path.exists(os.getenv("PIPELINES") + "/facts/c360/fct_user_per_group/" + PIPELINE_JSON_FILE_NAME)
-
     def test_visit_parents(self):
         print("test_visit_parents")
         path= os.getenv("PIPELINES")
+        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
+        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
+        pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
         table_path=path + "/facts/p1/fct_order/" + PIPELINE_JSON_FILE_NAME
         pipeline_def: FlinkTablePipelineDefinition = pm.read_pipeline_definition_from_file(table_path)
         assert pipeline_def
@@ -90,26 +87,6 @@ class TestPipelineManager(unittest.TestCase):
         print(pipeline_def.model_dump_json(indent=3))
         assert len(pipeline_def.parents) == 2
         assert len(pipeline_def.children) == 0
-
-    def test_build_pipeline_report_from_table(self):
-        print("test_walk_the_hierarchy_for_report_from_table")
-        path= os.getenv("PIPELINES")
-        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
-        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
-        pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
-        result = pm.get_static_pipeline_report_from_table("p1_fct_order", os.getenv("PIPELINES"))
-        assert result
-        print(result.model_dump_json(indent=3))
-
-    def test_walk_the_hierarchy_for_report_from_intermediate_table(self):
-        print("test_walk_the_hierarchy_for_report_from_table")
-        path= os.getenv("PIPELINES")
-        dml_table_path=path + "/facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
-        ddl_table_path=path + "/facts/p1/fct_order/sql-scripts/ddl.p1_fct_order.sql"
-        pm.build_pipeline_definition_from_ddl_dml_content(dml_table_path, ddl_table_path, path)
-        result = pm.get_static_pipeline_report_from_table("int_p1_table_1", os.getenv("PIPELINES"))
-        assert result
-        print(result.model_dump_json(indent=3))
 
 
 if __name__ == '__main__':

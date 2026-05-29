@@ -1,9 +1,13 @@
 # CHANGELOG
 
-### v0.1.50 2026-05-15
+### next
+
+* Project delete-compute-pool now includes a parameter to reference a file with the list of compute pool to delete.
+
+### v0.1.51 2026-05-28
 
 * Adapt statement result for next token
-* Integrate confluent-sql module (built for dbt-adpater) for lower level of REST API wrapper for statement deployment
+* Integrate confluent-sql module (built for confluent  dbt-adpater) for lower level of REST API wrapper for statement deployment
 * Add the `shift_left version --config` flag to get a view of the application configuration of all parameters.
 * Refactor confluent client to cover what is not in confluent-sql
 * Refactor integration tests in tests/it
@@ -16,6 +20,8 @@
 	```sh
 	shift_left project list-impacted-tables modified-files.json --project-path $PIPELINES --output-file impacted-files.json
 	```
+* update to c360 example, tune app_config
+* update to project manager to add unit test impact
 
 ### v0.1.49 2026-03-21
 

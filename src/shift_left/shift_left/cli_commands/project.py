@@ -750,6 +750,10 @@ def delete_unused_tables(
     """
     Delete unused tables
     """
+    inventory_path = os.getenv("PIPELINES", "")
+    if not inventory_path:
+        print(f"[red]Error: PIPELINES environment variable is not set[/red]")
+        raise typer.Exit(1)
     print("#" * 30 + f" Delete Unused Tables and Kafka Topics in {inventory_path}")
 
     if not os.path.exists(table_list_file):

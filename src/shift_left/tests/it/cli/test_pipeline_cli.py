@@ -1,10 +1,9 @@
 """
 Copyright 2024-2025 Confluent, Inc.
 
-Integration tests for the pipeline Typer app (local data under tests/data/flink-project).
+Cloud integration tests for the pipeline Typer app.
 
-Commands that call Confluent/Flink APIs (prepare, analyze-pool-usage) are skipped
-unless SHIFT_LEFT_RUN_CLOUD_IT is set to 1/true/yes and you use a real config/credentials.
+Local pipeline CLI behavior is covered by tests/ut/cli/test_pipeline_cli.py.
 """
 import os
 import tempfile
@@ -20,53 +19,16 @@ _PIPELINES = Path(os.environ.get("PIPELINES", str(_TESTS_ROOT / "data/flink-proj
 
 _CLOUD_IT = os.environ.get("SHIFT_LEFT_RUN_CLOUD_IT", "").lower() in ("1", "true", "yes")
 
-_DML_P1_FCT = _PIPELINES / "facts/p1/fct_order/sql-scripts/dml.p1_fct_order.sql"
 
-
-class TestPipelineCLI(unittest.TestCase):
-    """Pipeline CLI: report, build-metadata, report-running-statements, optional cloud commands."""
+@unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
+class TestPipelineCLICloud(unittest.TestCase):
+    """Pipeline CLI commands that call Confluent/Flink APIs (opt-in)."""
 
     @classmethod
     def setUpClass(cls):
         data_dir = _TESTS_ROOT / "data"
         os.environ.setdefault("PIPELINES", str(data_dir / "flink-project/pipelines"))
 
-    def test_report_command_success(self):
-        """Report command prints hierarchy for a known table."""
-        runner = CliRunner()
-        pl = str(_PIPELINES)
-        result = runner.invoke(app, ["report", "p1_fct_order", pl])
-        self.assertEqual(result.exit_code, 0, msg=result.stdout)
-        self.assertIn("p1_fct_order", result.stdout)
-        self.assertIn("int_p1_table_1", result.stdout)
-
-    def test_report_command_error(self):
-        """Report exits with error when table is not in inventory."""
-        runner = CliRunner()
-        pl = str(_PIPELINES)
-        result = runner.invoke(app, ["report", "non_existent_table", pl])
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("Table not found", result.stdout)
-
-
-
-    def test_build_metadata_command_error_invalid_file(self):
-        """build-metadata requires a .sql file as first argument."""
-        runner = CliRunner()
-        pl = str(_PIPELINES)
-        result = runner.invoke(app, ["build-metadata", "invalid_file.txt", pl])
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("the first parameter needs to be a dml sql file", result.stdout)
-
-    def test_report_running_statements_command_error_no_params(self):
-        """report-running-statements requires table, product, or dir."""
-        runner = CliRunner()
-        pl = str(_PIPELINES)
-        result = runner.invoke(app, ["report-running-statements", pl])
-        self.assertEqual(result.exit_code, 1)
-        self.assertIn("either table-name, product-name or dir must be provided", result.stdout)
-
-    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_prepare_command_with_sql_file(self):
         """prepare runs SQL via Confluent Flink API (opt-in)."""
         runner = CliRunner()
@@ -80,7 +42,6 @@ class TestPipelineCLI(unittest.TestCase):
         finally:
             os.unlink(path)
 
-    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command(self):
         """analyze-pool-usage calls Confluent APIs (opt-in)."""
         runner = CliRunner()
@@ -89,14 +50,12 @@ class TestPipelineCLI(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
         self.assertIn("Analyzing compute pool usage", result.stdout)
 
-    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command_with_product(self):
         runner = CliRunner()
         pl = str(_PIPELINES)
         result = runner.invoke(app, ["analyze-pool-usage", pl, "--product-name", "p1"])
         self.assertEqual(result.exit_code, 0, msg=result.stdout)
 
-    @unittest.skipUnless(_CLOUD_IT, "Set SHIFT_LEFT_RUN_CLOUD_IT=1 and use real Confluent config")
     def test_analyze_pool_usage_command_with_directory(self):
         runner = CliRunner()
         pl = str(_PIPELINES)

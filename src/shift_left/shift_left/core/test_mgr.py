@@ -10,7 +10,6 @@ Provides testing capabilities including:
 - Integration with Confluent Cloud Flink REST API
 - YAML-based test suite definitions and CSV test data support
 """
-from turtle import st
 from pydantic import BaseModel, Field
 from typing import List, Final, Optional, Dict, Tuple, Any, Callable, Set
 import yaml
@@ -508,7 +507,8 @@ def _load_sql_and_execute_statement(table_name: str,
     # Check existing statement status
     try:
         statement = statement_mgr.get_statement(statement_name)
-        logger.info(f"Statement retrieved: {statement.model_dump_json(indent=2)}")
+        if statement:
+            logger.info(f"Statement retrieved: {statement.model_dump_json(indent=2)}")
         if statement and isinstance(statement, Statement):
             if statement.status.phase in ["RUNNING", "COMPLETED"]:
                 logger.info(f"Statement {statement_name} already exists and is {statement.status.phase}")
@@ -648,8 +648,9 @@ def _execute_validation_tests(test_case: SLTestCase,
             logger.warning(f"Error deleting statement {statement_name}: {e}")
             # Continue execution - the statement will be recreated
 
+        statement_result = None
         try:
-            final_row= 'FAIL'
+            final_row = 'FAIL'
             # Execute the validation statement
             statement = _load_sql_and_execute_statement(
                 table_name=output_step.table_name,

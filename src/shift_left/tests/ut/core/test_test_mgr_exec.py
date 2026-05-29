@@ -51,7 +51,13 @@ class TestTestManager(unittest.TestCase):
         cls.data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
         reset_all_caches() # Reset all caches to ensure test isolation
         build_inventory(os.getenv("PIPELINES"))
-        cls._ddls_executed  = {'int_table_1_ut': False, 'int_table_2_ut': False, 'p1_fct_order_ut': False}
+
+    def setUp(self):
+        self._ddls_executed = {
+            'int_table_1_ut': False,
+            'int_table_2_ut': False,
+            'p1_fct_order_ut': False,
+        }
 
     # ---- Mock functions to be used in tests to avoid calling remote services ----
     def _mock_table_exists(self, table_name):
@@ -110,30 +116,31 @@ class TestTestManager(unittest.TestCase):
         compute_pool_id,
         fct,
         product_name,
-        statements=None,
         post_fix_unit_test=POST_FIX_UNIT_TEST,
     ):
             print(
                 f"\nmock_load_sql_and_execute_statement: {table_name} {sql_path} {prefix} "
-                f"{compute_pool_id} {fct} {product_name} {statements} {post_fix_unit_test}\n"
+                f"{compute_pool_id} {fct} {product_name} {post_fix_unit_test}\n"
             )
-            if statements is None:
-                statements = set()
             statement_name = test_mgr._build_statement_name(
                 table_name, prefix, post_fix_unit_test
             )
-            statements.add(Statement(name=statement_name, status={"phase": "COMPLETED"}))
-            return statements
+            data = Data(data=[OpRow(op=0, row=["PASS"])])
+            statement_result = StatementResult(
+                results=data,
+                api_version="v1",
+                kind="StatementResult",
+                metadata=None,
+            )
+            return Statement(
+                name=statement_name,
+                status={"phase": "COMPLETED"},
+                result=statement_result,
+            )
 
     def _mock_transform_sql_content(self, sql_input, table_name, post_fix_unit_test) -> str:
             self.assertEqual(post_fix_unit_test, self.POST_FIX_UNIT_TEST)
             return sql_input
-
-    def _mock_poll_response(self, statement_name) -> Tuple[str, Optional[StatementResult]]:
-        print(f"mock_poll_response: {statement_name}")
-        data = Data(data=[OpRow(op=0, row=["FAIL"]),OpRow(op=0, row=["PASS"])])
-
-        return "PASS", StatementResult(results=data, api_version="v1", kind="StatementResult", metadata=None)
 
     # ---------------------------------------------------------------
     # Start by testing the lower level private functions related to execution.
@@ -223,40 +230,31 @@ class TestTestManager(unittest.TestCase):
         assert statement.status.phase == "COMPLETED"
 
 
-    @patch('shift_left.core.test_mgr._poll_response')
     @patch('shift_left.core.test_mgr._load_sql_and_execute_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
-    def test_execute_validation(self, mock_delete_statement_if_exists, mock_load_sql_and_execute_statement, mock_poll_response):
+    def test_execute_validation(self, mock_delete_statement_if_exists, mock_load_sql_and_execute_statement):
         """Test the execution of the validation statements for a test case."""
         table_name = "p1_fct_order"
         test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
         test_case = test_suite_def.test_suite[0]
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
-        mock_poll_response.side_effect = self._mock_poll_response
-        statements, result_text, results = test_mgr._execute_validation_tests(test_case, table_ref, 'dev-val', 'test_pool')
+        statements, result_text, results = test_mgr._execute_validation_tests(test_case, table_ref, 'dev-val-1', 'test_pool')
         assert len(statements) == 1
-        assert statements.pop().name == "dev-val-p1-fct-order-ut"
-        assert result_text == "PASS"
+        assert statements.pop().name == "dev-val-1-p1-fct-order-ut"
+        assert result_text == "PASS\n"
         assert results is not None
-        print(f"results: {results.model_dump_json(indent=2)}")
         assert results.results.data[0].op == 0
-        assert results.results.data[0].row == ["FAIL"]
-        assert results.results.data[1].op == 0
-        assert results.results.data[1].row == ["PASS"]
+        assert results.results.data[0].row == ["PASS"]
 
 
-    @patch('shift_left.core.test_mgr._poll_response')
     @patch('shift_left.core.test_mgr._load_sql_and_execute_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.delete_statement_if_exists')
-    def test_execute_all_validations(self, mock_delete_statement_if_exists, mock_load_sql_and_execute_statement, mock_poll_response):
+    def test_execute_all_validations(self, mock_delete_statement_if_exists, mock_load_sql_and_execute_statement):
         """Test the execution of the validation statements for a test case."""
         table_name = "p1_fct_order"
-        test_suite_def, table_ref = test_mgr._load_test_suite_definition(table_name)
-        test_case = test_suite_def.test_suite[0]
         mock_delete_statement_if_exists.return_value = "deleted"
         mock_load_sql_and_execute_statement.side_effect = self._mock_load_sql_and_execute_statement
-        mock_poll_response.side_effect = self._mock_poll_response
         results = test_mgr.execute_validation_tests(table_name=table_name,
                                                                             test_case_name="",
                                                                             compute_pool_id="test_pool",
@@ -265,7 +263,7 @@ class TestTestManager(unittest.TestCase):
         print(f"results: {results.model_dump_json(indent=2)}")
         assert len(results.test_results) == 2
         for result in results.test_results.values():
-            assert result.result == "PASS"
+            assert result.result.strip() == "PASS"
 
 
     # NON HAPPY PATHS
@@ -467,9 +465,22 @@ class TestTestManager(unittest.TestCase):
                                      metadata=None)
             return result
 
-        mock_get_statement_results.side_effect = _mock_statement_results
+        def _mock_post_statement(
+            compute_pool_id, statement_name, sql_content, properties=None, stopped=False
+        ):
+            if "val" in statement_name:
+                result = _mock_statement_results(statement_name)
+                return Statement(
+                    name=statement_name,
+                    status={"phase": "COMPLETED"},
+                    result=result,
+                )
+            return self._mock_post_ddl_statement(
+                compute_pool_id, statement_name, sql_content, properties, stopped
+            )
 
-        mock_post_flink_statement.side_effect = self._mock_post_ddl_statement
+        mock_get_statement_results.side_effect = _mock_statement_results
+        mock_post_flink_statement.side_effect = _mock_post_statement
         mock_table_exists.side_effect = self._mock_table_exists
         mock_get_statement.side_effect = self._mock_get_None_statement
         mock_delete_statement.return_value = 'deleted'  # Mock delete operation
@@ -479,98 +490,11 @@ class TestTestManager(unittest.TestCase):
         assert suite_result
         assert len(suite_result.test_results) == 2
         assert len(suite_result.foundation_statements) == 4
-        assert suite_result.test_results["test_case_1"].result == "PASS"
-        assert suite_result.test_results["test_case_2"].result == "FAIL"
+        assert suite_result.test_results["test_case_1"].result.strip() == "PASS"
+        assert suite_result.test_results["test_case_2"].result.strip() == "FAIL"
         print(suite_result.model_dump_json(indent=2))
 
 
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_success_first_try(self, mock_get_results, mock_get_statement):
-        """Test _poll_response function when results are available on first try."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
-
-        # Mock get_statement to return a successful statement
-        mock_statement = Statement(name="test_statement", status={"phase": "COMPLETED"})
-        mock_get_statement.return_value = mock_statement
-
-        # Mock successful response on first call
-        op_row = OpRow(op=0, row=["PASS"])
-        data = Data(data=[op_row])
-        result = StatementResult(results=data, api_version="v1", kind="StatementResult", metadata=None)
-        mock_get_results.return_value = result
-
-        final_result, statement_result = test_mgr._poll_response("test_statement")
-
-        self.assertEqual(final_result, "PASS")
-        self.assertEqual(statement_result, result)
-        mock_get_results.assert_called_once_with("test_statement")
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    @patch('shift_left.core.test_mgr.time.sleep')
-    def test_poll_response_retry_logic(self, mock_sleep, mock_get_results, mock_get_statement):
-        """Test _poll_response function retry logic with empty results."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, OpRow, Statement
-
-        # Mock get_statement to return a successful statement
-        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
-        mock_get_statement.return_value = mock_statement
-
-        # First few calls return empty results, last call returns data
-        empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
-        op_row = OpRow(op=0, row=["PASS"])
-        data = Data(data=[op_row])
-        success_result = StatementResult(results=data, api_version="v1", kind="StatementResult", metadata=None)
-
-        mock_get_results.side_effect = [empty_result, empty_result, success_result]
-
-        final_result, statement_result = test_mgr._poll_response("test_statement")
-
-        self.assertEqual(final_result, "PASS")
-        self.assertEqual(statement_result, success_result)
-        self.assertEqual(mock_get_results.call_count, 3)
-        self.assertEqual(mock_sleep.call_count, 2)  # Sleep called for first 2 empty results
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_max_retries_exceeded(self, mock_get_results, mock_get_statement):
-        """Test _poll_response function when max retries are exceeded."""
-        from shift_left.core.models.flink_statement_model import StatementResult, Data, Statement
-
-        # Mock get_statement to return a running statement
-        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
-        mock_get_statement.return_value = mock_statement
-
-        # Always return empty results
-        empty_result = StatementResult(results=Data(data=[]), api_version="v1", kind="StatementResult", metadata=None)
-        mock_get_results.return_value = empty_result
-
-        with patch('shift_left.core.test_mgr.time.sleep'):
-            final_result, statement_result = test_mgr._poll_response("test_statement")
-
-        self.assertEqual(final_result, "FAIL")  # Default when no data
-        # Should call get_results for max_retries - 1 times (range(1, 7) = 1,2,3,4,5,6)
-        self.assertEqual(mock_get_results.call_count, 6)  # max_retries - 1
-
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
-    @patch('shift_left.core.test_mgr.statement_mgr.get_statement_results')
-    def test_poll_response_exception_handling(self, mock_get_results, mock_get_statement):
-        """Test _poll_response function exception handling."""
-        from shift_left.core.models.flink_statement_model import Statement
-
-        # Mock get_statement to return a running statement
-        mock_statement = Statement(name="test_statement", status={"phase": "RUNNING"})
-        mock_get_statement.return_value = mock_statement
-
-        # Mock exception on first call
-        mock_get_results.side_effect = Exception("API Error")
-
-        final_result, statement_result = test_mgr._poll_response("test_statement")
-
-        self.assertEqual(final_result, "FAIL")
-        self.assertIsNone(statement_result)
 
     @patch('shift_left.core.test_mgr.statement_mgr.get_statement')
     @patch('shift_left.core.test_mgr.statement_mgr.post_flink_statement')
@@ -647,8 +571,8 @@ class TestTestManager(unittest.TestCase):
             prefix="dev-ddl"
         )
 
-        # Should return [] when table exists and prefix is ddl
-        self.assertEqual(result, set())
+        # Should return None when table exists and prefix is ddl
+        self.assertIsNone(result)
         mock_execute.assert_not_called()
 
 
@@ -696,14 +620,18 @@ class TestTestManager(unittest.TestCase):
         def _mock_post_statement(
             compute_pool_id, statement_name, sql_content, properties=None, stopped=False
         ):
+            if "val" in statement_name:
+                result = _mock_statement_results(statement_name)
+                return Statement(
+                    name=statement_name,
+                    status={"phase": "COMPLETED"},
+                    result=result,
+                )
             if "ddl" in statement_name or "ins" in statement_name:
                 return Statement(name=statement_name, status={"phase": "COMPLETED"})
-            elif "dml" in statement_name:
+            if "dml" in statement_name:
                 return Statement(name=statement_name, status={"phase": "RUNNING"})
-            elif "val" in statement_name:
-                return Statement(name=statement_name, status={"phase": "RUNNING"})
-            else:
-                return Statement(name=statement_name, status={"phase": "UNKNOWN"})
+            return Statement(name=statement_name, status={"phase": "UNKNOWN"})
 
 
         mock_get_statement_results.side_effect = _mock_statement_results
@@ -723,7 +651,7 @@ class TestTestManager(unittest.TestCase):
         assert test_result
         self.assertEqual(len(test_result.statements), 3)
         self.assertEqual(len(test_suite_result.foundation_statements), 4)
-        assert test_result.result == "PASS"
+        assert test_result.result.strip() == "PASS"
         for statement in test_result.statements:
             print(f"statement: {statement.name} {statement.status}")
 

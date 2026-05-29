@@ -12,7 +12,6 @@ os.environ["PIPELINES"] = str(pathlib.Path(__file__).parent.parent.parent / "dat
 import shift_left.core.table_mgr as tm
 from shift_left.core.utils.app_config import get_config
 from shift_left.core.models.flink_statement_model import Statement
-from shift_left.core.utils.file_search import SCRIPTS_DIR
 
 class TestTableManager(unittest.TestCase):
 
@@ -78,51 +77,6 @@ class TestTableManager(unittest.TestCase):
         self.assertEqual(short_table_name, "test_table")
         self.assertEqual(table_type, "mv")
         self.assertEqual(product_name, "product")
-
-
-
-    def test_create_table_structure(self):
-        try:
-            tbf, tbn= tm.build_folder_structure_for_table("it2",os.getenv("STAGING") + "/intermediates", "p3")
-            assert os.path.exists(tbf)
-            assert os.path.exists(tbf + "/" + SCRIPTS_DIR)
-            dirname=tbf + "/" + SCRIPTS_DIR + "/ddl.int_p3_it2.sql"
-            assert os.path.exists(dirname)
-            assert os.path.exists(tbf + "/" + SCRIPTS_DIR + "/dml.int_p3_it2.sql" )
-            assert os.path.exists(tbf + "/Makefile")
-            with open(dirname, "r") as f:
-                content = f.read()
-                assert "CREATE TABLE IF NOT EXISTS int_p3_it2" in content
-            with open(tbf + "/Makefile", "r") as f:
-                content = f.read()
-                assert "TABLE_NAME=int_p3_it2" in content
-        except Exception as e:
-            print(e)
-            self.fail()
-
-    def test_update_make_file(self):
-        try:
-            tbf, tbn =tm.build_folder_structure_for_table("it2",os.getenv("PIPELINES") + "/intermediates", "p3")
-            assert os.path.exists(tbf + "/Makefile")
-            os.remove(tbf+ "/Makefile")
-            assert not os.path.exists(tbf + "/Makefile")
-            tm.get_or_build_inventory(os.getenv("PIPELINES"), os.getenv("PIPELINES"), True)
-            tm.update_makefile_in_folder(os.getenv("PIPELINES"), "int_p3_it2")
-            assert os.path.exists(tbf + "/Makefile")
-            with open(tbf + "/Makefile", "r") as f:
-                content = f.read()
-                assert "TABLE_NAME=int_p3_it2" in content
-        except Exception as e:
-            print(e)
-            self.fail()
-
-    def test_update_all_makefiles_in_folder(self):
-        try:
-            folder_path = os.getenv("PIPELINES") + "/intermediates"
-            count = tm.update_all_makefiles_in_folder(folder_path)
-            assert count > 0
-        except Exception as e:
-            print(e)
 
     def test_search_users_of_table(self):
         try:

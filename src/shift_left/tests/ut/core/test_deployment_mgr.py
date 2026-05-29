@@ -398,45 +398,6 @@ class TestDeploymentManager(BaseUT):
         mock_delete.assert_called()
         assert self.count == 6  # call for all 6 tables (z, d, c, f, p, e)
 
-    @patch('shift_left.core.deployment_mgr.statement_mgr.post_flink_statement')
-    @patch('shift_left.core.deployment_mgr.statement_mgr.delete_statement_if_exists')
-    def test_prepare_table(self, mock_delete, mock_post):
-        """
-        Test the prepare table
-        """
-
-        def mock_post_statement(compute_pool_id, statement_name, sql_content, properties={}):
-            print(f"mock_post_statement: {statement_name}")
-            print(f"sql_content: {sql_content}")
-            status = Status(
-                phase= "COMPLETED",
-                detail= ""
-            )
-            spec = Spec(
-                compute_pool_id=get_config().get('flink').get('compute_pool_id'),
-                principal="principal_sa",
-                statement=sql_content,
-                properties={"sql.current-catalog": "default", "sql.current-database": "default"},
-                stopped=False
-            )
-            metadata = Metadata(
-                created_at="2025-04-20T10:15:02.853006",
-                labels={},
-                resource_version="1",
-                self="https://test-url",
-                uid="test-uid",
-                updated_at="2025-04-20T10:15:02.853006"
-            )
-            return Statement(name= statement_name, status= status, spec=spec, metadata=metadata)
-
-
-        mock_delete.return_value = "deleted"
-        mock_post.side_effect = mock_post_statement
-        path_to_sql_file = os.getenv("PIPELINES",TEST_PIPELINES_DIR) + "/alter_table_avro_debezium.sql"
-        dm.prepare_tables_from_sql_file(sql_file_name=path_to_sql_file,
-                                        compute_pool_id="lfcp-121")
-
-
     @patch('shift_left.core.deployment_mgr._drop_node_worker')
     @patch('shift_left.core.deployment_mgr._build_execution_plan_using_sorted_ancestors')
     @patch('shift_left.core.deployment_mgr._build_topological_sorted_graph')
