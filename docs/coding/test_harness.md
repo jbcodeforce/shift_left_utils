@@ -321,13 +321,31 @@ The process looks like:
 	```
 
 1. [Optional] Data engineers modify the `impacted_tables.json` file to remove any tables they do not want to update.
-1. [Optional] Run the modify unit test DDLs command to update the test foundation tables:
+1. [Optional] Run `update-ut-ddl` to merge added columns into unit-test artifacts on a git branch:
+
+	When new columns were added to production DDL (scenario #1 above), `update-ut-ddl` with `--git-branch` merges `schema_diff.added` columns into:
+
+	- foundation UT DDL files (`tests/ddl_*.sql`)
+	- SQL insert files referenced in `test_definitions.yaml` (`tests/insert_*.sql`, `file_type: sql` only)
+	- validation SQL when the output table under test also had columns added (`tests/validate_*.sql`)
+
 	```sh
-	shift_left project update-ut-ddl
+	shift_left project update-ut-ddl --git-branch shift-left/ut-schema-update
 	# ---- same as
-	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json
-	# --- or as 
-	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json $PIPELINES
+	shift_left project update-ut-ddl ~/.shift_left/impacted_tables.json \
+	  --git-branch shift-left/ut-schema-update \
+	  --modified-files-path ~/.shift_left/modified_flink_files.json \
+	  --project-path $PIPELINES
+	```
+
+	The command does not auto-commit. Review changes on the branch, then commit manually.
+
+	To replace foundation UT DDL entirely from production DDL (full rewrite, legacy):
+
+	```sh
+	shift_left project update-ut-ddl ~/.shift_left/impacted_tables.json --full-replace
+	# ---- or without path (defaults to ~/.shift_left/impacted_tables.json)
+	shift_left project update-ut-ddl --full-replace --project-path $PIPELINES
 	```
 
 

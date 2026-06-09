@@ -277,6 +277,35 @@ class SQLparser:
 
         return columns
 
+    def extract_raw_column_definitions(self, sql_content: str) -> Dict[str, str]:
+        """
+        Map column name to full definition line from a CREATE TABLE statement.
+
+        Preserves original formatting (backticks, type precision). Skips constraints and WATERMARK.
+        """
+        cleaned = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+        cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
+        columns_section = self._extract_create_table_columns_section(cleaned)
+        if not columns_section:
+            return {}
+        column_defs = [
+            col.strip()
+            for col in self._split_by_comma_respecting_parens(columns_section)
+            if col.strip()
+        ]
+        result: Dict[str, str] = {}
+        for col_def in column_defs:
+            upper = col_def.upper()
+            if upper.startswith(
+                ("PRIMARY KEY", "FOREIGN KEY", "UNIQUE", "CHECK", "CONSTRAINT", "WATERMARK")
+            ):
+                continue
+            parts = col_def.split()
+            if len(parts) >= 2:
+                col_name = parts[0].strip('`"[]')
+                result[col_name] = col_def
+        return result
+
     def build_column_metadata_from_dml_select(self, dml_content: str, source_table_name: str) -> Dict[str, Dict]:
         """
         Parse INSERT INTO ... SELECT ... FROM source_table DML and extract column metadata

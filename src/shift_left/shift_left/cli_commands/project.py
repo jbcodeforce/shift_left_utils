@@ -436,18 +436,90 @@ def update_tables_version(
 
 @app.command()
 def update_ut_ddl(
-    impacted_tables_path: Annotated[str, typer.Argument(help="Path to impacted_tables.json produced by list-impacted-tables")],
+    impacted_tables_path: Annotated[
+        str,
+        typer.Argument(help="Path to impacted_tables.json produced by list-impacted-tables"),
+    ] = None,
+    git_branch: Annotated[
+        str,
+        typer.Option(
+            help="Git branch to create or checkout; merges schema_diff.added columns into UT DDL, inserts, and validation SQL",
+        ),
+    ] = None,
+    modified_files_path: Annotated[
+        str,
+        typer.Option(help="Path to modified_flink_files.json from list-modified-files"),
+    ] = None,
+    full_replace: Annotated[
+        bool,
+        typer.Option(
+            help="Replace foundation UT DDL entirely from production DDL (legacy; omit when using --git-branch)",
+        ),
+    ] = False,
     project_path: Annotated[str, typer.Option(envvar=["PIPELINES"], help="Project path where pipelines are located")] = None,
+    repo_root: Annotated[
+        str,
+        typer.Option(help="Git repository root; auto-detected when omitted"),
+    ] = None,
 ):
     """
-    Update the unit test DDLs for the given tables
+    Update unit-test artifacts after production DDL schema changes.
+
+    With --git-branch: merge added columns from schema_diff into foundation UT DDL, insert SQL,
+    and validation SQL on the given branch (requires modified_flink_files.json with schema_diff).
+
+    Without --git-branch (or with --full-replace): rewrite foundation UT DDL from production DDL.
     """
-    print("#" * 30 + f" Update unit test DDL for {impacted_tables_path}")
+    impacted_json = impacted_tables_path or os.path.join(shift_left_dir, "impacted_tables.json")
+    if not os.path.exists(impacted_json):
+        print(f"Impacted tables JSON not found: {impacted_json}")
+        raise typer.Exit(1)
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        print("Error: set PIPELINES or pass --project-path")
+        raise typer.Exit(1)
+
+    with open(impacted_json, "r") as f:
+        impacted_tables = json.load(f)
+
+    if git_branch and not full_replace:
+        print("#" * 30 + f" Update unit test artifacts on branch {git_branch}")
+        modified_json = modified_files_path or _default_modified_flink_files_json_path()
+        if not os.path.exists(modified_json):
+            print(f"Modified files JSON not found: {modified_json}")
+            print("Run list-modified-files first, or pass --modified-files-path")
+            raise typer.Exit(1)
+        with open(modified_json, "r") as f:
+            modified_files = json.load(f)
+        try:
+            result = project_manager.merge_unit_test_ddl_columns(
+                modified_files,
+                impacted_tables,
+                git_branch,
+                project_path=pipelines_path,
+                repo_root=repo_root,
+            )
+        except Exception as e:
+            print(f"{_get_status_emoji('ERROR')} updating unit test artifacts: {e}")
+            raise typer.Exit(1)
+        print(f"{_get_status_emoji('PASS')} Unit test artifacts updated on branch {git_branch}")
+        print(f"   DDL files: {len(result.ddl_paths)}")
+        for path in result.ddl_paths:
+            print(f"      {path}")
+        print(f"   Insert files: {len(result.insert_paths)}")
+        for path in result.insert_paths:
+            print(f"      {path}")
+        print(f"   Validation files: {len(result.validate_paths)}")
+        for path in result.validate_paths:
+            print(f"      {path}")
+        return result
+
+    print("#" * 30 + f" Update unit test DDL for {impacted_json}")
     try:
-        with open(impacted_tables_path, "r") as f:
-            impacted_tables = json.load(f)
-        project_manager.update_unit_test_ddl_for_foundation_tables(impacted_tables, project_path)
-        print(f"{_get_status_emoji('PASS')} Unit test DDL updated in {impacted_tables_path}")
+        updated = project_manager.update_unit_test_ddl_for_foundation_tables(
+            impacted_tables, pipelines_path
+        )
+        print(f"{_get_status_emoji('PASS')} Unit test DDL updated ({len(updated)} files)")
     except Exception as e:
         print(f"{_get_status_emoji('ERROR')} updating unit test DDL: {e}")
         raise typer.Exit(1)

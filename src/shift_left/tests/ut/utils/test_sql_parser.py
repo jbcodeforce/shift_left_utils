@@ -446,6 +446,21 @@ class TestSQLParser(unittest.TestCase):
         assert columns['standard'] == {'name': 'standard', 'type': 'STRING', 'nullable': True, 'primary_key': False}
         print(columns)
 
+    def test_extract_raw_column_definitions(self):
+        parser = SQLparser()
+        query = """CREATE TABLE `sl_raw_transactions` (
+          `txn_id` VARCHAR(36) NOT NULL,
+          `created_by` VARCHAR(255),
+          `updated_by` VARCHAR(255),
+          WATERMARK FOR `txn_id` AS `txn_id` - INTERVAL '5' SECONDS)
+        DISTRIBUTED BY HASH(`txn_id`) INTO 6 BUCKETS;"""
+        raw = parser.extract_raw_column_definitions(query)
+        assert "txn_id" in raw
+        assert "created_by" in raw
+        assert "updated_by" in raw
+        assert "VARCHAR(36)" in raw["txn_id"]
+        assert "WATERMARK" not in " ".join(raw.values())
+
     def test_extract_table_name_from_create_statement_quoted(self):
         parser = SQLparser()
         query="""CREATE TABLE IF NOT EXISTS `identity_metadata` (

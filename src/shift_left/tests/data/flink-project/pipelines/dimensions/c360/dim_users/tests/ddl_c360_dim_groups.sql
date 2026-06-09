@@ -1,5 +1,4 @@
-CREATE TABLE IF NOT EXISTS sl_c360_dim_groups_ut (
-  group_id STRING NOT NULL,
+CREATE TABLE IF NOT EXISTS sl_c360_dim_groups_ut (group_id STRING NOT NULL,
   tenant_id STRING NOT NULL,
   group_name STRING,
   group_type STRING,
@@ -7,8 +6,8 @@ CREATE TABLE IF NOT EXISTS sl_c360_dim_groups_ut (
   created_date STRING,
   is_active BOOLEAN,
   updated_at TIMESTAMP,
-  PRIMARY KEY(tenant_id, group_id) NOT ENFORCED
-) DISTRIBUTED BY HASH(tenant_id, group_id) INTO 1 BUCKETS
+  audit_source STRING,
+  PRIMARY KEY(tenant_id, group_id) NOT ENFORCED) DISTRIBUTED BY HASH(tenant_id, group_id) INTO 1 BUCKETS
 WITH (
   'changelog.mode' = 'upsert',
   'key.format' = 'avro-registry',

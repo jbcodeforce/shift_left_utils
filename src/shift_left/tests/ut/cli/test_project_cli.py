@@ -590,7 +590,7 @@ class TestProjectCLI(BaseUT):
                 json.dumps(
                     {
                         "ddl_modified_tables": ["sl_c360_src_groups"],
-                        "tables": ["sl_c360_dim_groups"],
+                        "impacted_tables": ["sl_c360_dim_groups"],
                         "production_ddl_paths": [],
                         "unit_test_ddl_paths": [ut_relative],
                     }
@@ -602,7 +602,7 @@ class TestProjectCLI(BaseUT):
 
                 result = self.runner.invoke(
                     app,
-                    ["update-ut-ddl", str(impacted_json), "--project-path", pipelines_root],
+                    ["update-ut-ddl", str(impacted_json), "--full-replace", "--project-path", pipelines_root],
                 )
 
                 assert result.exit_code == 0, result.stdout
@@ -624,7 +624,7 @@ class TestProjectCLI(BaseUT):
                 json.dumps(
                     {
                         "ddl_modified_tables": [],
-                        "tables": [],
+                        "impacted_tables": [],
                         "production_ddl_paths": [],
                         "unit_test_ddl_paths": [],
                     }
@@ -635,6 +635,122 @@ class TestProjectCLI(BaseUT):
                 ["update-ut-ddl", str(impacted_json), "--project-path", pipelines_root],
             )
             assert result.exit_code == 0, result.stdout
+
+    @patch("shift_left.core.project_manager.ensure_git_branch")
+    @patch("shift_left.core.project_manager._production_column_context")
+    def test_update_ut_ddl_merge_columns_cli(self, mock_prod_context, mock_git_branch):
+        """update-ut-ddl with --git-branch merges UT DDL, insert, and validation files."""
+        mock_git_branch.return_value = None
+        pipelines_root = os.environ["PIPELINES"]
+        ut_ddl_rel = "dimensions/c360/dim_groups/tests/ddl_src_c360_groups.sql"
+        insert_rel = "dimensions/c360/dim_groups/tests/insert_src_c360_groups_1.sql"
+        validate_rel = "dimensions/c360/dim_groups/tests/validate_c360_dim_groups_1.sql"
+        paths = {
+            ut_ddl_rel: os.path.join(pipelines_root, ut_ddl_rel),
+            insert_rel: os.path.join(pipelines_root, insert_rel),
+            validate_rel: os.path.join(pipelines_root, validate_rel),
+        }
+        originals = {rel: pathlib.Path(path).read_text() for rel, path in paths.items()}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            modified_json = pathlib.Path(tmp) / "modified_flink_files.json"
+            impacted_json = pathlib.Path(tmp) / "impacted_tables.json"
+            modified_json.write_text(
+                json.dumps(
+                    {
+                        "description": "test",
+                        "file_list": [
+                            {
+                                "table_name": "sl_c360_src_groups",
+                                "file_modified_url": "ignored",
+                                "same_sql_content": False,
+                                "running": False,
+                                "new_table_name": "sl_c360_src_groups",
+                                "schema_diff": {
+                                    "baseline_ref": "since:2025-01-01",
+                                    "added": ["created_by", "updated_by"],
+                                    "removed": [],
+                                    "modified": [],
+                                },
+                            },
+                            {
+                                "table_name": "sl_c360_dim_groups",
+                                "file_modified_url": "ignored",
+                                "same_sql_content": False,
+                                "running": False,
+                                "new_table_name": "sl_c360_dim_groups",
+                                "schema_diff": {
+                                    "baseline_ref": "since:2025-01-01",
+                                    "added": ["audit_source"],
+                                    "removed": [],
+                                    "modified": [],
+                                },
+                            },
+                        ],
+                    }
+                )
+            )
+            impacted_json.write_text(
+                json.dumps(
+                    {
+                        "ddl_modified_tables": [
+                            "sl_c360_src_groups",
+                            "sl_c360_dim_groups",
+                        ],
+                        "impacted_tables": ["sl_c360_dim_groups"],
+                        "production_ddl_paths": [],
+                        "unit_test_ddl_paths": [ut_ddl_rel],
+                    }
+                )
+            )
+
+            def prod_context_side_effect(table, inventory, parser):
+                if table == "sl_c360_src_groups":
+                    return (
+                        {
+                            "created_by": {"type": "STRING"},
+                            "updated_by": {"type": "STRING"},
+                        },
+                        {
+                            "created_by": "created_by STRING",
+                            "updated_by": "updated_by STRING",
+                        },
+                    )
+                if table == "sl_c360_dim_groups":
+                    return (
+                        {"audit_source": {"type": "STRING"}},
+                        {"audit_source": "audit_source STRING"},
+                    )
+                return ({}, {})
+
+            mock_prod_context.side_effect = prod_context_side_effect
+
+            try:
+                result = self.runner.invoke(
+                    app,
+                    [
+                        "update-ut-ddl",
+                        str(impacted_json),
+                        "--git-branch",
+                        "test/ut-schema-merge",
+                        "--modified-files-path",
+                        str(modified_json),
+                        "--project-path",
+                        pipelines_root,
+                    ],
+                )
+                assert result.exit_code == 0, result.stdout
+                ut_ddl = pathlib.Path(paths[ut_ddl_rel]).read_text()
+                insert_sql = pathlib.Path(paths[insert_rel]).read_text()
+                validate_sql = pathlib.Path(paths[validate_rel]).read_text()
+                assert "created_by STRING" in ut_ddl
+                assert "`created_by`" in insert_sql
+                assert "audit_source" in validate_sql
+                assert "audit_source_check" in validate_sql
+                mock_git_branch.assert_called_once()
+            finally:
+                for rel, path in paths.items():
+                    pathlib.Path(path).write_text(originals[rel])
 
     @patch("shift_left.core.project_manager.ConfluentCloudClient")
     def test_list_topics_writes_file(self, mock_client_cls):

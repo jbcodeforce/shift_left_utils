@@ -35,7 +35,12 @@ from shift_left.core.utils.ddl_schema_diff import (
     BaselineMode,
     SchemaDiff,
     diff_column_metadata,
+    ensure_git_branch,
     get_git_baseline_content,
+    get_git_repo_root,
+    merge_added_columns_into_ddl,
+    merge_added_columns_into_insert_sql,
+    merge_added_columns_into_validation_sql,
 )
 from jinja2 import Environment, PackageLoader
 import shift_left.core.statement_mgr as statement_mgr
@@ -85,6 +90,13 @@ class ImpactedTablesByModificationsResult(BaseModel):
     unit_test_ddl_paths: list[str] = Field(
         description="Paths to unit-test foundation DDL files relative to PIPELINES"
     )
+
+
+class MergeUtArtifactsResult(BaseModel):
+    """Paths of unit-test artifacts updated by merge_unit_test_ddl_columns."""
+    ddl_paths: list[str] = Field(default_factory=list)
+    insert_paths: list[str] = Field(default_factory=list)
+    validate_paths: list[str] = Field(default_factory=list)
 
 # ------- Public APIS ----------
 
@@ -231,6 +243,162 @@ def update_unit_test_ddl_for_foundation_tables(
     return _sync_foundation_ut_ddl_from_production(
         impacted.ddl_modified_tables, pipelines_path, inventory, post_fix
     )
+
+
+def merge_unit_test_ddl_columns(
+    modified_files: Union[ModifiedFilesResult, dict],
+    impacted: Union[ImpactedTablesByModificationsResult, dict],
+    git_branch: str,
+    project_path: str | None = None,
+    repo_root: str | None = None,
+) -> MergeUtArtifactsResult:
+    """
+    Merge added columns from production schema_diff into unit-test DDL, insert, and validation files.
+
+    Creates or checks out git_branch (fails on dirty work tree). Does not auto-commit.
+    """
+    modified = _normalize_modified_files_result(modified_files)
+    if isinstance(impacted, dict):
+        impacted = ImpactedTablesByModificationsResult.model_validate(impacted)
+
+    pipelines_path = project_path or os.getenv("PIPELINES")
+    if not pipelines_path:
+        raise ValueError("project_path must be provided or PIPELINES environment variable must be set")
+
+    schema_diff_by_table = _build_schema_diff_by_table(modified, impacted.ddl_modified_tables)
+    if not schema_diff_by_table:
+        raise ValueError(
+            "No schema_diff.added entries found for ddl_modified_tables. "
+            "Re-run list-modified-files with --baseline."
+        )
+
+    root = repo_root or get_git_repo_root()
+    ensure_git_branch(root, git_branch)
+
+    inventory = get_or_build_inventory(pipelines_path, pipelines_path, False)
+    parser = SQLparser()
+    result = MergeUtArtifactsResult()
+    seen_ddl: set[str] = set()
+    seen_insert: set[str] = set()
+    seen_validate: set[str] = set()
+
+    pattern = os.path.join(pipelines_path, "**", "tests", TEST_DEFINITION_FILE_NAME)
+    for definition_path in glob.glob(pattern, recursive=True):
+        tests_folder = os.path.dirname(definition_path)
+        table_folder = os.path.dirname(tests_folder)
+        try:
+            with open(definition_path, "r") as f:
+                test_definition = SLTestDefinition.model_validate(yaml.safe_load(f))
+        except Exception as e:
+            logger.debug(f"Skipping {definition_path}: {e}")
+            continue
+
+        foundation_tables_processed: set[str] = set()
+        for foundation in test_definition.foundations:
+            inventory_table = _resolve_foundation_inventory_table(
+                foundation.table_name, inventory
+            )
+            if not inventory_table or inventory_table not in schema_diff_by_table:
+                continue
+            if inventory_table in foundation_tables_processed:
+                continue
+            foundation_tables_processed.add(inventory_table)
+
+            schema_diff = schema_diff_by_table[inventory_table]
+            prod_meta, raw_defs = _production_column_context(inventory_table, inventory, parser)
+            added_defs = {
+                col: raw_defs[col]
+                for col in schema_diff.added
+                if col in raw_defs
+            }
+            if not added_defs:
+                logger.warning(
+                    f"No raw column definitions for added columns on {inventory_table}; skipping foundation DDL"
+                )
+                continue
+
+            ut_ddl_path = os.path.normpath(
+                os.path.join(table_folder, foundation.ddl_for_test.lstrip("./"))
+            )
+            if os.path.exists(ut_ddl_path):
+                with open(ut_ddl_path, "r") as f:
+                    ut_ddl = f.read()
+                updated_ddl, added = merge_added_columns_into_ddl(ut_ddl, added_defs, parser)
+                if added:
+                    with open(ut_ddl_path, "w") as f:
+                        f.write(updated_ddl)
+                    rel = _path_relative_to_pipelines(ut_ddl_path, pipelines_path)
+                    if rel not in seen_ddl:
+                        seen_ddl.add(rel)
+                        result.ddl_paths.append(rel)
+                    logger.info(f"Merged columns {added} into UT DDL {rel}")
+
+            for test_case in test_definition.test_suite:
+                for test_input in test_case.inputs:
+                    if test_input.table_name != foundation.table_name:
+                        continue
+                    if test_input.file_type != "sql":
+                        continue
+                    insert_path = os.path.normpath(
+                        os.path.join(table_folder, test_input.file_name.lstrip("./"))
+                    )
+                    if not os.path.exists(insert_path):
+                        logger.debug(f"Insert file not found: {insert_path}")
+                        continue
+                    with open(insert_path, "r") as f:
+                        insert_sql = f.read()
+                    try:
+                        updated_insert, added = merge_added_columns_into_insert_sql(
+                            insert_sql, schema_diff.added, prod_meta
+                        )
+                    except ValueError as e:
+                        logger.warning(f"Skipping insert merge for {insert_path}: {e}")
+                        continue
+                    if added:
+                        with open(insert_path, "w") as f:
+                            f.write(updated_insert)
+                        rel = _path_relative_to_pipelines(insert_path, pipelines_path)
+                        if rel not in seen_insert:
+                            seen_insert.add(rel)
+                            result.insert_paths.append(rel)
+                        logger.info(f"Merged columns {added} into insert {rel}")
+
+        for test_case in test_definition.test_suite:
+            for test_output in test_case.outputs:
+                if test_output.file_type != "sql":
+                    continue
+                inventory_table = _resolve_foundation_inventory_table(
+                    test_output.table_name, inventory
+                )
+                if not inventory_table or inventory_table not in schema_diff_by_table:
+                    continue
+                schema_diff = schema_diff_by_table[inventory_table]
+                prod_meta, _ = _production_column_context(inventory_table, inventory, parser)
+                validate_path = os.path.normpath(
+                    os.path.join(table_folder, test_output.file_name.lstrip("./"))
+                )
+                if not os.path.exists(validate_path):
+                    logger.debug(f"Validation file not found: {validate_path}")
+                    continue
+                with open(validate_path, "r") as f:
+                    validate_sql = f.read()
+                try:
+                    updated_validate, added = merge_added_columns_into_validation_sql(
+                        validate_sql, schema_diff.added, prod_meta
+                    )
+                except ValueError as e:
+                    logger.warning(f"Skipping validation merge for {validate_path}: {e}")
+                    continue
+                if added:
+                    with open(validate_path, "w") as f:
+                        f.write(updated_validate)
+                    rel = _path_relative_to_pipelines(validate_path, pipelines_path)
+                    if rel not in seen_validate:
+                        seen_validate.add(rel)
+                        result.validate_paths.append(rel)
+                    logger.info(f"Merged columns {added} into validation {rel}")
+
+    return result
 
 
 def list_modified_files(project_path: str,
@@ -473,6 +641,40 @@ def _normalize_modified_files_result(
     return ModifiedFilesResult(
         description=modified_files.get("description", ""),
         file_list=set(entries),
+    )
+
+
+def _build_schema_diff_by_table(
+    modified_files: ModifiedFilesResult,
+    ddl_modified_tables: list[str],
+) -> dict[str, SchemaDiff]:
+    allowed = set(ddl_modified_tables)
+    by_table: dict[str, SchemaDiff] = {}
+    for file_info in modified_files.file_list:
+        if file_info.table_name not in allowed:
+            continue
+        if not file_info.schema_diff or not file_info.schema_diff.added:
+            continue
+        by_table[file_info.table_name] = file_info.schema_diff
+    return by_table
+
+
+def _production_column_context(
+    inventory_table: str,
+    inventory: dict,
+    parser: SQLparser,
+) -> tuple[dict[str, dict], dict[str, str]]:
+    table_ref = inventory.get(inventory_table)
+    if not table_ref or not table_ref.get("ddl_ref"):
+        return {}, {}
+    production_ddl_path = from_pipeline_to_absolute(table_ref["ddl_ref"])
+    if not os.path.exists(production_ddl_path):
+        return {}, {}
+    with open(production_ddl_path, "r") as f:
+        ddl_sql = f.read()
+    return (
+        parser.build_column_metadata_from_sql_content(ddl_sql),
+        parser.extract_raw_column_definitions(ddl_sql),
     )
 
 

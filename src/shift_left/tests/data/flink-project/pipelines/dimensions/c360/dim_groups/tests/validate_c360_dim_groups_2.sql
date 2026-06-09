@@ -1,5 +1,4 @@
-with expected_results as (
-    select 
+with expected_results as (select 
     'group_id' as expected_group_id,    
     'tenant_id' as expected_tenant_id,    
     'group_name' as expected_group_name,    
@@ -11,9 +10,11 @@ with expected_results as (
     
     
     
-    -- union all -- add more union here for each potential test data
-
-),
+    --,
+    'audit_source_1' as expected_audit_source
+    union all
+    -- add more union here for each potential test data,
+    'audit_source_2' as expected_audit_source),
 actual_results as (
     select 
         group_id,
@@ -23,7 +24,8 @@ actual_results as (
         tenant_name,
         created_date,
         is_active,
-        updated_at
+        updated_at,
+        audit_source
         
     from c360_dim_groups_ut
 ),
@@ -47,7 +49,9 @@ validation_check as (
         case when a.tenant_name = e.expected_tenant_name then 'PASS' else 'FAIL' end as tenant_name_check,
         case when a.created_date = e.expected_created_date then 'PASS' else 'FAIL' end as created_date_check,
         case when a.is_active = e.expected_is_active then 'PASS' else 'FAIL' end as is_active_check,
-        case when a.updated_at = e.expected_updated_at then 'PASS' else 'FAIL' end as updated_at_check
+        case when a.updated_at = e.expected_updated_at then 'PASS' else 'FAIL' end as updated_at_check,
+        e.expected_audit_source,
+        case when a.audit_source = e.expected_audit_source then 'PASS' else 'FAIL' end as audit_source_check
     
     from expected_results e
     left join actual_results a on a.group_id = e.expected_group_id -- !!! change the condition here
@@ -55,7 +59,7 @@ validation_check as (
 overall_result as (
     select 
         count(*) as total_expected_records,
-        sum(case when group_id_check = 'PASS' AND tenant_id_check = 'PASS' AND group_name_check = 'PASS' AND group_type_check = 'PASS' AND tenant_name_check = 'PASS' AND created_date_check = 'PASS' AND is_active_check = 'PASS' AND updated_at_check = 'PASS' then 1 else 0 end) as passing_records,
+        sum(case when group_id_check = 'PASS' AND tenant_id_check = 'PASS' AND group_name_check = 'PASS' AND group_type_check = 'PASS' AND tenant_name_check = 'PASS' AND created_date_check = 'PASS' AND is_active_check = 'PASS' AND updated_at_check = 'PASS' AND audit_source_check = 'PASS' then 1 else 0 end) as passing_records,
         (select count(*) from actual_results) as actual_record_count
     from validation_check
 )
