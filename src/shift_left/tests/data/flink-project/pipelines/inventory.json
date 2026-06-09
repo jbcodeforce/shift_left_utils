@@ -1,4 +1,13 @@
 {
+    "No-Table": {
+        "table_name": "No-Table",
+        "product_name": "c360",
+        "type": "view",
+        "dml_ref": "",
+        "ddl_ref": "pipelines/views/c360/user_view/sql-scripts/ddl.c360_mv_user_view.sql",
+        "table_folder_name": "pipelines/views/c360/user_view",
+        "kafka_topic": null
+    },
     "a": {
         "table_name": "a",
         "product_name": "p2",

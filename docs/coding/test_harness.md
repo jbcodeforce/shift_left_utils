@@ -308,8 +308,8 @@ The process looks like:
 	}
 	```
 
-1. [Optional] Data engineer modify the `impacted_tables.json` file to remove any tables they do not want to update.
-1. [Optional] Run the modify Unit test DDLs for the foundation tables
+1. [Optional] Data engineers modify the `impacted_tables.json` file to remove any tables they do not want to update.
+1. [Optional] Run the modify unit test DDLs command to update the test foundation tables:
 	```sh
 	shift_left project update-ut-ddl
 	# ---- same as
@@ -317,6 +317,7 @@ The process looks like:
 	# --- or as 
 	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json $PIPELINES
 	```
+	
 
 ### Unit Test Harness FAQ
 

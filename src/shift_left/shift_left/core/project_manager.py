@@ -295,7 +295,18 @@ def list_modified_files(project_path: str,
                 if "tests" in path_parts[-2]:
                     logger.info(f"Skipping file: {file_path} because it has a parent folder named 'tests'")
                     continue
-                absolute_file_path = project_path + "/" + file_path
+                try:
+                    pipeline_idx = path_parts.index(PIPELINE_FOLDER_NAME)
+                except ValueError:
+                    logger.warning(f"File {file_path} is not under '{PIPELINE_FOLDER_NAME}', skipping")
+                    continue
+                pipeline_relative = os.path.join(*path_parts[pipeline_idx + 1:])
+                if os.path.basename(os.path.normpath(project_path)) == PIPELINE_FOLDER_NAME:
+                    absolute_file_path = os.path.join(project_path, pipeline_relative)
+                else:
+                    absolute_file_path = os.path.join(
+                        project_path, PIPELINE_FOLDER_NAME, pipeline_relative
+                    )
                 if not os.path.exists(absolute_file_path):
                     logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
                     continue
