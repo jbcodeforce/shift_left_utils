@@ -14,7 +14,7 @@ import shutil
 import importlib.resources
 import yaml
 from datetime import timezone
-from typing import Tuple, List, Any, Union
+from typing import Tuple, List, Any, Union, Literal
 from pydantic import BaseModel, Field
 from shift_left.core.models.flink_test_model import SLTestDefinition
 from shift_left.core.test_mgr import TEST_DEFINITION_FILE_NAME
@@ -31,6 +31,12 @@ from shift_left.core.utils.file_search import (
     create_folder_if_not_exist,
 )
 from shift_left.core.utils.sql_parser import SQLparser
+from shift_left.core.utils.ddl_schema_diff import (
+    BaselineMode,
+    SchemaDiff,
+    diff_column_metadata,
+    get_git_baseline_content,
+)
 from jinja2 import Environment, PackageLoader
 import shift_left.core.statement_mgr as statement_mgr
 from shift_left.core.models.flink_statement_model import Statement
@@ -46,6 +52,10 @@ class ModifiedFileInfo(BaseModel):
     same_sql_content: bool = Field(description="Whether the SQL is the same as the running statement")
     running: bool = Field(description="Whether the statement is running")
     new_table_name: str = Field(description="New table name after versioning")
+    schema_diff: SchemaDiff | None = Field(
+        default=None,
+        description="Top-level DDL column changes vs git baseline; set for production DDL files only",
+    )
 
     def __hash__(self) -> int:
         return hash(self.table_name)
@@ -227,7 +237,8 @@ def list_modified_files(project_path: str,
                         branch_name: str,
                         since: str,
                         file_filter: str,
-                        output_file: str) -> ModifiedFilesResult:
+                        output_file: str,
+                        baseline_mode: BaselineMode = "since") -> ModifiedFilesResult:
     """List modified files and return structured result.
 
     Args:
@@ -236,6 +247,7 @@ def list_modified_files(project_path: str,
         since: Date filter for git log (YYYY-MM-DD format)
         file_filter: File extension filter (e.g., '.sql')
         output_file: Optional output file path (for backward compatibility)
+        baseline_mode: DDL baseline for schema diff: 'since' or 'branch'
 
     Returns:
         ModifiedFilesResult: Structured result with description and file list
@@ -282,7 +294,8 @@ def list_modified_files(project_path: str,
         all_modified_files = git_diff_result.stdout.strip().split('\n')
         all_modified_files = [f for f in all_modified_files if f.strip()]  # Remove empty strings
         # Filter for specific file types (default: SQL files)
-        filtered_files = set[str]()
+        # absolute path -> git repo-relative path (for git show baseline)
+        filtered_files: dict[str, str] = {}
         for file_path in all_modified_files:
             lowered_file_path = file_path.lower()
             if file_filter in lowered_file_path and PIPELINE_FOLDER_NAME in lowered_file_path:
@@ -310,7 +323,8 @@ def list_modified_files(project_path: str,
                 if not os.path.exists(absolute_file_path):
                     logger.warning(f"File {absolute_file_path} does not currently exist, skipping")
                     continue
-                filtered_files.add(absolute_file_path)
+                git_repo_path = normalized_path.replace("\\", "/")
+                filtered_files[absolute_file_path] = git_repo_path
 
         print(f"Found {len(all_modified_files)} total modified files")
 
@@ -328,11 +342,17 @@ def list_modified_files(project_path: str,
         file_list = set()
         parser = SQLparser()
         for absolute_file_path in sorted(filtered_files):
+            git_repo_path = filtered_files[absolute_file_path]
             with open(absolute_file_path, 'r') as file:
                 sql_content = file.read()
+                schema_diff = None
                 if "create table" in sql_content.lower() or "create or replace table" in sql_content.lower():
                     table_name = parser.extract_table_name_from_create_statement(sql_content)
                     same_sql, running = False, False
+                    if _is_production_ddl_modification(absolute_file_path):
+                        schema_diff = _compute_ddl_schema_diff(
+                            parser, sql_content, git_repo_path, baseline_mode, since, branch_name
+                        )
                 else:
                     table_name = parser.extract_table_name_from_insert_into_statement(sql_content)
                     if table_name == "No-Table":
@@ -344,7 +364,8 @@ def list_modified_files(project_path: str,
                 file_modified_url=absolute_file_path,
                 same_sql_content=same_sql,
                 running=running,
-                new_table_name=table_name
+                new_table_name=table_name,
+                schema_diff=schema_diff,
             ))
 
         # Create result object
@@ -463,6 +484,37 @@ def _is_production_ddl_modification(file_modified_url: str) -> bool:
     if "/sql-scripts/" not in normalized.replace("\\", "/"):
         return False
     return os.path.basename(normalized).lower().startswith("ddl.")
+
+
+def _compute_ddl_schema_diff(
+    parser: SQLparser,
+    current_sql: str,
+    git_repo_path: str,
+    baseline_mode: BaselineMode,
+    since: str,
+    branch_name: str,
+) -> SchemaDiff | None:
+    """Compare current DDL columns to the git baseline; None if current DDL is not parseable."""
+    new_cols = parser.build_column_metadata_from_sql_content(current_sql)
+    if not new_cols:
+        logger.debug(f"No parseable CREATE TABLE in current DDL: {git_repo_path}")
+        return None
+    try:
+        baseline_sql, baseline_ref = get_git_baseline_content(
+            git_repo_path, baseline_mode, since, branch_name
+        )
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"Could not resolve git baseline for {git_repo_path}: {e}")
+        return None
+    if baseline_mode == "branch" and baseline_sql is None:
+        logger.warning(f"No baseline DDL at branch {branch_name} for {git_repo_path}")
+        return None
+    old_cols = (
+        parser.build_column_metadata_from_sql_content(baseline_sql)
+        if baseline_sql
+        else {}
+    )
+    return diff_column_metadata(old_cols, new_cols, baseline_ref)
 
 
 def _extract_ddl_modified_tables(file_list: set[ModifiedFileInfo]) -> list[str]:

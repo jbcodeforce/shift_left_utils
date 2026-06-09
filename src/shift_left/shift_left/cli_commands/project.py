@@ -24,6 +24,7 @@ from shift_left.core.project_manager import (
 from shift_left.core.utils.secure_typer import create_secure_typer_app
 from shift_left.core import table_analyzer
 from typing_extensions import Annotated
+from typing import Literal
 from rich.console import Console
 from rich.table import Table
 from shift_left.core.utils.ccloud_client import ConfluentCloudClient
@@ -311,7 +312,11 @@ def list_modified_files(
     branch_name: Annotated[str, typer.Argument(help="Git branch name to compare against (e.g., 'main', 'origin/main')")],
     project_path: Annotated[str, typer.Option(help="Project path where git repository is located")] = ".",
     file_filter: Annotated[str, typer.Option(help="File extension filter (e.g., '.sql', '.py')")] = ".sql",
-    since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = "2025-12-01"
+    since: Annotated[str, typer.Option(help="Date from which the files were modified (e.g., 'YYYY-MM-DD')")] = "2025-12-01",
+    baseline: Annotated[
+        Literal["since", "branch"],
+        typer.Option(help="DDL baseline for schema diff: 'since' = file at --since date; 'branch' = file at branch tip"),
+    ] = "since",
 ):
     """
     Get the list of files modified in the current git branch compared to the specified branch.
@@ -322,7 +327,9 @@ def list_modified_files(
     print("#" * 30 + f" List modified files in current branch vs {branch_name}")
     fname =  os.getenv("HOME",'~') + "/.shift_left/" + get_config().get('app', {}).get('modified_flink_files_file_name', 'modified_flink_files.txt')
     long_fname = fname.replace('.txt', '.json')
-    result = project_manager.list_modified_files(project_path, branch_name, since, file_filter, long_fname)
+    result = project_manager.list_modified_files(
+        project_path, branch_name, since, file_filter, long_fname, baseline_mode=baseline
+    )
 
     # Display structured result summary
     print(f"\nSummary:")

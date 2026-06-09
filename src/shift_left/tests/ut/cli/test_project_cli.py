@@ -344,6 +344,12 @@ class TestProjectCLI(BaseUT):
                             stderr="",
                             returncode=0,
                         ),
+                        MagicMock(stdout="abc123\n", stderr="", returncode=0),
+                        MagicMock(
+                            stdout="CREATE TABLE c360_fct_user_per_group (id INT)",
+                            stderr="",
+                            returncode=0,
+                        ),
                     ]
 
                     result = self.runner.invoke(
@@ -365,6 +371,72 @@ class TestProjectCLI(BaseUT):
                     assert "sl_c360_src_users" in content
                     assert "c360_fct_user_per_group" in content
                     mock_get_statement.assert_called()
+                finally:
+                    if old_home is not None:
+                        os.environ["HOME"] = old_home
+                    else:
+                        os.environ.pop("HOME", None)
+
+    @patch("shift_left.core.project_manager.get_git_baseline_content")
+    @patch("shift_left.core.project_manager.subprocess.run")
+    def test_list_modified_files_schema_diff(self, mock_subprocess_run, mock_baseline):
+        """Production DDL modifications include schema_diff with added columns."""
+        mock_baseline.return_value = (
+            "CREATE TABLE sl_raw_transactions (txn_id STRING NOT NULL, amount DECIMAL)",
+            "since:2025-01-01",
+        )
+        with tempfile.TemporaryDirectory() as project_tmp:
+            pipelines = pathlib.Path(project_tmp) / "pipelines"
+            ddl_dir = pipelines / "seeds/common/raw_transactions/sql-scripts"
+            ddl_dir.mkdir(parents=True)
+            ddl_path = ddl_dir / "ddl.raw_transactions.sql"
+            ddl_path.write_text(
+                "CREATE TABLE sl_raw_transactions ("
+                "txn_id STRING NOT NULL, amount DECIMAL, currency STRING)"
+            )
+            with tempfile.TemporaryDirectory() as output_tmp:
+                out_shift_left = pathlib.Path(output_tmp) / ".shift_left"
+                out_shift_left.mkdir()
+                old_home = os.environ.get("HOME")
+                try:
+                    os.environ["HOME"] = output_tmp
+                    json_path = out_shift_left / "modified_flink_files.json"
+                    mock_subprocess_run.side_effect = [
+                        MagicMock(stdout="develop\n", stderr="", returncode=0),
+                        MagicMock(
+                            stdout=(
+                                "pipelines/seeds/common/raw_transactions/sql-scripts/"
+                                "ddl.raw_transactions.sql\n"
+                            ),
+                            stderr="",
+                            returncode=0,
+                        ),
+                    ]
+                    result = self.runner.invoke(
+                        app,
+                        [
+                            "list-modified-files",
+                            "develop",
+                            "--file-filter", ".sql",
+                            "--project-path", project_tmp,
+                            "--since", "2025-01-01",
+                            "--baseline", "since",
+                        ],
+                    )
+                    assert result.exit_code == 0
+                    assert json_path.exists()
+                    payload = json.loads(json_path.read_text())
+                    ddl_entries = [
+                        f for f in payload["file_list"]
+                        if f["table_name"] == "sl_raw_transactions"
+                    ]
+                    assert len(ddl_entries) == 1
+                    schema_diff = ddl_entries[0]["schema_diff"]
+                    assert schema_diff["baseline_ref"] == "since:2025-01-01"
+                    assert schema_diff["added"] == ["currency"]
+                    assert schema_diff["removed"] == []
+                    assert schema_diff["modified"] == []
+                    mock_baseline.assert_called_once()
                 finally:
                     if old_home is not None:
                         os.environ["HOME"] = old_home
