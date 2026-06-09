@@ -245,9 +245,13 @@ The two extremes are:
 1. New column that doesn't have to be propagated. Action: update all test ddls for this table to add the field and do nothing else
 1. Otherwise, do #1 above and update any downstream tables/statements and their test suites.
 
+As an example, suppose at the raw level, two columns were added to the `sl_raw_transactions` and `sl_raw_tenants`:
+
+![](./images/diff-new-columns.png)
+
 The process looks like:
 
-1. Assess the modified SQL from a give date:
+1. Assess the modified SQL from a given date on the `main` git branch:
 	```sh
 	shift_left project list-modified-files --project-path . --file-filter sql --since 2025-09-10 main
 	```
@@ -263,6 +267,14 @@ The process looks like:
 			"same_sql_content": false,
 			"running": false,
 			"new_table_name": "sl_raw_transactions"
+			"schema_diff": {
+				"baseline_ref": "since:2026-06-01",
+				"added": [
+				"created_by",
+				"updated_by"
+				],
+				"removed": [],
+				"modified": []
 			},
 			..
 	```
@@ -317,7 +329,7 @@ The process looks like:
 	# --- or as 
 	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json $PIPELINES
 	```
-	
+
 
 ### Unit Test Harness FAQ
 
