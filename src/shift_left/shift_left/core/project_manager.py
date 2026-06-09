@@ -66,7 +66,7 @@ class ImpactedTablesByModificationsResult(BaseModel):
     ddl_modified_tables: list[str] = Field(
         description="Table names whose production DDL files were modified"
     )
-    tables: list[str] = Field(
+    impacted_tables: list[str] = Field(
         description="Downstream tables (recursive children of DDL-modified tables)"
     )
     production_ddl_paths: list[str] = Field(
@@ -184,7 +184,7 @@ def impacted_tables_by_modifications(
 
     return ImpactedTablesByModificationsResult(
         ddl_modified_tables=sorted(ddl_modified_tables),
-        tables=sorted(tables),
+        impacted_tables=sorted(tables),
         production_ddl_paths=sorted(production_ddl_paths),
         unit_test_ddl_paths=sorted(unit_test_ddl_paths),
     )

@@ -8,6 +8,8 @@ CREATE TABLE `sl_raw_transactions` (
   `location` VARCHAR(255),
   `status` VARCHAR(255),
   `transaction_type` VARCHAR(50),
+  `created_by` VARCHAR(255),
+  `updated_by` VARCHAR(255),
   WATERMARK FOR `timestamp` AS `timestamp` - INTERVAL '5' SECONDS)
 DISTRIBUTED BY HASH(`txn_id`) INTO 6 BUCKETS
 WITH (

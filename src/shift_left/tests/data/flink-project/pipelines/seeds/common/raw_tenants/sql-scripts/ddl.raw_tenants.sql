@@ -6,7 +6,9 @@ create table if not exists sl_raw_tenants (
         server_id INT,
         db STRING,
         `table` STRING,
-        snapshot BOOLEAN
+        snapshot BOOLEAN,
+        created_by STRING,
+        updated_by STRING
     >,
     op STRING,
     ts_ms TIMESTAMP(3),

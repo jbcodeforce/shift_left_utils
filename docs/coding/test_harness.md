@@ -238,12 +238,12 @@ Data engineers may use the csv format to create a lot of records. Now the challe
 
 ### Updating after schema changes
 
-Sometime source tables got their schema modified this will impact the ddl and dml scripts used for testing. An upstream schema change is typically adding new fields. Whenever this occurs, somebody has to decide whether the new columns need to be propagated through various pipelines.
+Sometime source tables got their schema modified, which will impact the ddl and dml scripts used for testing. An upstream schema change is typically adding new fields. Whenever this occurs, somebody has to decide whether the new columns need to be propagated through various pipelines and in the unit tests.
 
 The two extremes are:
 
-1. Simple new column that doesn't have to be propagated. Action: update all test ddls for this table to add the field and do nothing else
-1. New column that we do want to propagate. Action do #1 above and update any downstream tables/statements and their test suites.
+1. New column that doesn't have to be propagated. Action: update all test ddls for this table to add the field and do nothing else
+1. Otherwise, do #1 above and update any downstream tables/statements and their test suites.
 
 The process looks like:
 
@@ -254,11 +254,24 @@ The process looks like:
 
 	This will build a json file `$HOME/.shift_left/modified_flink_files.json` with all the SQL modified.
 
+	```json
+	  { "description": "Modified files in branch:'develop'\nFilter applied: sql\nGenerated on: 2026-05-29 17:38:06\nTotal files: 34",
+		"file_list": [
+			{
+			"table_name": "sl_raw_transactions",
+			"file_modified_url": "/Users/jerome/Documents/Code/shift_left_utils/src/shift_left/tests/data/flink-project/pipelines/seeds/common/raw_transactions/sql-scripts/ddl.raw_transactions.sql",
+			"same_sql_content": false,
+			"running": false,
+			"new_table_name": "sl_raw_transactions"
+			},
+			..
+	```
+
 1. Assess all the impacted tables from the DDLs modified
 	```sh
 	shift_left project  list-impacted-tables
 	# ---- which is the same as:
-	shift_left project  list-impacted-tables
+	shift_left project  list-impacted-tables 
 	 --modified-files-path ~/.shift_left/modified_flink_files.json 
 	# ---- OR:
 	shift_left project  list-impacted-tables
@@ -270,10 +283,39 @@ The process looks like:
 
 	it will produce a file named: `$HOME/.shift_left/impacted_tables.json`
 
-1. [Optional] Data engineer modify this file to remove any tables they do not want to modify.
+	```json
+	{
+		"ddl_modified_tables": [
+			"sl_raw_tenants",
+			"sl_raw_transactions"
+		],
+		"impacted_tables": [
+			"sl_c360_dim_groups",
+			"sl_c360_dim_users",
+			"sl_c360_fct_user_per_group",
+			"sl_cmn_src_tenants"
+		],
+		"production_ddl_paths": [
+			"dimensions/c360/dim_groups/sql-scripts/ddl.c360_dim_groups.sql",
+			"dimensions/c360/dim_users/sql-scripts/ddl.c360_dim_users.sql",
+			"facts/c360/fct_user_per_group/sql-scripts/ddl.c360_fct_user_per_group.sql",
+			"sources/common/src_tenant/sql-scripts/ddl.src_common_tenant.sql"
+		],
+		"unit_test_ddl_paths": [
+			"dimensions/c360/dim_groups/tests/ddl_src_common_tenant.sql",
+			"dimensions/c360/dim_users/tests/ddl_c360_dim_groups.sql"
+		]
+	}
+	```
+
+1. [Optional] Data engineer modify the `impacted_tables.json` file to remove any tables they do not want to update.
 1. [Optional] Run the modify Unit test DDLs for the foundation tables
 	```sh
-	shift_left project modify-unit-test-foundation-tables  ~/.shift_left/impacted_tables.json
+	shift_left project update-ut-ddl
+	# ---- same as
+	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json
+	# --- or as 
+	shift_left project update-ut-ddl  ~/.shift_left/impacted_tables.json $PIPELINES
 	```
 
 ### Unit Test Harness FAQ

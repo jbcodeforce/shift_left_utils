@@ -784,8 +784,8 @@ def _print_impacted_tables_summary(result: ImpactedTablesByModificationsResult) 
     print(f"   DDL-modified tables: {len(result.ddl_modified_tables)}")
     for table_name in result.ddl_modified_tables:
         print(f"      {table_name}")
-    print(f"   Downstream impacted tables: {len(result.tables)}")
-    for table_name in result.tables:
+    print(f"   Downstream impacted tables: {len(result.impacted_tables)}")
+    for table_name in result.impacted_tables:
         print(f"      {table_name}")
     print(f"   Production DDL files: {len(result.production_ddl_paths)}")
     print(f"   Unit-test DDL files: {len(result.unit_test_ddl_paths)}")
