@@ -49,7 +49,7 @@ def get_compute_pool_list(env_id: str = None, region: str = None) -> ComputePool
                     resp=client.make_request(method="GET", url=url, auth_header=auth_header)
                     response = ComputePoolListResponse.model_validate(resp)
                     resp_obj = response
-                logger.info(f"compute pool response as dict= {resp}")
+                logger.debug(f"compute pool response as dict= {resp}")
                 try:
                     if resp_obj.data:
                         for pool in resp_obj.data:
