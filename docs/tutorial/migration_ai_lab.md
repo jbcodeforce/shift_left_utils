@@ -182,7 +182,7 @@ The migration and prompts need to support more examples outside of the classical
 
 We propose two different migrations to illustrate ksql to Flink SQL query migration using the Confluent KsqlDB tutorials and one Spark to Flink SQL.
 
-You should have cloned the `flink_project_demo` repository during [the setup](setup_lab.md/#2--a-demonstration-project).
+You should have cloned the `flink_project_demo` repository during [the setup](setup_lab.md/#2-a-demonstration-project).
 
 ### 1. Project Initialization
 

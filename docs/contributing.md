@@ -174,7 +174,7 @@ We are using [uv](https://docs.astral.sh/uv/) as a new Python package manager. S
 * Fork the `https://github.com/jbcodeforce/shift_left_utils` repo in your github account.
 * Clone your repo to your local computer.
 * Add the upstream repository: see guide for step 1-3 here: [forking a repo](https://help.github.com/articles/fork-a-repo/)
-* Verify you have [set up the pre-requisited](./setup.md#pre-requisites)
+* Verify you have [set up the pre-requisited](./setup.md)
 1. Install [uv](https://github.com/astral-sh/uv) for Python package management
     ```sh
     # Install uv if not already installed

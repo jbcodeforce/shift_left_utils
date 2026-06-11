@@ -211,6 +211,7 @@ def get_or_build_inventory(
                 # extract table name from dml file
                 dml_sql_content=""
                 ddl_sql_content=""
+                upgrade_mode="Stateless"
                 if dml_file_name:
                     with open(dml_file_name, "r") as f:
                         dml_sql_content = f.read()

@@ -3,10 +3,62 @@ Copyright 2024-2025 Confluent, Inc.
 
 Secure Typer wrapper that provides debugging capabilities while sanitizing sensitive information.
 """
+import atexit
 import sys
 import traceback
 import typer
 from .error_sanitizer import sanitize_error_message
+
+_original_termios = None
+_exception_handler_installed = False
+_terminal_restore_registered = False
+
+
+def _save_terminal_attrs() -> None:
+    """Capture terminal settings at startup so they can be restored on exit."""
+    global _original_termios
+    if _original_termios is not None:
+        return
+    if not sys.stdin.isatty():
+        return
+    try:
+        import termios
+
+        _original_termios = termios.tcgetattr(sys.stdin)
+    except Exception:
+        pass
+
+
+def restore_terminal() -> None:
+    """Reset terminal cursor, alt-screen, and termios after Rich/Click usage."""
+    try:
+        from rich.console import Console
+
+        console = Console()
+        console.show_cursor(True)
+        if console.is_alt_screen:
+            console.set_alt_screen(False)
+    except Exception:
+        pass
+
+    global _original_termios
+    if _original_termios is not None and sys.stdin.isatty():
+        try:
+            import termios
+
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, _original_termios)
+        except Exception:
+            pass
+
+
+def _ensure_terminal_restore_registered() -> None:
+    """Register terminal restore once so normal CLI exits return the shell cleanly."""
+    global _terminal_restore_registered
+    if _terminal_restore_registered:
+        return
+    _terminal_restore_registered = True
+    _save_terminal_attrs()
+    atexit.register(restore_terminal)
 
 
 class SecureTyperApp(typer.Typer):
@@ -18,86 +70,8 @@ class SecureTyperApp(typer.Typer):
     """
 
     def __init__(self, *args, **kwargs):
-        # Force show_locals to True for debugging but we'll sanitize the output
-        #kwargs['pretty_exceptions_show_locals'] = True
+        _ensure_terminal_restore_registered()
         super().__init__(*args, **kwargs)
-
-        # Install our custom exception handler
-        self._install_secure_exception_handler()
-
-    def _install_secure_exception_handler(self):
-        """Install a secure exception handler that sanitizes traceback output."""
-
-        # Store the original exception handler
-        original_excepthook = sys.excepthook
-
-        def secure_excepthook(exc_type, exc_value, exc_traceback):
-            """Secure exception handler that sanitizes sensitive information."""
-
-            if issubclass(exc_type, KeyboardInterrupt):
-                # Don't handle keyboard interrupts
-                original_excepthook(exc_type, exc_value, exc_traceback)
-                return
-
-            # Format the full traceback with locals
-            tb_lines = []
-
-            # Add the traceback header
-            tb_lines.append("Traceback (most recent call last):")
-
-            # Process each frame in the traceback
-            tb = exc_traceback
-            while tb is not None:
-                frame = tb.tb_frame
-                filename = frame.f_code.co_filename
-                line_number = tb.tb_lineno
-                function_name = frame.f_code.co_name
-
-                # Add frame information
-                tb_lines.append(f'  File "{filename}", line {line_number}, in {function_name}')
-
-                # Get the source line if possible
-                try:
-                    import linecache
-                    line = linecache.getline(filename, line_number, frame.f_globals)
-                    if line:
-                        tb_lines.append(f'    {line.strip()}')
-                except:
-                    pass
-
-                # Add local variables (sanitized)
-                if frame.f_locals:
-                    tb_lines.append("")
-                    tb_lines.append("  Local variables:")
-                    for var_name, var_value in frame.f_locals.items():
-                        if not var_name.startswith('__'):
-                            # Sanitize the variable value
-                            sanitized_value = sanitize_error_message(repr(var_value))
-                            tb_lines.append(f"    {var_name} = {sanitized_value}")
-
-                tb_lines.append("")
-                tb = tb.tb_next
-
-            # Add the exception message (sanitized)
-            exception_msg = sanitize_error_message(str(exc_value))
-            tb_lines.append(f"{exc_type.__name__}: {exception_msg}")
-
-            # Print the sanitized traceback
-            sanitized_traceback = "\n".join(tb_lines)
-            final_output = sanitize_error_message(sanitized_traceback)
-
-            print(final_output, file=sys.stderr)
-
-        # Install our secure exception handler
-        sys.excepthook = secure_excepthook
-
-    def __call__(self, *args, **kwargs):
-        """Override the call method to ensure our exception handler is active."""
-        try:
-            return super().__call__(*args, **kwargs)
-        except Exception as e:
-            # This will be handled by our secure exception handler
-            raise
 
 
 def create_secure_typer_app(*args, **kwargs) -> SecureTyperApp:
@@ -114,40 +88,36 @@ def create_secure_typer_app(*args, **kwargs) -> SecureTyperApp:
     return SecureTyperApp(*args, **kwargs)
 
 
-def install_secure_exception_handler():
+def install_secure_exception_handler() -> None:
     """
     Install a global secure exception handler.
 
     This can be called independently to secure any Python application,
-    not just Typer apps.
+    not just Typer apps. Safe to call more than once.
     """
-    original_excepthook = sys.excepthook
+    global _exception_handler_installed
+    _ensure_terminal_restore_registered()
+    if _exception_handler_installed:
+        return
+    _exception_handler_installed = True
 
     def secure_global_excepthook(exc_type, exc_value, exc_traceback):
         """Global secure exception handler."""
-
         if issubclass(exc_type, KeyboardInterrupt):
-            original_excepthook(exc_type, exc_value, exc_traceback)
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            restore_terminal()
             return
 
-        # Create a sanitized traceback
         try:
-            # Get the formatted traceback
             tb_strings = traceback.format_exception(exc_type, exc_value, exc_traceback)
-
-            # Sanitize each line
             sanitized_lines = []
             for line in tb_strings:
-                sanitized_line = sanitize_error_message(line)
-                sanitized_lines.append(sanitized_line)
-
-            # Print the sanitized traceback
-            sanitized_output = "".join(sanitized_lines)
-            print(sanitized_output, file=sys.stderr)
-
+                sanitized_lines.append(sanitize_error_message(line))
+            print("".join(sanitized_lines), file=sys.stderr)
         except Exception:
-            # Fallback: sanitize just the exception message
             fallback_msg = sanitize_error_message(f"Error: {exc_value}")
             print(fallback_msg, file=sys.stderr)
+        finally:
+            restore_terminal()
 
     sys.excepthook = secure_global_excepthook

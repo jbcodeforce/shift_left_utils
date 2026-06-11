@@ -158,7 +158,7 @@ The `src/shift_left/tests/data` folder includes a dbt project used to demonstrat
     shift_left project init demo-flink-project ~/Code
     ```
 
-1. Modify the config.yaml file to reflect the Confluent Cloud environment. [See dedicated note on the config.yaml](./setup.md/#set-up-configyaml-file), but for migration the only important parameters are:
+1. Modify the config.yaml file to reflect the Confluent Cloud environment. [See dedicated note on the config.yaml](./setup.md/#configuration-file-setup), but for migration the only important parameters are:
     ```yaml
     confluent_cloud:
     flink:

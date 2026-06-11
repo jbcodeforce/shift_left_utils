@@ -5,6 +5,7 @@ Unit tests for error sanitization and security features.
 This test suite validates that sensitive information is properly masked 
 in error messages, exception outputs, and log files.
 """
+import sys
 import unittest
 import tempfile
 import os
@@ -286,6 +287,38 @@ class TestSecureLogging(BaseUT):
         # Should sanitize sensitive data
         self.assertNotIn('sk-test123456789', formatted)
         self.assertIn('***MASKED***', formatted)
+
+
+class TestSecureTyper(BaseUT):
+    """Test secure Typer helper behavior."""
+
+    def test_install_secure_exception_handler_is_idempotent(self):
+        """Repeated installs must not stack or replace the handler chain."""
+        from shift_left.core.utils import secure_typer as st
+
+        st._exception_handler_installed = False
+        st._terminal_restore_registered = False
+        st._original_termios = None
+
+        install = st.install_secure_exception_handler
+        install()
+        first_hook = sys.excepthook
+        install()
+        self.assertIs(sys.excepthook, first_hook)
+
+    def test_excepthook_sanitizes_and_restores_terminal(self):
+        """Unhandled exceptions go through the secure hook without leaking secrets."""
+        from shift_left.core.utils.secure_typer import install_secure_exception_handler
+
+        install_secure_exception_handler()
+        with patch("shift_left.core.utils.secure_typer.restore_terminal") as restore:
+            with patch("sys.stderr", new=MagicMock()):
+                sys.excepthook(
+                    ValueError,
+                    ValueError("api_key=sk-1234567890abcdef"),
+                    None,
+                )
+            restore.assert_called_once()
 
 
 class TestTyperSecurityConfiguration(BaseUT):
