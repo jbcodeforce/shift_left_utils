@@ -1,3 +1,17 @@
+## [0.1.52] - 2026-06-25
+
+### Changes:
+- 9461901 Merge branch 'main' into develop
+- f2066ee refactor unit and integration tests, to improve coverage and avoid overlap. Putting priority to cli
+- fd1bbd7 add delete compute pool by ids
+- 1690eb5 modified raw tenant and tx
+- f2f656a update to the doc for test harness
+- 7235b74 extract impacted columns too, when running project list-modified-files
+- 3a05614 add a diff diagram
+- 73f5155 Merge branch 'develop' of https://github.com/jbcodeforce/shift_left_utils into develop
+- 221e23b dev the update-ut-ddl, with unit tests successful
+- 56fb16a update to DE tutorial
+
 ## [0.1.51] - 2026-05-28
 
 ### Changes:

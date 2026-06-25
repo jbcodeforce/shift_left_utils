@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 from .error_sanitizer import sanitize_error_message
 
 BASE_CC_API = "api.confluent.cloud/org/v2"
-__version__ = "0.1.51"
+__version__ = "0.1.52"
 
 class SecureFormatter(logging.Formatter):
     """
