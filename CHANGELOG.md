@@ -2,7 +2,13 @@
 
 ### next
 
+### v0.1.52 2026-06-20
+
 * Project delete-compute-pool now includes a parameter to reference a file with the list of compute pool to delete.
+* refactor unit and integration tests, to improve coverage and avoid overlap. Putting priority to cli
+- add delete compute pool by ids
+- extract impacted columns too, when running project list-modified-files
+- Add command to assess impact on tests from a change to an upstream table definition (or schema update).
 
 ### v0.1.51 2026-05-28
 
